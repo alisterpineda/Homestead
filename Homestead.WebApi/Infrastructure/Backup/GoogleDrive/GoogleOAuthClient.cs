@@ -120,17 +120,25 @@ public class GoogleOAuthClient(HttpClient httpClient, TimeProvider timeProvider,
             // grant that is probably fine.
             if (GrantsDriveFile(body) is false)
             {
-                // Hand the useless authorization straight back before failing. Google does not invalidate
-                // it on its own, so walking away would strand a live credential in the user's security
-                // page forever — and worse, Google REMEMBERS the consent decision: the retry this message
-                // asks for could be answered from the remembered scope-less grant without ever showing the
-                // checkbox again, leaving the operator unable to follow the only fix there is. Best-effort,
-                // exactly as every other revocation here.
-                if (ReadString(body, "refresh_token") is { Length: > 0 } orphaned)
-                    await RevokeAsync(orphaned, ct);
-
+                // The useless authorization is live whether we want it or not. Google does not invalidate
+                // it on its own, so walking away strands a credential in the user's security page — and
+                // worse, Google REMEMBERS the consent decision: the retry this message asks for could be
+                // answered from the remembered scope-less grant without ever showing the checkbox again,
+                // leaving the operator unable to follow the only fix there is.
+                //
+                // It is still NOT revoked here. /revoke is GRANT-scoped, not token-scoped: it drops every
+                // token this client holds for that account. This method has no idea whether a live grant is
+                // already on file for the target being connected, so revoking from here turns a mis-ticked
+                // reconnect — or a second target sharing this client and account — into a dead mirror. The
+                // token travels out on the exception for the caller, which does know, to hand back.
+                //
+                // Access token as the fallback: /revoke takes either, and a grant that came back without a
+                // refresh token is just as remembered.
                 throw new GoogleDriveAuthException(
-                    "insufficient_scope", GoogleDriveAuthMessages.InsufficientScope);
+                    "insufficient_scope", GoogleDriveAuthMessages.InsufficientScope)
+                {
+                    OrphanedToken = ReadString(body, "refresh_token") ?? ReadString(body, "access_token"),
+                };
             }
 
             var grant = ReadGrant(body, existingRefreshToken: null);

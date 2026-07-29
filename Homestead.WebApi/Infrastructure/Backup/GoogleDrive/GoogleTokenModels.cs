@@ -60,6 +60,17 @@ public class GoogleDriveAuthException(string errorCode, string message) : Except
 {
     /// <summary>The OAuth error code (e.g. <c>invalid_grant</c>). Safe to log — unlike the body it came in.</summary>
     public string ErrorCode { get; } = errorCode;
+
+    /// <summary>
+    /// A live credential this failure means we will never use, for the caller to hand back to Google.
+    /// </summary>
+    /// <remarks>
+    /// Carried out rather than revoked where it is discovered, because whether revoking is <i>safe</i> is
+    /// not knowable there: Google's <c>/revoke</c> is GRANT-scoped, so it drops every token this client
+    /// holds for that account. Only the caller knows whether a live grant is already on file for the
+    /// target — and revoking then takes out a working mirror rather than one stale token.
+    /// </remarks>
+    public string? OrphanedToken { get; init; }
 }
 
 /// <summary>Wording shared by two detectors of one fault.</summary>

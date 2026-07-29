@@ -162,8 +162,12 @@ public class GoogleOAuthClientTests
     // The rejected authorization is live whether we want it or not: Google does not invalidate it, and it
     // remembers the consent decision — so an un-revoked one both strands a credential in the user's
     // security page and can be handed straight back on the retry, without the checkbox ever reappearing.
+    //
+    // It travels out on the exception rather than being revoked here, because /revoke is GRANT-scoped and
+    // this method cannot know whether a live grant is already on file for the target being connected. The
+    // caller decides; revoking from here would kill a mis-ticked reconnect's working mirror.
     [Fact]
-    public async Task PollDeviceToken_GrantedWithoutTheDriveScope_HandsTheUselessGrantBack()
+    public async Task PollDeviceToken_GrantedWithoutTheDriveScope_CarriesTheUselessGrantOutForTheCaller()
     {
         var (client, handler) = CreateSut();
         handler.QueueOk("""
@@ -171,12 +175,29 @@ public class GoogleOAuthClientTests
              "scope":"https://www.googleapis.com/auth/userinfo.email"}
             """);
 
-        await Assert.ThrowsAsync<GoogleDriveAuthException>(() =>
+        var ex = await Assert.ThrowsAsync<GoogleDriveAuthException>(() =>
             client.PollDeviceTokenAsync("id", "secret", "dc", TestContext.Current.CancellationToken));
 
-        Assert.Equal(2, handler.CallCount);
-        Assert.Contains("revoke", handler.RequestUrls[1]);
-        Assert.Contains("token=rt", handler.RequestBodies[1]);
+        Assert.Equal("rt", ex.OrphanedToken);
+        Assert.Equal(1, handler.CallCount);
+    }
+
+    // /revoke takes an access token as happily as a refresh token, and a scope-less grant that came back
+    // without one is just as remembered by Google — so there is still something to hand back.
+    [Fact]
+    public async Task PollDeviceToken_ScopelessWithNoRefreshToken_StillCarriesSomethingToRevoke()
+    {
+        var (client, handler) = CreateSut();
+        handler.QueueOk("""
+            {"access_token":"at","expires_in":3600,
+             "scope":"https://www.googleapis.com/auth/userinfo.email"}
+            """);
+
+        var ex = await Assert.ThrowsAsync<GoogleDriveAuthException>(() =>
+            client.PollDeviceTokenAsync("id", "secret", "dc", TestContext.Current.CancellationToken));
+
+        Assert.Equal("insufficient_scope", ex.ErrorCode);
+        Assert.Equal("at", ex.OrphanedToken);
     }
 
     [Fact]

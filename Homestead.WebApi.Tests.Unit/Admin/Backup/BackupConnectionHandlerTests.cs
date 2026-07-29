@@ -280,6 +280,126 @@ public class BackupConnectionHandlerTests : IDisposable
         Assert.Equal(BackupConnectStatus.Connected, response.Status);
     }
 
+    // Nothing was stored, so Disconnect — which revokes only what IS stored — could never reach this token
+    // again. Safe to revoke because the grant-scoped /revoke has no live grant here to collateral-damage.
+    [Fact]
+    public async Task Poll_AFailedProbeOnAFirstConnect_HandsTheGrantBack()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        _oauth.PollDeviceTokenAsync("client-id", "client-secret", "dc", Arg.Any<CancellationToken>())
+            .Returns(new GoogleDevicePollResult(GoogleDevicePollStatus.Granted, Grant()));
+        _accounts.GetAccountInfoAsync("at", Arg.Any<CancellationToken>())
+            .Returns<GoogleDriveAccountInfo>(_ => throw new GoogleDriveAuthException(
+                "service_disabled", "The Google Drive API is not enabled for this project."));
+
+        // The classified diagnosis must survive the revoke — it is the entire evidence trail.
+        var ex = await Assert.ThrowsAsync<GoogleDriveAuthException>(() => Poll().Handle(
+            new PollBackupTargetConnectionCommand(TargetKey, ValidPollToken()), ct));
+
+        Assert.Equal("service_disabled", ex.ErrorCode);
+        await _oauth.Received(1).RevokeAsync("rt", Arg.Any<CancellationToken>());
+    }
+
+    // The regression test for the destructive version of this fix: /revoke is GRANT-scoped, so with a grant
+    // already on file — and the probe that would have named the account being the thing that just failed —
+    // revoking would take out a working mirror. One throttled second must not cost the connection.
+    [Fact]
+    public async Task Poll_AFailedProbeWhileAlreadyConnected_KeepsTheStoredGrant()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await _store.SaveAsync(TargetKey, Grant("original-rt"), "owner@example.test", ct);
+
+        _oauth.PollDeviceTokenAsync("client-id", "client-secret", "dc", Arg.Any<CancellationToken>())
+            .Returns(new GoogleDevicePollResult(GoogleDevicePollStatus.Granted, Grant("second-rt")));
+        _accounts.GetAccountInfoAsync("at", Arg.Any<CancellationToken>())
+            .Returns<GoogleDriveAccountInfo>(_ => throw new GoogleDriveAuthException(
+                "service_disabled", "The Google Drive API is not enabled for this project."));
+
+        await Assert.ThrowsAsync<GoogleDriveAuthException>(() => Poll().Handle(
+            new PollBackupTargetConnectionCommand(TargetKey, ValidPollToken()), ct));
+
+        await _oauth.DidNotReceive().RevokeAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+
+        var read = await _store.ReadAsync(TargetKey, ct);
+        Assert.Equal("original-rt", read.Grant!.RefreshToken);
+        Assert.Equal("owner@example.test", read.ConnectedAccountEmail);
+    }
+
+    // Drive answers throttling with a 403 that 0f3389d3 deliberately surfaces as HttpRequestException. The
+    // authorization is fine, so it is neither revoked nor reported as an auth fault — and a 400 reaches the
+    // dialog's error stage with a working "Try again", where a 500 would only auto-toast.
+    [Fact]
+    public async Task Poll_AThrottledProbe_ReportsATryAgainAndRevokesNothing()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        _oauth.PollDeviceTokenAsync("client-id", "client-secret", "dc", Arg.Any<CancellationToken>())
+            .Returns(new GoogleDevicePollResult(GoogleDevicePollStatus.Granted, Grant()));
+        _accounts.GetAccountInfoAsync("at", Arg.Any<CancellationToken>())
+            .Returns<GoogleDriveAccountInfo>(_ => throw new HttpRequestException("rate limit exceeded"));
+
+        var ex = await Assert.ThrowsAsync<BusinessRuleException>(() => Poll().Handle(
+            new PollBackupTargetConnectionCommand(TargetKey, ValidPollToken()), ct));
+
+        Assert.Contains("Could not reach Google", ex.Message);
+        await _oauth.DidNotReceive().RevokeAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    // A consent approved without the Drive tickbox fails at the token exchange, before the probe exists to
+    // fail. Nothing is stored, so the same gate that makes the probe's revoke safe applies — and Google
+    // REMEMBERS the decision, so an un-revoked scope-less grant can answer the retry the message asks for
+    // without the checkbox ever reappearing.
+    [Fact]
+    public async Task Poll_AScopelessConsentOnAFirstConnect_HandsTheGrantBack()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        _oauth.PollDeviceTokenAsync("client-id", "client-secret", "dc", Arg.Any<CancellationToken>())
+            .Returns<GoogleDevicePollResult>(_ => throw new GoogleDriveAuthException(
+                "insufficient_scope", "no Drive access") { OrphanedToken = "scopeless-rt" });
+
+        var ex = await Assert.ThrowsAsync<GoogleDriveAuthException>(() => Poll().Handle(
+            new PollBackupTargetConnectionCommand(TargetKey, ValidPollToken()), ct));
+
+        Assert.Equal("insufficient_scope", ex.ErrorCode);
+        await _oauth.Received(1).RevokeAsync("scopeless-rt", Arg.Any<CancellationToken>());
+    }
+
+    // The destructive shape, one layer down from the probe: /revoke is GRANT-scoped, so a mis-ticked
+    // reconnect of a target that already has a grant on file must not hand anything back — the scope-less
+    // token may well sit on the very grant the mirror runs on.
+    [Fact]
+    public async Task Poll_AScopelessConsentWhileAlreadyConnected_KeepsTheStoredGrant()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await _store.SaveAsync(TargetKey, Grant("original-rt"), "owner@example.test", ct);
+
+        _oauth.PollDeviceTokenAsync("client-id", "client-secret", "dc", Arg.Any<CancellationToken>())
+            .Returns<GoogleDevicePollResult>(_ => throw new GoogleDriveAuthException(
+                "insufficient_scope", "no Drive access") { OrphanedToken = "scopeless-rt" });
+
+        await Assert.ThrowsAsync<GoogleDriveAuthException>(() => Poll().Handle(
+            new PollBackupTargetConnectionCommand(TargetKey, ValidPollToken()), ct));
+
+        await _oauth.DidNotReceive().RevokeAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+
+        var read = await _store.ReadAsync(TargetKey, ct);
+        Assert.Equal("original-rt", read.Grant!.RefreshToken);
+    }
+
+    // Every other exchange failure carries no orphaned token, and must not be routed through the revoke arm.
+    [Fact]
+    public async Task Poll_AnExchangeFailureWithNothingToHandBack_RevokesNothing()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        _oauth.PollDeviceTokenAsync("client-id", "client-secret", "dc", Arg.Any<CancellationToken>())
+            .Returns<GoogleDevicePollResult>(_ =>
+                throw new GoogleDriveAuthException("invalid_client", "bad client"));
+
+        await Assert.ThrowsAsync<GoogleDriveAuthException>(() => Poll().Handle(
+            new PollBackupTargetConnectionCommand(TargetKey, ValidPollToken()), ct));
+
+        await _oauth.DidNotReceive().RevokeAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
     [Fact]
     public async Task Poll_ATamperedOrExpiredTokenIsRefused()
     {
