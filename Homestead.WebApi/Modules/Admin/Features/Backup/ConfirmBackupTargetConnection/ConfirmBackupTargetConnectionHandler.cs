@@ -26,11 +26,25 @@ namespace Homestead.WebApi.Modules.Admin.Features.Backup.ConfirmBackupTargetConn
 /// The old mirror is deliberately left where it is. The target is one-way and nothing enumerates it; the
 /// files remain in the previous account, for its owner to delete by hand.
 /// </para>
+/// <para>
+/// <b>The authorization we walk away from is handed back.</b> Google's <c>/revoke</c> is grant-scoped
+/// rather than token-scoped — it drops every token this client holds for that account — which is exactly
+/// why this is one of the few places it is safe to call: the account we are leaving is by definition not
+/// the account we just stored, so this target has nothing left on that grant to take out.
+/// </para>
+/// <para>
+/// <b>This target.</b> A grant is per account-plus-client while the switch is per target, so a second Drive
+/// target sharing this OAuth client and still connected to the account being left behind loses its grant
+/// too. Pre-existing in shape (<c>DisconnectBackupTargetHandler</c> revokes unconditionally and has always
+/// had this), recoverable by reconnecting that target, and not narrowed here: config owns the client id and
+/// nothing in the schema records which grant a token belongs to.
+/// </para>
 /// </remarks>
 public class ConfirmBackupTargetConnectionHandler(
     AppDbContext db,
     IBackupTargetResolver resolver,
     IGoogleDriveGrantStore grantStore,
+    IGoogleOAuthClient oauth,
     IGoogleDriveConnectTokenProtector protector,
     GoogleDriveTokenManager tokenManager,
     IAuditContext audit,
@@ -53,6 +67,11 @@ public class ConfirmBackupTargetConnectionHandler(
 
         if (!string.Equals(pending.TargetKey, target.Key, StringComparison.OrdinalIgnoreCase))
             throw new BusinessRuleException("This connection attempt belongs to a different backup target.");
+
+        // Read before the store overwrites it: the outgoing refresh token is the only handle on the
+        // authorization this switch abandons. A DecryptFailed read yields a null Grant, which needs no
+        // special case — a token we cannot read is a token we cannot revoke either.
+        var outgoing = await grantStore.ReadAsync(target.Key, ct);
 
         // The pairings writing to this target — the join the state rows have no column for, since they
         // key off the pairing rather than the destination.
@@ -92,13 +111,26 @@ public class ConfirmBackupTargetConnectionHandler(
         await grantStore.SaveAsync(target.Key, pending.Grant, pending.AccountEmail, ct);
         tokenManager.Invalidate(target.Key);
 
+        // After the commit, never inline. This command bulk-deletes copy records and upload sessions before
+        // it gets here, so a rollback anywhere restores the old grant — and revoking inline would leave that
+        // restored grant pointing at a token already killed, a dead target with nothing on the card to say
+        // why.
+        //
+        // The token comparison is load-bearing, not defensive noise: a pending token stays valid for its
+        // whole ten-minute window and carries no single-use marker, so a double-clicked "Switch account"
+        // replays this command with the grant it already stored — and an unguarded revoke would kill the
+        // live connection it just made. Ordinal, because these are opaque credential strings.
+        if (outgoing.Grant is { } abandoned
+            && !string.Equals(abandoned.RefreshToken, pending.Grant.RefreshToken, StringComparison.Ordinal))
+            unitOfWork.OnAfterCommit(_ => RevokeAbandonedAsync(abandoned.RefreshToken, target.Key));
+
         // The target key is the identity here, so the audit id is derived from it the same way settings
         // rows do — audit entities are Guid-keyed and a config key is not.
         audit.TrackScalar(
             "BackupTarget",
             DeterministicGuid.FromKey(target.Key),
             "ConnectedAccountEmail",
-            oldValue: null,
+            oldValue: outgoing.ConnectedAccountEmail,
             newValue: pending.AccountEmail);
 
         await unitOfWork.SaveChangesAsync(ct);
@@ -109,5 +141,30 @@ public class ConfirmBackupTargetConnectionHandler(
 
         return new ConfirmBackupTargetConnectionResponse(
             target.Key, pending.AccountEmail, resetCopyCount);
+    }
+
+    /// <summary>
+    /// Hands the abandoned authorization back, without ever letting that failure read as the switch failing.
+    /// </summary>
+    /// <remarks>
+    /// Its own try/catch on top of <see cref="IGoogleOAuthClient.RevokeAsync"/>'s, which is best-effort for
+    /// transport failures only. This runs as an after-commit hook, so anything else escaping it would turn a
+    /// switch that has already been committed into a 500 — reporting a failure that did not happen, for a
+    /// courtesy call that cannot be retried anyway. <see cref="CancellationToken.None"/> because RevokeAsync
+    /// swallows TaskCanceledException: honouring the request token would silently no-op in exactly the case
+    /// that produces this path most often, the admin closing the tab.
+    /// </remarks>
+    private async Task RevokeAbandonedAsync(string refreshToken, string targetKey)
+    {
+        try
+        {
+            await oauth.RevokeAsync(refreshToken, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex,
+                "Could not revoke the Google authorization backup target {TargetKey} switched away from; it " +
+                "may linger in that account's third-party access page", targetKey);
+        }
     }
 }

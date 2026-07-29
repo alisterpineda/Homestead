@@ -72,6 +72,10 @@ public class BackupConnectionHandlerTests : IDisposable
         _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
             .Returns(ci => _db.SaveChangesAsync(ci.Arg<CancellationToken>()));
 
+        // Drain after-commit hooks synchronously, mirroring a successful commit, so deferred side effects run.
+        _unitOfWork.When(u => u.OnAfterCommit(Arg.Any<Func<CancellationToken, Task>>()))
+            .Do(ci => ci.Arg<Func<CancellationToken, Task>>()(CancellationToken.None).GetAwaiter().GetResult());
+
         _options.Get(Arg.Any<string>()).Returns(new BackupTargetOptions
         {
             Kind = BackupTargetKind.GoogleDrive,
@@ -113,7 +117,7 @@ public class BackupConnectionHandlerTests : IDisposable
         NullLogger<PollBackupTargetConnectionHandler>.Instance);
 
     private ConfirmBackupTargetConnectionHandler Confirm() => new(
-        _db, _resolver, _store, _protector, _tokenManager, _audit, _unitOfWork,
+        _db, _resolver, _store, _oauth, _protector, _tokenManager, _audit, _unitOfWork,
         NullLogger<ConfirmBackupTargetConnectionHandler>.Instance);
 
     private DisconnectBackupTargetHandler Disconnect() => new(
@@ -362,6 +366,66 @@ public class BackupConnectionHandlerTests : IDisposable
         var read = await _store.ReadAsync(TargetKey, ct);
         Assert.Equal("second-rt", read.Grant!.RefreshToken);
         Assert.Equal("second@example.test", read.ConnectedAccountEmail);
+    }
+
+    // A switch abandons the old account's authorization outright, and Google never invalidates it on its
+    // own. Safe to revoke precisely here: /revoke is grant-scoped, and this grant belongs to an account we
+    // are provably no longer using.
+    [Fact]
+    public async Task Confirm_RevokesTheAccountItSwitchedAwayFrom()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await _store.SaveAsync(TargetKey, Grant("original-rt"), "first@example.test", ct);
+
+        var pending = _protector.ProtectPending(new GoogleConnectPendingGrant(
+            TargetKey, Grant("second-rt"), "second@example.test", Now.AddMinutes(10)));
+
+        await Confirm().Handle(new ConfirmBackupTargetConnectionCommand(TargetKey, pending), ct);
+
+        await _oauth.Received(1).RevokeAsync("original-rt", Arg.Any<CancellationToken>());
+
+        // And the token that replaced it is emphatically not the one revoked.
+        var read = await _store.ReadAsync(TargetKey, ct);
+        Assert.Equal("second-rt", read.Grant!.RefreshToken);
+        await _oauth.DidNotReceive().RevokeAsync("second-rt", Arg.Any<CancellationToken>());
+    }
+
+    // A pending token is valid for its whole window and carries no single-use marker, so a double-clicked
+    // "Switch account" arrives twice. The second pass finds its OWN grant stored — revoking it would take
+    // out the connection it just made.
+    [Fact]
+    public async Task Confirm_ReplayedWithTheSamePendingToken_DoesNotRevokeWhatItJustStored()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await _store.SaveAsync(TargetKey, Grant("original-rt"), "first@example.test", ct);
+
+        var pending = _protector.ProtectPending(new GoogleConnectPendingGrant(
+            TargetKey, Grant("second-rt"), "second@example.test", Now.AddMinutes(10)));
+
+        await Confirm().Handle(new ConfirmBackupTargetConnectionCommand(TargetKey, pending), ct);
+        await Confirm().Handle(new ConfirmBackupTargetConnectionCommand(TargetKey, pending), ct);
+
+        await _oauth.Received(1).RevokeAsync("original-rt", Arg.Any<CancellationToken>());
+        await _oauth.DidNotReceive().RevokeAsync("second-rt", Arg.Any<CancellationToken>());
+
+        var read = await _store.ReadAsync(TargetKey, ct);
+        Assert.Equal("second-rt", read.Grant!.RefreshToken);
+    }
+
+    // The mismatch that mints a pending token needs a stored EMAIL, not a readable grant — so Confirm can
+    // arrive with nothing to hand back (disconnected from another tab, or a grant that will not decrypt).
+    // Revoking is skipped rather than guessed at.
+    [Fact]
+    public async Task Confirm_WithNothingPreviouslyStored_RevokesNothing()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        var pending = _protector.ProtectPending(new GoogleConnectPendingGrant(
+            TargetKey, Grant("first-rt"), "first@example.test", Now.AddMinutes(10)));
+
+        await Confirm().Handle(new ConfirmBackupTargetConnectionCommand(TargetKey, pending), ct);
+
+        await _oauth.DidNotReceive().RevokeAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
