@@ -76,6 +76,19 @@ public class GoogleDriveAccountClientTests
         Assert.Null(info.StorageLimitBytes);
     }
 
+    // A proxy's creative idea of JSON must not escape as an unclassifiable 500 from a raw GetString().
+    [Fact]
+    public async Task GetAccountInfo_ANonStringEmailAddress_ReadsAsAbsentRatherThanThrowing()
+    {
+        var (client, handler) = CreateSut();
+        handler.QueueOk("""{"user":{"emailAddress":42},"storageQuota":{"usage":"5"}}""");
+
+        var info = await client.GetAccountInfoAsync("at", TestContext.Current.CancellationToken);
+
+        Assert.Null(info.EmailAddress);
+        Assert.Equal(5, info.StorageUsedBytes);
+    }
+
     // --- The 403 that means "enable an API" -----------------------------------------------------------
 
     // The setup mistake this whole classification exists for. Every OAuth step succeeds — codes, consent,

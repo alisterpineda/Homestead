@@ -21,6 +21,14 @@ public record GoogleDriveAccountInfo(
 /// </remarks>
 public interface IGoogleDriveAccountClient
 {
+    /// <summary>Reads the connected account's address and quota.</summary>
+    /// <exception cref="GoogleDriveAuthException">
+    /// The authorization (or the Cloud project behind it) needs an operator: a rejected token, a Drive API
+    /// that was never enabled, a consent without the Drive scope. Callers <b>latch</b> the target on this.
+    /// </exception>
+    /// <exception cref="HttpRequestException">
+    /// A transient failure, <b>including Drive's throttling 403s</b>. Must NOT be treated as a dead grant.
+    /// </exception>
     Task<GoogleDriveAccountInfo> GetAccountInfoAsync(string accessToken, CancellationToken ct);
 }
 
@@ -52,12 +60,9 @@ public class GoogleDriveAccountClient(HttpClient httpClient, ILogger<GoogleDrive
         using var document = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
         var root = document.RootElement;
 
-        string? email = null;
-        if (root.TryGetProperty("user", out var user)
-            && user.TryGetProperty("emailAddress", out var emailValue))
-        {
-            email = emailValue.GetString();
-        }
+        // Through ReadString rather than a raw GetString(): that one throws on a value that is not a string,
+        // which would leave a proxy's creative idea of JSON escaping as an unclassifiable 500.
+        var email = root.TryGetProperty("user", out var user) ? ReadString(user, "emailAddress") : null;
 
         long? usage = null;
         long? limit = null;
