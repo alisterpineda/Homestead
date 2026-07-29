@@ -865,11 +865,15 @@ public sealed class GoogleDriveBackupTarget : IBackupTarget, IBackupTargetCache,
         _ => exception
     };
 
-    private static bool IsOutOfSpace(GoogleApiException ex) => HasReason(ex, "storageQuotaExceeded");
+    // Both lists are shared with the about.get probe, which classifies the same 403s from the raw JSON
+    // rather than through the SDK: one of them reading a reason as transient while the other reads it as a
+    // dead authorization is how a throttled minute would latch a working target as disconnected.
+    private static bool IsOutOfSpace(GoogleApiException ex) =>
+        HasReason(ex, GoogleDriveErrorReasons.OutOfSpace);
 
     private static bool IsRateLimited(GoogleApiException ex) =>
         ex.HttpStatusCode == HttpStatusCode.TooManyRequests
-        || HasReason(ex, "userRateLimitExceeded", "rateLimitExceeded", "quotaExceeded");
+        || HasReason(ex, GoogleDriveErrorReasons.Throttling);
 
     private static bool HasReason(GoogleApiException ex, params string[] reasons) =>
         ex.Error?.Errors?.Any(e => reasons.Contains(e.Reason, StringComparer.Ordinal)) == true;

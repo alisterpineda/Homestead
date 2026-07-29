@@ -97,6 +97,10 @@ dotnet user-secrets set "Backup:Targets:gdrive:ClientSecret" "<secret>"
 Then, in the app: **Admin → Backup → Connect Google account** on that target's card, and follow the
 code. Config names the client; the grant is minted by a human and stored (encrypted) in the database.
 
+> **On the approval screen, tick the Google Drive permission.** It is a checkbox, and Google does not
+> tick it for you. Approving without it issues a perfectly valid authorization that carries no Drive
+> access, and the flow otherwise looks like it worked.
+
 Finally, add a backup on the card — the pairing of *what* to mirror with *where* — and optionally a
 schedule.
 
@@ -129,6 +133,8 @@ schedule.
 | `invalid_client` when connecting | The client id or secret does not match a real client | Re-check `ClientId`/`ClientSecret` for a typo or a trailing newline; a secret can only be *replaced*, never re-read |
 | `invalid_scope` when connecting | The client is the wrong **type** — a Web application or Desktop client cannot use the device flow | Create a new client of type *TVs and Limited Input devices* |
 | `access_denied` while waiting for approval | You declined, or a Workspace admin policy blocks the app | Approve with a personal account; Workspace-managed accounts may be blocked by policy |
+| *"The Google Drive API is not enabled…"* — **after** a device flow that looked perfect | Exactly what it says. The device flow only talks to Google's OAuth endpoints, which do not care whether the Drive API is enabled, so nothing fails until the first Drive call — which happens right at the end of connecting | Enable the Google Drive API (the *"The Google Drive API is enabled"* checklist item above; the message also carries Google's direct link), then connect again |
+| *"…does not include Drive access"* | The Drive permission on the consent screen is a **checkbox**, and approving without ticking it yields a valid token with no Drive access | Connect again and tick the Drive permission |
 | It works, then dies about **7 days** later | The consent screen is still in *Testing* | Publish it to **In production** (no review is needed for `drive.file`), then reconnect |
 | *"The stored Google credential could not be decrypted"* | The Data Protection key ring changed — typically a container recreated without persisting it | Reconnect. To prevent recurrence, keep the key ring's database persistent |
 | *"Not connected to Google"* despite valid config | Config names the client; nobody has completed the device flow yet | Use **Connect Google account** on the target's card |

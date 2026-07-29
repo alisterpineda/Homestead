@@ -61,3 +61,49 @@ public class GoogleDriveAuthException(string errorCode, string message) : Except
     /// <summary>The OAuth error code (e.g. <c>invalid_grant</c>). Safe to log — unlike the body it came in.</summary>
     public string ErrorCode { get; } = errorCode;
 }
+
+/// <summary>Wording shared by two detectors of one fault.</summary>
+/// <remarks>
+/// A consent screen approved <i>without</i> ticking the Drive permission is caught in two places: at the
+/// token exchange when Google states the granted scope, and at the first Drive call when it does not.
+/// Same fault, same fix — so one sentence, rather than two that drift apart.
+/// </remarks>
+internal static class GoogleDriveAuthMessages
+{
+    public const string InsufficientScope =
+        "Google issued an authorization that does not include Drive access. On the consent screen, tick "
+        + "the Google Drive permission — it is a checkbox, and is not ticked for you — then connect again.";
+}
+
+/// <summary>
+/// The Google <c>reason</c> strings this feature acts on, in one place.
+/// </summary>
+/// <remarks>
+/// Drive answers throttling, storage exhaustion, and genuine authorization faults <b>all with HTTP
+/// 403</b>, so the reason string is the only thing separating "retry in a moment" from "an operator has
+/// to go and fix something". Two places read them — the mirror's SDK path and the raw <c>about.get</c>
+/// probe — and a list only one of them knows about is precisely how a transient blip ends up latching a
+/// target as permanently disconnected.
+/// </remarks>
+internal static class GoogleDriveErrorReasons
+{
+    /// <summary>
+    /// Transient. Note that <c>quotaExceeded</c>, confusingly, means <i>rate</i> and not storage.
+    /// </summary>
+    public static readonly string[] Throttling =
+    [
+        "userRateLimitExceeded", "rateLimitExceeded", "quotaExceeded", "dailyLimitExceeded",
+        // The newer details[].reason spellings of the same faults.
+        "RATE_LIMIT_EXCEEDED", "RESOURCE_EXHAUSTED",
+    ];
+
+    /// <summary>Storage exhaustion — a 403 like the others, and the one that is never retryable.</summary>
+    public static readonly string[] OutOfSpace = ["storageQuotaExceeded"];
+
+    /// <summary>The Drive API is not enabled on the Cloud project. Stated under two spellings.</summary>
+    public static readonly string[] ServiceDisabled = ["accessNotConfigured", "SERVICE_DISABLED"];
+
+    /// <summary>The authorization carries no Drive scope. Also stated under two spellings.</summary>
+    public static readonly string[] InsufficientScope =
+        ["insufficientPermissions", "ACCESS_TOKEN_SCOPE_INSUFFICIENT"];
+}

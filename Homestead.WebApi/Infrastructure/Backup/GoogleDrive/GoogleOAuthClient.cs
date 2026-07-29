@@ -113,6 +113,26 @@ public class GoogleOAuthClient(HttpClient httpClient, TimeProvider timeProvider,
 
         if (response.IsSuccessStatusCode)
         {
+            // Checked here rather than left to the first Drive call, because Google renders Drive access
+            // as a TICKBOX on the consent screen: approving without ticking it issues a perfectly valid
+            // token that carries no Drive scope, and the flow reads as successful from both ends. Only
+            // enforced when Google actually states what it granted — an absent field must never fail a
+            // grant that is probably fine.
+            if (GrantsDriveFile(body) is false)
+            {
+                // Hand the useless authorization straight back before failing. Google does not invalidate
+                // it on its own, so walking away would strand a live credential in the user's security
+                // page forever — and worse, Google REMEMBERS the consent decision: the retry this message
+                // asks for could be answered from the remembered scope-less grant without ever showing the
+                // checkbox again, leaving the operator unable to follow the only fix there is. Best-effort,
+                // exactly as every other revocation here.
+                if (ReadString(body, "refresh_token") is { Length: > 0 } orphaned)
+                    await RevokeAsync(orphaned, ct);
+
+                throw new GoogleDriveAuthException(
+                    "insufficient_scope", GoogleDriveAuthMessages.InsufficientScope);
+            }
+
             var grant = ReadGrant(body, existingRefreshToken: null);
 
             // A device flow that returns no refresh token is unusable for a backup: the whole point is
@@ -265,6 +285,35 @@ public class GoogleOAuthClient(HttpClient httpClient, TimeProvider timeProvider,
         var expiresAt = timeProvider.GetUtcNow().AddSeconds(Math.Max(0, expiresIn - 60));
 
         return new GoogleTokenGrant(refreshToken, accessToken, expiresAt);
+    }
+
+    /// <summary>
+    /// Scopes that satisfy the requirement. Full <c>drive</c> strictly subsumes <c>drive.file</c>, and an
+    /// account that granted it earlier can have it come back here instead — refusing that would block a
+    /// connection that works perfectly.
+    /// </summary>
+    private static readonly string[] SufficientScopes =
+        [Scope, "https://www.googleapis.com/auth/drive"];
+
+    /// <summary>
+    /// Whether Google's stated granted scope covers <see cref="Scope"/>; null when it stated none.
+    /// </summary>
+    /// <remarks>
+    /// Three-valued on purpose, and deliberately <b>not</b> applied on refresh. The caller latches a
+    /// target as disconnected on <see cref="GoogleDriveAuthException"/>, so treating a missing
+    /// <c>scope</c> field as a shortfall would let a Google response-shape change kill every working
+    /// mirror. Enforced only at the device grant, where the consent decision was just made and the field
+    /// is reliably present.
+    /// </remarks>
+    private static bool? GrantsDriveFile(JsonElement body)
+    {
+        if (ReadString(body, "scope") is not { Length: > 0 } granted)
+            return null;
+
+        // Ordinal: OAuth scope values are case-sensitive by specification.
+        return granted
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Any(one => SufficientScopes.Contains(one, StringComparer.Ordinal));
     }
 
     private static string? ReadString(JsonElement body, string name) =>

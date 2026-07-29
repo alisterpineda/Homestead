@@ -140,6 +140,92 @@ public class GoogleOAuthClientTests
         Assert.Equal("malformed_response", ex.ErrorCode);
     }
 
+    // Google renders Drive access as a TICKBOX on the consent screen. Approving without ticking it issues
+    // a valid token carrying no Drive scope, and the flow looks successful from both ends — so it is worth
+    // failing here, with the fix named, rather than at the first Drive call as an opaque 403.
+    [Fact]
+    public async Task PollDeviceToken_GrantedWithoutTheDriveScope_PointsAtTheConsentTickbox()
+    {
+        var (client, handler) = CreateSut();
+        handler.QueueOk("""
+            {"access_token":"at","refresh_token":"rt","expires_in":3600,
+             "scope":"https://www.googleapis.com/auth/userinfo.email"}
+            """);
+
+        var ex = await Assert.ThrowsAsync<GoogleDriveAuthException>(() =>
+            client.PollDeviceTokenAsync("id", "secret", "dc", TestContext.Current.CancellationToken));
+
+        Assert.Equal("insufficient_scope", ex.ErrorCode);
+        Assert.Contains("checkbox", ex.Message);
+    }
+
+    // The rejected authorization is live whether we want it or not: Google does not invalidate it, and it
+    // remembers the consent decision — so an un-revoked one both strands a credential in the user's
+    // security page and can be handed straight back on the retry, without the checkbox ever reappearing.
+    [Fact]
+    public async Task PollDeviceToken_GrantedWithoutTheDriveScope_HandsTheUselessGrantBack()
+    {
+        var (client, handler) = CreateSut();
+        handler.QueueOk("""
+            {"access_token":"at","refresh_token":"rt","expires_in":3600,
+             "scope":"https://www.googleapis.com/auth/userinfo.email"}
+            """);
+
+        await Assert.ThrowsAsync<GoogleDriveAuthException>(() =>
+            client.PollDeviceTokenAsync("id", "secret", "dc", TestContext.Current.CancellationToken));
+
+        Assert.Equal(2, handler.CallCount);
+        Assert.Contains("revoke", handler.RequestUrls[1]);
+        Assert.Contains("token=rt", handler.RequestBodies[1]);
+    }
+
+    [Fact]
+    public async Task PollDeviceToken_GrantedWithTheDriveScopeAmongOthers_Succeeds()
+    {
+        var (client, handler) = CreateSut();
+        handler.QueueOk("""
+            {"access_token":"at","refresh_token":"rt","expires_in":3600,
+             "scope":"https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email"}
+            """);
+
+        var result = await client.PollDeviceTokenAsync(
+            "id", "secret", "dc", TestContext.Current.CancellationToken);
+
+        Assert.Equal(GoogleDevicePollStatus.Granted, result.Status);
+    }
+
+    // Full `drive` strictly subsumes `drive.file`, so an account that granted it earlier can have it come
+    // back here instead. Refusing that would block a connection that works perfectly.
+    [Fact]
+    public async Task PollDeviceToken_GrantedABroaderDriveScope_IsAccepted()
+    {
+        var (client, handler) = CreateSut();
+        handler.QueueOk("""
+            {"access_token":"at","refresh_token":"rt","expires_in":3600,
+             "scope":"https://www.googleapis.com/auth/drive"}
+            """);
+
+        var result = await client.PollDeviceTokenAsync(
+            "id", "secret", "dc", TestContext.Current.CancellationToken);
+
+        Assert.Equal(GoogleDevicePollStatus.Granted, result.Status);
+    }
+
+    // Three-valued on purpose: the caller LATCHES the target as disconnected on this exception type, so a
+    // response that simply does not state a scope must not be read as a shortfall. A Google response-shape
+    // change would otherwise refuse every new connection.
+    [Fact]
+    public async Task PollDeviceToken_GrantedWithNoStatedScope_IsAcceptedRatherThanAssumedInsufficient()
+    {
+        var (client, handler) = CreateSut();
+        handler.QueueOk("""{"access_token":"at","refresh_token":"rt","expires_in":3600}""");
+
+        var result = await client.PollDeviceTokenAsync(
+            "id", "secret", "dc", TestContext.Current.CancellationToken);
+
+        Assert.Equal(GoogleDevicePollStatus.Granted, result.Status);
+    }
+
     // --- Refresh --------------------------------------------------------------------------------------
 
     [Fact]
