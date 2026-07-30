@@ -185,9 +185,69 @@ ancestor trail comes from the API's `PlaceContentsResponse.path`.
 | `/admin/schedules` | ScheduleListComponent |
 | `/admin/settings` | SystemSettingsComponent (runtime log-level controls) |
 | `/admin/ai` | AiStatusComponent — read-only status of providers defined under `Ai:Providers` |
-| `/admin/backup` | BackupTargetListComponent — one card per `Backup:Targets:{key}`, each nesting zero or more **source rows** (a `backup.sources` row pairing a registered source kind with that target; `documents` is the only kind today). Card level: destination Enabled toggle, Add backup dialog (disabled once every kind is paired). Source level: own Enabled toggle ("Paused" badge when off, "Paused — destination disabled" when the card's toggle is the one off), Back up now / Dry run / schedule add-edit-remove / delete. Card test ids: `backup-target-{key}`, `enabled-toggle-{key}`, `add-backup-{key}`, `no-sources-{key}`, `availability-badge`, `configuration-error`. Per-source test ids are suffixed with the source **guid**: `backup-source-{id}`, `source-enabled-toggle-{id}`, `paused-badge-{id}`, `source-unavailable-{id}`, `back-up-now-{id}`, `dry-run-{id}`, `remove-schedule-{id}`, `schedule-note-{id}`, `delete-source-{id}`, `confirm-delete-source-{id}`, `last-run-badge-{id}`, `last-run-summary-{id}`, `last-run-error-{id}`, `backed-up-count-{id}`, `prune-blocked-banner-{id}`, `prune-anyway-{id}`, `dismiss-prune-{id}`. Several render only conditionally (no schedule → no `remove-schedule`; no latch → no banner) |
+| `/admin/backup` | BackupTargetListComponent — see **Backup** below |
 
 Sidebar groups: **Manage** (Users / Groups / Jobs / Schedules), **Configuration** (System Settings / AI / Backup).
+
+#### Backup (`/admin/backup`)
+
+> **Drive targets are not reachable in the default stack.** `Homestead.AppHost` hard-codes exactly one
+> target — `local`, at `.homestead-data/backup` (`AppHost.cs:31-32`). A Drive target additionally needs
+> AppHost user-secrets (`Backup:Targets:{key}:Kind|ClientId|ClientSecret`) **and** a real Google Cloud
+> OAuth client, neither of which is present. Everything marked *Drive-only* below exists in the component
+> and cannot be exercised — do not spend a cycle trying.
+
+One card per `Backup:Targets:{key}`, each nesting zero or more **source rows** (a `backup.sources` row
+pairing a registered source kind with that target; `documents` is the only kind today). Each card renders a
+**location line** under its title — the destination path for a local target, the Drive root folder *as
+actually created* for a Drive one. Card level: destination Enabled toggle, Add backup dialog (disabled once
+every kind is paired). Source level: own Enabled toggle ("Paused" badge when off, "Paused — destination
+disabled" when the card's toggle is the one off), Back up now / Dry run / schedule add-edit-remove / delete.
+The card list also includes any *stale* target key that survives only on a `backup.sources` row
+(`GetBackupTargetsHandler.cs:108-125`), so a card can exist with no matching config.
+
+**Reachable in the dev stack** (the `local` target):
+
+- Card: `backup-target-{key}`, `availability-badge`, `enabled-toggle-{key}`, `add-backup-{key}`,
+  `no-sources-{key}`
+- Per-source, suffixed with the source **guid**: `backup-source-{id}`, `source-enabled-toggle-{id}`,
+  `paused-badge-{id}`, `source-unavailable-{id}`, `back-up-now-{id}`, `dry-run-{id}`,
+  `remove-schedule-{id}`, `schedule-note-{id}`, `delete-source-{id}`, `confirm-delete-source-{id}`,
+  `last-run-badge-{id}`, `last-success-{id}`, `last-run-summary-{id}`, `last-run-error-{id}`,
+  `out-of-space-{id}`, `backed-up-count-{id}`, `prune-blocked-banner-{id}`, `prune-anyway-{id}`,
+  `dismiss-prune-{id}`
+- Add-backup dialog (`add-backup-dialog.component.ts`): trigger `add-backup-{key}`, then
+  `source-kind-trigger` (the kind `hlm-select`) and `add-backup-error`
+
+**Conditional** — present in the component, absent on a healthy local stack:
+
+- `no-targets` — the page empty state; never renders while AppHost defines `local`
+- `configuration-error` + the "Unavailable" `availability-badge` — a valid local path is Available
+- `remove-schedule-{id}` / `schedule-note-{id}` — only once a schedule exists
+- `out-of-space-{id}`, `last-run-error-{id}`, `prune-blocked-banner-{id}` / `prune-anyway-{id}` /
+  `dismiss-prune-{id}` — only after a run that produced that condition
+
+**Drive-only — NOT reachable** (per the caveat above):
+
+- Card: `connection-{key}` (renders for **any** Drive target, connected or not — absent entirely for a
+  local one), `connected-as-{key}`, `free-space-{key}`, `disconnect-{key}`, `confirm-disconnect-{key}`,
+  `auth-failed-banner-{key}`
+- Location: `location-link-{key}` (the anchor variant, only when the target reports a browsable URL) and
+  `location-notice-{key}` (the config-vs-created skew advisory). A local target reports neither.
+- Connect dialog (`connect-google-dialog.component.ts`): `connect-google-{key}`, `connect-user-code`,
+  `connect-verification-url`, `connect-copy-code`, `connect-waiting`, `connect-mismatch`,
+  `connect-confirm-switch`, `connect-retry`, `connect-error`, `connect-denied`, `connect-expired`
+
+Selector traps:
+
+- **The location line has no test id when there is no URL.** `location-link-{key}` is on the `<a>`; with no
+  `locationUrl` the text renders as a bare `<p class="font-mono break-all">` inside the card header. Match
+  it by text or by the card, not by a testid that will not be there.
+- **`location-link-{key}` is `target="_blank"` to Google Drive.** Do not click it — it opens a new tab
+  against an external host.
+- **`backup-schedule-dialog.component.ts` has no test ids at all.** Select by role/text: trigger button
+  "Add schedule" / "Edit schedule", dialog title of the same name, cron input `#backup-cron` (placeholder
+  `0 3 * * *`), an "Enabled" checkbox, and Cancel / submit in the footer.
 
 ### Admin-only surfaces (verify hidden/denied as `user@test.com`)
 
@@ -199,11 +259,18 @@ Sidebar groups: **Manage** (Users / Groups / Jobs / Schedules), **Configuration*
 - Base path is `/api/v1/...` (e.g. `/api/v1/documents`, `/api/v1/documents/tags`,
   `/api/v1/admin/settings/system` — `GET`/`PATCH` for System Settings), proxied through `:4200`
   — use it when inspecting `browser_network_requests`.
-- Backup: `/api/v1/admin/backup/targets` (`GET` — returns the cards *and* the source-kind catalog),
-  `/targets/{key}` (`PATCH` — destination enable only), `/sources` (`POST`), `/sources/{id}`
-  (`PATCH` for enable + `acknowledgePruneBlock`, `DELETE` with optional `?cancelRun=true`),
-  `/sources/{id}/runs` (`POST`), `/sources/{id}/schedule` (`PUT`/`DELETE`) — all admin-only. Runs and
-  schedules are **source**-scoped, not target-scoped.
+- Backup:
+  - `/api/v1/admin/backup/targets` (`GET`) — returns **`items`** (the cards) and **`sourceKinds`** (the
+    catalog feeding the Add-backup picker). Not `targets`.
+  - `/targets/{key}` (`PATCH` — destination enable only)
+  - `/sources` (`POST`), `/sources/{id}` (`PATCH` for enable + `acknowledgePruneBlock`, `DELETE` with
+    optional `?cancelRun=true`)
+  - `/sources/{id}/runs` (`POST`), `/sources/{id}/schedule` (`PUT`/`DELETE`)
+  - Drive-only, **not reachable** (see Backup above): `/targets/{key}/connect` (`POST`),
+    `/targets/{key}/connect/poll` (`POST`), `/targets/{key}/connect/confirm` (`POST`),
+    `/targets/{key}/validate` (`POST`), `/targets/{key}/connection` (`DELETE`)
+
+  All admin-only. Runs and schedules are **source**-scoped, not target-scoped.
 
 ### Known gotchas
 
