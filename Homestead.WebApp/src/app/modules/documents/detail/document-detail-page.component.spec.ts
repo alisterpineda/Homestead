@@ -11,6 +11,7 @@ import { DocumentEditStateService } from './document-edit-state.service';
 import { PageHeaderService } from '@/shared/services/page-header.service';
 import { DocumentApiService } from '@/api/services/document-api.service';
 import { DocumentVersionApiService } from '@/api/services/document-version-api.service';
+import { AdminBackupApiService } from '@/api/services/admin-backup-api.service';
 import type { GetDocumentResponse } from '@/api/generated/models/get-document-response';
 import type { TextExtractionProvenanceResponse } from '@/api/generated/models/text-extraction-provenance-response';
 import type { GetDocumentVersionDto } from '@/api/generated/models/get-document-version-dto';
@@ -74,7 +75,10 @@ describe('DocumentDetailPageComponent', () => {
           { path: 'documents/:id', component: DummyComponent },
         ]),
         PageHeaderService,
-        { provide: AuthService, useValue: { canWrite: signal(true) } },
+        // isAdmin is not optional here: the real template gates the Backup section on it, so a mock
+        // without it throws the moment that branch is evaluated.
+        { provide: AuthService, useValue: { canWrite: signal(true), isAdmin: signal(false) } },
+        { provide: AdminBackupApiService, useValue: { getDocumentBackupState: vi.fn(() => EMPTY) } },
         { provide: OpenDocumentsService, useValue: mockOpenDocumentsService },
         { provide: DocumentEditStateService, useValue: mockEditStateService },
         {
@@ -477,7 +481,13 @@ describe('DocumentDetailPageComponent — edit-state guards on refresh', () => {
           provideHttpClient(),
           provideRouter([{ path: 'documents', component: DummyComponent }]),
           PageHeaderService,
-          { provide: AuthService, useValue: { canWrite: signal(true) } },
+          // isAdmin is not optional here: the real template gates the Backup section on it, so a mock
+          // without it throws the moment that branch is evaluated.
+          { provide: AuthService, useValue: { canWrite: signal(true), isAdmin: signal(false) } },
+          {
+            provide: AdminBackupApiService,
+            useValue: { getDocumentBackupState: vi.fn(() => EMPTY) },
+          },
           { provide: OpenDocumentsService, useValue: guardOpenDocumentsService },
           { provide: DocumentEditStateService, useValue: guardEditStateService },
           { provide: DocumentApiService, useValue: guardDocumentApi },
@@ -765,4 +775,241 @@ describe('DocumentDetailPageComponent — edit-state guards on refresh', () => {
         expect(guardComponent.summarizing()).toBe(true);
       });
     });
+});
+
+// --- Backup section (admin only) --------------------------------------------------------------------
+//
+// The template gates the section on `auth.isAdmin()`, and the fetch is gated on it in TypeScript too,
+// so a non-admin issues zero requests against an admin-only endpoint. The overridden template keeps
+// these focused on the fetch keying — what the section itself renders is covered by
+// document-backup-state.component.spec.ts.
+describe('DocumentDetailPageComponent — backup state', () => {
+  let backupParamMap: BehaviorSubject<ReturnType<typeof convertToParamMap>>;
+  let backupApi: { getDocumentBackupState: ReturnType<typeof vi.fn> };
+  let backupFixture: ComponentFixture<DocumentDetailPageComponent>;
+  let backupComponent: DocumentDetailPageComponent;
+
+  function backupDocument(): GetDocumentResponse {
+    return {
+      id: 'doc-1',
+      name: 'Doc 1',
+      contentType: 'application/pdf',
+      fileExtension: '.pdf',
+      fileHash: 'hash',
+      fileSize: 100,
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+      parties: [],
+      tags: [],
+      suggestions: [],
+      versions: [
+        {
+          id: 'ver-1',
+          contentType: 'application/pdf',
+          fileExtension: '.pdf',
+          fileSize: 100,
+          createdAt: '2026-01-01T00:00:00Z',
+          updatedAt: '2026-01-01T00:00:00Z',
+          versionNumber: 1,
+        },
+      ],
+    };
+  }
+
+  function configure(isAdmin: boolean, options: { realTemplate?: boolean } = {}) {
+    backupParamMap = new BehaviorSubject(convertToParamMap({}));
+    backupApi = {
+      getDocumentBackupState: vi.fn(() =>
+        of({
+          documentId: 'doc-1',
+          liveVersionCount: 1,
+          sources: [
+            {
+              backupSourceId: 'src-1',
+              targetKey: 'local',
+              targetKind: 'Local' as const,
+              isAvailable: true,
+              isEnabled: true,
+              targetEnabled: true,
+              copiedVersionCount: 1,
+              pendingRemovalCount: 0,
+              versions: [],
+            },
+          ],
+        }),
+      ),
+    };
+
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideRouter([{ path: 'documents', component: DummyComponent }]),
+        PageHeaderService,
+        { provide: AuthService, useValue: { canWrite: signal(true), isAdmin: signal(isAdmin) } },
+        { provide: AdminBackupApiService, useValue: backupApi },
+        {
+          provide: OpenDocumentsService,
+          useValue: {
+            addDocument: vi.fn(),
+            removeDocument: vi.fn(),
+            getPrevDocumentId: vi.fn(() => null),
+            getNextDocumentId: vi.fn(() => null),
+            openDocuments: signal([]) as unknown as OpenDocumentsService['openDocuments'],
+          },
+        },
+        {
+          provide: DocumentEditStateService,
+          useValue: {
+            saveState: vi.fn(),
+            getState: vi.fn(() => null),
+            clearState: vi.fn(),
+            clearAll: vi.fn(),
+            discardChanges: vi.fn(),
+            setActiveHasChanges: vi.fn(),
+          },
+        },
+        {
+          provide: DocumentApiService,
+          useValue: {
+            getDocument: vi.fn(() => of(options.realTemplate ? backupDocument() : null)),
+            getDocumentFile: vi.fn(() => EMPTY),
+            patchDocument: vi.fn(() => of(null)),
+          },
+        },
+        {
+          provide: DocumentVersionApiService,
+          useValue: {
+            getDocumentVersion: vi.fn(() => EMPTY),
+            getDocumentActivity: vi.fn(() => of({ items: [] })),
+          },
+        },
+        {
+          provide: ProcessingHubService,
+          useValue: {
+            jobCompleted$: new Subject(),
+            waitForJob: vi.fn(() => new Promise(() => {})),
+          },
+        },
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            paramMap: backupParamMap.asObservable(),
+            snapshot: { paramMap: convertToParamMap({}) },
+          },
+        },
+      ],
+    });
+
+    // Overridden by default: this component owns heavy children (NgScrollbar, resizable panels,
+    // dialogs) that jsdom cannot render, and most of these specs are about the fetch, not the markup.
+    // One case opts back into the real template — the only place an `auth.isAdmin()` template gate
+    // could actually throw.
+    if (!options.realTemplate) {
+      TestBed.overrideComponent(DocumentDetailPageComponent, { set: { template: '<div></div>' } });
+    }
+
+    backupFixture = TestBed.createComponent(DocumentDetailPageComponent);
+    backupComponent = backupFixture.componentInstance;
+    backupFixture.detectChanges();
+
+    backupParamMap.next(convertToParamMap({ id: 'doc-1' }));
+    backupFixture.detectChanges();
+  }
+
+  beforeEach(() => {
+    vi.stubGlobal('localStorage', {
+      getItem: vi.fn(() => null),
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+    });
+    vi.stubGlobal('sessionStorage', {
+      getItem: vi.fn(() => null),
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    TestBed.resetTestingModule();
+  });
+
+  // The latch keeps an admin-only request off the wire for a page nobody opened that deeply.
+  it('fetches nothing until the Metadata tab has been opened', () => {
+    configure(true);
+
+    expect(backupApi.getDocumentBackupState).not.toHaveBeenCalled();
+
+    backupComponent.onTabActivated('metadata');
+    backupFixture.detectChanges();
+
+    expect(backupApi.getDocumentBackupState).toHaveBeenCalledWith('doc-1');
+    expect(backupComponent.backupState()?.sources?.length).toBe(1);
+  });
+
+  it('issues no request at all for a non-admin', () => {
+    configure(false);
+
+    backupComponent.onTabActivated('metadata');
+    backupFixture.detectChanges();
+
+    expect(backupApi.getDocumentBackupState).not.toHaveBeenCalled();
+    expect(backupComponent.backupState()).toBeNull();
+  });
+
+  // The latch lives on the COMPONENT, not inside <hlm-tabs>: there are two tab instances under
+  // @if (isMobile()), so a resize across 768px destroys whichever one holds the state.
+  it('keeps the latch set once opened', () => {
+    configure(true);
+
+    backupComponent.onTabActivated('metadata');
+    backupComponent.onTabActivated('info');
+    backupFixture.detectChanges();
+
+    expect(backupComponent.metadataOpened()).toBe(true);
+  });
+
+  // Load-bearing keying: the component is REUSED across prev/next navigation and the active tab does
+  // not change during it, so a fetch driven only by tabActivated would leave the previous document's
+  // backup state on screen under the new document's name.
+  it('refetches when the document changes with the tab already open', () => {
+    configure(true);
+
+    backupComponent.onTabActivated('metadata');
+    backupFixture.detectChanges();
+    expect(backupApi.getDocumentBackupState).toHaveBeenCalledTimes(1);
+
+    backupParamMap.next(convertToParamMap({ id: 'doc-2' }));
+    backupFixture.detectChanges();
+
+    expect(backupApi.getDocumentBackupState).toHaveBeenCalledWith('doc-2');
+  });
+
+  it('refetches on the explicit refresh affordance', () => {
+    configure(true);
+
+    backupComponent.onTabActivated('metadata');
+    backupFixture.detectChanges();
+    expect(backupApi.getDocumentBackupState).toHaveBeenCalledTimes(1);
+
+    backupComponent.refreshBackupState();
+    backupFixture.detectChanges();
+
+    expect(backupApi.getDocumentBackupState).toHaveBeenCalledTimes(2);
+  });
+
+  // The one case that renders the real template. Without `isAdmin` on the AuthService mock this throws
+  // rather than failing an assertion, which is why every mock in this file now carries it.
+  it('renders the section for an admin once the Metadata tab is open', async () => {
+    configure(true, { realTemplate: true });
+
+    backupComponent.onTabActivated('metadata');
+    backupFixture.detectChanges();
+    await backupFixture.whenStable();
+    backupFixture.detectChanges();
+
+    const element = backupFixture.nativeElement as HTMLElement;
+    expect(element.querySelector('[data-testid="document-backup-state"]')).toBeTruthy();
+    expect(element.querySelector('[data-testid="refresh-backup-state"]')).toBeTruthy();
+  });
 });

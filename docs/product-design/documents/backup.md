@@ -261,6 +261,62 @@ line (also derived from `processing.jobs`), and a Drive target's card carries it
 plus the location link, which is the only way to answer "which of my Drive folders is the app's".
 See [Phase 2 — the Google Drive target](#phase-2--the-google-drive-target).
 
+**Last-successful-run excludes runs that mirrored nothing.** A *skipped* run — the pairing disabled, the
+destination switched off — stages its skip reason, zeroes its child count and completes **normally**, and
+a *dry run* does the same after copying nothing. Counted, either would let a paused backup report a fresh
+success on every cron tick, forever. Since this line is the catch-all for every way a backup dies
+silently, it is the last value in the system that may be easy to fake. A run with no staged summary at
+all still counts: an older row that completed before summaries existed is a genuine run, and treating it
+as a skip would invent staleness that never happened.
+
+### The per-document read surface
+
+`/admin/backup` answers "is this backup working?" at the pairing level. It cannot answer *"where did
+**this** document go in the mirror, and is that backup even alive?"* — a question otherwise reachable
+only by reasoning about year shards, collision suffixes and `_versions/` by hand. A **Backup** section on
+the Metadata tab of the document detail page answers it.
+
+- **Admin-only and read-only.** There is no per-document *Back up now*: per-document selection is out of
+  scope (see above), and a backup that copies a hand-picked subset is not a backup. The only action is a
+  link to `/admin/backup`.
+- **Availability leads; the copy record is subordinate to it.** Disconnecting a target deliberately keeps
+  its state rows, so a panel that led with the copy record would render a cheerful "backed up" against a
+  destination nobody can reach. The order is: is this pairing reachable → when did it last actually
+  mirror something → what does it record about this version → the document-level roll-up.
+- **"Last written", never "copied".** A rename is planned as a *move*, which on an id-addressed
+  destination is a metadata patch with no re-upload — and it still bumps the state row's timestamp. "Copied
+  2 minutes ago" after a rename would be a copy event that never happened.
+- **Absence of a recorded failure is not success.** A batch stages its per-file failures as typed data
+  (version id, kind, path, message) so the panel can say *"the copy of this file failed: &lt;why&gt;"* —
+  the thrown message is joined and truncated across the whole batch and cannot be attributed to one file,
+  and a first-ever copy that fails writes no state row to join on. Where no failure was recorded — an
+  older row, or a run that died without naming files — the panel says *"the last run failed; this file's
+  outcome was not recorded"*, never something that reads as fine.
+- **Facts, not a status enum.** The endpoint returns counts, timestamps, paths and reasons; the client
+  does the phrasing. Verify runs then add fields rather than breaking a vocabulary. And there is no
+  "verified" and no hash comparison: `DocumentVersion.FileHash` is written once at insert and never
+  rewritten, so comparing it against the recorded backup hash could only ever agree with itself.
+- **No "will move on the next run".** Collision suffixes are a function of the *whole* document set, and
+  adding a version relocates the previously-latest file into `_versions/` under the same shard and stem —
+  so any per-document approximation false-negatives on the most common case.
+- **Copies are counted against live versions only.** State rows are FK-less tombstones that outlive the
+  version they describe, so counting rows would report "3 of 2". The leftovers are reported separately as
+  files still sitting in the mirror until a run's anti-join removes them — or forever, if the delete
+  breaker has latched.
+- **A link only while the pairing is usable.** The object URL is composed from the handle already on the
+  state row (no listing, no read of the destination, so the one-way guarantee is untouched) and is
+  suppressed entirely when the pairing is unavailable: a dead link after a disconnect or an account
+  switch is worse than no link. A filesystem target has none — its handle *is* the relative path, and a
+  `file://` URL would leak the server root and open nothing.
+- **Known gap: a trashed document cannot reach it.** The page 404s under the global soft-delete filter,
+  exactly as `GET /documents/{id}` does — while trashed documents *stay mirrored* (see
+  [Trashed documents stay mirrored](#trashed-documents-stay-mirrored)). So the one class of document
+  whose mirror state is most surprising is the one this surface cannot report on.
+
+The panel carries its own refresh control rather than relying on real-time updates. Job notifications are
+sent to the user who created the job, and a scheduled run carries the *schedule creator's* id — so the
+nightly run, the common case, never reaches whichever admin happens to be reading the page.
+
 ## Design principles
 
 ### The mirror is readable without Homestead

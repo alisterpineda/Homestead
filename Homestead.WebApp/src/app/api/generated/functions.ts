@@ -153,6 +153,8 @@ export type { TestAiConnection$Params as TestAiConnection$Params } from './fn/ad
 export { testAiConnection as testAiConnection } from './fn/admin/test-ai-connection';
 export type { GetBackupTargets$Params as GetBackupTargets$Params } from './fn/admin/get-backup-targets';
 export { getBackupTargets as getBackupTargets } from './fn/admin/get-backup-targets';
+export type { GetDocumentBackupState$Params as GetDocumentBackupState$Params } from './fn/admin/get-document-backup-state';
+export { getDocumentBackupState as getDocumentBackupState } from './fn/admin/get-document-backup-state';
 export type { PatchBackupTarget$Params as PatchBackupTarget$Params } from './fn/admin/patch-backup-target';
 export { patchBackupTarget as patchBackupTarget } from './fn/admin/patch-backup-target';
 export type { CreateBackupSource$Params as CreateBackupSource$Params } from './fn/admin/create-backup-source';

@@ -27,7 +27,13 @@ import { AdminBackupApiService } from '@/api/services/admin-backup-api.service';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { ProcessingHubService } from '@/shared/services/processing-hub.service';
 import { formatBytes } from '@/shared/utils';
-import { formatRelativeAge } from '@/shared/utils/relative-age';
+import {
+  backupKindLabel,
+  backupLastSuccessLabel,
+  backupStatusLabel,
+  backupStatusVariant,
+  isBackupStale,
+} from '@/shared/utils/backup-labels';
 import { handleMutationError, handleQueryError } from '@/shared/utils/rxjs-error.utils';
 import type { BackupTargetResponse } from '@/api/generated/models/backup-target-response';
 import type { BackupSourceItemResponse } from '@/api/generated/models/backup-source-item-response';
@@ -777,40 +783,11 @@ export class BackupTargetListComponent implements OnInit {
   }
 
   lastSuccessLabel(source: BackupSourceItemResponse): string {
-    return source.lastSuccessfulRunAt ? formatRelativeAge(source.lastSuccessfulRunAt) : 'never';
+    return backupLastSuccessLabel(source);
   }
 
-  /**
-   * Whether the last success is old enough to be worth shouting about.
-   *
-   * Scaled to the schedule where one exists — roughly two missed runs — because "3 days ago" is alarming
-   * for an hourly backup and unremarkable for a weekly one. Only flagged when a schedule is armed: a
-   * manual-only backup is as stale as its owner intends.
-   */
   isStale(source: BackupSourceItemResponse): boolean {
-    const schedule = source.schedule;
-    if (!schedule?.isEnabled || !source.isEnabled) return false;
-
-    const threshold = this.stalenessThresholdMs(schedule);
-    if (!source.lastSuccessfulRunAt) {
-      // Never succeeded, but only stale once a scheduled run has actually had time to happen.
-      const armed = new Date(schedule.nextRunAt).getTime() - threshold;
-      return Number.isFinite(armed) && Date.now() > armed;
-    }
-
-    const age = Date.now() - new Date(source.lastSuccessfulRunAt).getTime();
-    return Number.isFinite(age) && age > threshold;
-  }
-
-  private static readonly DefaultStalenessMs = 7 * 24 * 60 * 60 * 1000;
-
-  private stalenessThresholdMs(schedule: NonNullable<BackupSourceItemResponse['schedule']>): number {
-    if (!schedule.lastRunAt) return BackupTargetListComponent.DefaultStalenessMs;
-
-    const interval = new Date(schedule.nextRunAt).getTime() - new Date(schedule.lastRunAt).getTime();
-    if (!Number.isFinite(interval) || interval <= 0) return BackupTargetListComponent.DefaultStalenessMs;
-
-    return interval * 2;
+    return isBackupStale(source);
   }
 
   disconnect(target: BackupTargetResponse, ctx: { close: () => void }): void {
@@ -857,28 +834,14 @@ export class BackupTargetListComponent implements OnInit {
     return this.existingKindsByTarget().get(target.key) ?? [];
   }
 
+  // Thin delegates to the shared vocabulary: templates cannot call imported functions directly, and
+  // the per-document panel renders the same words from the same source.
   kindLabel(kind: BackupTargetResponse['kind']): string {
-    switch (kind) {
-      case 'Local':
-        return 'Local directory';
-      case 'GoogleDrive':
-        return 'Google Drive';
-      default:
-        return 'Unknown kind';
-    }
+    return backupKindLabel(kind);
   }
 
   statusVariant(status: ProcessingJobStatus): 'default' | 'secondary' | 'destructive' | 'outline' {
-    switch (status) {
-      case 'Completed':
-        return 'default';
-      case 'Failed':
-        return 'destructive';
-      case 'PartiallyCompleted':
-        return 'secondary';
-      default:
-        return 'outline';
-    }
+    return backupStatusVariant(status);
   }
 
   /**
@@ -926,18 +889,7 @@ export class BackupTargetListComponent implements OnInit {
   }
 
   statusLabel(run: NonNullable<BackupSourceItemResponse['lastRun']>): string {
-    switch (run.status) {
-      case 'Completed':
-        return run.summary?.skipped ? 'Skipped' : 'Completed';
-      case 'PartiallyCompleted':
-        return `Partial (${run.failedChildCount} failed)`;
-      case 'InProgress':
-        return run.totalChildCount > 0
-          ? `Running ${run.completedChildCount + run.failedChildCount}/${run.totalChildCount}`
-          : 'Running';
-      default:
-        return run.status;
-    }
+    return backupStatusLabel(run);
   }
 
   // Delegates to the shared humanizer so byte formatting stays consistent with the rest of the app

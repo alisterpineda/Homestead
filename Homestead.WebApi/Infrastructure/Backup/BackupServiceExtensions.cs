@@ -25,6 +25,11 @@ public static class BackupServiceExtensions
         services.AddSingleton<GoogleDriveTokenManager>();
         services.AddScoped<IGoogleDriveGrantStore, GoogleDriveGrantStore>();
         services.AddScoped<IBackupTargetGate, BackupTargetGate>();
+
+        // Scoped, because it reads through the request's AppDbContext. Shared by every surface that has
+        // to say whether a pairing is actually running — the admin page and the per-document panel — so
+        // the two can never describe the same job rows in two different vocabularies.
+        services.AddScoped<IBackupRunHistory, BackupRunHistory>();
         services.AddSingleton<IGoogleDriveConnectTokenProtector, GoogleDriveConnectTokenProtector>();
 
         // Stateless (a logger and nothing else), so a singleton — and resolvable from the after-commit

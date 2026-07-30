@@ -215,6 +215,36 @@ public class GoogleDriveBackupTargetTests : IDisposable
         Assert.Null(target.DescribeLocation("Homestead/Backup"));
     }
 
+    // The handle IS the Drive file id, so the viewer link is pure string composition off the state row —
+    // no listing, no lookup, and therefore no breach of the mirror's one-way guarantee.
+    [Fact]
+    public void DescribeObjectUrl_BuildsTheViewerLinkFromTheStoredHandle()
+    {
+        Assert.Equal("https://drive.google.com/file/d/file-1/view", _sut.DescribeObjectUrl("file-1"));
+    }
+
+    // A pairing with nothing recorded has nothing to point at, and a link to an empty id would 404.
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void DescribeObjectUrl_WithNoHandle_IsNull(string? handle)
+    {
+        Assert.Null(_sut.DescribeObjectUrl(handle));
+    }
+
+    // Same guard as DescribeLocation: a target whose config cannot run has no object to name.
+    [Fact]
+    public void DescribeObjectUrl_OnAnUnconfiguredTarget_IsNull()
+    {
+        var target = new GoogleDriveBackupTarget(
+            TargetKey,
+            new BackupTargetOptions { Kind = BackupTargetKind.GoogleDrive },
+            null!, null!, NullLogger<GoogleDriveBackupTarget>.Instance);
+
+        Assert.Null(target.DescribeObjectUrl("file-1"));
+    }
+
     // --- Put ------------------------------------------------------------------------------------------
 
     [Fact]

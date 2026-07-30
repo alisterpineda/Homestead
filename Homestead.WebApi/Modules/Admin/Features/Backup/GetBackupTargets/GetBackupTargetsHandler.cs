@@ -1,6 +1,4 @@
-using System.Text.Json;
 using Homestead.WebApi.Domain.Backup;
-using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Infrastructure.Backup;
 using Homestead.WebApi.Persistence;
 using MediatR;
@@ -18,7 +16,8 @@ public class GetBackupTargetsHandler(
     IBackupTargetResolver resolver,
     IBackupTargetGate gate,
     IBackupTargetOptionsAccessor options,
-    IBackupSourceCatalog catalog)
+    IBackupSourceCatalog catalog,
+    IBackupRunHistory runHistory)
     : IRequestHandler<GetBackupTargetsQuery, GetBackupTargetsResponse>
 {
     public async Task<GetBackupTargetsResponse> Handle(
@@ -43,9 +42,15 @@ public class GetBackupTargetsHandler(
 
         var totalsBySource = totals.ToDictionary(t => t.SourceId);
 
-        var lastRuns = await LoadLastRunsAsync(sources, ct);
-        var lastSuccesses = await LoadLastSuccessfulRunsAsync(sources, ct);
-        var schedules = await LoadSchedulesAsync(sources, ct);
+        var sourceIds = sources.Select(s => s.Id).ToList();
+        var scheduleIds = sources
+            .Where(s => s.ScheduleId is not null)
+            .Select(s => s.ScheduleId!.Value)
+            .ToList();
+
+        var lastRuns = await runHistory.GetLastRunsAsync(sourceIds, ct);
+        var lastSuccesses = await runHistory.GetLastSuccessfulRunsAsync(sourceIds, ct);
+        var schedules = await runHistory.GetSchedulesAsync(scheduleIds, ct);
 
         var sourcesByTarget = sources
             .GroupBy(s => s.TargetKey, StringComparer.OrdinalIgnoreCase)
@@ -226,201 +231,6 @@ public class GetBackupTargetsHandler(
                 ? schedules.GetValueOrDefault(scheduleId)
                 : null,
         };
-    }
-
-    private const int MaxChildErrors = 5;
-
-    private async Task<Dictionary<Guid, BackupRunStatus>> LoadLastRunsAsync(
-        List<BackupSource> sources, CancellationToken ct)
-    {
-        var jobTypes = catalog.All().Select(d => d.JobType).Distinct().ToList();
-
-        if (sources.Count == 0 || jobTypes.Count == 0)
-            return [];
-
-        var sourceIds = sources.Select(s => s.Id).ToList();
-
-        // Newest parent run per pairing. EntityId is indexed; ParentJobId == null is what excludes the
-        // batch children, which carry their parent's EntityId. The grouped ordering keeps this one query
-        // rather than one per pairing.
-        var rows = await db.ProcessingJobs
-            .AsNoTracking()
-            .Where(j => jobTypes.Contains(j.Type)
-                        && j.EntityId != null
-                        && sourceIds.Contains(j.EntityId.Value)
-                        && j.ParentJobId == null)
-            .GroupBy(j => j.EntityId!.Value)
-            .Select(g => g
-                .OrderByDescending(j => j.CreatedAt)
-                .Select(j => new
-                {
-                    EntityId = j.EntityId!.Value,
-                    j.Id,
-                    j.Status,
-                    j.CreatedAt,
-                    j.StartedAt,
-                    j.CompletedAt,
-                    j.Error,
-                    j.TotalChildCount,
-                    j.CompletedChildCount,
-                    j.FailedChildCount,
-                    j.Result,
-                })
-                .First())
-            .ToListAsync(ct);
-
-        // A parent whose CHILDREN failed carries no Error of its own: the generic
-        // JobProcessorService.UpdateParentProgressAsync sets the parent's status from the child tally but
-        // never writes an error string, and only a throw from the parent's own handler populates one. So
-        // without this the admin page shows a red "Failed" badge with no explanation anywhere, and the
-        // only record of WHICH files failed sits on the child rows in /admin/jobs.
-        var failedParentIds = rows
-            .Where(r => r.FailedChildCount > 0)
-            .Select(r => r.Id)
-            .ToList();
-
-        // Result comes back alongside Error: a failed batch stages a typed outcome there, and the card
-        // needs the code rather than the message — an out-of-space run must render as one sentence, not
-        // as a stack of identical fragments, and message strings are never parsed to decide that.
-        var childErrors = failedParentIds.Count == 0
-            ? []
-            : await db.ProcessingJobs
-                .AsNoTracking()
-                .Where(j => j.ParentJobId != null
-                            && failedParentIds.Contains(j.ParentJobId.Value)
-                            && j.Status == ProcessingJobStatus.Failed)
-                .Select(j => new { ParentJobId = j.ParentJobId!.Value, j.Error, j.Result })
-                .ToListAsync(ct);
-
-        var errorsByParent = childErrors
-            .Where(e => e.Error != null)
-            .GroupBy(e => e.ParentJobId)
-            .ToDictionary(
-                g => g.Key,
-                // Capped: a large run can fail many batches, and the admin page needs the shape of the
-                // problem, not every line of it. /admin/jobs remains the exhaustive record.
-                g => (IReadOnlyList<string>)g.Select(e => e.Error!).Take(MaxChildErrors).ToList());
-
-        var outOfSpaceParents = childErrors
-            .Where(e => DeserializeOutcome(e.Result)?.ErrorCode == BackupBatchOutcome.OutOfSpaceCode)
-            .Select(e => e.ParentJobId)
-            .ToHashSet();
-
-        return rows.ToDictionary(r => r.EntityId, r => new BackupRunStatus
-        {
-            JobId = r.Id,
-            Status = r.Status,
-            CreatedAt = r.CreatedAt,
-            StartedAt = r.StartedAt,
-            CompletedAt = r.CompletedAt,
-            Error = r.Error,
-            TotalChildCount = r.TotalChildCount,
-            CompletedChildCount = r.CompletedChildCount,
-            FailedChildCount = r.FailedChildCount,
-            OutOfSpace = outOfSpaceParents.Contains(r.Id),
-            BatchErrors = errorsByParent.GetValueOrDefault(r.Id, []),
-            Summary = DeserializeSummary(r.Result),
-        });
-    }
-
-    /// <summary>
-    /// When each pairing last completed a run cleanly.
-    /// </summary>
-    /// <remarks>
-    /// A separate query from the newest-run one on purpose: the two answer different questions, and the
-    /// gap between them is the signal. "Last run: failed, 4 minutes ago" and "last successful run: 38
-    /// days ago" is a backup that has been quietly broken for over a month, which no single row says.
-    /// </remarks>
-    private async Task<Dictionary<Guid, DateTimeOffset>> LoadLastSuccessfulRunsAsync(
-        List<BackupSource> sources, CancellationToken ct)
-    {
-        var jobTypes = catalog.All().Select(d => d.JobType).Distinct().ToList();
-
-        if (sources.Count == 0 || jobTypes.Count == 0)
-            return [];
-
-        var sourceIds = sources.Select(s => s.Id).ToList();
-
-        var rows = await db.ProcessingJobs
-            .AsNoTracking()
-            .Where(j => jobTypes.Contains(j.Type)
-                        && j.EntityId != null
-                        && sourceIds.Contains(j.EntityId.Value)
-                        && j.ParentJobId == null
-                        && j.Status == ProcessingJobStatus.Completed
-                        && j.CompletedAt != null)
-            .GroupBy(j => j.EntityId!.Value)
-            .Select(g => new { EntityId = g.Key, CompletedAt = g.Max(j => j.CompletedAt) })
-            .ToListAsync(ct);
-
-        return rows
-            .Where(r => r.CompletedAt is not null)
-            .ToDictionary(r => r.EntityId, r => r.CompletedAt!.Value);
-    }
-
-    // Joined by the source row's own ScheduleId. The old shape had to load every BackupToTarget schedule
-    // and match a target key out of the jsonb payload in memory; the FK makes that a plain id lookup.
-    private async Task<Dictionary<Guid, BackupScheduleSummary>> LoadSchedulesAsync(
-        List<BackupSource> sources, CancellationToken ct)
-    {
-        var scheduleIds = sources
-            .Where(s => s.ScheduleId is not null)
-            .Select(s => s.ScheduleId!.Value)
-            .Distinct()
-            .ToList();
-
-        if (scheduleIds.Count == 0)
-            return [];
-
-        var rows = await db.ProcessingSchedules
-            .AsNoTracking()
-            .Where(s => scheduleIds.Contains(s.Id))
-            .Select(s => new BackupScheduleSummary
-            {
-                Id = s.Id,
-                CronExpression = s.CronExpression,
-                IsEnabled = s.IsEnabled,
-                Priority = s.Priority,
-                NextRunAt = s.NextRunAt,
-                LastRunAt = s.LastRunAt,
-            })
-            .ToListAsync(ct);
-
-        return rows.ToDictionary(r => r.Id);
-    }
-
-    // The staged result is handler-written jsonb. A shape change across a deploy would leave older rows
-    // undeserializable; degrade to "no summary" rather than failing the whole admin page.
-    private static BackupRunSummary? DeserializeSummary(string? result)
-    {
-        if (string.IsNullOrWhiteSpace(result))
-            return null;
-
-        try
-        {
-            return JsonSerializer.Deserialize<BackupRunSummary>(result);
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
-    }
-
-    // Same degrade-don't-fail posture as the summary above: an older row whose shape has since changed
-    // simply reports no outcome rather than taking the whole admin page down.
-    private static BackupBatchOutcome? DeserializeOutcome(string? result)
-    {
-        if (string.IsNullOrWhiteSpace(result))
-            return null;
-
-        try
-        {
-            return JsonSerializer.Deserialize<BackupBatchOutcome>(result);
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
     }
 
     private record SourceTotals(Guid SourceId, int Count, long Bytes);

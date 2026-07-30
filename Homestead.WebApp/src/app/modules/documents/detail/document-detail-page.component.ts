@@ -38,6 +38,7 @@ import {
   lucideRefreshCw,
   lucideArrowLeft,
   lucideSparkles,
+  lucideDatabaseBackup,
 } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
@@ -67,10 +68,12 @@ import type { PartyOption } from '../parties/party-input/party-input.component';
 import { AddVersionDialogComponent } from './add-version-dialog/add-version-dialog.component';
 import { ReprocessDialogComponent } from './reprocess-dialog/reprocess-dialog.component';
 import { TextExtractionProvenanceComponent } from './text-extraction-provenance/text-extraction-provenance.component';
+import { DocumentBackupStateComponent } from './backup-state/document-backup-state.component';
 import { ClassifyOptionsDialogComponent } from '../shared/classify-options-dialog/classify-options-dialog.component';
 import { formatBytes, parseDate, toIsoDateString, datesEqual, triggerDownload } from '@/shared/utils';
 import { DocumentApiService } from '@/api/services/document-api.service';
 import { DocumentVersionApiService } from '@/api/services/document-version-api.service';
+import { AdminBackupApiService } from '@/api/services/admin-backup-api.service';
 import type { JsonPatchDocument } from '@/api/generated/models/json-patch-document';
 import { replace } from '@/shared/json-patch';
 import type { GetDocumentResponse } from '@/api/generated/models/get-document-response';
@@ -83,7 +86,7 @@ import { PageHeaderService } from '@/shared/services/page-header.service';
 import { OpenDocumentsService } from './open-documents.service';
 import { DocumentEditStateService, type DocumentEditState } from './document-edit-state.service';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
-import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
+import { handleMutationError, handleQueryError } from '@/shared/utils/rxjs-error.utils';
 import { toast } from '@spartan-ng/brain/sonner';
 
 @Component({
@@ -116,6 +119,7 @@ import { toast } from '@spartan-ng/brain/sonner';
     ReprocessDialogComponent,
     TextExtractionProvenanceComponent,
     ClassifyOptionsDialogComponent,
+    DocumentBackupStateComponent,
     HlmBadge,
     HlmEmptyImports,
     HlmDatePicker,
@@ -142,6 +146,7 @@ import { toast } from '@spartan-ng/brain/sonner';
       lucideRefreshCw,
       lucideArrowLeft,
       lucideSparkles,
+      lucideDatabaseBackup,
     }),
   ],
   template: `
@@ -597,6 +602,67 @@ import { toast } from '@spartan-ng/brain/sonner';
               <p class="text-sm text-muted-foreground break-all">{{ displayFileHash() }}</p>
             </div>
           }
+
+          <!--
+            Admin-only, and read-only. Rendered only once a documents backup pairing exists (or the
+            fetch failed) — with nothing configured to mirror documents there is no question for this
+            section to answer.
+          -->
+          @if (auth.isAdmin()) {
+            <!--
+              The error case is rendered by the SAME branch as the loaded one, deliberately. Falling back
+              to null on failure would otherwise collapse the section into the identical nothing that "no
+              pairing is configured" renders — and take the retry button with it.
+            -->
+            @if (backupStateError() || (backupState()?.sources?.length ?? 0) > 0) {
+              <hlm-separator />
+
+              <div class="flex items-center justify-between gap-2">
+                <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Backup
+                </p>
+
+                <!--
+                  An explicit refresh, because a run's completion may never reach this client:
+                  ProcessingNotifier sends to the job's creator, and a scheduled run carries the
+                  SCHEDULE creator's id — so the nightly run, the common case, notifies nobody here.
+                -->
+                <button
+                  hlmBtn
+                  variant="ghost"
+                  size="icon-sm"
+                  data-testid="refresh-backup-state"
+                  [disabled]="backupStateLoading()"
+                  (click)="refreshBackupState()"
+                  aria-label="Refresh backup state"
+                >
+                  @if (backupStateLoading()) {
+                    <hlm-spinner class="size-4" />
+                  } @else {
+                    <ng-icon hlm name="lucideRefreshCw" size="sm" />
+                  }
+                </button>
+              </div>
+
+              @if (backupStateError()) {
+                <p class="text-sm text-destructive" data-testid="backup-state-error">
+                  This document's backup state could not be loaded, so nothing below is known — this is
+                  not a report that it is unbacked. Try again.
+                </p>
+              } @else if (backupState()?.sources; as backupSources) {
+                <app-document-backup-state
+                  [sources]="backupSources"
+                  [selectedVersionId]="displayVersionId()"
+                />
+
+                <!-- No per-source anchor exists on /admin/backup, so this stays a plain link. -->
+                <a hlmBtn variant="link" class="w-fit px-0" routerLink="/admin/backup">
+                  <ng-icon hlm name="lucideDatabaseBackup" size="sm" />
+                  Manage backups
+                </a>
+              }
+            }
+          }
         </div>
       </ng-template>
 
@@ -694,7 +760,11 @@ import { toast } from '@spartan-ng/brain/sonner';
 
       @if (isMobile()) {
         <!-- Mobile: single tabbed layout -->
-        <hlm-tabs tab="preview" class="min-w-0 flex flex-1 flex-col overflow-hidden">
+        <hlm-tabs
+          tab="preview"
+          class="min-w-0 flex flex-1 flex-col overflow-hidden"
+          (tabActivated)="onTabActivated($event)"
+        >
           <hlm-tabs-list class="w-full" aria-label="Document tabs">
             <button hlmTabsTrigger="preview" class="flex-1">Preview</button>
             <button hlmTabsTrigger="info" class="flex-1">Info</button>
@@ -736,7 +806,13 @@ import { toast } from '@spartan-ng/brain/sonner';
 
           <!-- Info/Text tabs panel -->
           <div hlmResizablePanel [defaultSize]="25" [minSize]="20" class="flex flex-col overflow-hidden">
-            <hlm-tabs tab="info" class="min-w-0 flex flex-1 flex-col overflow-hidden">
+            <!-- Both instances wire this: they are separate elements under @if (isMobile()), so a
+                 resize across 768px recreates one and destroys the other. -->
+            <hlm-tabs
+              tab="info"
+              class="min-w-0 flex flex-1 flex-col overflow-hidden"
+              (tabActivated)="onTabActivated($event)"
+            >
               <hlm-tabs-list variant="line" class="mx-4 mt-3">
                 <button hlmTabsTrigger="info">Info</button>
                 <button hlmTabsTrigger="content">Content</button>
@@ -818,6 +894,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
 
   private documentApi = inject(DocumentApiService);
   private versionApi = inject(DocumentVersionApiService);
+  private adminBackupApi = inject(AdminBackupApiService);
   private sanitizer = inject(DomSanitizer);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
@@ -1016,6 +1093,87 @@ export class DocumentDetailPageComponent implements OnDestroy {
   );
 
   document = this.documentData;
+
+  // --- Backup state (admin only) --------------------------------------------------------------------
+
+  /** The version the backup panel reports on — whichever one the page is currently showing. */
+  displayVersionId = computed(() => this.activeVersion()?.id ?? null);
+
+  /**
+   * Sticky latch: true once the Metadata tab has been opened, so the admin-only fetch never happens
+   * for a page nobody looked at that deeply.
+   *
+   * Held on the COMPONENT rather than inside the tabs. There are two `<hlm-tabs>` instances — mobile
+   * and desktop — under `@if (isMobile())`, so crossing 768px destroys and recreates them; anything
+   * latched inside would be lost on every resize, and the section would blank out mid-read.
+   */
+  metadataOpened = signal(false);
+
+  backupStateLoading = signal(false);
+
+  /**
+   * Public, because a failed fetch has to be SAID. `handleQueryError` falls back to null, which collapses
+   * the whole section — including its own retry button — into the same nothing that "no pairing is
+   * configured" renders. An admin would read a load failure as "this document is not backed up anywhere",
+   * which is the one conclusion this panel must never let someone reach by accident.
+   */
+  backupStateError = signal(false);
+
+  private backupStateRefresh = signal(0);
+
+  onTabActivated(tab: string): void {
+    if (tab === 'metadata') this.metadataOpened.set(true);
+  }
+
+  /**
+   * The explicit refresh behind the section header. Needed because a completed run may never reach
+   * this client at all: `ProcessingNotifier` returns early without a user id and sends to
+   * `Clients.User(...)`, and a scheduled run carries the SCHEDULE creator's id — so the nightly run,
+   * the common case, notifies nobody who happens to be reading this page.
+   */
+  refreshBackupState(): void {
+    this.backupStateRefresh.update((v) => v + 1);
+  }
+
+  /**
+   * Keyed on the document id as well as the tab latch, which is load-bearing: this component is REUSED
+   * across prev/next navigation (the reason `initializedDocId` exists) and the active tab does not
+   * change during it — a fetch driven only by `tabActivated` would leave the previous document's
+   * backup state on screen under the new document's name.
+   */
+  private backupStateData = toSignal(
+    combineLatest([
+      toObservable(this.documentId),
+      toObservable(this.refreshTrigger),
+      toObservable(this.metadataOpened),
+      toObservable(this.backupStateRefresh),
+    ]).pipe(
+      switchMap(([id, , opened]) => {
+        // Gated here and not only in the template, so a non-admin issues zero requests against an
+        // admin-only endpoint. The loading flag is cleared on the way out because switchMap drops the
+        // in-flight request without running its map/catchError — leaving it set would disable the
+        // refresh button for the rest of the page's life.
+        if (!id || !opened || !this.auth.isAdmin()) {
+          this.backupStateLoading.set(false);
+          return of(null);
+        }
+
+        this.backupStateLoading.set(true);
+        this.backupStateError.set(false);
+
+        return this.adminBackupApi.getDocumentBackupState(id).pipe(
+          map((r) => {
+            this.backupStateLoading.set(false);
+            return r;
+          }),
+          handleQueryError(this.backupStateLoading, this.backupStateError, null),
+        );
+      }),
+    ),
+    { initialValue: null },
+  );
+
+  backupState = this.backupStateData;
 
   private origDocumentDate = computed(() => parseDate(this.document()?.documentDate));
   private origExpiryDate = computed(() => parseDate(this.document()?.expiryDate));

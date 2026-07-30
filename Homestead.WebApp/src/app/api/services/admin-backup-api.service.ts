@@ -4,6 +4,7 @@ import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { getBackupTargets } from '@/api/generated/fn/admin/get-backup-targets';
+import { getDocumentBackupState } from '@/api/generated/fn/admin/get-document-backup-state';
 import { patchBackupTarget } from '@/api/generated/fn/admin/patch-backup-target';
 import { createBackupSource } from '@/api/generated/fn/admin/create-backup-source';
 import { patchBackupSource } from '@/api/generated/fn/admin/patch-backup-source';
@@ -17,6 +18,7 @@ import { confirmBackupTargetConnection } from '@/api/generated/fn/admin/confirm-
 import { disconnectBackupTarget } from '@/api/generated/fn/admin/disconnect-backup-target';
 import { validateBackupTargetConnection } from '@/api/generated/fn/admin/validate-backup-target-connection';
 import type { GetBackupTargetsResponse } from '@/api/generated/models/get-backup-targets-response';
+import type { GetDocumentBackupStateResponse } from '@/api/generated/models/get-document-backup-state-response';
 import type { PatchBackupTargetBody } from '@/api/generated/models/patch-backup-target-body';
 import type { PatchBackupTargetResponse } from '@/api/generated/models/patch-backup-target-response';
 import type { CreateBackupSourceBody } from '@/api/generated/models/create-backup-source-body';
@@ -39,6 +41,15 @@ export class AdminBackupApiService {
 
   listTargets(): Observable<GetBackupTargetsResponse> {
     return getBackupTargets(this.http, this.config.rootUrl).pipe(map(r => r.body));
+  }
+
+  /**
+   * Where one document stands in every mirror configured to carry it. Read-only, admin-only, and 404s
+   * for a document that does not exist or is in the trash.
+   */
+  getDocumentBackupState(documentId: string): Observable<GetDocumentBackupStateResponse> {
+    return getDocumentBackupState(this.http, this.config.rootUrl, { documentId })
+      .pipe(map(r => r.body));
   }
 
   /** Target-level enable only — the prune latch is acknowledged per source. */

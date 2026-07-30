@@ -114,7 +114,7 @@ public class BackupBatchJobHandler(
                         && versionIds.Contains(s.DocumentVersionId))
             .ToDictionaryAsync(s => s.DocumentVersionId, ct);
 
-        var failures = new List<string>();
+        var failures = new List<BackupActionFailure>();
         var pruneCandidates = new List<string>();
         var deferred = new List<BackupAction>();
         var pendingSinceFlush = 0;
@@ -207,7 +207,8 @@ public class BackupBatchJobHandler(
                     "Backup {Kind} failed for version {VersionId} on target {TargetKey} at {Path}",
                     action.Kind, action.VersionId, source.TargetKey, action.RelativePath);
 
-                failures.Add($"{action.Kind} '{action.RelativePath}': {ex.Message}");
+                failures.Add(new BackupActionFailure(
+                    action.VersionId, action.Kind.ToString(), action.RelativePath, ex.Message));
             }
         }
 
@@ -236,10 +237,11 @@ public class BackupBatchJobHandler(
 
         // One clean message, and a typed marker beside it. Nothing latches: quota frees up entirely
         // outside Homestead (the user empties their trash, buys storage) with no event to observe, so the
-        // next scheduled run simply retries.
+        // next scheduled run simply retries. The per-action failures ride along: a move that genuinely
+        // failed in the same batch is not erased by the destination also being full.
         if (outOfSpace)
         {
-            job.SetResult(new BackupBatchOutcome(BackupBatchOutcome.OutOfSpaceCode, skippedPuts));
+            job.SetResult(BuildOutcome(BackupBatchOutcome.OutOfSpaceCode, skippedPuts, failures));
             await db.SaveChangesAsync(ct);
 
             throw new InvalidOperationException(outOfSpaceMessage ?? OutOfSpaceMessage);
@@ -249,12 +251,44 @@ public class BackupBatchJobHandler(
         // as a silent success — the admin needs to see that some files did not make it.
         if (failures.Count > 0)
         {
-            throw new InvalidOperationException(
-                $"{failures.Count} of {payload.Actions.Count} backup action(s) failed: " +
-                string.Join("; ", failures.Take(10)) +
-                (failures.Count > 10 ? $" (+{failures.Count - 10} more)" : string.Empty));
+            // Staged BEFORE the throw, and after the flush above that persisted the successes. The thrown
+            // message is capped and joined, which makes it useless for answering "did THIS file fail" —
+            // the typed list is what a per-document reader joins on, by version id.
+            job.SetResult(BuildOutcome(errorCode: null, skippedPuts, failures));
+            await db.SaveChangesAsync(ct);
+
+            throw new InvalidOperationException(DescribeFailures(failures, payload.Actions.Count));
         }
     }
+
+    /// <summary>
+    /// How many per-action failures are staged on the job. The count on the outcome stays whole, so a cap
+    /// here reads as "not listed" rather than as "did not fail".
+    /// </summary>
+    private const int MaxStagedFailures = 100;
+
+    /// <summary>How many failures the thrown message names before rolling the rest into a count.</summary>
+    private const int MaxDescribedFailures = 10;
+
+    private static BackupBatchOutcome BuildOutcome(
+        string? errorCode, int skippedPuts, List<BackupActionFailure> failures) =>
+        new(errorCode,
+            skippedPuts,
+            failures.Count == 0 ? null : failures.Take(MaxStagedFailures).ToList(),
+            failures.Count);
+
+    /// <summary>
+    /// The batch's failure message, composed from the same list that is staged on the job so the two can
+    /// never describe different things.
+    /// </summary>
+    private static string DescribeFailures(List<BackupActionFailure> failures, int actionCount) =>
+        $"{failures.Count} of {actionCount} backup action(s) failed: " +
+        string.Join("; ", failures
+            .Take(MaxDescribedFailures)
+            .Select(f => $"{f.Kind} '{f.RelativePath}': {f.Message}")) +
+        (failures.Count > MaxDescribedFailures
+            ? $" (+{failures.Count - MaxDescribedFailures} more)"
+            : string.Empty);
 
     /// <summary>
     /// Fallback wording only. The destination's own exception message wins where there is one — this

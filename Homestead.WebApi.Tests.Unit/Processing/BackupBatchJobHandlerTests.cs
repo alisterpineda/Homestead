@@ -739,6 +739,122 @@ public class BackupBatchJobHandlerTests : IDisposable
         Assert.Equal(2, outcome.SkippedPuts);
     }
 
+    // A full destination does not erase an action that failed for its own reasons in the same batch: the
+    // rolled-up out-of-space sentence is what the run RENDERS as, not the whole record of what went wrong.
+    [Fact]
+    public async Task OutOfSpace_StillCarriesTheOrdinaryFailuresBesideItsCode()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (sourcePath, hash) = SeedBlob("hello");
+        var badVersion = Guid.NewGuid();
+
+        // Ordered so the ordinary failure happens first: once the destination reports full, every
+        // remaining put is skipped rather than attempted.
+        _target.FailPutsAt = "2025/Bad.pdf";
+        _target.OutOfSpaceAt = "2025/Full.pdf";
+
+        var job = CreateJob([
+            Put(badVersion, "2025/Bad.pdf", sourcePath, hash),
+            Put(Guid.NewGuid(), "2025/Full.pdf", sourcePath, hash),
+        ]);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _sut.HandleAsync(job, ct));
+
+        var outcome = JsonSerializer.Deserialize<BackupBatchOutcome>(job.Result!)!;
+        Assert.Equal(BackupBatchOutcome.OutOfSpaceCode, outcome.ErrorCode);
+        Assert.Equal(1, outcome.SkippedPuts);
+        Assert.Equal(1, outcome.FailureCount);
+
+        var failure = Assert.Single(outcome.Failures!);
+        Assert.Equal(badVersion, failure.VersionId);
+        Assert.Equal("2025/Bad.pdf", failure.RelativePath);
+    }
+
+    // --- Per-action failures --------------------------------------------------------------------------
+
+    // The thrown message is joined and truncated, so it can never answer "did the copy of THIS document
+    // fail, and why". A first-ever copy that fails writes no state row either, so there is no persisted
+    // path to join on — the version id on the staged failure is the only key a per-document reader has.
+    [Fact]
+    public async Task AFailedAction_StagesATypedFailureOnTheJob()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (sourcePath, hash) = SeedBlob("hello");
+        var badVersion = Guid.NewGuid();
+        var goodVersion = Guid.NewGuid();
+
+        _target.FailPutsAt = "2025/Bad.pdf";
+
+        var job = CreateJob([
+            Put(badVersion, "2025/Bad.pdf", sourcePath, hash),
+            Put(goodVersion, "2025/Good.pdf", sourcePath, hash),
+        ]);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _sut.HandleAsync(job, ct));
+
+        var outcome = JsonSerializer.Deserialize<BackupBatchOutcome>(job.Result!)!;
+
+        Assert.Null(outcome.ErrorCode);
+        Assert.Equal(1, outcome.FailureCount);
+
+        var failure = Assert.Single(outcome.Failures!);
+        Assert.Equal(badVersion, failure.VersionId);
+        Assert.Equal(nameof(BackupActionKind.Put), failure.Kind);
+        Assert.Equal("2025/Bad.pdf", failure.RelativePath);
+        Assert.Equal("Simulated write failure at 2025/Bad.pdf.", failure.Message);
+
+        // Staged after the flush that persisted the successes, so one bad file still costs the others
+        // nothing.
+        Assert.True(await _db.DocumentBackupStates.AnyAsync(s => s.DocumentVersionId == goodVersion, ct));
+    }
+
+    // The message and the staged list are now composed from the same source, which is only safe if the
+    // wording is unchanged: the parent's BatchErrors is what /admin/backup renders today.
+    [Fact]
+    public async Task TheThrownMessage_KeepsItsExistingWordingExactly()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (sourcePath, hash) = SeedBlob("hello");
+
+        _target.FailPutsAt = "2025/Bad.pdf";
+
+        var job = CreateJob([
+            Put(Guid.NewGuid(), "2025/Bad.pdf", sourcePath, hash),
+            Put(Guid.NewGuid(), "2025/Good.pdf", sourcePath, hash),
+        ]);
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => _sut.HandleAsync(job, ct));
+
+        Assert.Equal(
+            "1 of 2 backup action(s) failed: Put '2025/Bad.pdf': Simulated write failure at 2025/Bad.pdf.",
+            ex.Message);
+    }
+
+    // A cap that also capped the count would read as "only a hundred failed" on a run where everything
+    // did. The list truncates; the total stays whole.
+    [Fact]
+    public async Task ManyFailures_CapTheStagedListWhileTheCountStaysWhole()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (sourcePath, hash) = SeedBlob("hello");
+
+        _target.FailAllPuts = true;
+
+        var job = CreateJob(Enumerable.Range(0, 120)
+            .Select(i => Put(Guid.NewGuid(), $"2025/Doc{i}.pdf", sourcePath, hash)));
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => _sut.HandleAsync(job, ct));
+
+        var outcome = JsonSerializer.Deserialize<BackupBatchOutcome>(job.Result!)!;
+
+        Assert.Equal(100, outcome.Failures!.Count);
+        Assert.Equal(120, outcome.FailureCount);
+
+        // The message keeps its own, much tighter cap — unchanged from before the list existed.
+        Assert.StartsWith("120 of 120 backup action(s) failed: ", ex.Message);
+        Assert.EndsWith("(+110 more)", ex.Message);
+    }
+
     // --- Prune dispatch -------------------------------------------------------------------------------
 
     [Fact]
@@ -799,6 +915,10 @@ public class BackupBatchJobHandlerTests : IDisposable
         public Dictionary<string, string> Objects { get; } = new(StringComparer.Ordinal);
         public bool Available { get; set; } = true;
         public string? FailPutsAt { get; set; }
+
+        /// <summary>Fails every put, for covering what a batch does with a great many failures at once.</summary>
+        public bool FailAllPuts { get; set; }
+
         public string? OutOfSpaceAt { get; set; }
         public bool ContentHashSupported { get; set; }
         public bool FailPrune { get; set; }
@@ -825,7 +945,7 @@ public class BackupBatchJobHandlerTests : IDisposable
         {
             PutContexts.Add(context);
 
-            if (FailPutsAt == target.RelativePath)
+            if (FailAllPuts || FailPutsAt == target.RelativePath)
                 throw new InvalidOperationException($"Simulated write failure at {target.RelativePath}.");
 
             if (OutOfSpaceAt == target.RelativePath)

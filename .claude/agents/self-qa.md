@@ -137,8 +137,29 @@ sends unauthenticated → `/login` and inactive → `/pending-activation`.
 | `/documents/tags` | TagListComponent | table/badge/input/create/edit + color picker |
 | `/documents/trash` | TrashListComponent | |
 | `/documents/settings` | DocumentSettingsComponent | **adminGuard** |
-| `/documents/:id` | DocumentDetailPageComponent | version + reprocess dialogs |
+| `/documents/:id` | DocumentDetailPageComponent | version + reprocess dialogs; tabs differ by breakpoint (below) |
 | `/documents/:id/versions/:versionId` | DocumentDetailPageComponent | |
+
+**The detail page's tabs differ by breakpoint.** Desktop: Info / Content / Metadata / Activity. Mobile
+(≤768px): **Preview** / Info / Content / Metadata / Activity — two separate `<hlm-tabs>` instances under
+`@if (isMobile())`, so a resize destroys one and builds the other. The mobile instance defaults to
+**Preview**, so a mobile run must click Metadata explicitly.
+
+#### Backup section (Metadata tab, admin-only)
+
+An admin-only, read-only report of where this document stands in each documents backup mirror. Rendered
+after the Version block, and **hidden entirely when no `documents` pairing exists** — so a QA run must
+first create the pairing at `/admin/backup` (Add backup → Documents → `local`). The fetch is latched: it
+does not happen until the Metadata tab has been activated once, and the latch survives a breakpoint
+resize (it lives on the component, not inside the tabs).
+
+- Container: `document-backup-state`; header refresh icon-button: `refresh-backup-state`
+- Per-source, suffixed with the **backup source guid**: `backup-source-{id}`,
+  `availability-badge-{id}` (Unavailable / Paused), `last-run-badge-{id}`, `last-success-{id}`,
+  `unavailable-reason-{id}`, `version-written-{id}`, `version-failure-{id}`, `version-not-written-{id}`,
+  `version-rollup-{id}`
+- `remote-link-{id}` is **Drive-only** — a local target has no browsable object URL, so it never renders
+  on the default stack.
 
 ### Finances  (`/finances`, FinancesLayoutComponent; index → accounts)
 
@@ -266,6 +287,8 @@ Selector traps:
   - `/sources` (`POST`), `/sources/{id}` (`PATCH` for enable + `acknowledgePruneBlock`, `DELETE` with
     optional `?cancelRun=true`)
   - `/sources/{id}/runs` (`POST`), `/sources/{id}/schedule` (`PUT`/`DELETE`)
+  - `/documents/{documentId}` (`GET`) — the per-document Backup section on the document detail page's
+    Metadata tab. Admin-only (403 for a contributor); 404 for an unknown or trashed document.
   - Drive-only, **not reachable** (see Backup above): `/targets/{key}/connect` (`POST`),
     `/targets/{key}/connect/poll` (`POST`), `/targets/{key}/connect/confirm` (`POST`),
     `/targets/{key}/validate` (`POST`), `/targets/{key}/connection` (`DELETE`)
@@ -278,3 +301,8 @@ Selector traps:
 - `hlm-checkbox` aria-label: bind `[aria-label]`, NOT `[attr.aria-label]`.
 - Document list search lives in the `?search=` query param (debounced 300ms), not local component state.
 - Pages with header actions register an `<ng-template #headerActions>`; actions clear on NavigationStart.
+- **Dark mode**: sidebar user menu → **Theme** → a dialog with Light / Dark / System radios. The
+  `<input type=radio>` is intercepted by its wrapping `<label>` — click the label, not the radio, or
+  Playwright times out.
+- **Logging out takes two confirmations**, which is not a bug: an in-app `alertdialog` "Log out?"
+  (Cancel / Log out), then Keycloak's own "Do you want to log out?" page.

@@ -155,6 +155,23 @@ public sealed class GoogleDriveBackupTarget : IBackupTarget, IBackupTargetCache,
         return $"Google Drive / {root}";
     }
 
+    /// <inheritdoc />
+    /// <remarks>
+    /// The handle is the Drive file id, so this is the canonical viewer URL and nothing else is needed to
+    /// build it. Guarded on the same config verdict as <see cref="DescribeLocation"/>: a target that
+    /// cannot run has no object to point at, and a link that 404s is worse than no link.
+    /// </remarks>
+    public string? DescribeObjectUrl(string? handle)
+    {
+        if (ConfigurationError is not null || string.IsNullOrWhiteSpace(handle))
+            return null;
+
+        // Escaped, because the handle is opaque persisted data rather than something this class produced:
+        // a file id is URL-safe today, but splicing an unescaped value carrying '/', '?' or '#' into a
+        // path segment would silently point the link somewhere else entirely.
+        return $"https://drive.google.com/file/d/{Uri.EscapeDataString(handle.Trim())}/view";
+    }
+
     private string EffectiveRootFolderPath =>
         string.IsNullOrWhiteSpace(_options.RootFolderPath)
             ? DefaultRootFolderPath

@@ -651,6 +651,110 @@ public class BackupMirrorTests : IntegrationTestBase
         Assert.True(after > DateTimeOffset.UtcNow.AddMinutes(-5));
     }
 
+    // The staleness line is only worth anything if it is hard to fake, and a SKIPPED run is the easiest
+    // way to fake it: the planner stages Skipped = true, zeroes the child count and completes normally.
+    // Counted, a paused backup would report a fresh success on every cron tick, forever — which is the
+    // exact failure this value exists to expose.
+    [Fact]
+    public async Task LastSuccessfulRunAt_IsNotRefreshedByASkippedRun()
+    {
+        var client = await CreateAdminClientAsync();
+        var sourceId = await CreateSourceAsync(client);
+
+        var docId = await UploadAndWaitAsync(client, "real.pdf");
+        await SetDocumentDateAsync(docId, new DateOnly(2025, 1, 1));
+
+        await RunBackupExpectingSuccessAsync(client, sourceId);
+
+        var afterRealRun = (await GetSourceAsync(client, sourceId)).LastSuccessfulRunAt;
+        Assert.NotNull(afterRealRun);
+
+        var skipped = await RunSkippedBackupAsync(client, sourceId);
+        Assert.Equal(ProcessingJobStatus.Completed, skipped.Status);
+
+        var source = await GetSourceAsync(client, sourceId);
+
+        // The newest run still moves — the skip is not hidden, it just does not count as a success.
+        Assert.True(source.LastRun!.Summary!.Skipped);
+        Assert.Equal(skipped.Id, source.LastRun.JobId);
+        Assert.Equal(afterRealRun, source.LastSuccessfulRunAt);
+    }
+
+    // Same shape, different lie: a dry run plans everything and copies nothing, so it must not read as a
+    // backup that happened.
+    [Fact]
+    public async Task LastSuccessfulRunAt_IsNotRefreshedByADryRun()
+    {
+        var client = await CreateAdminClientAsync();
+        var sourceId = await CreateSourceAsync(client);
+
+        var docId = await UploadAndWaitAsync(client, "dry.pdf");
+        await SetDocumentDateAsync(docId, new DateOnly(2025, 1, 1));
+
+        await RunBackupExpectingSuccessAsync(client, sourceId);
+
+        var afterRealRun = (await GetSourceAsync(client, sourceId)).LastSuccessfulRunAt;
+        Assert.NotNull(afterRealRun);
+
+        await RunBackupExpectingSuccessAsync(client, sourceId, dryRun: true);
+
+        var source = await GetSourceAsync(client, sourceId);
+
+        Assert.True(source.LastRun!.Summary!.DryRun);
+        Assert.Equal(afterRealRun, source.LastSuccessfulRunAt);
+    }
+
+    // And the other direction: a dry run must not POISON a later real run either. The jsonb predicate
+    // runs per row, so the newest real run has to win over a dry run that happened after the first one.
+    [Fact]
+    public async Task LastSuccessfulRunAt_IsRefreshedByARealRunAfterADryRun()
+    {
+        var client = await CreateAdminClientAsync();
+        var sourceId = await CreateSourceAsync(client);
+
+        var docId = await UploadAndWaitAsync(client, "both.pdf");
+        await SetDocumentDateAsync(docId, new DateOnly(2025, 1, 1));
+
+        await RunBackupExpectingSuccessAsync(client, sourceId, dryRun: true);
+        Assert.Null((await GetSourceAsync(client, sourceId)).LastSuccessfulRunAt);
+
+        await RunBackupExpectingSuccessAsync(client, sourceId);
+
+        var source = await GetSourceAsync(client, sourceId);
+        Assert.NotNull(source.LastSuccessfulRunAt);
+        Assert.False(source.LastRun!.Summary!.DryRun);
+    }
+
+    /// <summary>
+    /// Queues a run and then disables the pairing before the worker can claim it — the shape a
+    /// still-armed schedule produces after an operator pauses the backup.
+    /// </summary>
+    /// <remarks>
+    /// The ordering is the only way to reach the planner's skip path from outside: the run-now endpoint
+    /// refuses an already-disabled source outright, so the skip only ever happens to a run that was
+    /// legitimate when it was queued. The processor takes its concurrency permits before claiming, so
+    /// holding them keeps the job Pending rather than merely unstarted.
+    /// </remarks>
+    private async Task<ProcessingJob> RunSkippedBackupAsync(HttpClient client, Guid sourceId)
+    {
+        Guid jobId;
+
+        await using (await Factory.Services.GetRequiredService<IJobProcessorControl>().PauseAsync(CT))
+        {
+            var response = await client.PostAsJsonAsync(
+                $"/api/v1/admin/backup/sources/{sourceId}/runs", new { }, CT);
+            response.EnsureSuccessStatusCode();
+
+            jobId = (await response.Content.ReadFromJsonAsync<RunResult>(CT))!.JobId;
+
+            (await client.PatchAsJsonAsync(
+                $"/api/v1/admin/backup/sources/{sourceId}", new { isEnabled = false }, CT))
+                .EnsureSuccessStatusCode();
+        }
+
+        return await WaitForBackupJobAsync(jobId);
+    }
+
     [Fact]
     public async Task DisablingTheTarget_BlocksRunsForEverySourceOnIt()
     {
@@ -746,6 +850,141 @@ public class BackupMirrorTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
+    // --- the per-document read surface ----------------------------------------------------------------
+
+    // Everything the panel leads with, end to end after a real run: the pairing is reachable, it last
+    // succeeded just now, and this document's version has a recorded path in the mirror.
+    [Fact]
+    public async Task DocumentBackupState_ReportsWhereThisDocumentWentAfterARun()
+    {
+        var client = await CreateAdminClientAsync();
+        var sourceId = await CreateSourceAsync(client);
+
+        var docId = await UploadAndWaitAsync(client, "traced.pdf");
+        await RenameDocumentAsync(docId, "Traced");
+        await SetDocumentDateAsync(docId, new DateOnly(2025, 1, 1));
+
+        await RunBackupExpectingSuccessAsync(client, sourceId);
+
+        var state = await GetDocumentBackupStateAsync(client, docId);
+
+        Assert.Equal(docId, state.DocumentId);
+        Assert.Equal(1, state.LiveVersionCount);
+
+        var source = Assert.Single(state.Sources);
+        Assert.Equal(sourceId, source.BackupSourceId);
+        Assert.Equal(TargetKey, source.TargetKey);
+        Assert.Equal("Documents", source.SourceDisplayName);
+        Assert.True(source.IsAvailable);
+        Assert.Null(source.UnavailableReason);
+        Assert.True(source.IsEnabled);
+        Assert.True(source.TargetEnabled);
+        Assert.NotNull(source.LastSuccessfulRunAt);
+        Assert.Equal(1, source.CopiedVersionCount);
+        Assert.Equal(0, source.PendingRemovalCount);
+
+        var version = Assert.Single(source.Versions);
+        Assert.Equal(1, version.VersionNumber);
+        Assert.Equal($"{Root}/2025/Traced.pdf", version.RemoteRelativePath);
+        Assert.NotNull(version.LastWrittenAt);
+        Assert.True(version.FileSize > 0);
+        Assert.Null(version.LastFailureMessage);
+
+        // A local directory has no browsable URL, and inventing a file:// one would leak the server root.
+        Assert.Null(version.RemoteUrl);
+    }
+
+    // Before any run there is nothing recorded — and the version is still listed, because "not copied" is
+    // exactly the state this surface exists to make visible.
+    [Fact]
+    public async Task DocumentBackupState_BeforeAnyRun_RecordsNothingButStillListsTheVersion()
+    {
+        var client = await CreateAdminClientAsync();
+        var sourceId = await CreateSourceAsync(client);
+
+        var docId = await UploadAndWaitAsync(client, "unrun.pdf");
+
+        var source = Assert.Single((await GetDocumentBackupStateAsync(client, docId)).Sources);
+
+        Assert.Equal(sourceId, source.BackupSourceId);
+        Assert.Null(source.LastSuccessfulRunAt);
+        Assert.Null(source.LastRun);
+        Assert.Equal(0, source.CopiedVersionCount);
+
+        var version = Assert.Single(source.Versions);
+        Assert.Null(version.LastWrittenAt);
+        Assert.Null(version.RemoteRelativePath);
+    }
+
+    // The sentence the whole of Change 2 exists to make reachable: a first-ever copy that fails writes no
+    // state row, so without the typed per-action failure there is nothing to join this document against.
+    [Fact]
+    public async Task DocumentBackupState_SurfacesThisDocumentsOwnFailure()
+    {
+        var client = await CreateAdminClientAsync();
+        var sourceId = await CreateSourceAsync(client);
+
+        var docId = await UploadAndWaitAsync(client, "lost.pdf");
+        await RenameDocumentAsync(docId, "Lost");
+        await SetDocumentDateAsync(docId, new DateOnly(2025, 1, 1));
+
+        // Delete the blob behind the app's back, leaving the version row intact: the library has lost a
+        // file, so the batch fails with this version named.
+        using (var scope = CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var blob = await db.DocumentVersions.AsNoTracking().FirstAsync(v => v.DocumentId == docId, CT);
+            File.Delete(Path.Combine(Factory.MediaPath, blob.FilePath));
+        }
+
+        var job = await RunBackupAsync(client, sourceId);
+        Assert.Equal(ProcessingJobStatus.Failed, job.Status);
+
+        var source = Assert.Single((await GetDocumentBackupStateAsync(client, docId)).Sources);
+
+        Assert.Equal(0, source.CopiedVersionCount);
+        Assert.Null(source.LastSuccessfulRunAt);
+        Assert.Equal(1, source.LastRun!.FailedChildCount);
+
+        var version = Assert.Single(source.Versions);
+        Assert.NotNull(version.LastFailureMessage);
+        Assert.Contains("missing from storage", version.LastFailureMessage);
+        Assert.NotNull(version.LastFailureAt);
+    }
+
+    [Fact]
+    public async Task DocumentBackupState_ForAnUnknownDocument_Is404()
+    {
+        var client = await CreateAdminClientAsync();
+
+        var response = await client.GetAsync(
+            $"/api/v1/admin/backup/documents/{Guid.NewGuid()}", CT);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task DocumentBackupState_RequiresAdmin()
+    {
+        var admin = await CreateAdminClientAsync();
+        var docId = await UploadAndWaitAsync(admin, "guarded.pdf");
+
+        var contributor = await CreateUserClientAsync();
+
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await contributor.GetAsync($"/api/v1/admin/backup/documents/{docId}", CT)).StatusCode);
+    }
+
+    private async Task<DocumentBackupStateResult> GetDocumentBackupStateAsync(
+        HttpClient client, Guid documentId)
+    {
+        var response = await client.GetFromJsonAsync<DocumentBackupStateResult>(
+            $"/api/v1/admin/backup/documents/{documentId}", CT);
+
+        Assert.NotNull(response);
+        return response;
+    }
+
     [Fact]
     public async Task BackupEndpoints_RequireAdmin()
     {
@@ -830,4 +1069,36 @@ public class BackupMirrorTests : IntegrationTestBase
 
     private record ScheduleItem(
         Guid Id, string CronExpression, bool IsEnabled, int Priority, DateTimeOffset NextRunAt);
+
+    private record DocumentBackupStateResult(
+        Guid DocumentId,
+        int LiveVersionCount,
+        List<DocumentBackupSourceItem> Sources);
+
+    private record DocumentBackupSourceItem(
+        Guid BackupSourceId,
+        string TargetKey,
+        string? TargetKind,
+        string? SourceDisplayName,
+        bool IsAvailable,
+        string? UnavailableReason,
+        bool IsEnabled,
+        bool TargetEnabled,
+        string? TargetAccountEmail,
+        DateTimeOffset? LastSuccessfulRunAt,
+        RunStatusItem? LastRun,
+        ScheduleItem? Schedule,
+        int CopiedVersionCount,
+        int PendingRemovalCount,
+        List<DocumentBackupVersionItem> Versions);
+
+    private record DocumentBackupVersionItem(
+        Guid DocumentVersionId,
+        int VersionNumber,
+        DateTimeOffset? LastWrittenAt,
+        string? RemoteRelativePath,
+        string? RemoteUrl,
+        long? FileSize,
+        string? LastFailureMessage,
+        DateTimeOffset? LastFailureAt);
 }

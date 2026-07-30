@@ -9,6 +9,7 @@ using Homestead.WebApi.Modules.Admin.Features.Backup.DeleteBackupSchedule;
 using Homestead.WebApi.Modules.Admin.Features.Backup.DeleteBackupSource;
 using Homestead.WebApi.Modules.Admin.Features.Backup.DisconnectBackupTarget;
 using Homestead.WebApi.Modules.Admin.Features.Backup.GetBackupTargets;
+using Homestead.WebApi.Modules.Admin.Features.Backup.GetDocumentBackupState;
 using Homestead.WebApi.Modules.Admin.Features.Backup.PatchBackupSource;
 using Homestead.WebApi.Modules.Admin.Features.Backup.PatchBackupTarget;
 using Homestead.WebApi.Modules.Admin.Features.Backup.PollBackupTargetConnection;
@@ -105,6 +106,7 @@ public static class AdminModule
             .RequireAuthorization(AuthPolicies.RequireAdmin);
 
         GetBackupTargetsEndpoint.Map(backup);
+        GetDocumentBackupStateEndpoint.Map(backup);
         PatchBackupTargetEndpoint.Map(backup);
         CreateBackupSourceEndpoint.Map(backup);
         PatchBackupSourceEndpoint.Map(backup);

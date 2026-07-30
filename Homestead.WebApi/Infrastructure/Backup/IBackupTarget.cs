@@ -90,6 +90,19 @@ public interface IBackupTarget
     string? DescribeLocation(string? resolvedRoot) => Location;
 
     /// <summary>
+    /// A browsable URL for one mirrored object, given the handle persisted on its state row. Null when
+    /// this destination has none — which is the default, and the honest answer for most.
+    /// </summary>
+    /// <remarks>
+    /// Pure string composition from state the caller already holds: no listing, no lookup, no read of the
+    /// destination. That is what keeps the one-way guarantee intact — the mirror is still never consulted
+    /// about what is out there, this only formats a link out of what we recorded when we wrote it. A
+    /// filesystem target deliberately keeps the default: its handle IS the relative path, so a
+    /// <c>file://</c> URL would leak the server's own root and be unopenable from a browser anyway.
+    /// </remarks>
+    string? DescribeObjectUrl(string? handle) => null;
+
+    /// <summary>
     /// True when the target's <i>config</i> is complete and coherent enough to attempt writes. A static
     /// verdict computed once — whether a stored credential exists and still works is database state, so
     /// the composed answer every gate actually consults comes from <see cref="IBackupTargetGate"/>.
