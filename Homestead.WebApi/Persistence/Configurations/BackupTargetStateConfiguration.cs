@@ -1,4 +1,5 @@
 using Homestead.WebApi.Domain.Backup;
+using Homestead.WebApi.Infrastructure.Backup;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -20,6 +21,14 @@ public class BackupTargetStateConfiguration : IEntityTypeConfiguration<BackupTar
         builder.Property(s => s.IsEnabled)
             .IsRequired()
             .HasDefaultValue(true);
+
+        // The same constant config validation refuses a longer path against, so schema and validation
+        // cannot drift apart.
+        builder.Property(s => s.RootFolderPath)
+            .HasMaxLength(BackupConfiguration.MaxRootFolderPathLength);
+
+        builder.Property(s => s.RootFolderWebViewLink)
+            .HasMaxLength(512);
 
         builder.Property(s => s.CreatedAt)
             .IsRequired()

@@ -173,7 +173,7 @@ target on `/admin/backup` and is what backup pairings are stored against, so ren
 | `Backup__Targets__{key}__Path` | — | `Local` only: the mirror root. Must not overlap `FileStorage__MediaPath` or `__CachePath` |
 | `Backup__Targets__{key}__ClientId` | — | `GoogleDrive` only: your own OAuth client id — see [Google Drive backup setup](docs/google-drive-backup-setup.md) |
 | `Backup__Targets__{key}__ClientSecret` | — | `GoogleDrive` only: that client's secret. Google shows it **once**, at creation |
-| `Backup__Targets__{key}__RootFolderName` | `Homestead Backup` | `GoogleDrive` only: the app-managed folder in My Drive |
+| `Backup__Targets__{key}__RootFolderPath` | `Homestead/Backup` | `GoogleDrive` only: the app-managed folder in My Drive, as a `/`-separated path. Applied when the folder is first created; editing it later does not move an existing mirror |
 | `Backup__Targets__{key}__MaxFilesPerBatch` | per-kind | Override how many file copies one batch attempts |
 | `Backup__Targets__{key}__MaxBytesPerBatch` | per-kind | Override the byte budget for one batch — lower this on a slow uplink |
 | `Backup__Targets__{key}__MaxOpsPerMetadataBatch` | per-kind | Override how many moves/deletes one batch attempts |

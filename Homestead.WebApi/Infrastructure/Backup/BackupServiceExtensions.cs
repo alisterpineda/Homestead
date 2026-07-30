@@ -27,6 +27,10 @@ public static class BackupServiceExtensions
         services.AddScoped<IBackupTargetGate, BackupTargetGate>();
         services.AddSingleton<IGoogleDriveConnectTokenProtector, GoogleDriveConnectTokenProtector>();
 
+        // Stateless (a logger and nothing else), so a singleton — and resolvable from the after-commit
+        // hooks the connect slices register, which outlive nothing but still run inside the request scope.
+        services.AddSingleton<IBackupTargetRootProvisioner, BackupTargetRootProvisioner>();
+
         var targets = BackupConfiguration.ReadTargets(configuration);
         services.AddSingleton<IBackupTargetOptionsAccessor>(new BackupTargetOptionsAccessor(targets));
 
@@ -72,7 +76,12 @@ public static class BackupServiceExtensions
                 options,
                 sp.GetRequiredService<GoogleDriveTokenManager>(),
                 sp.GetRequiredService<IServiceScopeFactory>(),
-                sp.GetRequiredService<ILogger<GoogleDriveBackupTarget>>()),
+                sp.GetRequiredService<ILogger<GoogleDriveBackupTarget>>(),
+                // Nothing registers one in production, so this resolves to null and behaviour is
+                // unchanged. It is the seam the integration suite injects a network-free Drive through —
+                // without it, connect and validate would make real outbound calls to googleapis.com the
+                // moment root provisioning moved onto those paths.
+                sp.GetService<Google.Apis.Http.IHttpClientFactory>()),
 
             _ => new LocalDirectoryBackupTarget(key, options, storage)
         };

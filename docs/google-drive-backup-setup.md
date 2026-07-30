@@ -81,8 +81,10 @@ what backup pairings are stored against — renaming it later orphans them.
 Backup__Targets__gdrive__Kind=GoogleDrive
 Backup__Targets__gdrive__ClientId=<id>.apps.googleusercontent.com
 Backup__Targets__gdrive__ClientSecret=<secret>
-# Optional; defaults to "Homestead Backup".
-Backup__Targets__gdrive__RootFolderName=Homestead Backup
+# Optional; defaults to "Homestead/Backup". A forward-slash path relative to My Drive, applied when
+# the folder is FIRST CREATED — after that, Homestead records the folder it made and keeps using it,
+# so editing this does not move an existing mirror.
+Backup__Targets__gdrive__RootFolderPath=Homestead/Backup
 ```
 
 **Local development** — AppHost user-secrets, so nothing is committed:
@@ -108,10 +110,21 @@ schedule.
 
 ## What the mirror does, and does not, do
 
-- **The root folder is app-managed.** Homestead creates and maintains `Homestead Backup` (or whatever
-  you named it) in My Drive. Files *you* put inside it are invisible to Homestead (`drive.file` sees
-  only what it created) and live at its mercy — an empty-folder sweep can trash a folder with your
-  file inside it. Recoverable from Google's trash, but do not use this folder for anything else.
+- **The root folder is app-managed.** Homestead creates and maintains `My Drive/Homestead/Backup` (or
+  whatever path you configured) the moment you connect the account — you do not have to wait for a run.
+  Its card on `/admin/backup` links straight to it, which is the reliable way to tell it from any folder
+  of your own that happens to share the name: Homestead cannot see folders it did not create
+  (`drive.file`), so it can neither adopt yours nor warn you that it exists.
+
+  Files *you* put inside the app's folder are invisible to Homestead and live at its mercy — an
+  empty-folder sweep can trash a folder with your file inside it. Recoverable from Google's trash, but
+  do not use this folder for anything else.
+- **To share the mirror with someone**, share that folder from Drive's own UI. Homestead created it in
+  *your* My Drive, so you own it, sharing is just an ACL, the storage quota stays on your account, and
+  `drive.file` keeps working because the app is still the creator. Mirroring into a folder someone *else*
+  owns, or a Workspace Shared Drive, is not supported. Note the two caveats: the mirror never reads the
+  destination back, so if the other person moves or deletes a mirrored file Homestead will not notice
+  and the hole is permanent; and the empty-folder sweep above applies to their files too.
 - **Deletes go to the trash, never permanently.** Homestead never calls `files.delete`. Everything it
   removes is trashed, giving you Google's ~30-day recovery window. The consequence: **trashed files
   still hold your storage quota** until purged, so removing files from the mirror does not immediately

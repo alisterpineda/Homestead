@@ -14,7 +14,8 @@ using DriveFile = Google.Apis.Drive.v3.Data.File;
 namespace Homestead.WebApi.Infrastructure.Backup.GoogleDrive;
 
 /// <summary>
-/// Mirrors documents into a personal Google account's My Drive, under one app-managed root folder.
+/// Mirrors documents into a personal Google account's My Drive, under one app-managed root folder path
+/// (<c>Homestead/Backup</c> by default).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -39,7 +40,12 @@ public sealed class GoogleDriveBackupTarget : IBackupTarget, IBackupTargetCache,
     /// <summary>The My Drive root, as an alias Drive accepts anywhere a parent id is expected.</summary>
     private const string MyDriveRoot = "root";
 
-    private const string DefaultRootFolderName = "Homestead Backup";
+    /// <summary>
+    /// Two segments rather than one flat folder: the top segment is an app-owned namespace, so a future
+    /// non-backup Drive context becomes <c>Homestead/Exports</c> instead of squatting a second top-level
+    /// folder. Applied at first creation only — see <see cref="_resolvedRootPath"/>.
+    /// </summary>
+    private const string DefaultRootFolderPath = "Homestead/Backup";
 
     /// <summary>
     /// Upload chunk size. Must be a multiple of 256 KB (Drive's rule); 8 MB is large enough that a
@@ -88,6 +94,15 @@ public sealed class GoogleDriveBackupTarget : IBackupTarget, IBackupTargetCache,
     // under the gate — the write has to be visible, not merely eventually visible.
     private volatile bool _mapLoaded;
 
+    /// <summary>
+    /// The root path as actually created, once anything exists there. Pinned: it wins over config for the
+    /// life of the mirror, because <c>DocumentBackupState</c> rows hold root-relative paths plus Drive
+    /// file ids — honouring a changed config would mint a new empty root while every file stayed
+    /// physically in the old tree, and mirror reporting would converge while being silently wrong.
+    /// </summary>
+    /// <remarks>Volatile for the same reason <c>_mapLoaded</c> is; cleared alongside it.</remarks>
+    private volatile string? _resolvedRootPath;
+
     public GoogleDriveBackupTarget(
         string key,
         BackupTargetOptions options,
@@ -116,14 +131,34 @@ public sealed class GoogleDriveBackupTarget : IBackupTarget, IBackupTargetCache,
 
     public string Key { get; }
     public BackupTargetKind? Kind => _options.Kind;
-    // Null when unconfigured, per the interface contract — there is no meaningful "where" for a target
-    // that cannot run.
-    public string? Location => ConfigurationError is null ? $"Google Drive / {RootFolderName}" : null;
     public bool IsAvailable => ConfigurationError is null;
     public string? ConfigurationError { get; }
 
-    private string RootFolderName =>
-        string.IsNullOrWhiteSpace(_options.RootFolderName) ? DefaultRootFolderName : _options.RootFolderName;
+    /// <summary>What config asks for, which is only consulted while nothing has been created yet.</summary>
+    public string? Location => DescribeLocation(null);
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// The persisted root wins, so the card names the folder the mirror actually lives in rather than the
+    /// one config currently asks for. Null-when-unconfigured is an interface contract: there is no
+    /// meaningful "where" for a target that cannot run.
+    /// </remarks>
+    public string? DescribeLocation(string? resolvedRoot)
+    {
+        if (ConfigurationError is not null)
+            return null;
+
+        // Blank falls back rather than rendering a nameless folder, for the same reason a blank config
+        // value does — the caller reads the column straight off the row and cannot vouch for it.
+        var root = string.IsNullOrWhiteSpace(resolvedRoot) ? EffectiveRootFolderPath : resolvedRoot.Trim();
+
+        return $"Google Drive / {root}";
+    }
+
+    private string EffectiveRootFolderPath =>
+        string.IsNullOrWhiteSpace(_options.RootFolderPath)
+            ? DefaultRootFolderPath
+            : _options.RootFolderPath.Trim();
 
     // 255 bytes per name and a deep tree, same as the conservative default — but the payoff Phase 1
     // declared is real here: Drive returns a checksum on the write response, so a copy can be verified
@@ -389,32 +424,92 @@ public sealed class GoogleDriveBackupTarget : IBackupTarget, IBackupTargetCache,
         if (_folderIds.ContainsKey(path))
             return;
 
-        var isRoot = path.Length == 0;
-        var parentId = isRoot ? MyDriveRoot : _folderIds[ParentPath(path)];
-        var name = isRoot ? RootFolderName : path[(path.LastIndexOf('/') + 1)..];
+        if (path.Length == 0)
+        {
+            await EnsureRootLockedAsync(ct);
+            return;
+        }
 
-        var folderId = await FindFolderAsync(parentId, name, ct) ?? await CreateFolderAsync(parentId, name, ct);
+        var parentId = _folderIds[ParentPath(path)];
+        var name = path[(path.LastIndexOf('/') + 1)..];
 
-        _folderIds[path] = folderId;
-        await RememberFolderAsync(path, folderId, ct);
+        var folder = await FindFolderAsync(parentId, name, ct)
+                     ?? await CreateFolderAsync(parentId, name, ct);
+
+        _folderIds[path] = folder.Id;
+        await RememberFolderAsync(path, folder.Id, ct);
     }
 
-    private async Task<string?> FindFolderAsync(string parentId, string name, CancellationToken ct)
+    /// <summary>
+    /// Find-or-creates the whole root chain (<c>Homestead/Backup</c>) and maps its last segment as the
+    /// target root.
+    /// </summary>
+    private async Task EnsureRootLockedAsync(CancellationToken ct)
+    {
+        // Reached only when the root is unmapped, and that is enough: a mapped root always has its path
+        // recorded, because RememberRootAsync writes both rows in ONE transaction. There is deliberately no
+        // repair path for "mapped but unrecorded" — no code path can produce it (the account switch clears
+        // both together; a disconnect clears neither the pin nor the link), and the one thing that could —
+        // a mirror created before this column existed — is out of scope by standing permission from the
+        // repo owner. If that invariant is ever broken, the symptom is a card that reports the configured
+        // path for a mirror that lives elsewhere; fix the writer, not this reader.
+        //
+        // The path as actually created wins over config once anything exists there: DocumentBackupState
+        // rows hold root-relative paths plus Drive file ids, so relocating the root would leave the
+        // mirror physically in the old tree while reporting converged.
+        var path = _resolvedRootPath ?? EffectiveRootFolderPath;
+
+        var parentId = MyDriveRoot;
+        string? webViewLink = null;
+
+        // Intermediates deliberately get NO map entry. Map keys stay strictly root-relative, which is what
+        // keeps PruneUpwardsAsync's slash guard a structural guarantee that nothing above the effective
+        // root can be trashed — the failure mode being the user's own top-level "Homestead". Cold cost is
+        // one files.list per segment; the root resolves once per process and is then cached.
+        foreach (var segment in path.Split('/'))
+        {
+            var folder = await FindFolderAsync(parentId, segment, ct)
+                         ?? await CreateFolderAsync(parentId, segment, ct);
+
+            parentId = folder.Id;
+            webViewLink = folder.WebViewLink;
+        }
+
+        _folderIds[string.Empty] = parentId;
+        _resolvedRootPath = path;
+
+        await RememberRootAsync(path, parentId, webViewLink, ct);
+    }
+
+    /// <summary>
+    /// A Drive folder as this class needs it: the id everything is addressed by, plus Drive's own URL for
+    /// it so the admin card can link straight to the folder the app owns.
+    /// </summary>
+    /// <remarks>
+    /// The link is requested for every folder rather than only the root: it is one extra field on a call
+    /// already being made, and branching would cost more than it saves.
+    /// </remarks>
+    private readonly record struct DriveFolder(string Id, string? WebViewLink);
+
+    private async Task<DriveFolder?> FindFolderAsync(string parentId, string name, CancellationToken ct)
     {
         var list = _drive.Value.Files.List();
         list.Q = $"name = '{EscapeQueryValue(name)}' and '{EscapeQueryValue(parentId)}' in parents " +
                  $"and mimeType = '{FolderMimeType}' and trashed = false";
-        list.Fields = "files(id)";
+        list.Fields = "files(id,webViewLink)";
         list.PageSize = 10;
         // Oldest wins, so two instances that already raced into twin folders converge on the same one
         // rather than alternating.
         list.OrderBy = "createdTime";
 
         var response = await ExecuteAsync(() => list.ExecuteAsync(ct), ct);
-        return response.Files is { Count: > 0 } files ? files[0].Id : null;
+
+        return response.Files is { Count: > 0 } files
+            ? new DriveFolder(files[0].Id, files[0].WebViewLink)
+            : null;
     }
 
-    private async Task<string> CreateFolderAsync(string parentId, string name, CancellationToken ct)
+    private async Task<DriveFolder> CreateFolderAsync(string parentId, string name, CancellationToken ct)
     {
         var request = _drive.Value.Files.Create(new DriveFile
         {
@@ -422,10 +517,10 @@ public sealed class GoogleDriveBackupTarget : IBackupTarget, IBackupTargetCache,
             MimeType = FolderMimeType,
             Parents = [parentId],
         });
-        request.Fields = "id";
+        request.Fields = "id,webViewLink";
 
         var created = await ExecuteAsync(() => request.ExecuteAsync(ct), ct);
-        return created.Id;
+        return new DriveFolder(created.Id, created.WebViewLink);
     }
 
     // --- Uploads --------------------------------------------------------------------------------------
@@ -739,6 +834,17 @@ public sealed class GoogleDriveBackupTarget : IBackupTarget, IBackupTargetCache,
         foreach (var row in rows)
             _folderIds[row.Path] = row.RemoteFolderId;
 
+        // The pin. Read here (and not seeded into _folderIds — the root's id has exactly one home, the
+        // path-"" row already loaded above) so a reconnect re-finds the root along the path it was
+        // actually created at rather than whatever config now says.
+        var pinned = await db.BackupTargetStates
+            .AsNoTracking()
+            .Where(s => s.TargetKey == Key)
+            .Select(s => s.RootFolderPath)
+            .FirstOrDefaultAsync(ct);
+
+        _resolvedRootPath = string.IsNullOrWhiteSpace(pinned) ? null : pinned;
+
         _mapLoaded = true;
     }
 
@@ -752,6 +858,10 @@ public sealed class GoogleDriveBackupTarget : IBackupTarget, IBackupTargetCache,
     {
         _folderIds.Clear();
         _mapLoaded = false;
+        // Cleared with the map, not independently: a stale path here would make a reconnect re-find the
+        // root along the PREVIOUS account's layout. The row it was read from survives a disconnect on
+        // purpose (it pins the surviving copy records) and is cleared only by an account switch.
+        _resolvedRootPath = null;
 
         _logger.LogInformation(
             "Dropped the cached Drive folder map for target {TargetKey}; the next run rebuilds it", Key);
@@ -762,26 +872,84 @@ public sealed class GoogleDriveBackupTarget : IBackupTarget, IBackupTargetCache,
         await using var scope = _scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
+        await UpsertFolderAsync(db, path, folderId, ct);
+
+        await db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// Records the root <i>as actually created</i> — its id, the path, and Drive's own URL for the folder.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This is what makes the admin card's location true by construction: every run reads the path from
+    /// here, and config is consulted only while nothing has been created yet.
+    /// </para>
+    /// <para>
+    /// Both halves in <b>one</b> scope and one flush — the map row that addresses the folder and the state
+    /// row the card renders from. Two flushes would be two connections and two round trips for one logical
+    /// write, and a failure between them leaves the id mapped with no recorded path, which is precisely the
+    /// state <see cref="AdoptMappedRootAsync"/> then has to spend a Drive call repairing. The id still has
+    /// exactly one home: <c>backup.target_folders</c> under path key <c>""</c>. It is not duplicated onto
+    /// the state row, whose clearing rules differ.
+    /// </para>
+    /// </remarks>
+    private async Task RememberRootAsync(
+        string path, string folderId, string? webViewLink, CancellationToken ct)
+    {
+        await using var scope = _scopeFactory.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var now = DateTimeOffset.UtcNow;
+
+        await UpsertFolderAsync(db, string.Empty, folderId, ct);
+
+        var state = await db.BackupTargetStates.FirstOrDefaultAsync(s => s.TargetKey == Key, ct);
+
+        if (state is null)
+        {
+            // Lazily, exactly as GoogleDriveGrantStore does: a target that has never been touched has no
+            // row, and a first run against a target connected before this column existed is a first touch.
+            state = new BackupTargetState
+            {
+                TargetKey = Key,
+                IsEnabled = true,
+                CreatedAt = now,
+            };
+
+            db.BackupTargetStates.Add(state);
+        }
+
+        state.RootFolderPath = path;
+        // Never blanked by a response that simply did not carry one: a link already on file points at the
+        // same folder, and losing it costs the only answer to "which of these is the app's".
+        state.RootFolderWebViewLink = webViewLink ?? state.RootFolderWebViewLink;
+        state.UpdatedAt = now;
+
+        await db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>Stages the (path → folder id) row. The caller flushes, so several can share one round trip.</summary>
+    private async Task UpsertFolderAsync(
+        AppDbContext db, string path, string folderId, CancellationToken ct)
+    {
         var existing = await db.BackupTargetFolders
             .FirstOrDefaultAsync(f => f.TargetKey == Key && f.Path == path, ct);
 
         if (existing is not null)
         {
             existing.RemoteFolderId = folderId;
-        }
-        else
-        {
-            db.BackupTargetFolders.Add(new BackupTargetFolder
-            {
-                Id = Guid.NewGuid(),
-                TargetKey = Key,
-                Path = path,
-                RemoteFolderId = folderId,
-                CreatedAt = DateTimeOffset.UtcNow,
-            });
+            return;
         }
 
-        await db.SaveChangesAsync(ct);
+        db.BackupTargetFolders.Add(new BackupTargetFolder
+        {
+            Id = Guid.NewGuid(),
+            TargetKey = Key,
+            Path = path,
+            RemoteFolderId = folderId,
+            CreatedAt = DateTimeOffset.UtcNow,
+        });
     }
 
     /// <summary>

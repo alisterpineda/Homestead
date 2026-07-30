@@ -120,17 +120,24 @@ without their prunes reaching into each other's files:
 > after the first run of the new layout.
 
 ```
-<root>/
-  Documents/                               ← the documents kind's root folder
-    2024/
-      Tax Return 2024.pdf                  ← latest version
-      _versions/
-        Tax Return 2024 (v1).pdf           ← superseded
-    2025/
-      Car Insurance.pdf
-    _undated/                              ← Document.DocumentDate is null
-      Misc Receipt.pdf
+My Drive/Homestead/                        ← app-owned namespace, Drive only (RootFolderPath)
+  Backup/                                  ← the target root: map key "", the ONLY mapped level of this chain
+    Documents/                             ← the documents kind's root folder
+      2024/
+        Tax Return 2024.pdf                ← latest version
+        _versions/
+          Tax Return 2024 (v1).pdf         ← superseded
+      2025/
+        Car Insurance.pdf
+      _undated/                            ← Document.DocumentDate is null
+        Misc Receipt.pdf
 ```
+
+For a **local** target the chain above `Documents/` is just the configured `Path`; only the Drive target
+has an app-created root path — see [The target root](#the-target-root). Paths in `backup.target_folders`
+and `DocumentBackupState` are relative to the target root either way —
+`Documents/2024/Tax Return 2024.pdf` — so nothing below the root knows or cares which kind of destination
+it is on.
 
 - **Year shard.** The folder is `Document.DocumentDate?.Year`, falling back to `_undated` when the date
   is null. Sharding keeps any one folder small enough to browse, and by year is the axis a person
@@ -221,9 +228,13 @@ source row — and nests that target's backups inside it.
 
 The **card** carries what belongs to the destination:
 
-- Config (key, kind, path) and an availability badge. A misconfigured target reads as
+- Config (key, kind) and an availability badge. A misconfigured target reads as
   **unavailable, because &lt;reason&gt;** rather than preventing the app from booting — the same
   error-string posture the OCR engines and AI providers use.
+- **Where the mirror is** — the configured directory for a local target; for Drive, the root folder as
+  *actually created*, rendered as a link to it. Never the configured value once something exists there:
+  a card that names a location the mirror does not live at is worse than no card. When config and the
+  created root disagree, a one-line notice says so. See [The target root](#the-target-root).
 - A destination enable toggle, which pauses every backup writing here (a target with no state row reads
   as enabled: defining it in config *is* the opt-in).
 - An *Add backup* picker, fed by the source-kind catalog the list endpoint returns alongside the cards,
@@ -246,7 +257,8 @@ state table to genuine state.
 
 Phase 2 extends the surface: every backup row gains a **"last successful run: N days ago"** staleness
 line (also derived from `processing.jobs`), and a Drive target's card carries its connection state —
-*Connect / Disconnect*, "Connected as …", Drive free space, and an async-validated availability badge.
+*Connect / Disconnect*, "Connected as …", Drive free space, and an async-validated availability badge —
+plus the location link, which is the only way to answer "which of my Drive folders is the app's".
 See [Phase 2 — the Google Drive target](#phase-2--the-google-drive-target).
 
 ## Design principles
@@ -342,7 +354,7 @@ Backup:Targets:{key}:Kind              # Local | GoogleDrive
 Backup:Targets:{key}:Path              # Local: the mirror root
 Backup:Targets:{key}:ClientId          # GoogleDrive: the admin's own OAuth client
 Backup:Targets:{key}:ClientSecret      # GoogleDrive
-Backup:Targets:{key}:RootFolderName    # GoogleDrive, optional — default "Homestead Backup"
+Backup:Targets:{key}:RootFolderPath    # GoogleDrive, optional — default "Homestead/Backup"
 ```
 
 As env vars: `Backup__Targets__local__Kind`, `Backup__Targets__local__Path`. Zero configured targets
@@ -351,6 +363,14 @@ means backup is off — the graceful no-op, with no built-in destination seeded.
 A `Path` that **overlaps** `FileStorage:MediaPath` or `FileStorage:CachePath` in either direction is
 refused. Nested inside media storage, every run copies the library into itself; wrapped around it, the
 mirror's own delete pass is pointed at the originals.
+
+`RootFolderPath` is a forward-slash path relative to My Drive, and it applies on **first creation only**:
+once the root exists, the path as actually created is recorded on `backup.target_state` and every run
+reads it from there. Editing config afterwards does not relocate anything — see
+[The target root](#the-target-root) for why, and for the notice the admin card shows
+when the two disagree. It is validated for shape (no `\`, no leading/trailing `/`, no empty, `.` or `..`
+segments, ≤255 bytes per segment, ≤1024 characters overall) and, like every other config problem here,
+reports as *unavailable, because …* rather than stopping the app from booting.
 
 Batching and breaker knobs are **per source kind**, under that kind's own section — for documents,
 `Backup:Documents:` — `MinAbsoluteDeletes`, `DeleteFraction`, `MaxFilesPerBatch`, `MaxBytesPerBatch`,
@@ -366,13 +386,15 @@ What is tunable where:
 
 | Level | Database (admin) | Static config |
 |---|---|---|
-| Target | enabled; the OAuth grant (encrypted refresh token, connected account, issued-at), auth-failed latch, folder map — cloud kinds only | kind, path / client id + secret / root folder name; per-target batch-cap overrides |
+| Target | enabled; the OAuth grant (encrypted refresh token, connected account, issued-at), auth-failed latch, folder map, the *resolved* root path + its Drive link — cloud kinds only | kind, path / client id + secret / root folder path (first creation only); per-target batch-cap overrides |
 | Backup (source row) | existence of the pairing, enabled, breaker latch/ack, schedule | batch caps, breaker thresholds (`Backup:{Kind}:*`) |
 | Run | nothing stored — dry-run / prune-anyway are flags on that run | — |
 
 The target row's split follows the same line as everything else: the OAuth *client* is an
 environment-bound fact and lives in config; the *grant* is obtained interactively at runtime — the one
-thing config cannot express — and lives in the database, exactly as the enable toggle already did.
+thing config cannot express — and lives in the database, exactly as the enable toggle already did. The
+root folder is the same shape once more: config names where to *put* it, the database records where it
+actually *is*.
 
 ## Phase 2 — the Google Drive target
 
@@ -500,9 +522,63 @@ exactly as anticipated. Everything below follows from names not being identity:
   trust-and-record — the pre-write hash check has already guarded the content. `keepRevisionForever`
   is never set: unpinned prior revisions cost no quota and auto-purge (~30 days), so no revision
   cleanup exists; pinned ones would cost quota forever.
-- **The target root is a named folder in My Drive** — `RootFolderName`, default `Homestead Backup` —
-  and the setup copy warns that it is app-managed: files placed there by hand are invisible to the
-  app (`drive.file`) and live at its mercy.
+#### The target root
+
+The root is a **two-segment path in My Drive** — `RootFolderPath`, default `Homestead/Backup` — created
+by find-or-create, one `files.list` per segment, anchored at `parents: ["root"]` at the top and by id
+thereafter. It is app-managed, and the setup copy says so: files placed there by hand are invisible to
+the app (`drive.file`) and live at its mercy.
+
+- **Two segments, not one flat folder.** The top segment is an app-owned namespace, so a future
+  non-backup Drive context becomes `Homestead/Exports` rather than squatting a second top-level folder.
+  Over a bare `Homestead`: the top segment would stop telling a human what they had found, and patching
+  that with a `README.txt` at the root would force orphan detection to special-case a file no state row
+  owns. `Backup` is title-case for consistency with `Documents`/`_versions`/`_undated` underneath — the
+  whole premise is human readability, and Drive's case-insensitive name matching means the choice has no
+  correctness dimension.
+- **Created at connect time, not at first run.** The share-the-mirror workflow is the reason: you cannot
+  share a folder that does not exist yet, and nothing else creates the root until a first run succeeds.
+  Provisioning is a best-effort after-commit hook on both connect paths (first/same-account poll, and a
+  confirmed account switch) plus the same idempotent call inline in `validate`, which the admin page
+  fires per connected target on every load — so a hook that failed is repaired within a second. It never
+  runs inline on the connect paths: the grant's flush is joined to the command transaction, and the token
+  manager reads it from a separate connection, so it would see *not connected*. Its failures are
+  swallowed by design — an after-commit throw would turn a connect that already committed into a 500.
+  Accepted cost: an abandoned connection leaves one empty folder.
+- **The resolved root is persisted and is the read path.** `backup.target_state.RootFolderPath` records
+  the path as actually created, and `RootFolderWebViewLink` Drive's own URL for the folder. Config
+  supplies the default on first creation; every run afterwards reads the database. That is what makes the
+  admin card's location true *by construction* — under config-only, changing the value relabelled the
+  card without relocating a single file, so the card could claim a location the mirror did not live at.
+- **The path is a pin, and only an account switch clears it.** `DocumentBackupState` rows hold
+  root-relative paths plus Drive file ids, so honouring a config edit after creation would mint a new
+  empty root while every copied file stayed physically in the old tree — a mirror reporting converged and
+  silently wrong. A **disconnect** therefore keeps it (it keeps the copy records too, which is what makes
+  reconnecting the same account cheap), and so does the link, so the disconnect dialog's "the files stay
+  in that account's Drive — delete them there" advice is one click away. A **confirmed account switch**
+  is the one path that clears both, because it is the same path that deletes every copy record: new
+  account, new ids, full re-upload, nothing left for the old path to keep coherent.
+- **The chain above the root gets no map entry.** Only the last segment is remembered, under
+  `backup.target_folders` path key `""`. Keys stay strictly root-relative, which is what keeps
+  `PruneUpwardsAsync`'s stop-at-the-last-slash guard a *structural* guarantee that nothing above the
+  effective root can be trashed — the failure mode being the user's own top-level `Homestead`. Admitting
+  above-the-root entries would downgrade that to a rule someone has to remember. Cold cost of
+  re-deriving them is one `files.list` per segment, once per process. The root's id is likewise **not**
+  duplicated onto `target_state`: the two rows have different clearing rules, so a copy would be cleared
+  in one place and not the other on the most common path.
+- **`Homestead` is the most collidable possible top segment, and the collision cannot be detected.**
+  `drive.file` cannot see a folder the app did not create, so a same-named folder of the user's own is
+  invisible — it can never be adopted, and we cannot even warn that it exists. The mitigation is the
+  link, not the name: the card renders the location as an anchor to the folder the app owns, which
+  permanently answers "which of these two is Homestead's". A Google Picker would be the only sanctioned
+  way to reach a user-*chosen* folder; it is rejected for now (see the non-goals) and the scope is not
+  broadened.
+- **Config-vs-actual skew is named, not silent.** Reading the location from the database fixes the false
+  label but would otherwise turn a config edit into a no-op nothing acknowledges. When both values are
+  present and differ (case-insensitively — Drive matches names that way), the card shows one line saying
+  what config asks for, where the mirror actually is, and that reconnecting a different Google account
+  starts fresh from config. **Deferred:** an *edit the folder* affordance, which forces an explicit
+  relocate-vs-abandon decision plus real UX. The notice is what makes deferring it honest.
 
 ### Deletes trash; `files.delete` is never called
 
@@ -541,6 +617,10 @@ missing folder exactly once and writes the map; batches only ever read ids from 
 name-resolve. A 404 on a mapped id fails that action and invalidates the row; the next run's ensure
 repairs it. Steady state costs zero folder calls, and a `Move` into a brand-new year shard works
 because its folder exists before any batch runs.
+
+Map keys are **strictly root-relative**, with `""` meaning the effective target root — the last segment
+of `RootFolderPath`. Nothing above that root is ever mapped; see [The target root](#the-target-root) for
+why that is load-bearing rather than tidy.
 
 This is the one stated caveat to *the planner does no file I/O*: the ensure step is destination
 metadata I/O, but it is bounded by the number of **new folders** (roughly, new year shards — tens),

@@ -40,11 +40,20 @@ public class HomesteadApiFactory : WebApplicationFactory<Program>
     /// <summary>The config key of the Google Drive target the connect-flow suite exercises.</summary>
     public const string GoogleDriveTargetKey = "gdrive";
 
+    /// <summary>The root folder path that target is configured with.</summary>
+    public const string GoogleDriveRootFolderPath = "Homestead/Backup";
+
     /// <summary>Google's OAuth endpoints, faked. Script it before driving the connect flow.</summary>
     public FakeGoogleOAuthClient GoogleOAuth { get; } = new();
 
     /// <summary>Drive's about.get, faked — the one read both connect and validate depend on.</summary>
     public FakeGoogleDriveAccountClient GoogleAccounts { get; } = new();
+
+    /// <summary>
+    /// Drive's own HTTP surface, faked. Folders only — enough for the root-folder chain that connect and
+    /// validate now provision.
+    /// </summary>
+    public FakeDriveHandler GoogleDrive { get; } = new();
 
     /// <summary>
     /// The clock the WebApi resolves as <see cref="TimeProvider"/>. Follows system time by default;
@@ -85,6 +94,12 @@ public class HomesteadApiFactory : WebApplicationFactory<Program>
         builder.UseSetting($"Backup:Targets:{GoogleDriveTargetKey}:Kind", "GoogleDrive");
         builder.UseSetting($"Backup:Targets:{GoogleDriveTargetKey}:ClientId", "test-client-id");
         builder.UseSetting($"Backup:Targets:{GoogleDriveTargetKey}:ClientSecret", "test-client-secret");
+
+        // Set explicitly even though it equals the default, so the config-vs-created skew notice is
+        // reachable: with the option unset there is nothing for the card to compare the created root
+        // against, and the case would be untestable rather than merely untested.
+        builder.UseSetting(
+            $"Backup:Targets:{GoogleDriveTargetKey}:RootFolderPath", GoogleDriveRootFolderPath);
 
         // Satisfy OidcStartupValidator. OIDC is never actually exercised in integration tests
         // (auth happens through /test/force-login), so placeholder values are fine.
@@ -182,6 +197,15 @@ public class HomesteadApiFactory : WebApplicationFactory<Program>
 
             services.RemoveAll<IGoogleDriveAccountClient>();
             services.AddSingleton<IGoogleDriveAccountClient>(GoogleAccounts);
+
+            // Drive's THIRD surface: the SDK's own DriveService. BackupServiceExtensions.Create resolves
+            // Google's IHttpClientFactory optionally and nothing registers one in production, so this is a
+            // test-only seam — and it is not a nicety. Connect and validate now provision the root folder,
+            // so without it those endpoints would make real outbound calls to googleapis.com.
+            services.AddSingleton<Google.Apis.Http.IHttpClientFactory>(
+                new Google.Apis.Http.HttpClientFromMessageHandlerFactory(_ =>
+                    new Google.Apis.Http.HttpClientFromMessageHandlerFactory.ConfiguredHttpMessageHandler(
+                        GoogleDrive, false, false)));
 
             // NO DbContext swap. AppDbContext uses the REAL production registration from Program.cs
             // (non-pooled AddDbContext + EnrichNpgsqlDbContext, with the command-transaction interceptors

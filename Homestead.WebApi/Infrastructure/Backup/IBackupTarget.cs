@@ -77,6 +77,19 @@ public interface IBackupTarget
     string? Location { get; }
 
     /// <summary>
+    /// <see cref="Location"/> for a destination whose real location is only known once it exists.
+    /// <paramref name="resolvedRoot"/> is the root as actually created, or null when nothing has been
+    /// created yet.
+    /// </summary>
+    /// <remarks>
+    /// Exists so the admin page can render a location that is true <i>by construction</i>: a target whose
+    /// root is picked from config on first creation only must display what it created, not what config now
+    /// asks for. A destination addressed entirely by config (a local directory) has nothing to resolve and
+    /// keeps the default.
+    /// </remarks>
+    string? DescribeLocation(string? resolvedRoot) => Location;
+
+    /// <summary>
     /// True when the target's <i>config</i> is complete and coherent enough to attempt writes. A static
     /// verdict computed once — whether a stored credential exists and still works is database state, so
     /// the composed answer every gate actually consults comes from <see cref="IBackupTargetGate"/>.

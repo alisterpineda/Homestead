@@ -23,6 +23,12 @@ namespace Homestead.WebApi.Modules.Admin.Features.Backup.ConfirmBackupTargetConn
 /// correct outcome.
 /// </para>
 /// <para>
+/// That includes the <b>pinned root path</b>, which this is the only path allowed to clear. Everywhere
+/// else the pin keeps surviving copy records coherent with where their files physically are; here there
+/// are no surviving copy records, so the new account's root is picked from config afresh and provisioned
+/// immediately.
+/// </para>
+/// <para>
 /// The old mirror is deliberately left where it is. The target is one-way and nothing enumerates it; the
 /// files remain in the previous account, for its owner to delete by hand.
 /// </para>
@@ -47,6 +53,7 @@ public class ConfirmBackupTargetConnectionHandler(
     IGoogleOAuthClient oauth,
     IGoogleDriveConnectTokenProtector protector,
     GoogleDriveTokenManager tokenManager,
+    IBackupTargetRootProvisioner rootProvisioner,
     IAuditContext audit,
     IUnitOfWork unitOfWork,
     ILogger<ConfirmBackupTargetConnectionHandler> logger)
@@ -101,6 +108,19 @@ public class ConfirmBackupTargetConnectionHandler(
 
         db.BackupTargetFolders.RemoveRange(folders);
 
+        // Clearing the pinned root is correct on THIS path and no other, because this is the same path
+        // that just deleted every DocumentBackupState row: a new account means new ids, new folders and a
+        // full re-upload, so there is nothing left for the old path to keep coherent. (Disconnect keeps
+        // those rows and must therefore keep the pin.) The grant store shares this scoped AppDbContext, so
+        // both writes flush inside the one transaction.
+        var state = await db.BackupTargetStates.FirstOrDefaultAsync(s => s.TargetKey == target.Key, ct);
+
+        if (state is not null)
+        {
+            state.RootFolderPath = null;
+            state.RootFolderWebViewLink = null;
+        }
+
         // The rows are only half of the map: the target is a singleton holding a warm in-memory copy, and
         // a folder id from the old account resolves to nothing in the new one. Without this the ensure
         // step short-circuits on the stale cache and every subsequent run 404s against a parent that does
@@ -110,6 +130,13 @@ public class ConfirmBackupTargetConnectionHandler(
 
         await grantStore.SaveAsync(target.Key, pending.Grant, pending.AccountEmail, ct);
         tokenManager.Invalidate(target.Key);
+
+        // The new account's root, before the old account's authorization is handed back. Both hooks are
+        // independent and both self-guard; the order simply reads correctly. After the commit for the same
+        // reason the revoke is: the grant is not durable — nor visible to the token manager's own
+        // connection — until then. CancellationToken.None for that reason too: the provisioner swallows
+        // everything but cancellation, and a cancelled hook would throw out of a switch already committed.
+        unitOfWork.OnAfterCommit(_ => rootProvisioner.EnsureAsync(target, CancellationToken.None));
 
         // After the commit, never inline. This command bulk-deletes copy records and upload sessions before
         // it gets here, so a rollback anywhere restores the old grant — and revoking inline would leave that

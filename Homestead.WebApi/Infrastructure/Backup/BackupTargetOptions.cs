@@ -30,11 +30,17 @@ public class BackupTargetOptions
     public string? ClientSecret { get; set; }
 
     /// <summary>
-    /// The app-managed folder in My Drive that the mirror lives under. Defaults to "Homestead Backup" at
-    /// use rather than here, so an explicitly blank value in config still falls back rather than
-    /// producing a nameless folder.
+    /// The app-managed folder in My Drive that the mirror lives under, as a forward-slash path relative
+    /// to My Drive (e.g. <c>Homestead/Backup</c>). Defaults to "Homestead/Backup" at use rather than
+    /// here, so an explicitly blank value in config still falls back rather than producing a nameless
+    /// folder.
     /// </summary>
-    public string? RootFolderName { get; set; }
+    /// <remarks>
+    /// Applies on <b>first creation only</b>. Once the root exists, the path as actually created is
+    /// recorded on <c>backup.target_state</c> and wins over this — relocating an existing mirror by
+    /// editing config would leave every already-copied file in the old tree while reporting converged.
+    /// </remarks>
+    public string? RootFolderPath { get; set; }
 
     // --- Per-target batch-cap overrides (any kind) ---
     //

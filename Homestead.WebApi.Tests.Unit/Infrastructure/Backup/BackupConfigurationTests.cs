@@ -165,6 +165,107 @@ public class BackupConfigurationTests
         Assert.NotNull(BackupConfiguration.Validate("nas", options, storage));
     }
 
+    // --- GoogleDrive: the root folder path --------------------------------------------------------------
+
+    private static BackupTargetOptions Drive(string? rootFolderPath) => new()
+    {
+        Kind = BackupTargetKind.GoogleDrive,
+        ClientId = "client-id",
+        ClientSecret = "client-secret",
+        RootFolderPath = rootFolderPath,
+    };
+
+    [Theory]
+    [InlineData(@"Homestead\Backup")]
+    [InlineData("/Homestead/Backup")]
+    [InlineData("Homestead/Backup/")]
+    [InlineData("Homestead//Backup")]
+    [InlineData("Homestead/   /Backup")]
+    [InlineData("Homestead/./Backup")]
+    [InlineData("Homestead/../Backup")]
+    [InlineData("..")]
+    public void AMalformedRootFolderPath_YieldsAReasonRatherThanThrowing(string path)
+    {
+        var error = BackupConfiguration.Validate("gdrive", Drive(path), DefaultStorage);
+
+        Assert.NotNull(error);
+        Assert.Contains("RootFolderPath", error);
+    }
+
+    // 255 matches Drive's own per-name limit, which Capabilities.MaxSegmentLength also declares.
+    [Fact]
+    public void ASegmentOverTheDriveNameLimit_IsRefused()
+    {
+        var error = BackupConfiguration.Validate(
+            "gdrive", Drive("Homestead/" + new string('a', 256)), DefaultStorage);
+
+        Assert.NotNull(error);
+        Assert.Contains("255 bytes or fewer", error);
+    }
+
+    // Counted in UTF-8 bytes, not characters — Drive's limit is a byte limit, and a name of multi-byte
+    // characters hits it at well under 255 chars.
+    [Fact]
+    public void ASegmentUnder255CharsButOver255Bytes_IsRefused()
+    {
+        var error = BackupConfiguration.Validate(
+            "gdrive", Drive(new string('é', 200)), DefaultStorage);
+
+        Assert.NotNull(error);
+        Assert.Contains("255 bytes or fewer", error);
+    }
+
+    [Fact]
+    public void ARootFolderPathOverTheColumnLength_IsRefused()
+    {
+        var deep = string.Join('/', Enumerable.Repeat(new string('a', 100), 12));
+
+        var error = BackupConfiguration.Validate("gdrive", Drive(deep), DefaultStorage);
+
+        Assert.NotNull(error);
+        Assert.Contains("1024 characters or fewer", error);
+    }
+
+    // Blank means "use the default", which is by construction valid — skipping the checks entirely is
+    // what keeps an unset option from reading as a misconfiguration.
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void BlankRootFolderPath_FallsBackAndIsValid(string? path)
+    {
+        Assert.Null(BackupConfiguration.Validate("gdrive", Drive(path), DefaultStorage));
+    }
+
+    [Fact]
+    public void AValidTwoSegmentPath_HasNoError()
+    {
+        Assert.Null(BackupConfiguration.Validate("gdrive", Drive("Homestead/Backup"), DefaultStorage));
+    }
+
+    [Fact]
+    public void ASingleSegmentPath_HasNoError()
+    {
+        Assert.Null(BackupConfiguration.Validate("gdrive", Drive("Mirror"), DefaultStorage));
+    }
+
+    // The credential checks come first: a target with neither is misconfigured for a reason the admin can
+    // act on, and naming the path instead would send them to the wrong setting.
+    [Fact]
+    public void MissingCredentials_AreReportedBeforeTheRootFolderPath()
+    {
+        var options = new BackupTargetOptions
+        {
+            Kind = BackupTargetKind.GoogleDrive,
+            RootFolderPath = "/nonsense/",
+        };
+
+        var error = BackupConfiguration.Validate("gdrive", options, DefaultStorage);
+
+        Assert.NotNull(error);
+        Assert.Contains("ClientId is required", error);
+    }
+
     [Fact]
     public void ReadTargets_BindsEveryConfiguredInstance()
     {

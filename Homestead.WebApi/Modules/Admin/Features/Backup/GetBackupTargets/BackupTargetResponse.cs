@@ -128,8 +128,20 @@ public record BackupTargetResponse
     public required string Key { get; init; }
     public BackupTargetKind? Kind { get; init; }
 
-    /// <summary>Where the mirror lives (the configured path for a local target).</summary>
+    /// <summary>
+    /// Where the mirror lives (the configured path for a local target; for Drive, the root folder as
+    /// actually created).
+    /// </summary>
     public string? Location { get; init; }
+
+    /// <summary>A browsable URL for the destination, when it has one. Null for a local directory.</summary>
+    public string? LocationUrl { get; init; }
+
+    /// <summary>
+    /// An advisory about the location — set when config asks for a root path the mirror was not created
+    /// at. A full sentence, like <see cref="ConfigurationError"/>: the reasoning belongs on this side.
+    /// </summary>
+    public string? LocationNotice { get; init; }
 
     /// <summary>False when config is missing or incoherent; see <see cref="ConfigurationError"/>.</summary>
     public required bool IsAvailable { get; init; }

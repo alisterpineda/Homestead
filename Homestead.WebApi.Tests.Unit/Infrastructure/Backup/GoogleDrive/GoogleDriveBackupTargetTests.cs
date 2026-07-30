@@ -43,31 +43,40 @@ public class GoogleDriveBackupTargetTests : IDisposable
             .AddScoped(_ => store)
             .BuildServiceProvider();
 
-        var tokenManager = new GoogleDriveTokenManager(
+        _tokenManager = new GoogleDriveTokenManager(
             _services.GetRequiredService<IServiceScopeFactory>(),
             Substitute.For<IGoogleOAuthClient>(),
             new FakeTimeProvider(Now),
             NullLogger<GoogleDriveTokenManager>.Instance);
 
-        _sut = new GoogleDriveBackupTarget(
-            TargetKey,
-            new BackupTargetOptions
-            {
-                Kind = BackupTargetKind.GoogleDrive,
-                ClientId = "client-id",
-                ClientSecret = "client-secret",
-            },
-            tokenManager,
-            _services.GetRequiredService<IServiceScopeFactory>(),
-            NullLogger<GoogleDriveBackupTarget>.Instance,
-            new HttpClientFromMessageHandlerFactory(_ =>
-                new HttpClientFromMessageHandlerFactory.ConfiguredHttpMessageHandler(_drive, false, false)),
-            delay: (wait, _) =>
-            {
-                _delays.Add(wait);
-                return Task.CompletedTask;
-            });
+        _sut = CreateTarget();
     }
+
+    private readonly GoogleDriveTokenManager _tokenManager;
+
+    /// <summary>
+    /// A target over the same fake Drive and the same in-memory store. <paramref name="rootFolderPath"/>
+    /// left null is the production default (config unset), which is what most tests want.
+    /// </summary>
+    private GoogleDriveBackupTarget CreateTarget(string? rootFolderPath = null) => new(
+        TargetKey,
+        new BackupTargetOptions
+        {
+            Kind = BackupTargetKind.GoogleDrive,
+            ClientId = "client-id",
+            ClientSecret = "client-secret",
+            RootFolderPath = rootFolderPath,
+        },
+        _tokenManager,
+        _services.GetRequiredService<IServiceScopeFactory>(),
+        NullLogger<GoogleDriveBackupTarget>.Instance,
+        new HttpClientFromMessageHandlerFactory(_ =>
+            new HttpClientFromMessageHandlerFactory.ConfiguredHttpMessageHandler(_drive, false, false)),
+        delay: (wait, _) =>
+        {
+            _delays.Add(wait);
+            return Task.CompletedTask;
+        });
 
     public void Dispose()
     {
@@ -95,6 +104,26 @@ public class GoogleDriveBackupTargetTests : IDisposable
         });
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
     }
+
+    /// <summary>Pre-seeds the target-state row, which is where the resolved root path is pinned.</summary>
+    private async Task SeedStateAsync(string? rootFolderPath, string? webViewLink = null)
+    {
+        _db.BackupTargetStates.Add(new BackupTargetState
+        {
+            TargetKey = TargetKey,
+            IsEnabled = true,
+            RootFolderPath = rootFolderPath,
+            RootFolderWebViewLink = webViewLink,
+            CreatedAt = Now,
+            UpdatedAt = Now,
+        });
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+    }
+
+    // AsNoTracking on purpose: the ensure step writes through its own DI scope's context, so a tracking
+    // read here would hand back this fixture's stale copy of the row it seeded.
+    private Task<BackupTargetState> ReadStateAsync(CancellationToken ct) =>
+        _db.BackupTargetStates.AsNoTracking().SingleAsync(s => s.TargetKey == TargetKey, ct);
 
     // --- Shape ----------------------------------------------------------------------------------------
 
@@ -148,6 +177,42 @@ public class GoogleDriveBackupTargetTests : IDisposable
 
         Assert.False(target.IsAvailable);
         Assert.Contains("ClientId is required", target.ConfigurationError);
+    }
+
+    // --- Location -------------------------------------------------------------------------------------
+
+    // Config supplies the default, so this is what the card reads before anything exists in Drive.
+    [Fact]
+    public void Location_WithNothingCreatedYet_ReportsTheConfiguredPath()
+    {
+        Assert.Equal("Google Drive / Homestead/Backup", _sut.Location);
+        Assert.Equal("Google Drive / Homestead/Backup", _sut.DescribeLocation(null));
+
+        using var configured = CreateTarget("Archive/Homestead");
+        Assert.Equal("Google Drive / Archive/Homestead", configured.Location);
+    }
+
+    // The whole point of D5: once the root exists, the DB is the read path — otherwise editing config
+    // relabels the card without relocating a single file, and the card claims a location that is false.
+    [Fact]
+    public void DescribeLocation_PrefersTheResolvedRootOverConfig()
+    {
+        using var target = CreateTarget("Archive/Homestead");
+
+        Assert.Equal("Google Drive / Legacy/Mirror", target.DescribeLocation("Legacy/Mirror"));
+    }
+
+    // Null-when-unconfigured is an interface contract, and a resolved root does not buy an exemption.
+    [Fact]
+    public void DescribeLocation_OnAnUnconfiguredTarget_IsStillNull()
+    {
+        var target = new GoogleDriveBackupTarget(
+            TargetKey,
+            new BackupTargetOptions { Kind = BackupTargetKind.GoogleDrive },
+            null!, null!, NullLogger<GoogleDriveBackupTarget>.Instance);
+
+        Assert.Null(target.Location);
+        Assert.Null(target.DescribeLocation("Homestead/Backup"));
     }
 
     // --- Put ------------------------------------------------------------------------------------------
@@ -395,7 +460,8 @@ public class GoogleDriveBackupTargetTests : IDisposable
     {
         var ct = TestContext.Current.CancellationToken;
 
-        _drive.Respond(HttpMethod.Post, "/drive/v3/files", """{"id":"root-id"}""");
+        _drive.Respond(HttpMethod.Post, "/drive/v3/files", """{"id":"homestead-id"}""");
+        _drive.Respond(HttpMethod.Post, "/drive/v3/files", """{"id":"backup-id"}""");
         _drive.Respond(HttpMethod.Post, "/drive/v3/files", """{"id":"documents-id"}""");
         _drive.Respond(HttpMethod.Post, "/drive/v3/files", """{"id":"2025-id"}""");
 
@@ -404,10 +470,18 @@ public class GoogleDriveBackupTargetTests : IDisposable
         var map = await _db.BackupTargetFolders.AsNoTracking()
             .ToDictionaryAsync(f => f.Path, f => f.RemoteFolderId, ct);
 
-        // The target root is a map entry like any other, at the empty path.
-        Assert.Equal("root-id", map[string.Empty]);
+        // The EFFECTIVE root is a map entry like any other, at the empty path: the last segment of the
+        // root path, not its first.
+        Assert.Equal("backup-id", map[string.Empty]);
         Assert.Equal("documents-id", map["Documents"]);
         Assert.Equal("2025-id", map["Documents/2025"]);
+
+        // D3, and load-bearing: the chain ABOVE the effective root must not enter the keyspace at all.
+        // That is what keeps the prune walk's slash guard a structural guarantee rather than a rule
+        // someone has to remember — the failure mode being trashing the user's own top-level "Homestead".
+        Assert.Equal(3, map.Count);
+        Assert.DoesNotContain("Homestead", map.Keys);
+        Assert.DoesNotContain("Homestead/Backup", map.Keys);
     }
 
     [Fact]
@@ -415,27 +489,127 @@ public class GoogleDriveBackupTargetTests : IDisposable
     {
         var ct = TestContext.Current.CancellationToken;
 
-        _drive.RespondToQuery("name = 'Homestead Backup'", """{"files":[{"id":"existing-root"}]}""");
+        _drive.RespondToQuery("name = 'Homestead'", """{"files":[{"id":"existing-homestead"}]}""");
+        _drive.RespondToQuery("name = 'Backup'", """{"files":[{"id":"existing-backup"}]}""");
 
         await _sut.EnsureFoldersAsync([string.Empty], ct);
 
         var row = await _db.BackupTargetFolders.AsNoTracking().SingleAsync(f => f.Path == string.Empty, ct);
-        Assert.Equal("existing-root", row.RemoteFolderId);
+        Assert.Equal("existing-backup", row.RemoteFolderId);
         Assert.Empty(_drive.Where(HttpMethod.Post));
     }
 
-    // Steady state has to cost zero folder calls, or every run pays for the whole tree.
+    // Steady state has to cost zero folder calls, or every run pays for the whole tree — and a mapped
+    // root has to short-circuit the whole chain above it, not just its own segment. The pin is part of
+    // steady state, not decoration: whatever created the root recorded it in the same flush.
     [Fact]
     public async Task EnsureFolders_WithAFullyMappedTree_TouchesGoogleNotAtAll()
     {
         var ct = TestContext.Current.CancellationToken;
-        await MapFolderAsync(string.Empty, "root-id");
+        await SeedStateAsync("Homestead/Backup");
+        await MapFolderAsync(string.Empty, "backup-id");
         await MapFolderAsync("Documents", "documents-id");
         await MapFolderAsync("Documents/2025", "2025-id");
 
         await _sut.EnsureFoldersAsync(["Documents/2025"], ct);
 
         Assert.Empty(_drive.Calls);
+    }
+
+    // The map row and the state row are ONE transaction, so a mapped root always has its path recorded.
+    // That invariant is what lets the root branch trust the map alone — see EnsureRootLockedAsync.
+    [Fact]
+    public async Task EnsureFolders_WritesTheMapRowAndThePinTogether()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        _drive.Respond(HttpMethod.Post, "/drive/v3/files", """{"id":"homestead-id"}""");
+        _drive.Respond(HttpMethod.Post, "/drive/v3/files", """{"id":"backup-id"}""");
+
+        await _sut.EnsureFoldersAsync([], ct);
+
+        Assert.Equal("backup-id", (await _db.BackupTargetFolders.AsNoTracking()
+            .SingleAsync(f => f.Path == string.Empty, ct)).RemoteFolderId);
+        Assert.Equal("Homestead/Backup", (await ReadStateAsync(ct)).RootFolderPath);
+    }
+
+    // Every run reads the root from here, and the card renders from it — so a run that creates the root
+    // and fails to record it would leave the card guessing from config forever.
+    [Fact]
+    public async Task EnsureFolders_RecordsTheRootPathAndWebViewLinkOnTheTargetState()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        _drive.Respond(HttpMethod.Post, "/drive/v3/files", """{"id":"homestead-id"}""");
+        _drive.Respond(HttpMethod.Post, "/drive/v3/files",
+            """{"id":"backup-id","webViewLink":"https://drive.google.com/drive/folders/backup-id"}""");
+
+        // No state row beforehand — this is the upsert path, and it is the common one: a target whose
+        // grant was stored before this column existed has a row, one that never connected has none.
+        await _sut.EnsureFoldersAsync([], ct);
+
+        var state = await ReadStateAsync(ct);
+        Assert.Equal("Homestead/Backup", state.RootFolderPath);
+        Assert.Equal("https://drive.google.com/drive/folders/backup-id", state.RootFolderWebViewLink);
+    }
+
+    [Fact]
+    public async Task EnsureFolders_WithAnExistingStateRow_UpdatesItInPlace()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await SeedStateAsync(rootFolderPath: null);
+
+        _drive.Respond(HttpMethod.Post, "/drive/v3/files", """{"id":"homestead-id"}""");
+        _drive.Respond(HttpMethod.Post, "/drive/v3/files", """{"id":"backup-id"}""");
+
+        await _sut.EnsureFoldersAsync([], ct);
+
+        var state = await ReadStateAsync(ct);
+        Assert.Equal("Homestead/Backup", state.RootFolderPath);
+        Assert.True(state.IsEnabled);
+    }
+
+    // The pin. DocumentBackupState rows hold root-relative paths plus Drive file ids, so honouring a
+    // changed config after creation would mint a new empty root while every already-copied file stayed
+    // physically in the old tree — a mirror reporting converged and silently wrong.
+    [Fact]
+    public async Task EnsureFolders_WithAPinnedRootPath_IgnoresTheConfiguredPath()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await SeedStateAsync("Legacy/Mirror");
+
+        _drive.Respond(HttpMethod.Post, "/drive/v3/files", """{"id":"legacy-id"}""");
+        _drive.Respond(HttpMethod.Post, "/drive/v3/files", """{"id":"mirror-id"}""");
+
+        await _sut.EnsureFoldersAsync([], ct);
+
+        Assert.Contains(_drive.Calls, c => c.Query.Contains("name = 'Legacy'"));
+        Assert.Contains(_drive.Calls, c => c.Query.Contains("name = 'Mirror'"));
+        Assert.DoesNotContain(_drive.Calls, c => c.Query.Contains("name = 'Homestead'"));
+
+        var row = await _db.BackupTargetFolders.AsNoTracking().SingleAsync(f => f.Path == string.Empty, ct);
+        Assert.Equal("mirror-id", row.RemoteFolderId);
+
+        // Rewritten, not replaced — the pin survives its own re-resolution.
+        Assert.Equal("Legacy/Mirror", (await ReadStateAsync(ct)).RootFolderPath);
+    }
+
+    [Fact]
+    public async Task EnsureFolders_WithAConfiguredPath_UsesItInsteadOfTheDefault()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var target = CreateTarget("Archive/Homestead");
+
+        _drive.Respond(HttpMethod.Post, "/drive/v3/files", """{"id":"archive-id"}""");
+        _drive.Respond(HttpMethod.Post, "/drive/v3/files", """{"id":"homestead-id"}""");
+
+        await target.EnsureFoldersAsync([], ct);
+
+        Assert.Contains(_drive.Calls, c => c.Query.Contains("name = 'Archive'"));
+
+        var row = await _db.BackupTargetFolders.AsNoTracking().SingleAsync(f => f.Path == string.Empty, ct);
+        Assert.Equal("homestead-id", row.RemoteFolderId);
+        Assert.Equal("Archive/Homestead", (await ReadStateAsync(ct)).RootFolderPath);
     }
 
     // A miss at write time (a crash gap, or a folder removed out of band) resolves on demand rather than
@@ -445,7 +619,8 @@ public class GoogleDriveBackupTargetTests : IDisposable
     {
         var ct = TestContext.Current.CancellationToken;
 
-        _drive.Respond(HttpMethod.Post, "/drive/v3/files", """{"id":"root-id"}""");
+        _drive.Respond(HttpMethod.Post, "/drive/v3/files", """{"id":"homestead-id"}""");
+        _drive.Respond(HttpMethod.Post, "/drive/v3/files", """{"id":"backup-id"}""");
         _drive.Respond(HttpMethod.Post, "/drive/v3/files", """{"id":"documents-id"}""");
         _drive.Respond(HttpMethod.Post, "/drive/v3/files", """{"id":"2099-id"}""");
         _drive.Respond(HttpMethod.Post, "/upload/drive/v3/files", """{"id":"created"}""");
@@ -474,6 +649,32 @@ public class GoogleDriveBackupTargetTests : IDisposable
     }
 
     // --- Folder prune ---------------------------------------------------------------------------------
+
+    // Nothing above the effective root may ever be trashed, and the guarantee is STRUCTURAL rather than a
+    // rule: the chain gets no map keys, so the walk-up cannot name it and the slash guard stops at the
+    // kind root regardless. The failure mode this defends is trashing the user's own top-level "Homestead".
+    [Fact]
+    public async Task Prune_NeverReachesTheRootChain()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        _drive.Respond(HttpMethod.Post, "/drive/v3/files", """{"id":"homestead-id"}""");
+        _drive.Respond(HttpMethod.Post, "/drive/v3/files", """{"id":"backup-id"}""");
+        _drive.Respond(HttpMethod.Post, "/drive/v3/files", """{"id":"documents-id"}""");
+        _drive.Respond(HttpMethod.Post, "/drive/v3/files", """{"id":"2025-id"}""");
+
+        await _sut.EnsureFoldersAsync(["Documents/2025"], ct);
+
+        // Everything reads empty (the fake's default), so the walk-up goes as far as it structurally can.
+        await _sut.PruneEmptyFoldersAsync(["Documents/2025"], ct);
+
+        var trashed = _drive.Where(HttpMethod.Patch).Select(c => c.Url).ToList();
+
+        Assert.Contains(trashed, u => u.Contains("2025-id"));
+        Assert.DoesNotContain(trashed, u => u.Contains("documents-id"));
+        Assert.DoesNotContain(trashed, u => u.Contains("backup-id"));
+        Assert.DoesNotContain(trashed, u => u.Contains("homestead-id"));
+    }
 
     [Fact]
     public async Task Prune_TrashesAnEmptyFolderAndWalksUpToTheKindRoot()

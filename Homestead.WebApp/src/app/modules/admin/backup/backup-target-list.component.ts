@@ -11,6 +11,7 @@ import {
   lucideTrash2,
   lucideLink,
   lucideUnlink,
+  lucideExternalLink,
 } from '@ng-icons/lucide';
 import { toast } from '@spartan-ng/brain/sonner';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
@@ -70,6 +71,7 @@ type DeleteStage = 'confirm' | 'cancelRun' | 'retry';
       lucideTrash2,
       lucideLink,
       lucideUnlink,
+      lucideExternalLink,
     }),
   ],
   template: `
@@ -133,8 +135,35 @@ type DeleteStage = 'confirm' | 'cancelRun' | 'retry';
                     </span>
                   }
                 </div>
+                <!-- The location is read from what was actually created, not from config — and when the
+                     destination has a browsable URL it is the answer to "which of my folders is the
+                     app's", which nothing else can give: the drive.file scope cannot see, and therefore
+                     cannot warn about, a same-named folder of the user's own. -->
                 @if (t.location) {
-                  <p hlmCardDescription class="font-mono break-all">{{ t.location }}</p>
+                  <p hlmCardDescription class="font-mono break-all">
+                    @if (t.locationUrl) {
+                      <a
+                        [href]="t.locationUrl"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="inline-flex items-center gap-1 underline underline-offset-2 hover:no-underline"
+                        [attr.data-testid]="'location-link-' + t.key"
+                      >
+                        {{ t.location }}
+                        <ng-icon hlm name="lucideExternalLink" size="xs" class="shrink-0" />
+                      </a>
+                    } @else {
+                      {{ t.location }}
+                    }
+                  </p>
+                }
+                @if (t.locationNotice) {
+                  <p
+                    class="text-xs text-muted-foreground"
+                    [attr.data-testid]="'location-notice-' + t.key"
+                  >
+                    {{ t.locationNotice }}
+                  </p>
                 }
               </div>
 

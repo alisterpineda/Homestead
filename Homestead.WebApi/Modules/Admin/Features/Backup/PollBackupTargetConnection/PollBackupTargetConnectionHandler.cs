@@ -36,6 +36,11 @@ namespace Homestead.WebApi.Modules.Admin.Features.Backup.PollBackupTargetConnect
 /// catch inside this handler can see. A single-row upsert failing is narrow enough not to be worth new
 /// machinery for — but it is a gap, not a solved case.
 /// </para>
+/// <para>
+/// <b>This is where a first connect provisions the root folder</b> — and a same-account reconnect too.
+/// (The account-switch path is the confirm slice.) Deferred to after the commit rather than run inline:
+/// see the hook's own comment.
+/// </para>
 /// </remarks>
 public class PollBackupTargetConnectionHandler(
     IBackupTargetResolver resolver,
@@ -45,6 +50,8 @@ public class PollBackupTargetConnectionHandler(
     IGoogleDriveGrantStore grantStore,
     IGoogleDriveConnectTokenProtector protector,
     GoogleDriveTokenManager tokenManager,
+    IBackupTargetRootProvisioner rootProvisioner,
+    IUnitOfWork unitOfWork,
     TimeProvider timeProvider,
     ILogger<PollBackupTargetConnectionHandler> logger)
     : IRequestHandler<PollBackupTargetConnectionCommand, PollBackupTargetConnectionResponse>
@@ -172,6 +179,17 @@ public class PollBackupTargetConnectionHandler(
         // A cached token from a previous grant would otherwise keep writing into the old account until it
         // expired on its own.
         tokenManager.Invalidate(target.Key);
+
+        // After the commit, never inline: SaveAsync's flush is joined to the pipeline transaction, so the
+        // token manager — which reads the grant from its own scope on a separate connection — would see
+        // NotConnected. Eager creation is what makes the share-with-a-spouse workflow possible at all; you
+        // cannot share a folder that does not exist yet.
+        //
+        // CancellationToken.None, exactly as the confirm slice's revoke hook is: the provisioner swallows
+        // everything BUT cancellation, and the request token is already cancelled in the case that produces
+        // this path most often — the admin closing the tab. Honouring it would throw out of a connect that
+        // has already committed, and skip the folder the next validate would then have to repair.
+        unitOfWork.OnAfterCommit(_ => rootProvisioner.EnsureAsync(target, CancellationToken.None));
 
         return new PollBackupTargetConnectionResponse
         {

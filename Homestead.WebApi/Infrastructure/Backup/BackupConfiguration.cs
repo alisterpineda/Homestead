@@ -1,3 +1,4 @@
+using System.Text;
 using Homestead.WebApi.Infrastructure.Storage;
 
 namespace Homestead.WebApi.Infrastructure.Backup;
@@ -50,6 +51,52 @@ public static class BackupConfiguration
 
         if (string.IsNullOrWhiteSpace(options.ClientSecret))
             return "ClientSecret is required for a GoogleDrive target.";
+
+        return ValidateRootFolderPath(options.RootFolderPath);
+    }
+
+    /// <summary>The longest a single Drive folder name may be, in UTF-8 bytes.</summary>
+    private const int MaxDriveSegmentBytes = 255;
+
+    /// <summary>
+    /// The longest a root folder path may be. <c>BackupTargetStateConfiguration</c> reads this for the
+    /// column the resolved path is persisted into, so schema and validation agree by construction rather
+    /// than by two literals and a comment asking someone to keep them in step.
+    /// </summary>
+    public const int MaxRootFolderPathLength = 1024;
+
+    // Blank is skipped entirely: it means "use the default", which is valid by construction.
+    //
+    // A Drive folder name may LEGALLY contain a forward slash — splitting on one is a convention this app
+    // imposes, not something Drive enforces. That is precisely why an option named "…Name" that quietly
+    // accepted separators was a lie: the only honest fix is to call it a path and say what a path may be.
+    private static string? ValidateRootFolderPath(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+
+        var path = value.Trim();
+
+        if (path.Contains('\\'))
+            return "RootFolderPath must use '/' to separate folders, not '\\'.";
+
+        if (path.StartsWith('/') || path.EndsWith('/'))
+            return "RootFolderPath must not start or end with '/'.";
+
+        if (path.Length > MaxRootFolderPathLength)
+            return $"RootFolderPath must be {MaxRootFolderPathLength} characters or fewer.";
+
+        foreach (var segment in path.Split('/'))
+        {
+            if (string.IsNullOrWhiteSpace(segment))
+                return "RootFolderPath must not contain an empty folder name.";
+
+            if (segment is "." or "..")
+                return "RootFolderPath must not contain '.' or '..' segments.";
+
+            if (Encoding.UTF8.GetByteCount(segment) > MaxDriveSegmentBytes)
+                return $"Each folder in RootFolderPath must be {MaxDriveSegmentBytes} bytes or fewer.";
+        }
 
         return null;
     }

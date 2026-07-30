@@ -12,5 +12,7 @@ export interface BackupTargetResponse {
   key: string;
   kind?: (null | BackupTargetKind);
   location?: (string | null);
+  locationNotice?: (string | null);
+  locationUrl?: (string | null);
   sources: Array<BackupSourceItemResponse>;
 }

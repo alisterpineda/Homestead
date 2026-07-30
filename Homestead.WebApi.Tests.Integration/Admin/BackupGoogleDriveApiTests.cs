@@ -1,6 +1,7 @@
 using System.Net;
 using Homestead.WebApi.Domain.Backup;
 using Homestead.WebApi.Domain.Processing;
+using Homestead.WebApi.Infrastructure.Backup;
 using Homestead.WebApi.Infrastructure.Backup.GoogleDrive;
 using Homestead.WebApi.Modules.Documents.Backup;
 using Homestead.WebApi.Modules.Documents.Processing;
@@ -69,14 +70,54 @@ public class BackupGoogleDriveApiTests : IntegrationTestBase
         return (await response.Content.ReadFromJsonAsync<SourceResult>(CT))!.Id;
     }
 
+    private FakeDriveHandler Drive => Factory.GoogleDrive;
+
     private async Task ResetAsync()
     {
         Oauth.Reset();
         Accounts.Reset();
+        Drive.Reset();
+
+        using var scope = CreateScope();
 
         // The grant lives in the database, and Respawn does not know about the singleton token cache.
-        using var scope = CreateScope();
         scope.ServiceProvider.GetRequiredService<GoogleDriveTokenManager>().Invalidate(TargetKey);
+
+        // Nor about the target's warm folder map, whose rows Respawn has just deleted from under it. Left
+        // populated, the ensure step short-circuits on a mapped root and this suite would assert against
+        // ids minted by a previous test.
+        if (scope.ServiceProvider.GetRequiredService<IBackupTargetResolver>().Resolve(TargetKey)
+            is IBackupTargetCache cache)
+            cache.InvalidateCache();
+    }
+
+    /// <summary>The state row, read fresh — the resolved root lives here.</summary>
+    private Task<BackupTargetState> GetStateAsync() =>
+        WithDbAsync(db => db.BackupTargetStates
+            .AsNoTracking()
+            .SingleAsync(s => s.TargetKey == TargetKey, CT));
+
+    /// <summary>Rewrites the pin, standing in for a mirror created before config said what it says now.</summary>
+    private async Task SetRootFolderPathAsync(string path)
+    {
+        using var scope = CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var state = await db.BackupTargetStates.SingleAsync(s => s.TargetKey == TargetKey, CT);
+        state.RootFolderPath = path;
+        await db.SaveChangesAsync(CT);
+    }
+
+    /// <summary>The chain the default root path resolves to, as this fake minted it.</summary>
+    private (string HomesteadId, string BackupId) RootChain()
+    {
+        var homesteadId = Drive.FolderId("root", "Homestead");
+        Assert.NotNull(homesteadId);
+
+        var backupId = Drive.FolderId(homesteadId, "Backup");
+        Assert.NotNull(backupId);
+
+        return (homesteadId, backupId);
     }
 
     // --- The card, before anything is connected -------------------------------------------------------
@@ -210,6 +251,154 @@ public class BackupGoogleDriveApiTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
+    // --- The root folder ------------------------------------------------------------------------------
+
+    // Eager creation at connect is what makes the share-the-mirror workflow possible at all: you cannot
+    // share a folder that does not exist yet, and nothing else creates it until a first run succeeds.
+    [Fact]
+    public async Task Connect_CreatesTheRootChainAndTheCardLinksToTheFolder()
+    {
+        await ResetAsync();
+        var client = await CreateAdminClientAsync();
+
+        await ConnectAsync(client);
+
+        // Top-down, anchored at My Drive — two segments, no more.
+        Assert.Equal(["Homestead", "Backup"], Drive.Created);
+
+        var (_, backupId) = RootChain();
+
+        // Only the EFFECTIVE root enters the map keyspace: keys stay strictly root-relative, which is what
+        // keeps the prune walk structurally unable to reach the user's own top-level "Homestead".
+        var folders = await WithDbAsync(db => db.BackupTargetFolders
+            .AsNoTracking()
+            .Where(f => f.TargetKey == TargetKey)
+            .ToListAsync(CT));
+
+        var rootRow = Assert.Single(folders);
+        Assert.Equal(string.Empty, rootRow.Path);
+        Assert.Equal(backupId, rootRow.RemoteFolderId);
+
+        var state = await GetStateAsync();
+        Assert.Equal("Homestead/Backup", state.RootFolderPath);
+        Assert.Equal(FakeDriveHandler.WebViewLinkFor(backupId), state.RootFolderWebViewLink);
+
+        var target = await GetTargetAsync(client);
+        Assert.Equal("Google Drive / Homestead/Backup", target.Location);
+        Assert.Equal(FakeDriveHandler.WebViewLinkFor(backupId), target.LocationUrl);
+
+        // Config and what was created agree, which is the common case and must render nothing.
+        Assert.Null(target.LocationNotice);
+    }
+
+    // The pin outlives a disconnect precisely because the copy records do — and reconnect-cheapness is what
+    // that buys: the same folders are re-adopted by name rather than re-created into twins.
+    [Fact]
+    public async Task Disconnect_KeepsThePinAndAReconnectReAdoptsTheSameFolder()
+    {
+        await ResetAsync();
+        var client = await CreateAdminClientAsync();
+
+        await ConnectAsync(client);
+        var (_, backupId) = RootChain();
+
+        var disconnect = await client.DeleteAsync(
+            $"/api/v1/admin/backup/targets/{TargetKey}/connection", CT);
+        disconnect.EnsureSuccessStatusCode();
+
+        // The ids go with the grant: they are meaningless under any other authorization.
+        Assert.False(await WithDbAsync(db => db.BackupTargetFolders
+            .AnyAsync(f => f.TargetKey == TargetKey, CT)));
+
+        var afterDisconnect = await GetStateAsync();
+        Assert.Equal("Homestead/Backup", afterDisconnect.RootFolderPath);
+        Assert.Equal(
+            FakeDriveHandler.WebViewLinkFor(backupId), afterDisconnect.RootFolderWebViewLink);
+
+        // …and the card still links to it, so "the files stay in that account's Drive — delete them there"
+        // is one click away even with nothing connected.
+        Assert.Equal(
+            FakeDriveHandler.WebViewLinkFor(backupId), (await GetTargetAsync(client)).LocationUrl);
+
+        Drive.Created.Clear();
+
+        await ConnectAsync(client);
+
+        Assert.Empty(Drive.Created);
+
+        var remapped = await WithDbAsync(db => db.BackupTargetFolders
+            .AsNoTracking()
+            .SingleAsync(f => f.TargetKey == TargetKey, CT));
+
+        Assert.Equal(string.Empty, remapped.Path);
+        Assert.Equal(backupId, remapped.RemoteFolderId);
+    }
+
+    // Reading the location from the database is what makes it true — but it also turns a config edit into a
+    // silent no-op, so the skew is named rather than left to be discovered.
+    [Fact]
+    public async Task APersistedRootThatDiffersFromConfig_IsDisplayedAndTheSkewIsNamed()
+    {
+        await ResetAsync();
+        var client = await CreateAdminClientAsync();
+
+        await ConnectAsync(client);
+        await SetRootFolderPathAsync("Legacy/Mirror");
+
+        var target = await GetTargetAsync(client);
+
+        // What was created, never what config asks for.
+        Assert.Equal("Google Drive / Legacy/Mirror", target.Location);
+
+        Assert.NotNull(target.LocationNotice);
+        Assert.Contains("Homestead/Backup", target.LocationNotice);
+        Assert.Contains("Legacy/Mirror", target.LocationNotice);
+    }
+
+    // The self-heal. The connect dialog's success triggers a reload, which fires validate per connected
+    // Drive target — so a connect-time hook that failed is repaired within a second in practice.
+    [Fact]
+    public async Task Validate_ProvisionsARootThatConnectFailedToCreate()
+    {
+        await ResetAsync();
+        var client = await CreateAdminClientAsync();
+
+        await ConnectAsync(client);
+
+        // Stand in for a connect-time hook that never landed: no map row, no pin, cold cache.
+        using (var scope = CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            db.BackupTargetFolders.RemoveRange(
+                await db.BackupTargetFolders.Where(f => f.TargetKey == TargetKey).ToListAsync(CT));
+
+            var state = await db.BackupTargetStates.SingleAsync(s => s.TargetKey == TargetKey, CT);
+            state.RootFolderPath = null;
+            state.RootFolderWebViewLink = null;
+
+            await db.SaveChangesAsync(CT);
+
+            if (scope.ServiceProvider.GetRequiredService<IBackupTargetResolver>().Resolve(TargetKey)
+                is IBackupTargetCache cache)
+                cache.InvalidateCache();
+        }
+
+        var response = await client.PostAsync(
+            $"/api/v1/admin/backup/targets/{TargetKey}/validate", null, CT);
+        response.EnsureSuccessStatusCode();
+
+        Assert.True((await response.Content.ReadFromJsonAsync<ValidateResult>(CT))!.IsAvailable);
+
+        var repaired = await GetStateAsync();
+        Assert.Equal("Homestead/Backup", repaired.RootFolderPath);
+
+        var (_, backupId) = RootChain();
+        Assert.Equal(backupId, (await WithDbAsync(db => db.BackupTargetFolders
+            .AsNoTracking()
+            .SingleAsync(f => f.TargetKey == TargetKey, CT))).RemoteFolderId);
+    }
+
     // --- Account switching ----------------------------------------------------------------------------
 
     [Fact]
@@ -287,11 +476,66 @@ public class BackupGoogleDriveApiTests : IntegrationTestBase
         // Stored file ids mean nothing in the new account's Drive, so every one of them is forgotten and
         // the next run re-uploads in full.
         Assert.False(await WithDbAsync(db => db.DocumentBackupStates.AnyAsync(CT)));
-        Assert.False(await WithDbAsync(db => db.BackupTargetFolders.AnyAsync(CT)));
+
+        // The old account's mapping is gone. What remains is the NEW account's root, provisioned by the
+        // switch's own after-commit hook — a folder created under the grant that was just stored, not a
+        // survivor of the one abandoned.
+        var mapped = await WithDbAsync(db => db.BackupTargetFolders.AsNoTracking().ToListAsync(CT));
+        var rootRow = Assert.Single(mapped);
+        Assert.Equal(string.Empty, rootRow.Path);
+        Assert.DoesNotContain("Documents/2025", mapped.Select(f => f.Path));
 
         Assert.Equal(
             "second@example.test",
             (await GetTargetAsync(client)).Connection!.ConnectedAccountEmail);
+    }
+
+    // The one path allowed to clear the pin, because it is the same path that deletes every recorded copy:
+    // a new account means new ids and a full re-upload, so nothing is left for the old path to keep
+    // coherent. Discriminated with a pin that DIFFERS from config — otherwise config and the default agree
+    // and a pin left in place would be indistinguishable from one cleared and re-resolved.
+    [Fact]
+    public async Task AnAccountSwitch_ClearsThePinAndProvisionsAFreshRootFromConfig()
+    {
+        await ResetAsync();
+        var client = await CreateAdminClientAsync();
+
+        await ConnectAsync(client, "first@example.test");
+        await SetRootFolderPathAsync("Legacy/Mirror");
+
+        // A different account's Drive holds nothing this app created — which, under drive.file, is exactly
+        // what the app can see of it.
+        Drive.Reset();
+
+        Oauth.NextPollResult = FakeGoogleOAuthClient.Granted("refresh-token-2");
+        Accounts.NextAccount = new GoogleDriveAccountInfo("second@example.test", null, null);
+
+        var start = await client.PostAsync($"/api/v1/admin/backup/targets/{TargetKey}/connect", null, CT);
+        var connect = (await start.Content.ReadFromJsonAsync<ConnectResult>(CT))!;
+
+        var poll = await client.PostAsJsonAsync(
+            $"/api/v1/admin/backup/targets/{TargetKey}/connect/poll",
+            new { pollToken = connect.PollToken }, CT);
+
+        var mismatch = (await poll.Content.ReadFromJsonAsync<PollResult>(CT))!;
+        Assert.Equal("AccountMismatch", mismatch.Status);
+
+        var confirm = await client.PostAsJsonAsync(
+            $"/api/v1/admin/backup/targets/{TargetKey}/connect/confirm",
+            new { pendingToken = mismatch.PendingToken }, CT);
+        confirm.EnsureSuccessStatusCode();
+
+        // Cleared, then re-resolved from config rather than carried over.
+        var state = await GetStateAsync();
+        Assert.Equal("Homestead/Backup", state.RootFolderPath);
+        Assert.Equal(["Homestead", "Backup"], Drive.Created);
+
+        var (_, backupId) = RootChain();
+        Assert.Equal(FakeDriveHandler.WebViewLinkFor(backupId), state.RootFolderWebViewLink);
+
+        var target = await GetTargetAsync(client);
+        Assert.Equal("Google Drive / Homestead/Backup", target.Location);
+        Assert.Null(target.LocationNotice);
     }
 
     // --- Disconnect -----------------------------------------------------------------------------------
@@ -652,6 +896,8 @@ public class BackupGoogleDriveApiTests : IntegrationTestBase
         string Key,
         string? Kind,
         string? Location,
+        string? LocationUrl,
+        string? LocationNotice,
         bool IsAvailable,
         string? ConfigurationError,
         bool IsEnabled,

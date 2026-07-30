@@ -17,6 +17,7 @@ public class GetBackupTargetsHandler(
     AppDbContext db,
     IBackupTargetResolver resolver,
     IBackupTargetGate gate,
+    IBackupTargetOptionsAccessor options,
     IBackupSourceCatalog catalog)
     : IRequestHandler<GetBackupTargetsQuery, GetBackupTargetsResponse>
 {
@@ -75,7 +76,12 @@ public class GetBackupTargetsHandler(
             {
                 Key = target.Key,
                 Kind = target.Kind,
-                Location = target.Location,
+                // The persisted root wins; config is the fallback only while nothing has been created.
+                // Same shape as overriding the config-only IsAvailable with the composed verdict below —
+                // what the card shows has to be the answer that is currently true, not the static one.
+                Location = target.DescribeLocation(state?.RootFolderPath),
+                LocationUrl = state?.RootFolderWebViewLink,
+                LocationNotice = BuildLocationNotice(target, options.Get(key), state),
                 IsAvailable = verdict.IsAvailable,
                 ConfigurationError = verdict.Reason,
                 Connection = BuildConnection(target, state),
@@ -135,6 +141,44 @@ public class GetBackupTargetsHandler(
             AuthFailedAt = state?.AuthFailedAt,
             AuthFailedReason = state?.AuthFailedReason,
         };
+    }
+
+    /// <summary>
+    /// Names the one skew reading the location from the database can otherwise hide: config asking for a
+    /// root the mirror was not created at.
+    /// </summary>
+    /// <remarks>
+    /// Reading from the database is what makes the displayed location true — but it also turns a config
+    /// edit into a silent no-op, and a setting that does nothing while nothing anywhere says so is the same
+    /// trap in a new place. The common case (config unset, default used) renders nothing.
+    /// </remarks>
+    private static string? BuildLocationNotice(
+        IBackupTarget target, BackupTargetOptions bag, BackupTargetState? state)
+    {
+        if (target.Kind is not BackupTargetKind.GoogleDrive)
+            return null;
+
+        // A target whose config cannot run renders no location at all, and a notice about a location the
+        // card is not showing reads as an orphaned sentence. Its ConfigurationError is the message that
+        // matters there.
+        if (target.DescribeLocation(state?.RootFolderPath) is null)
+            return null;
+
+        if (state?.RootFolderPath is not { Length: > 0 } actual
+            || bag.RootFolderPath is not { Length: > 0 } raw)
+            return null;
+
+        var configured = raw.Trim();
+
+        // Case-insensitively, because Drive matches names that way: "homestead/backup" against
+        // "Homestead/Backup" is the same folder, not a relocation nobody performed.
+        if (configured.Length == 0
+            || string.Equals(configured, actual, StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        return $"Config asks for '{configured}', but the mirror was created at '{actual}' and stays " +
+               "there — the recorded copies point into that folder. Reconnecting a different Google " +
+               "account starts fresh from config.";
     }
 
     private BackupSourceItemResponse BuildSource(

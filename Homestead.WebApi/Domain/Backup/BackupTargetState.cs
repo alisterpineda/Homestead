@@ -65,6 +65,41 @@ public class BackupTargetState
     /// </summary>
     public string? AuthFailedReason { get; set; }
 
+    // --- The resolved root (GoogleDrive kinds; all null for Local) ---
+
+    /// <summary>The root folder path as actually created, forward-slash. Null until one exists.</summary>
+    /// <remarks>
+    /// <para>
+    /// The <i>resolved</i> root, not the configured one: config supplies the default on first creation and
+    /// this records what came of it, so the admin card displays a location that is true by construction
+    /// rather than one config merely asks for.
+    /// </para>
+    /// <para>
+    /// <b>It pins the mirror.</b> <see cref="DocumentBackupState"/> rows hold root-relative paths plus
+    /// Drive file ids, so honouring a config edit after creation would mint a new empty root while every
+    /// copied file stayed physically in the old tree — a mirror reporting converged and silently wrong.
+    /// It therefore survives a disconnect (which keeps those copy records) and is cleared only by a
+    /// confirmed account switch, which deletes them.
+    /// </para>
+    /// <para>
+    /// The folder's <b>id</b> lives in <c>backup.target_folders</c> under path key <c>""</c> and is not
+    /// duplicated here: the two rows have different clearing rules, so a copy would be cleared in one
+    /// place and not the other on the most common path — and what it would buy is one <c>files.list</c>
+    /// per segment, once, on a reconnect that oldest-wins find already lands on the same folder for.
+    /// </para>
+    /// </remarks>
+    public string? RootFolderPath { get; set; }
+
+    /// <summary>Drive's own URL for that folder, so the card can link straight to it.</summary>
+    /// <remarks>
+    /// The only workable mitigation for the root's collidable top segment: the <c>drive.file</c> scope
+    /// cannot see a folder the app did not create, so a same-named folder of the user's own can never be
+    /// detected, let alone warned about. One click answers "which of these is the app's". Kept across a
+    /// disconnect on purpose — the disconnect dialog already says the files stay in that account's Drive,
+    /// and a live link makes that advice actionable.
+    /// </remarks>
+    public string? RootFolderWebViewLink { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
 }

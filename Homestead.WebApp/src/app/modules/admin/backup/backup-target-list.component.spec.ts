@@ -46,7 +46,7 @@ function driveTarget(
   return target({
     key: 'gdrive',
     kind: 'GoogleDrive',
-    location: 'Google Drive / Homestead Backup',
+    location: 'Google Drive / Homestead/Backup',
     connection: { isConnected: true, ...connection },
     ...overrides,
   });
@@ -973,5 +973,58 @@ describe('BackupTargetListComponent', () => {
     const { element } = setup([driveTarget()]);
 
     expect(element.textContent).toContain('Google Drive');
+  });
+
+  // --- The location ---------------------------------------------------------------------------------
+
+  // The only workable answer to "which of my two Homestead folders is the app's": the drive.file scope
+  // cannot see a folder the app did not create, so a collision can never be detected, let alone warned
+  // about. One click settles it permanently.
+  it('links the location to the destination folder when it has a URL', () => {
+    const { element } = setup([
+      driveTarget({}, { locationUrl: 'https://drive.google.com/drive/folders/backup-id' }),
+    ]);
+
+    const link = element.querySelector<HTMLAnchorElement>('[data-testid="location-link-gdrive"]');
+
+    expect(link?.getAttribute('href')).toBe('https://drive.google.com/drive/folders/backup-id');
+    expect(link?.getAttribute('target')).toBe('_blank');
+    expect(link?.getAttribute('rel')).toContain('noopener');
+    expect(link?.textContent).toContain('Google Drive / Homestead/Backup');
+  });
+
+  // A local directory has no browsable URL, and neither does a Drive target before its root exists.
+  it('renders the location as plain text with no URL', () => {
+    const { element } = setup([target()]);
+
+    expect(element.querySelector('[data-testid="location-link-local"]')).toBeNull();
+    expect(element.querySelector('[data-testid="backup-target-local"]')?.textContent).toContain(
+      '/mnt/nas/homestead-backup',
+    );
+  });
+
+  // Reading the location from the database is what makes it true — but it also turns a config edit into a
+  // silent no-op, and a setting that does nothing while nothing says so is the same trap in a new place.
+  it('surfaces a config-vs-actual skew notice when the server sends one', () => {
+    const { element } = setup([
+      driveTarget(
+        {},
+        {
+          locationNotice:
+            "Config asks for 'Archive/Homestead', but the mirror was created at 'Homestead/Backup' and stays there.",
+        },
+      ),
+    ]);
+
+    expect(element.querySelector('[data-testid="location-notice-gdrive"]')?.textContent).toContain(
+      "Config asks for 'Archive/Homestead'",
+    );
+  });
+
+  // The common case — config unset, the default used — must render nothing at all.
+  it('renders no location notice when config and the created root agree', () => {
+    const { element } = setup([driveTarget()]);
+
+    expect(element.querySelector('[data-testid="location-notice-gdrive"]')).toBeNull();
   });
 });

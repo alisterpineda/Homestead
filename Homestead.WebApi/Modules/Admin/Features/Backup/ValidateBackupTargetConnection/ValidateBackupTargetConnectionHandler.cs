@@ -20,6 +20,12 @@ namespace Homestead.WebApi.Modules.Admin.Features.Backup.ValidateBackupTargetCon
 /// so the next scheduled run refuses immediately instead of discovering the same thing the hard way; a
 /// successful one clears a stale marker, which is what makes "reconnect, then look again" work.
 /// </para>
+/// <para>
+/// It is also the <b>self-heal</b> for root-folder provisioning. The connect dialog's success output
+/// triggers a reload, which fires this per connected Drive target — so a connect-time hook that failed is
+/// repaired within a second in practice. Steady state costs zero extra Drive calls: the ensure step
+/// early-returns on a mapped root.
+/// </para>
 /// </remarks>
 public class ValidateBackupTargetConnectionHandler(
     IBackupTargetResolver resolver,
@@ -28,6 +34,7 @@ public class ValidateBackupTargetConnectionHandler(
     IGoogleDriveGrantStore grantStore,
     IGoogleDriveAccountClient accounts,
     GoogleDriveTokenManager tokenManager,
+    IBackupTargetRootProvisioner rootProvisioner,
     ILogger<ValidateBackupTargetConnectionHandler> logger)
     : IRequestHandler<ValidateBackupTargetConnectionCommand, ValidateBackupTargetConnectionResponse>
 {
@@ -72,6 +79,15 @@ public class ValidateBackupTargetConnectionHandler(
                 target.Key, bag.ClientId!, bag.ClientSecret!, ct);
 
             var account = await accounts.GetAccountInfoAsync(accessToken, ct);
+
+            // Inline is correct here, unlike on the connect paths: the grant is already committed, so the
+            // token manager's own connection can see it. Ordered before the one write below so all the
+            // slow Drive work happens before the first flush — which is what keeps this command's lazy
+            // transaction from holding a pooled connection across a round trip to Google.
+            //
+            // The provisioner swallows its own failures, so no folder problem can reach the catch arms
+            // below and latch a perfectly good authorization as dead.
+            await rootProvisioner.EnsureAsync(target, ct);
 
             // The probe succeeded, so any marker left by an earlier failure is stale.
             await grantStore.ClearAuthFailureAsync(target.Key, ct);

@@ -27,8 +27,17 @@ public class BackupTargetFolder
 
     /// <summary>
     /// Forward-slash path from the target root, including the kind root folder (e.g. <c>Documents/2024</c>).
-    /// The empty string is the target root folder itself, which is a map entry like any other.
+    /// The empty string is the <i>effective</i> target root — for Drive, the id of the last segment of the
+    /// root path (<c>Homestead/Backup</c>'s <c>Backup</c>).
     /// </summary>
+    /// <remarks>
+    /// The chain above that root is deliberately <b>unmapped</b>: keys stay strictly root-relative, which
+    /// is what keeps <c>PruneUpwardsAsync</c>'s "stop at the last slash" guard a <i>structural</i>
+    /// guarantee that nothing above the effective root can be trashed. Admitting above-the-root entries
+    /// would downgrade it to a rule someone has to remember, and the failure mode is trashing the user's
+    /// own top-level <c>Homestead</c>. The intermediates are re-derived by name lookup whenever <c>""</c>
+    /// is unmapped, which costs one <c>files.list</c> per segment, once per process.
+    /// </remarks>
     public required string Path { get; set; }
 
     /// <summary>The destination's own id for the folder.</summary>

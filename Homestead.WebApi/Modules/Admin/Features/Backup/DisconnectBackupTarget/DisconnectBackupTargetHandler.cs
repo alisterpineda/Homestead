@@ -63,6 +63,13 @@ public class DisconnectBackupTargetHandler(
         // created them. State rows deliberately stay: re-connecting the SAME account should not force a
         // full re-upload, and reconnecting a different one resets them explicitly (see the confirm slice).
         //
+        // For the same reason the state row's RootFolderPath is deliberately NOT cleared: it is the pin
+        // that keeps those surviving copy records coherent. Clearing it would let a config edit between
+        // disconnect and reconnect create a new empty root while every mirrored file stayed in the old
+        // tree. Reconnecting the same account therefore re-finds the same folders by name along the pinned
+        // path, oldest-wins. RootFolderWebViewLink stays too, so the "the files stay in that account's
+        // Drive — delete them there if you want them gone" advice this dialog gives is one click away.
+        //
         // Through the change tracker rather than ExecuteDelete: the map is bounded by the number of
         // folders (roughly, year shards — tens), so there is no bulk win to buy with a raw write.
         var folders = await db.BackupTargetFolders

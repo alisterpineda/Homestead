@@ -7,7 +7,8 @@ namespace Homestead.WebApi.Infrastructure.Backup;
 /// Exists because a Drive target's OAuth client id and secret are needed by the connect and validate
 /// slices, and <see cref="IBackupTarget"/> deliberately does not expose them: an interface that every
 /// handler resolves is the wrong place to hang a credential. Targets keep their own copy privately; this
-/// hands the same bag to the two callers that legitimately need it.
+/// hands the same bag to the handful of callers that legitimately need it — including the admin page,
+/// which compares the <i>configured</i> root path against the one actually created.
 /// </remarks>
 public interface IBackupTargetOptionsAccessor
 {

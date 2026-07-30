@@ -41,6 +41,12 @@ public class BackupConnectionHandlerTests : IDisposable
     private readonly IAuditContext _audit = Substitute.For<IAuditContext>();
     private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>();
 
+    private readonly IBackupTargetRootProvisioner _rootProvisioner =
+        Substitute.For<IBackupTargetRootProvisioner>();
+
+    /// <summary>The stand-in the resolver hands back, so root provisioning is assertable per target.</summary>
+    private IBackupTarget _target = null!;
+
     private readonly GoogleDriveGrantStore _store;
     private readonly GoogleDriveConnectTokenProtector _protector;
     private readonly GoogleDriveTokenManager _tokenManager;
@@ -107,25 +113,33 @@ public class BackupConnectionHandlerTests : IDisposable
         target.ConfigurationError.Returns(configurationError);
         target.IsAvailable.Returns(configurationError is null);
 
+        _target = target;
         _resolver.Find(Arg.Any<string>()).Returns(target);
     }
 
     private ConnectBackupTargetHandler Connect() => new(_resolver, _options, _oauth, _protector);
 
     private PollBackupTargetConnectionHandler Poll() => new(
-        _resolver, _options, _oauth, _accounts, _store, _protector, _tokenManager, _time,
-        NullLogger<PollBackupTargetConnectionHandler>.Instance);
+        _resolver, _options, _oauth, _accounts, _store, _protector, _tokenManager, _rootProvisioner,
+        _unitOfWork, _time, NullLogger<PollBackupTargetConnectionHandler>.Instance);
 
     private ConfirmBackupTargetConnectionHandler Confirm() => new(
-        _db, _resolver, _store, _oauth, _protector, _tokenManager, _audit, _unitOfWork,
+        _db, _resolver, _store, _oauth, _protector, _tokenManager, _rootProvisioner, _audit, _unitOfWork,
         NullLogger<ConfirmBackupTargetConnectionHandler>.Instance);
 
     private DisconnectBackupTargetHandler Disconnect() => new(
         _db, _resolver, _store, _oauth, _tokenManager, _audit, _unitOfWork);
 
     private ValidateBackupTargetConnectionHandler Validate(IBackupTargetGate gate) => new(
-        _resolver, _options, gate, _store, _accounts, _tokenManager,
+        _resolver, _options, gate, _store, _accounts, _tokenManager, _rootProvisioner,
         NullLogger<ValidateBackupTargetConnectionHandler>.Instance);
+
+    private Task EnsuredTheRoot() =>
+        _rootProvisioner.Received(1).EnsureAsync(_target, Arg.Any<CancellationToken>());
+
+    private Task EnsuredNothing() =>
+        _rootProvisioner.DidNotReceive().EnsureAsync(
+            Arg.Any<IBackupTarget>(), Arg.Any<CancellationToken>());
 
     private static IBackupTargetGate Gate(bool available, string? reason = null)
     {
@@ -232,6 +246,39 @@ public class BackupConnectionHandlerTests : IDisposable
         Assert.Equal("owner@example.test", read.ConnectedAccountEmail);
     }
 
+    // The mirror folder has to exist before anyone can share it from Drive's UI, and nothing else creates
+    // it until a first run succeeds. After the commit rather than inline: the grant's flush is joined to
+    // the pipeline transaction, so the token manager — reading on its own connection — would see nothing.
+    [Fact]
+    public async Task Poll_Granted_EnsuresTheRootFolderAfterTheCommit()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        _oauth.PollDeviceTokenAsync("client-id", "client-secret", "dc", Arg.Any<CancellationToken>())
+            .Returns(new GoogleDevicePollResult(GoogleDevicePollStatus.Granted, Grant()));
+        _accounts.GetAccountInfoAsync("at", Arg.Any<CancellationToken>())
+            .Returns(new GoogleDriveAccountInfo("owner@example.test", 100, 1000));
+
+        await Poll().Handle(new PollBackupTargetConnectionCommand(TargetKey, ValidPollToken()), ct);
+
+        await EnsuredTheRoot();
+    }
+
+    [Theory]
+    [InlineData(GoogleDevicePollStatus.Pending)]
+    [InlineData(GoogleDevicePollStatus.SlowDown)]
+    [InlineData(GoogleDevicePollStatus.Denied)]
+    [InlineData(GoogleDevicePollStatus.Expired)]
+    public async Task Poll_NotYetGranted_DoesNotTouchDrive(GoogleDevicePollStatus status)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        _oauth.PollDeviceTokenAsync("client-id", "client-secret", "dc", Arg.Any<CancellationToken>())
+            .Returns(new GoogleDevicePollResult(status));
+
+        await Poll().Handle(new PollBackupTargetConnectionCommand(TargetKey, ValidPollToken()), ct);
+
+        await EnsuredNothing();
+    }
+
     // Stored file ids are meaningless in another account's Drive, so switching abandons the existing
     // mirror — far too destructive to do implicitly.
     [Fact]
@@ -260,6 +307,25 @@ public class BackupConnectionHandlerTests : IDisposable
         // The held grant travels sealed, not in the clear.
         Assert.DoesNotContain("second-rt", response.PendingToken);
         Assert.Equal("second-rt", _protector.UnprotectPending(response.PendingToken!)!.Grant.RefreshToken);
+    }
+
+    // Nothing was stored, so there is no authorization to create a folder under — and creating one in the
+    // offered account before the admin has confirmed the switch would leave litter in a Drive they may
+    // never connect.
+    [Fact]
+    public async Task Poll_AccountMismatch_DoesNotEnsureAnything()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await _store.SaveAsync(TargetKey, Grant("original-rt"), "first@example.test", ct);
+
+        _oauth.PollDeviceTokenAsync("client-id", "client-secret", "dc", Arg.Any<CancellationToken>())
+            .Returns(new GoogleDevicePollResult(GoogleDevicePollStatus.Granted, Grant("second-rt")));
+        _accounts.GetAccountInfoAsync("at", Arg.Any<CancellationToken>())
+            .Returns(new GoogleDriveAccountInfo("second@example.test", null, null));
+
+        await Poll().Handle(new PollBackupTargetConnectionCommand(TargetKey, ValidPollToken()), ct);
+
+        await EnsuredNothing();
     }
 
     [Fact]
@@ -548,6 +614,34 @@ public class BackupConnectionHandlerTests : IDisposable
         await _oauth.DidNotReceive().RevokeAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
+    // The one path allowed to clear the pin, and the reason is that it is the same path that deletes every
+    // recorded copy: a new account means new ids, new folders and a full re-upload, so nothing is left for
+    // the old path to keep coherent. Everywhere else the pin must survive.
+    [Fact]
+    public async Task Confirm_ClearsThePinnedRootPathAndEnsuresTheNewOne()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await _store.SaveAsync(TargetKey, Grant("original-rt"), "first@example.test", ct);
+
+        var seeded = await _db.BackupTargetStates.SingleAsync(s => s.TargetKey == TargetKey, ct);
+        seeded.RootFolderPath = "Homestead/Backup";
+        seeded.RootFolderWebViewLink = "https://drive.google.com/drive/folders/backup-id";
+        await _db.SaveChangesAsync(ct);
+
+        var pending = _protector.ProtectPending(new GoogleConnectPendingGrant(
+            TargetKey, Grant("second-rt"), "second@example.test", Now.AddMinutes(10)));
+
+        await Confirm().Handle(new ConfirmBackupTargetConnectionCommand(TargetKey, pending), ct);
+
+        var state = await _db.BackupTargetStates.AsNoTracking()
+            .SingleAsync(s => s.TargetKey == TargetKey, ct);
+
+        Assert.Null(state.RootFolderPath);
+        Assert.Null(state.RootFolderWebViewLink);
+
+        await EnsuredTheRoot();
+    }
+
     [Fact]
     public async Task Confirm_ATamperedPendingTokenIsRefused()
     {
@@ -598,6 +692,43 @@ public class BackupConnectionHandlerTests : IDisposable
 
         // Reconnecting the SAME account should not force a full re-upload.
         Assert.True(await _db.DocumentBackupStates.AnyAsync(ct));
+    }
+
+    // The pin outlives a disconnect precisely because the copy records do. Clearing it would let a config
+    // edit between disconnect and reconnect create a new empty root while every mirrored file stayed in
+    // the old tree — and the link is what makes "the files stay in that account's Drive, delete them
+    // there" actionable.
+    [Fact]
+    public async Task Disconnect_KeepsThePinnedRootPath()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await SeedPairingWithStateAsync(ct);
+        await _store.SaveAsync(TargetKey, Grant(), "owner@example.test", ct);
+
+        var seeded = await _db.BackupTargetStates.SingleAsync(s => s.TargetKey == TargetKey, ct);
+        seeded.RootFolderPath = "Homestead/Backup";
+        seeded.RootFolderWebViewLink = "https://drive.google.com/drive/folders/backup-id";
+
+        _db.BackupTargetFolders.Add(new BackupTargetFolder
+        {
+            Id = Guid.NewGuid(),
+            TargetKey = TargetKey,
+            Path = "Documents/2025",
+            RemoteFolderId = "folder-id",
+            CreatedAt = Now,
+        });
+        await _db.SaveChangesAsync(ct);
+
+        await Disconnect().Handle(new DisconnectBackupTargetCommand(TargetKey), ct);
+
+        // The ids go with the grant.
+        Assert.False(await _db.BackupTargetFolders.AnyAsync(ct));
+
+        var state = await _db.BackupTargetStates.AsNoTracking()
+            .SingleAsync(s => s.TargetKey == TargetKey, ct);
+
+        Assert.Equal("Homestead/Backup", state.RootFolderPath);
+        Assert.Equal("https://drive.google.com/drive/folders/backup-id", state.RootFolderWebViewLink);
     }
 
     // The card renders from the surviving state row precisely so this stays reachable — an orphaned grant
@@ -706,5 +837,104 @@ public class BackupConnectionHandlerTests : IDisposable
         Assert.True(response.IsAvailable);
         await _accounts.DidNotReceive().GetAccountInfoAsync(
             Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    // The self-heal: the connect dialog's success triggers a reload, which fires this per connected target,
+    // so a connect-time hook that failed is repaired within a second. Idempotent and free once the root is
+    // mapped, which is why it can sit on a path the page fires on every load.
+    [Fact]
+    public async Task Validate_ASuccessfulProbe_AlsoEnsuresTheRoot()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await _store.SaveAsync(TargetKey, Grant(), "owner@example.test", ct);
+
+        _accounts.GetAccountInfoAsync("at", Arg.Any<CancellationToken>())
+            .Returns(new GoogleDriveAccountInfo("owner@example.test", 400, 1000));
+
+        await Validate(Gate(true)).Handle(new ValidateBackupTargetConnectionCommand(TargetKey), ct);
+
+        await EnsuredTheRoot();
+    }
+
+    [Fact]
+    public async Task Validate_ANotConnectedTarget_DoesNotEnsureAnything()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        await Validate(Gate(false, BackupTargetGate.NotConnectedReason))
+            .Handle(new ValidateBackupTargetConnectionCommand(TargetKey), ct);
+
+        await EnsuredNothing();
+    }
+
+    [Fact]
+    public async Task Validate_ADeadGrant_DoesNotEnsureAnything()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await _store.SaveAsync(TargetKey, Grant(), "owner@example.test", ct);
+
+        _accounts.GetAccountInfoAsync("at", Arg.Any<CancellationToken>())
+            .Returns<GoogleDriveAccountInfo>(_ =>
+                throw new GoogleDriveAuthException("unauthorized", "Google rejected the token."));
+
+        await Validate(Gate(true)).Handle(new ValidateBackupTargetConnectionCommand(TargetKey), ct);
+
+        await EnsuredNothing();
+    }
+
+    // --- The provisioner itself -----------------------------------------------------------------------
+
+    // Load-bearing, not defensive noise: UnitOfWork awaits after-commit hooks unguarded, so a throw here
+    // would turn a connect that ALREADY COMMITTED into a 500 — reporting a failure that did not happen,
+    // for work the next validate repairs anyway.
+    [Fact]
+    public async Task RootProvisioner_SwallowsAFailureRatherThanFailingACommittedConnect()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        var target = Substitute.For<IBackupTarget>();
+        target.Key.Returns(TargetKey);
+        target.IsAvailable.Returns(true);
+        target.EnsureFoldersAsync(Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>())
+            .Returns<Task>(_ => throw new HttpRequestException("Drive is having a moment"));
+
+        var provisioner = new BackupTargetRootProvisioner(
+            NullLogger<BackupTargetRootProvisioner>.Instance);
+
+        await provisioner.EnsureAsync(target, ct);
+    }
+
+    // An empty collection ensures exactly the root chain: the target's ancestor expansion always includes
+    // the root and emits nothing for a set with no members.
+    [Fact]
+    public async Task RootProvisioner_AsksForTheRootChainAndNothingElse()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        var target = Substitute.For<IBackupTarget>();
+        target.Key.Returns(TargetKey);
+        target.IsAvailable.Returns(true);
+
+        await new BackupTargetRootProvisioner(NullLogger<BackupTargetRootProvisioner>.Instance)
+            .EnsureAsync(target, ct);
+
+        await target.Received(1).EnsureFoldersAsync(
+            Arg.Is<IReadOnlyCollection<string>>(paths => paths.Count == 0), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task RootProvisioner_LeavesAMisconfiguredTargetAlone()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        var target = Substitute.For<IBackupTarget>();
+        target.Key.Returns(TargetKey);
+        target.IsAvailable.Returns(false);
+
+        await new BackupTargetRootProvisioner(NullLogger<BackupTargetRootProvisioner>.Instance)
+            .EnsureAsync(target, ct);
+
+        await target.DidNotReceive().EnsureFoldersAsync(
+            Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>());
     }
 }
