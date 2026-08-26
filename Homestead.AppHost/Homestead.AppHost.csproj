@@ -1,4 +1,4 @@
-<Project Sdk="Aspire.AppHost.Sdk/13.3.5">
+<Project Sdk="Aspire.AppHost.Sdk/13.5.3">
 
     <PropertyGroup>
         <OutputType>Exe</OutputType>
@@ -6,6 +6,9 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <UserSecretsId>0deba5e3-7b67-402a-8f16-ab2788876f62</UserSecretsId>
+        <!-- Aspire SDK 13.5+ warns (ASPIRE010) when AspireUseCliBundle is unset/false. We keep the
+             SDK-injected DCP/dashboard packages so `dotnet run` works without the CLI bundle. -->
+        <NoWarn>$(NoWarn);ASPIRE010</NoWarn>
     </PropertyGroup>
 
     <ItemGroup>
@@ -13,9 +16,9 @@
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="Aspire.Hosting.JavaScript" Version="13.3.5" />
-<PackageReference Include="Aspire.Hosting.Keycloak" Version="13.3.5-preview.1.26270.6" />
-<PackageReference Include="Aspire.Hosting.PostgreSQL" Version="13.3.5" />
+      <PackageReference Include="Aspire.Hosting.JavaScript" Version="13.5.3" />
+<PackageReference Include="Aspire.Hosting.Keycloak" Version="13.5.3-preview.1.26425.3" />
+<PackageReference Include="Aspire.Hosting.PostgreSQL" Version="13.5.3" />
     </ItemGroup>
 
 </Project>

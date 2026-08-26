@@ -10,6 +10,9 @@ riderModule.iml
 
 # Frontend
 node_modules/
+# pnpm resolves its package store to the repo root here (`pnpm store path` -> /.pnpm-store);
+# a transitive dev toolchain populates it during installs. Never ours to track.
+/.pnpm-store/
 Homestead.WebApi/wwwroot/
 
 # Tesseract models are provisioned by scripts/fetch-tessdata.sh (pinned in tessdata.ref),

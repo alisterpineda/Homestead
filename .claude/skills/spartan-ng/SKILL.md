@@ -142,6 +142,8 @@ for c in $(ls src/app/shared/components/spartan/); do npx ng g @spartan-ng/cli:u
 
 ### Known upgrade gotchas (1.0.1 → 1.1.0, nova)
 
+> **Version skew (deliberate):** the vendored helm is 1.1.0-generated, but the installed `@spartan-ng/cli`/`@spartan-ng/brain` are 1.3.x. Any `ui:*` generation now emits 1.3.x helm into a 1.1.0 tree — treat it as a 1.1.0 → 1.3.x upgrade (whose gotchas are not yet cataloged below), not a same-version regen, and run the full verification chain (build + healthcheck + `self-qa`).
+
 A green `ng build` **and** a clean `healthcheck` are **not sufficient** after a regen — two of these are runtime-only regressions. Always run the `self-qa` subagent afterward.
 
 - **The `icon` helm was removed in 1.1.0.** There is no `ui:icon` template; regenerated helm imports `NgIcon`/`provideIcons` straight from `@ng-icons/core`. But this app uses `HlmIconImports` (~86 files) and `<ng-icon hlm size="sm|xs">` (~448 sites) that rely on the `HlmIcon` directive's token→px sizing. **Do NOT migrate** — restore the previous `icon` helm from git and re-add its tsconfig alias; it's self-contained and decoupled from the new helm, and the `Helm Icons` healthcheck passes with it:

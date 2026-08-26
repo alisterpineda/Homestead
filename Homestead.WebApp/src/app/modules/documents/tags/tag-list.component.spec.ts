@@ -1,11 +1,14 @@
 import { TestBed, ComponentFixture } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideRouter, Router } from '@angular/router';
-import { signal } from '@angular/core';
+import { Component, signal } from '@angular/core';
 import { TagListComponent } from './tag-list.component';
 import { DEFAULT_COLUMN_VISIBILITY } from './tag-table/tag-table.component';
 import { UserPreferencesService } from '@/shared/services/user-preferences.service';
 import type { TagSortBy } from '@/api/generated/models/tag-sort-by';
+
+@Component({ template: '' })
+class DummyComponent {}
 
 describe('TagListComponent', () => {
   let fixture: ComponentFixture<TagListComponent>;
@@ -13,7 +16,13 @@ describe('TagListComponent', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideRouter([])],
+      providers: [
+        provideHttpClient(),
+        // The component syncs sort/search/paging into the URL, so the un-spied calls in these
+        // specs perform a real navigation. Without the target route registered the router rejects
+        // with NG04002 and the failure surfaces as an unhandled rejection.
+        provideRouter([{ path: 'documents/tags', component: DummyComponent }]),
+      ],
     });
     fixture = TestBed.createComponent(TagListComponent);
     component = fixture.componentInstance;

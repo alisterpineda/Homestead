@@ -1,7 +1,7 @@
 import { TestBed, ComponentFixture } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideRouter, Router } from '@angular/router';
-import { signal } from '@angular/core';
+import { Component, signal } from '@angular/core';
 import { of, Subject } from 'rxjs';
 import { DocumentListComponent } from './document-list.component';
 import { DEFAULT_COLUMN_VISIBILITY } from './document-table/document-table.component';
@@ -10,6 +10,9 @@ import { TagApiService } from '@/api/services/tag-api.service';
 import { PartyApiService } from '@/api/services/party-api.service';
 import { DocumentApiService } from '@/api/services/document-api.service';
 import type { DocumentSortBy } from '@/api/generated/models/document-sort-by';
+
+@Component({ template: '' })
+class DummyComponent {}
 
 describe('DocumentListComponent', () => {
   let fixture: ComponentFixture<DocumentListComponent>;
@@ -23,7 +26,17 @@ describe('DocumentListComponent', () => {
     });
 
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideRouter([])],
+      providers: [
+        provideHttpClient(),
+        // The component syncs sort/search/paging into the URL, so the un-spied calls in these
+        // specs perform a real navigation. Without the target route registered the router rejects
+        // with NG04002 and the failure surfaces as an unhandled rejection. The empty path keeps
+        // the specs' own `router.navigate([], { queryParams })` matching once a sibling exists.
+        provideRouter([
+          { path: '', component: DummyComponent },
+          { path: 'documents', component: DummyComponent },
+        ]),
+      ],
     });
     fixture = TestBed.createComponent(DocumentListComponent);
     component = fixture.componentInstance;

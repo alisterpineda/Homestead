@@ -1,11 +1,14 @@
 import { TestBed, ComponentFixture } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideRouter, Router } from '@angular/router';
-import { signal } from '@angular/core';
+import { Component, signal } from '@angular/core';
 import { PartyListComponent } from './party-list.component';
 import { DEFAULT_COLUMN_VISIBILITY } from './party-table/party-table.component';
 import { UserPreferencesService } from '@/shared/services/user-preferences.service';
 import type { PartySortBy } from '@/api/generated/models/party-sort-by';
+
+@Component({ template: '' })
+class DummyComponent {}
 
 describe('PartyListComponent', () => {
   let fixture: ComponentFixture<PartyListComponent>;
@@ -13,7 +16,13 @@ describe('PartyListComponent', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideRouter([])],
+      providers: [
+        provideHttpClient(),
+        // The component syncs sort/search/paging into the URL, so the un-spied calls in these
+        // specs perform a real navigation. Without the target route registered the router rejects
+        // with NG04002 and the failure surfaces as an unhandled rejection.
+        provideRouter([{ path: 'documents/parties', component: DummyComponent }]),
+      ],
     });
     fixture = TestBed.createComponent(PartyListComponent);
     component = fixture.componentInstance;
