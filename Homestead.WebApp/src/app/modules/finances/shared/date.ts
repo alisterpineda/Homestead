@@ -10,7 +10,7 @@ export function tomorrowIso(): string {
   return d.toISOString().slice(0, 10);
 }
 
-/** `tomorrowIso()` as a local Date — the max-date cap for hlm-date-picker `[max]`. */
+/** `tomorrowIso()` as a local Date — the cap for hlm-date-picker `[maxDate]`. */
 export function tomorrowDate(): Date {
   return parseDate(tomorrowIso())!;
 }

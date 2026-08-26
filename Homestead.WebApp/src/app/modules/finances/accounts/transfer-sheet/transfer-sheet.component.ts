@@ -135,7 +135,7 @@ export type TransferDirection = 'outgoing' | 'incoming';
                 class="w-full"
                 captionLayout="dropdown"
                 [date]="datePicker.date()"
-                [max]="maxDate"
+                [maxDate]="maxDate"
                 (dateChange)="datePicker.set($event)"
               >
                 <hlm-date-picker-input inputId="transfer-date" placeholder="Select date" />

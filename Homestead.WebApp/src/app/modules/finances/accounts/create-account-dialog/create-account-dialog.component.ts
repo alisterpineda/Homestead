@@ -135,7 +135,7 @@ import { todayIso, tomorrowDate } from '../../shared/date';
                     class="w-full"
                     captionLayout="dropdown"
                     [date]="initialAsOfDatePicker.date()"
-                    [max]="maxAsOfDate"
+                    [maxDate]="maxAsOfDate"
                     (dateChange)="initialAsOfDatePicker.set($event)"
                   >
                     <hlm-date-picker-input inputId="create-account-as-of" placeholder="Select date" />

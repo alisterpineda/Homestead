@@ -92,7 +92,7 @@ export type BalanceEntrySheetMode = 'create' | 'edit';
                 class="w-full"
                 captionLayout="dropdown"
                 [date]="datePicker.date()"
-                [max]="maxDate"
+                [maxDate]="maxDate"
                 (dateChange)="datePicker.set($event)"
               >
                 <hlm-date-picker-input inputId="balance-entry-date" placeholder="Select date" />

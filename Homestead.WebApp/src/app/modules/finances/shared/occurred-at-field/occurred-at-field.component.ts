@@ -32,7 +32,7 @@ import { tomorrowIso } from '../date';
           class="w-44"
           captionLayout="dropdown"
           [date]="dateValue()"
-          [max]="maxDateValue()"
+          [maxDate]="maxDateValue()"
           (dateChange)="onDateChange($event)"
         >
           <hlm-date-picker-input [inputId]="dateId()" placeholder="Select date" />

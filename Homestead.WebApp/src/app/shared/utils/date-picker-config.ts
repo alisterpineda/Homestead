@@ -12,7 +12,7 @@ export function formatPickerDate(date: Date): string {
 
 /** Lenient, local-safe parse: ISO-leading strings parse as LOCAL y/m/d (no UTC day
  *  shift); anything else falls back to `new Date(value)`; invalid → null.
- *  (Spartan 1.1.0's `HlmDatePickerConfig.parseDate` contract returns `T | null`.) */
+ *  (Spartan's `HlmDatePickerConfig.parseDate` contract returns `T | null`.) */
 export function parsePickerDate(value: string): Date | null {
   const trimmed = value.trim();
   if (!trimmed) return null;

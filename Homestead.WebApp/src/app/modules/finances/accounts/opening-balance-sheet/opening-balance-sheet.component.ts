@@ -100,7 +100,7 @@ export type OpeningBalanceSheetMode = 'edit' | 'create-missing';
                 class="w-full"
                 captionLayout="dropdown"
                 [date]="asOfDatePicker.date()"
-                [max]="maxDate"
+                [maxDate]="maxDate"
                 (dateChange)="asOfDatePicker.set($event)"
               >
                 <hlm-date-picker-input inputId="opening-balance-date" placeholder="Select date" />

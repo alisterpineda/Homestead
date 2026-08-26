@@ -106,7 +106,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
                 class="w-full"
                 captionLayout="dropdown"
                 [date]="asOfDatePicker.date()"
-                [max]="maxDate"
+                [maxDate]="maxDate"
                 (dateChange)="asOfDatePicker.set($event)"
               >
                 <hlm-date-picker-input inputId="add-position-date" placeholder="Select date" />

@@ -253,7 +253,7 @@ function moneyPairError(
                 class="w-full"
                 captionLayout="dropdown"
                 [date]="editAcquiredOnPicker.date()"
-                [max]="maxAcquiredDate"
+                [maxDate]="maxAcquiredDate"
                 (dateChange)="editAcquiredOnPicker.set($event)"
               >
                 <hlm-date-picker-input inputId="durable-acquired" placeholder="Select date" />

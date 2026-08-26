@@ -126,7 +126,7 @@ export type FlowDirection = 'Expense' | 'Income';
                 class="w-full"
                 captionLayout="dropdown"
                 [date]="datePicker.date()"
-                [max]="maxDate"
+                [maxDate]="maxDate"
                 (dateChange)="datePicker.set($event)"
               >
                 <hlm-date-picker-input inputId="flow-date" placeholder="Select date" />
