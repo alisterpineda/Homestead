@@ -14,7 +14,6 @@ import { switchMap, map, of, defer, type Observable } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideMinus, lucidePlus, lucideTriangleAlert, lucideArrowRight } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
-import { HlmSheetImports } from '@/shared/components/spartan/sheet';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmInput } from '@/shared/components/spartan/input';
@@ -30,7 +29,7 @@ import {
 import { ItemStatusBadgeComponent } from '../../shared/item-status-badge.component';
 import { TagBadgeComponent } from '@/shared/components/tag-badge/tag-badge.component';
 import { isTerminalStatus } from '../../shared/item-status-meta';
-import { injectSheetSide } from '../../shared/sheet-side';
+import { QuickPanelComponent } from '../../shared/quick-panel/quick-panel.component';
 import { formatQty } from '../consumable-shared';
 import { UnitPipe } from '../unit.pipe';
 import { StockStepperEngine, stockLocationKey, stepperKey } from './stock-stepper.engine';
@@ -76,7 +75,7 @@ interface StepperPayload {
     RouterLink,
     NgIcon,
     HlmIconImports,
-    HlmSheetImports,
+    QuickPanelComponent,
     HlmButton,
     HlmLabel,
     HlmInput,
@@ -91,16 +90,10 @@ interface StepperPayload {
   ],
   providers: [provideIcons({ lucideMinus, lucidePlus, lucideTriangleAlert, lucideArrowRight })],
   template: `
-    <hlm-sheet [side]="sheetSide()" [state]="state()" (stateChanged)="onStateChanged($event)">
-      <hlm-sheet-content *hlmSheetPortal class="md:max-w-md max-md:max-h-[85dvh] max-md:rounded-t-xl">
-        <hlm-sheet-header>
-          <div class="flex items-center gap-2">
-            <h3 hlmSheetTitle class="min-w-0 truncate">{{ consumableView()?.name }}</h3>
-            @if (archived() && consumableView(); as s) {
-              <app-item-status-badge [status]="s.status" />
-            }
-          </div>
-        </hlm-sheet-header>
+    <app-quick-panel [title]="consumableView()?.name" [state]="state()" (stateChanged)="onStateChanged($event)">
+      @if (archived() && consumableView(); as s) {
+        <app-item-status-badge panelTitleEnd [status]="s.status" />
+      }
 
         @if (consumableView(); as s) {
           <div class="flex-1 space-y-4 overflow-y-auto px-4 py-1">
@@ -334,7 +327,7 @@ interface StepperPayload {
             }
           </div>
 
-          <hlm-sheet-footer class="flex-row items-center justify-between gap-2">
+          <div class="mt-auto flex items-center justify-between gap-2 p-4">
             <span class="text-xs text-muted-foreground">Updated {{ updatedRelative() }}</span>
             <!-- Styled to match the durable panel's plain link exactly; stays a <button> only so it can
                  flush pending optimistic stepper taps before navigating (durable patches are synchronous). -->
@@ -347,10 +340,9 @@ interface StepperPayload {
               {{ navigating() ? 'Saving changes...' : 'View details' }}
               <ng-icon hlm name="lucideArrowRight" size="sm" />
             </button>
-          </hlm-sheet-footer>
+          </div>
         }
-      </hlm-sheet-content>
-    </hlm-sheet>
+    </app-quick-panel>
   `,
 })
 export class ConsumableQuickPanelComponent {
@@ -364,8 +356,6 @@ export class ConsumableQuickPanelComponent {
   private consumableApi = inject(InventoryConsumableApiService);
   private errorHandler = inject(ErrorHandlerService);
   private router = inject(Router);
-
-  protected sheetSide = injectSheetSide();
 
   // Engine commits deliberately outlive the component (close-flush must land), but emitting on a
   // destroyed OutputRef warns (NG0953) — late results still apply to signals, just don't emit.

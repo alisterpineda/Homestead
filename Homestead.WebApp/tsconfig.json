@@ -139,6 +139,9 @@
       ],
       "@/shared/components/spartan/icon": [
         "./src/app/shared/components/spartan/icon/src/index.ts"
+      ],
+      "@/shared/components/spartan/drawer": [
+        "./src/app/shared/components/spartan/drawer/src/index.ts"
       ]
     }
   },

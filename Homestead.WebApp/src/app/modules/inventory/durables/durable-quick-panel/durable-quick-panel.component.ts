@@ -15,7 +15,6 @@ import { switchMap, map, of, catchError } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideBox, lucideCpu, lucideArrowRight } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
-import { HlmSheetImports } from '@/shared/components/spartan/sheet';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmInput } from '@/shared/components/spartan/input';
@@ -29,7 +28,7 @@ import {
 import { ItemStatusBadgeComponent } from '../../shared/item-status-badge.component';
 import { TagBadgeComponent } from '@/shared/components/tag-badge/tag-badge.component';
 import { ALL_ITEM_STATUSES, itemStatusLabel } from '../../shared/item-status-meta';
-import { injectSheetSide } from '../../shared/sheet-side';
+import { QuickPanelComponent } from '../../shared/quick-panel/quick-panel.component';
 import { durableLocationPath, type LocationPathView } from '../../shared/location-path';
 import { LocationPathComponent } from '../../shared/location-path.component';
 import { acquisitionSummary } from '../acquisition-summary';
@@ -59,7 +58,7 @@ type InlineForm = 'move' | 'lent' | null;
     RouterLink,
     NgIcon,
     HlmIconImports,
-    HlmSheetImports,
+    QuickPanelComponent,
     HlmButton,
     HlmLabel,
     HlmInput,
@@ -72,21 +71,15 @@ type InlineForm = 'move' | 'lent' | null;
   ],
   providers: [provideIcons({ lucideBox, lucideCpu, lucideArrowRight })],
   template: `
-    <hlm-sheet [side]="sheetSide()" [state]="state()" (stateChanged)="onStateChanged($event)">
-      <hlm-sheet-content *hlmSheetPortal class="md:max-w-md max-md:max-h-[85dvh] max-md:rounded-t-xl">
-        <hlm-sheet-header>
-          <div class="flex items-center gap-2">
-            @if (view()?.isContainer) {
-              <ng-icon hlm name="lucideBox" size="sm" class="shrink-0 text-muted-foreground" aria-label="Container" />
-            } @else if (view()?.hasComponents) {
-              <ng-icon hlm name="lucideCpu" size="sm" class="shrink-0 text-muted-foreground" aria-label="Assembly" />
-            }
-            <h3 hlmSheetTitle class="min-w-0 truncate">{{ view()?.name }}</h3>
-            @if (view()?.status; as status) {
-              <app-item-status-badge [status]="status" />
-            }
-          </div>
-        </hlm-sheet-header>
+    <app-quick-panel [title]="view()?.name" [state]="state()" (stateChanged)="onStateChanged($event)">
+      @if (view()?.isContainer) {
+        <ng-icon hlm panelTitleStart name="lucideBox" size="sm" class="shrink-0 text-muted-foreground" aria-label="Container" />
+      } @else if (view()?.hasComponents) {
+        <ng-icon hlm panelTitleStart name="lucideCpu" size="sm" class="shrink-0 text-muted-foreground" aria-label="Assembly" />
+      }
+      @if (view()?.status; as status) {
+        <app-item-status-badge panelTitleEnd [status]="status" />
+      }
 
         @if (view(); as it) {
           <div class="flex-1 space-y-4 overflow-y-auto px-4 py-1">
@@ -260,7 +253,7 @@ type InlineForm = 'move' | 'lent' | null;
             }
           </div>
 
-          <hlm-sheet-footer class="flex-row items-center justify-between gap-2">
+          <div class="mt-auto flex items-center justify-between gap-2 p-4">
             <span class="text-xs text-muted-foreground">Updated {{ updatedRelative() }}</span>
             <a
               [routerLink]="['/inventory/items', it.id]"
@@ -269,10 +262,9 @@ type InlineForm = 'move' | 'lent' | null;
               View details
               <ng-icon hlm name="lucideArrowRight" size="sm" />
             </a>
-          </hlm-sheet-footer>
+          </div>
         }
-      </hlm-sheet-content>
-    </hlm-sheet>
+    </app-quick-panel>
   `,
 })
 export class DurableQuickPanelComponent {
@@ -287,7 +279,6 @@ export class DurableQuickPanelComponent {
   private errorHandler = inject(ErrorHandlerService);
   private destroyRef = inject(DestroyRef);
 
-  protected sheetSide = injectSheetSide();
 
   protected readonly statuses = ALL_ITEM_STATUSES;
   protected readonly statusLabel = itemStatusLabel;

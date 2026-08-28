@@ -315,6 +315,18 @@ describe('DurableQuickPanelComponent', () => {
     });
   });
 
+  describe('title row', () => {
+    it('projects the container icon and status badge beside the name', async () => {
+      // Both reach the title row only via the `panelTitleStart` / `panelTitleEnd` projection slots;
+      // a misspelled attribute would silently drop them into the body, so pin them through the DOM.
+      await open(makeItem({ isContainer: true, status: 'Lent', lentTo: 'Dave' }));
+      const body = (fixture.nativeElement as HTMLElement).ownerDocument.body;
+      const titleRow = body.querySelector('hlm-sheet-content [hlmsheettitle]')!.parentElement!;
+      expect(titleRow.querySelector('[aria-label="Container"]')).not.toBeNull();
+      expect(titleRow.querySelector('app-item-status-badge')).not.toBeNull();
+    });
+  });
+
   describe('contents count', () => {
     it('fetches a PageSize-1 children count for containers when opened', async () => {
       await open(makeItem({ isContainer: true }));

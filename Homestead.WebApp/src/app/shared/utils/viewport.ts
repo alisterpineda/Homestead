@@ -20,9 +20,9 @@ export const MD_BREAKPOINT_QUERY = '(width >= 48rem)';
  * portrait. That service belongs to the sidebar and stays untouched.
  *
  * Why JS at all: CSS can only hide; it cannot choose which component tree to instantiate. Every
- * call site either picks between different trees (popover vs bottom sheet; resizable panes vs tabs
- * that hold a PDF `<iframe>`, which a CSS-only version would mount and load twice; the sheet's
- * `side` variant) or derives a *state* default (`'card' | 'table'`) that feeds a persisted
+ * call site either picks between different trees (popover or right-side sheet vs bottom drawer;
+ * resizable panes vs tabs that hold a PDF `<iframe>`, which a CSS-only version would mount and
+ * load twice) or derives a *state* default (`'card' | 'table'`) that feeds a persisted
  * preference. So one JS signal is legitimate — and it should stay tiny and ask the browser the
  * literal question Tailwind's `md:` asks.
  *

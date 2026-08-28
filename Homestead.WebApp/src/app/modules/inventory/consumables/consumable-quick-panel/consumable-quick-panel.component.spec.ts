@@ -240,6 +240,13 @@ describe('ConsumableQuickPanelComponent', () => {
       api.detail = makeDetail({ consumable: makeConsumable({ status: 'Archived' }) });
       await open(makeConsumable({ status: 'Archived' }));
       expect(component.archived()).toBe(true);
+
+      // The badge reaches the title row only via the `panelTitleEnd` projection slot; a misspelled
+      // attribute would silently drop it into the body, so pin it through the portaled DOM.
+      const body = (fixture.nativeElement as HTMLElement).ownerDocument.body;
+      const titleRow = body.querySelector('hlm-sheet-content [hlmsheettitle]')!.parentElement!;
+      expect(titleRow.textContent).toContain('Paper towels');
+      expect(titleRow.querySelector('app-item-status-badge')).not.toBeNull();
     });
   });
 

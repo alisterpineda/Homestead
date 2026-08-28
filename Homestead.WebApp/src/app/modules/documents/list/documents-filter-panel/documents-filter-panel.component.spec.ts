@@ -146,14 +146,14 @@ describe('DocumentsFilterPanelComponent', () => {
       fixture.detectChanges();
       const host: HTMLElement = fixture.nativeElement;
       expect(host.querySelector('[hlmpopover]')).not.toBeNull();
-      expect(host.querySelector('hlm-sheet')).toBeNull();
+      expect(host.querySelector('hlm-drawer')).toBeNull();
     });
 
-    it('renders the sheet wrapper on mobile', () => {
+    it('renders the drawer wrapper on mobile', () => {
       media.fireChange(false);
       fixture.detectChanges();
       const host: HTMLElement = fixture.nativeElement;
-      expect(host.querySelector('hlm-sheet')).not.toBeNull();
+      expect(host.querySelector('hlm-drawer')).not.toBeNull();
       expect(host.querySelector('[hlmpopover]')).toBeNull();
     });
   });

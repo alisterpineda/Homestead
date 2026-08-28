@@ -4,7 +4,7 @@ import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideListFilter } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmPopoverImports } from '@/shared/components/spartan/popover';
-import { HlmSheetImports } from '@/shared/components/spartan/sheet';
+import { HlmDrawerImports } from '@/shared/components/spartan/drawer';
 import { HlmCheckboxImports } from '@/shared/components/spartan/checkbox';
 import { HlmSeparatorImports } from '@/shared/components/spartan/separator';
 import { HlmComboboxImports } from '@/shared/components/spartan/combobox';
@@ -25,7 +25,7 @@ export interface FilterOption {
     NgIcon,
     HlmIconImports,
     HlmPopoverImports,
-    HlmSheetImports,
+    HlmDrawerImports,
     HlmCheckboxImports,
     HlmSeparatorImports,
     HlmComboboxImports,
@@ -45,17 +45,18 @@ export interface FilterOption {
         </div>
       </div>
     } @else {
-      <hlm-sheet side="bottom">
-        <button hlmSheetTrigger hlmBtn variant="outline" aria-label="Filter documents">
+      <hlm-drawer>
+        <button hlmDrawerTrigger hlmBtn variant="outline" aria-label="Filter documents">
           <ng-icon hlm name="lucideListFilter" size="sm" class="text-muted-foreground" />
           @if (activeCount() > 0) {
             <span hlmBadge variant="secondary" class="font-normal">{{ activeCount() }}</span>
           }
         </button>
-        <hlm-sheet-content *hlmSheetPortal class="p-0" [showCloseButton]="false">
+        <hlm-drawer-content *hlmDrawerPortal>
+          <h3 hlmDrawerTitle class="sr-only">Filter documents</h3>
           <ng-container *ngTemplateOutlet="panelBody" />
-        </hlm-sheet-content>
-      </hlm-sheet>
+        </hlm-drawer-content>
+      </hlm-drawer>
     }
 
     <ng-template #panelBody>
