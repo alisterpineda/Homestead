@@ -1,6 +1,11 @@
 @layer theme, base, components, utilities;
 @import 'tailwindcss/theme.css' layer(theme);
 @import 'tailwindcss/preflight.css' layer(base);
+/* Deliberately NO `layer(utilities)`: utilities stay unlayered so a plain app rule below can beat a
+   helm template's utility class on source order without `!important`. The @layer line above only
+   DECLARES the name order — it does not put anything in `utilities`, and nothing else does either,
+   so no `@layer utilities` block reaches the built sheet. Don't reason about this file as if one
+   existed; check the compiled CSS. */
 @import 'tailwindcss/utilities.css';
 
 @import "@spartan-ng/brain/hlm-tailwind-preset.css";
@@ -140,5 +145,7 @@
 
 /* Command palette search input: keep ≥16px so iOS Safari doesn't auto-zoom on focus.
    Scoped override so the generated helm command-input stays byte-for-byte stock.
-   Unlayered → beats the helm template's `text-sm` (Tailwind `@layer utilities`) with no `!important`. */
+   Ties the helm template's `text-sm` on specificity (both 0,1,0) and wins on SOURCE ORDER alone —
+   it sits after the utilities import. Not a layering win: utilities are emitted unlayered here (see
+   the import block up top), so keep this rule below that import and no `!important` is needed. */
 [data-slot='command-input'] { font-size: 1rem; line-height: 1.5rem; }
