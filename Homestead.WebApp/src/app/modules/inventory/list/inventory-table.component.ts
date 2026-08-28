@@ -32,10 +32,9 @@ import { formatQty } from '../consumables/consumable-shared';
 import { UnitPipe } from '../consumables/unit.pipe';
 import { escapeHtml } from '@/shared/utils';
 import { TagBadgeComponent } from '@/shared/components/tag-badge/tag-badge.component';
+import { locationCellView } from './inventory-row';
 import type { InventoryRow, InventorySortId, InventorySortState } from './inventory-row';
 import {
-  durableLocationPath,
-  stockEntryLocationPath,
   locationPathText,
   renderCrumbs,
   CRUMB_CLASSES,
@@ -51,8 +50,8 @@ export type { InventorySortId, InventorySortState } from './inventory-row';
 /**
  * The Location cell as a plain HTML string, not <app-location-path>: the row itself is the click
  * target (it opens the quick panel), and a string cell keeps thousands of rows light. The markup
- * mirrors the component span for span, because the branch rule (durableLocationPath /
- * stockEntryLocationPath), the collapse-plus-layout rule (renderCrumbs, CRUMB_CLASSES) and the
+ * mirrors the component span for span, because the branch rule ({@link locationCellView}), the
+ * collapse-plus-layout rule (renderCrumbs, CRUMB_CLASSES) and the
  * line literals (PATH_HOST_CLASSES, PATH_PREFIX_CLASSES, PATH_SEPARATOR*) are shared with it — ancestors are muted here exactly as they are on every other surface. The column
  * is narrow by construction, so the middle collapses; the tooltip is always the FULL path.
  */
@@ -295,27 +294,17 @@ export class InventoryTableComponent {
       accessorFn: (row) => row.locationText,
       header: () => flexRenderComponent(SortHeaderButton, { inputs: { header: 'Location' } }),
       cell: (info) => {
-        const row = info.row.original;
-        const durable = row.durable;
-        if (durable) {
-          const view = durableLocationPath(durable);
-          if (view.crumbs.length === 1 && view.crumbs[0].muted && !view.prefix) {
-            return '<span class="text-sm italic text-muted-foreground">Unplaced</span>';
+        const cellView = locationCellView(info.row.original);
+        switch (cellView.kind) {
+          case 'path':
+            return renderLocationCell(cellView.view);
+          case 'placeholder':
+            return `<span class="text-sm italic text-muted-foreground">${cellView.text}</span>`;
+          case 'text': {
+            const escaped = escapeHtml(cellView.text);
+            return `<span class="block truncate text-sm" title="${escaped}">${escaped}</span>`;
           }
-          return renderLocationCell(view);
         }
-        // A consumable held in exactly one place reads like a durable's path; spread stock is a
-        // count, and stock whose entry resolved to nothing keeps the flat label below.
-        const single = row.consumable?.stockLocations;
-        if (single?.length === 1 && single[0].path.length > 0) {
-          return renderLocationCell(stockEntryLocationPath(single[0]));
-        }
-        const text = row.locationText;
-        if (text === '—' || text === 'Unplaced') {
-          return `<span class="text-sm italic text-muted-foreground">${text}</span>`;
-        }
-        const escaped = escapeHtml(text);
-        return `<span class="block truncate text-sm" title="${escaped}">${escaped}</span>`;
       },
     },
     {

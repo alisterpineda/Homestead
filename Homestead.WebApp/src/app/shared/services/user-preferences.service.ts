@@ -76,6 +76,13 @@ export class UserPreferencesService {
       v === null || v === 'table' || v === 'card',
   });
 
+  readonly inventoryItemViewMode = persistedSignal<'table' | 'card' | null>({
+    key: 'homestead-inventory-item-view-mode',
+    defaultValue: null,
+    validate: (v): v is 'table' | 'card' | null =>
+      v === null || v === 'table' || v === 'card',
+  });
+
   readonly documentColumnVisibility = persistedSignal<VisibilityState>({
     key: 'homestead-document-columns',
     defaultValue: {},

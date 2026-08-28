@@ -160,10 +160,13 @@ import type { ConsumableResponse } from '@/api/generated/models/consumable-respo
                 <h3 class="text-sm font-medium text-muted-foreground">{{ contentsLabel }}</h3>
                 <!-- Same interactive table as the Items list, scoped to this place's loose contents.
                      No place/area filter (the place is the route, not a filter); Show inactive is hidden
-                     (place contents carry only live statuses); the Location column is constant here. -->
+                     (place contents carry only live statuses); the Location column is constant here.
+                     The list inherits the item view-mode pref (card on phones) but shows no toggle of
+                     its own — one place to change it, on the Items list. -->
                 <app-inventory-items-view
                   [rows]="contentRows()"
                   [showInactiveFilter]="false"
+                  [showViewToggle]="false"
                   [columnVisibility]="hideLocationColumn"
                   (changed)="changed.emit()"
                   (openDurable)="openDurable.emit($event)"

@@ -7,6 +7,8 @@ import { By } from '@angular/platform-browser';
 import { of, throwError } from 'rxjs';
 import { InventoryItemsViewComponent } from './inventory-items-view.component';
 import { InventoryTableComponent } from './inventory-table.component';
+import { InventoryCardGridComponent } from './inventory-card-grid.component';
+import { UserPreferencesService } from '@/shared/services/user-preferences.service';
 import { InventoryDurableApiService } from '@/api/services/inventory-durable-api.service';
 import { InventoryConsumableApiService } from '@/api/services/inventory-consumable-api.service';
 import { durableToRow, consumableToRow, type InventoryRow } from './inventory-row';
@@ -63,10 +65,19 @@ describe('InventoryItemsViewComponent', () => {
   let component: InventoryItemsViewComponent;
   let durableApi: StubDurableApi;
   let consumableApi: StubConsumableApi;
+  let mockStorage: Record<string, string>;
 
   beforeEach(async () => {
     durableApi = new StubDurableApi();
     consumableApi = new StubConsumableApi();
+    // jsdom has no usable localStorage, and the view-mode pref is a persistedSignal. A fresh
+    // in-memory record per test means no pref leaks into the next one.
+    mockStorage = {};
+    vi.stubGlobal('localStorage', {
+      getItem: vi.fn((key: string) => mockStorage[key] ?? null),
+      setItem: vi.fn((key: string, value: string) => { mockStorage[key] = value; }),
+      removeItem: vi.fn((key: string) => { delete mockStorage[key]; }),
+    });
     TestBed.configureTestingModule({
       providers: [
         provideZonelessChangeDetection(),
@@ -84,6 +95,12 @@ describe('InventoryItemsViewComponent', () => {
     await fixture.whenStable();
     fixture.detectChanges();
   });
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  function setViewPref(mode: 'table' | 'card' | null): void {
+    TestBed.inject(UserPreferencesService).inventoryItemViewMode.set(mode);
+  }
 
   function ids(rows: readonly InventoryRow[]): string[] {
     return rows.map(r => r.id).sort();
@@ -301,5 +318,104 @@ describe('InventoryItemsViewComponent', () => {
     fixture.detectChanges();
     expect(document.body.textContent).not.toContain('Show inactive');
     expect(document.body.textContent).toContain('Low stock only');
+  });
+  describe('view mode', () => {
+    it('falls back to the table on a wide viewport when the pref is unset', () => {
+      expect(TestBed.inject(UserPreferencesService).inventoryItemViewMode()).toBeNull();
+      expect(component.viewMode()).toBe('table');
+    });
+
+    it('honours an explicit stored preference in either direction', () => {
+      setViewPref('card');
+      expect(component.viewMode()).toBe('card');
+      setViewPref('table');
+      expect(component.viewMode()).toBe('table');
+    });
+
+    it('renders the card grid instead of the table when the pref is card', async () => {
+      setViewPref('card');
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const host = fixture.nativeElement as HTMLElement;
+      expect(host.querySelector('app-inventory-card-grid')).not.toBeNull();
+      expect(host.querySelector('app-inventory-table')).toBeNull();
+    });
+
+    it('dispatches a card-grid open to the kind-matched output', async () => {
+      setViewPref('card');
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      let durable: DurableResponse | undefined;
+      let consumable: ConsumableResponse | undefined;
+      component.openDurable.subscribe(d => (durable = d));
+      component.openConsumable.subscribe(c => (consumable = c));
+
+      const grid = fixture.debugElement.query(By.directive(InventoryCardGridComponent))
+        .componentInstance as InventoryCardGridComponent;
+      grid.open.emit(durableToRow(WRENCH));
+      expect(durable).toBe(WRENCH);
+      grid.open.emit(consumableToRow(TAPE));
+      expect(consumable).toBe(TAPE);
+    });
+
+    it('setViewMode writes the preference', () => {
+      component.setViewMode('card');
+      expect(TestBed.inject(UserPreferencesService).inventoryItemViewMode()).toBe('card');
+      component.setViewMode('table');
+      expect(TestBed.inject(UserPreferencesService).inventoryItemViewMode()).toBe('table');
+    });
+
+    it('renders no view toggle when showViewToggle is false (Browse inherits the pref)', async () => {
+      const host = fixture.nativeElement as HTMLElement;
+      expect(host.querySelector('[aria-label="View mode"]')).not.toBeNull();
+
+      fixture.componentRef.setInput('showViewToggle', false);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(host.querySelector('[aria-label="View mode"]')).toBeNull();
+    });
+
+    it('defaults to the card grid below 768px with no stored preference', async () => {
+      // injectIsNarrowViewport reads matchMedia at construction, so stub before creating.
+      vi.stubGlobal('matchMedia', vi.fn(() => ({
+        matches: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })));
+
+      const f = TestBed.createComponent(InventoryItemsViewComponent);
+      f.componentRef.setInput('rows', ROWS);
+      f.detectChanges();
+      await f.whenStable();
+      f.detectChanges();
+
+      expect(f.componentInstance.viewMode()).toBe('card');
+      expect((f.nativeElement as HTMLElement).querySelector('app-inventory-card-grid')).not.toBeNull();
+    });
+
+    it('lets an explicit table preference win over the narrow-viewport card fallback', async () => {
+      vi.stubGlobal('matchMedia', vi.fn(() => ({
+        matches: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })));
+      setViewPref('table');
+
+      const f = TestBed.createComponent(InventoryItemsViewComponent);
+      f.componentRef.setInput('rows', ROWS);
+      f.detectChanges();
+      await f.whenStable();
+      f.detectChanges();
+
+      expect(f.componentInstance.viewMode()).toBe('table');
+      const host = f.nativeElement as HTMLElement;
+      expect(host.querySelector('app-inventory-table')).not.toBeNull();
+      expect(host.querySelector('app-inventory-card-grid')).toBeNull();
+    });
   });
 });

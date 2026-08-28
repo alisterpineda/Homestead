@@ -37,6 +37,8 @@ import type { InventoryRow } from './inventory-row';
       [hlmDropdownMenuTrigger]="menu"
       [aria-label]="row().kind === 'consumable' ? 'Consumable actions' : 'Durable actions'"
       (click)="onTriggerClick($event)"
+      (keydown.enter)="onTriggerKeydown($event)"
+      (keydown.space)="onTriggerKeydown($event)"
     >
       <ng-icon hlm name="lucideEllipsisVertical" size="sm" />
     </button>
@@ -93,5 +95,15 @@ export class InventoryRowActionsComponent {
   protected onTriggerClick(event: MouseEvent): void {
     event.stopPropagation();
     event.preventDefault();
+  }
+
+  /**
+   * Keyboard twin of the click guard: the host row/card opens the quick panel on Enter/Space, so an
+   * activation keystroke on the trigger must not bubble up to it. Only propagation is stopped — the
+   * default is left alone, because CdkMenuTrigger relies on the button's native click (synthesised
+   * from this keystroke) to actually open the menu.
+   */
+  protected onTriggerKeydown(event: Event): void {
+    event.stopPropagation();
   }
 }

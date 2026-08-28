@@ -3,6 +3,7 @@ import {
   consumableToRow,
   placeConsumableToRow,
   formatPath,
+  locationCellView,
   sortRows,
   type InventoryRow,
 } from './inventory-row';
@@ -95,6 +96,92 @@ describe('placeConsumableToRow', () => {
     });
     expect(row.onHand).toBe(7);
     expect(row.onHandHint).toBeUndefined();
+  });
+});
+
+describe('locationCellView', () => {
+  it('renders a durable\'s resolved path as crumbs', () => {
+    const row = durableToRow(makeItem({
+      resolvedAreaId: 'garage',
+      path: [
+        { id: 'garage', name: 'Garage', kind: 'Area' },
+        { id: 'chest', name: 'Tool chest', kind: 'Container' },
+      ],
+    }));
+    const view = locationCellView(row);
+    expect(view.kind).toBe('path');
+    expect(view.kind === 'path' && view.view.crumbs.map(c => c.label)).toEqual(['Garage', 'Tool chest']);
+  });
+
+  it('keeps a component\'s "Part of" prefix as a path, not a placeholder', () => {
+    const row = durableToRow(makeItem({
+      parentIsContainer: false,
+      resolvedAreaId: 'garage',
+      path: [
+        { id: 'garage', name: 'Garage', kind: 'Area' },
+        { id: 'pc', name: 'Gaming PC', kind: 'Item' },
+      ],
+    }));
+    const view = locationCellView(row);
+    expect(view.kind).toBe('path');
+    expect(view.kind === 'path' && view.view.prefix).toBe('Part of');
+  });
+
+  it('reads a directly-unplaced durable as the Unplaced placeholder', () => {
+    expect(locationCellView(durableToRow(makeItem()))).toEqual({ kind: 'placeholder', text: 'Unplaced' });
+  });
+
+  it('keeps an unplaced-rooted chain as a path (the muted root is one of several crumbs)', () => {
+    const row = durableToRow(makeItem({
+      path: [{ id: 'bin', name: 'Loose bin', kind: 'Container' }],
+    }));
+    const view = locationCellView(row);
+    expect(view.kind).toBe('path');
+    expect(view.kind === 'path' && view.view.crumbs.map(c => c.label)).toEqual(['Unplaced', 'Loose bin']);
+  });
+
+  it('renders a consumable held in exactly one resolved place as crumbs', () => {
+    const row = consumableToRow(makeConsumable({
+      stockLocations: [{
+        id: 'e1', quantity: 12, areaId: 'garage',
+        path: [
+          { id: 'garage', name: 'Garage', kind: 'Area' },
+          { id: 'chest', name: 'Tool chest', kind: 'Container' },
+        ],
+        locationLabel: 'Garage › Tool chest',
+      }],
+    }));
+    const view = locationCellView(row);
+    expect(view.kind).toBe('path');
+    expect(view.kind === 'path' && view.view.crumbs.map(c => c.label)).toEqual(['Garage', 'Tool chest']);
+  });
+
+  it('falls back to flat text for a single stock entry with no resolved path', () => {
+    const row = consumableToRow(makeConsumable({
+      stockLocations: [{ id: 'e1', quantity: 12, areaId: null, path: [], locationLabel: 'Somewhere' }],
+    }));
+    expect(locationCellView(row)).toEqual({ kind: 'text', text: 'Somewhere' });
+  });
+
+  it('summarizes spread stock as text', () => {
+    const row = consumableToRow(makeConsumable({
+      stockLocations: [
+        { id: 'e1', quantity: 6, areaId: 'garage', path: [{ id: 'garage', name: 'Garage', kind: 'Area' }], locationLabel: 'Garage' },
+        { id: 'e2', quantity: 6, areaId: 'pantry', path: [{ id: 'pantry', name: 'Pantry', kind: 'Area' }], locationLabel: 'Pantry' },
+      ],
+    }));
+    expect(locationCellView(row)).toEqual({ kind: 'text', text: '2 locations' });
+  });
+
+  it('reads a zero-stock consumable as the em-dash placeholder', () => {
+    expect(locationCellView(consumableToRow(makeConsumable()))).toEqual({ kind: 'placeholder', text: '—' });
+  });
+
+  it('reads a single unlabelled stock entry as the Unplaced placeholder', () => {
+    const row = consumableToRow(makeConsumable({
+      stockLocations: [{ id: 'e1', quantity: 3, areaId: null, path: [], locationLabel: null }],
+    }));
+    expect(locationCellView(row)).toEqual({ kind: 'placeholder', text: 'Unplaced' });
   });
 });
 

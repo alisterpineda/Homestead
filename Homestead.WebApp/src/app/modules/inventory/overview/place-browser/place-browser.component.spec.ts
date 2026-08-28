@@ -244,6 +244,8 @@ describe('PlaceBrowserComponent', () => {
     // The place is the route, not a filter; the drilled place has only live statuses; every loose
     // item resolves to this same place, so the Location column is redundant.
     expect(view.showInactiveFilter()).toBe(false);
+    // The drilled list inherits the item view-mode pref but shows no toggle of its own.
+    expect(view.showViewToggle()).toBe(false);
     expect(view.columnVisibility()).toEqual({ location: false });
     expect(view.rows().map(r => r.id).sort()).toEqual(['screws', 'wrench']);
 

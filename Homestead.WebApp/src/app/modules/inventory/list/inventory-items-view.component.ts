@@ -9,6 +9,7 @@ import {
   output,
 } from '@angular/core';
 import { Router } from '@angular/router';
+import { NgTemplateOutlet } from '@angular/common';
 import { type Observable } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
@@ -16,9 +17,13 @@ import {
   lucideListFilter,
   lucideArrowUp,
   lucideArrowDown,
+  lucideLayoutGrid,
+  lucideTable,
+  lucideEllipsisVertical,
 } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
+import { HlmButtonGroupImports } from '@/shared/components/spartan/button-group';
 import { HlmToggleGroupImports } from '@/shared/components/spartan/toggle-group';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
@@ -31,9 +36,12 @@ import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-men
 import { InventoryDurableApiService } from '@/api/services/inventory-durable-api.service';
 import { InventoryConsumableApiService } from '@/api/services/inventory-consumable-api.service';
 import { InventoryTableComponent } from './inventory-table.component';
+import { InventoryCardGridComponent } from './inventory-card-grid.component';
 import { EditDurableSheetComponent } from '../durables/edit-durable-sheet/edit-durable-sheet.component';
 import { EditConsumableSheetComponent } from '../consumables/edit-consumable-sheet/edit-consumable-sheet.component';
 import { isTerminalStatus } from '../shared/item-status-meta';
+import { injectIsNarrowViewport } from '../shared/sheet-side';
+import { UserPreferencesService } from '@/shared/services/user-preferences.service';
 import { sortRows, type InventoryRow, type InventorySortId, type InventorySortState } from './inventory-row';
 import { replace } from '@/shared/json-patch';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
@@ -58,8 +66,15 @@ export const kindFilterFromParam = (v: string | null): KindFilter => (isKindFilt
 
 /**
  * The interactive items surface shared by the standalone Items list and the Browse drill-down: the
- * refine toolbar (kind toggle + refine popover + sort dropdown), the table, and the row-level edit
- * sheets / delete-confirm dialog plus their archive/restore/delete mutations.
+ * refine toolbar (kind toggle + refine popover + sort dropdown + view toggle), the rows themselves
+ * rendered as either a table or a card grid, and the row-level edit sheets / delete-confirm dialog
+ * plus their archive/restore/delete mutations.
+ *
+ * The renderer follows a persisted three-state preference (`table` / `card` / unset); unset resolves
+ * to cards below 768px and the table above, so phones get the card grid without anyone opting in.
+ * Below `sm` the sort dropdown and the view toggle collapse into a `⋮` overflow menu (the kind
+ * toggle and Filter stay inline at every width) — the shared toolbar pattern from
+ * `docs/product-design/shared/table-ux.md`.
  *
  * The parent supplies `rows` already place-scoped (area filter, container drill, place contents);
  * this component owns only the non-place refinements — kind, show-inactive, low-stock, lent, sort —
@@ -73,9 +88,11 @@ export const kindFilterFromParam = (v: string | null): KindFilter => (isKindFilt
   selector: 'app-inventory-items-view',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    NgTemplateOutlet,
     NgIcon,
     HlmIconImports,
     HlmButton,
+    HlmButtonGroupImports,
     HlmToggleGroupImports,
     HlmSpinner,
     HlmEmptyImports,
@@ -86,6 +103,7 @@ export const kindFilterFromParam = (v: string | null): KindFilter => (isKindFilt
     HlmSeparatorImports,
     HlmDropdownMenuImports,
     InventoryTableComponent,
+    InventoryCardGridComponent,
     EditDurableSheetComponent,
     EditConsumableSheetComponent,
   ],
@@ -94,6 +112,9 @@ export const kindFilterFromParam = (v: string | null): KindFilter => (isKindFilt
     lucideListFilter,
     lucideArrowUp,
     lucideArrowDown,
+    lucideLayoutGrid,
+    lucideTable,
+    lucideEllipsisVertical,
   })],
   host: { class: 'flex min-h-0 flex-1 flex-col gap-4' },
   template: `
@@ -163,37 +184,97 @@ export const kindFilterFromParam = (v: string | null): KindFilter => (isKindFilt
           </div>
         </div>
 
-        <button hlmBtn variant="outline" [hlmDropdownMenuTrigger]="sortMenu">
+        <button hlmBtn variant="outline" class="hidden sm:inline-flex" [hlmDropdownMenuTrigger]="sortMenu">
           <ng-icon hlm [name]="sort().desc ? 'lucideArrowDown' : 'lucideArrowUp'" size="sm" />
           {{ sortFieldLabel() }}
         </button>
+        <ng-template #sortGroup>
+          <span hlmDropdownMenuLabel>Sort by</span>
+          <hlm-dropdown-menu-group>
+            @for (opt of sortFields(); track opt.id) {
+              <button
+                hlmDropdownMenuRadio
+                [checked]="sort().id === opt.id"
+                (triggered)="onSortByChange(opt.id)"
+              >
+                <hlm-dropdown-menu-radio-indicator />
+                {{ opt.label }}
+              </button>
+            }
+          </hlm-dropdown-menu-group>
+          <hlm-dropdown-menu-separator />
+          <span hlmDropdownMenuLabel>Direction</span>
+          <hlm-dropdown-menu-group>
+            <button hlmDropdownMenuRadio [checked]="!sort().desc" (triggered)="onSortDirChange(false)">
+              <hlm-dropdown-menu-radio-indicator />
+              Ascending
+            </button>
+            <button hlmDropdownMenuRadio [checked]="sort().desc" (triggered)="onSortDirChange(true)">
+              <hlm-dropdown-menu-radio-indicator />
+              Descending
+            </button>
+          </hlm-dropdown-menu-group>
+        </ng-template>
         <ng-template #sortMenu>
           <hlm-dropdown-menu class="w-44">
-            <span hlmDropdownMenuLabel>Sort by</span>
-            <hlm-dropdown-menu-group>
-              @for (opt of sortFields(); track opt.id) {
-                <button
-                  hlmDropdownMenuRadio
-                  [checked]="sort().id === opt.id"
-                  (triggered)="onSortByChange(opt.id)"
-                >
+            <ng-container [ngTemplateOutlet]="sortGroup" [ngTemplateOutletInjector]="'outlet'" />
+          </hlm-dropdown-menu>
+        </ng-template>
+
+        @if (showViewToggle()) {
+          <div hlmButtonGroup class="hidden sm:flex" aria-label="View mode">
+            <button
+              hlmBtn
+              [variant]="viewMode() === 'card' ? 'secondary' : 'outline'"
+              size="icon"
+              (click)="setViewMode('card')"
+              aria-label="Card view"
+            >
+              <ng-icon hlm name="lucideLayoutGrid" size="sm" />
+            </button>
+            <button
+              hlmBtn
+              [variant]="viewMode() === 'table' ? 'secondary' : 'outline'"
+              size="icon"
+              (click)="setViewMode('table')"
+              aria-label="Table view"
+            >
+              <ng-icon hlm name="lucideTable" size="sm" />
+            </button>
+          </div>
+        }
+
+        <button hlmBtn variant="outline" size="icon" class="sm:hidden"
+                [hlmDropdownMenuTrigger]="overflowMenu" aria-label="More options">
+          <ng-icon hlm name="lucideEllipsisVertical" size="sm" />
+        </button>
+        <ng-template #overflowMenu>
+          <hlm-dropdown-menu class="w-44">
+            @if (showViewToggle()) {
+              <span hlmDropdownMenuLabel>View</span>
+              <hlm-dropdown-menu-group>
+                <button hlmDropdownMenuRadio [checked]="viewMode() === 'card'"
+                        (triggered)="setViewMode('card')">
                   <hlm-dropdown-menu-radio-indicator />
-                  {{ opt.label }}
+                  Card
                 </button>
-              }
-            </hlm-dropdown-menu-group>
-            <hlm-dropdown-menu-separator />
-            <span hlmDropdownMenuLabel>Direction</span>
-            <hlm-dropdown-menu-group>
-              <button hlmDropdownMenuRadio [checked]="!sort().desc" (triggered)="onSortDirChange(false)">
-                <hlm-dropdown-menu-radio-indicator />
-                Ascending
-              </button>
-              <button hlmDropdownMenuRadio [checked]="sort().desc" (triggered)="onSortDirChange(true)">
-                <hlm-dropdown-menu-radio-indicator />
-                Descending
-              </button>
-            </hlm-dropdown-menu-group>
+                <button hlmDropdownMenuRadio [checked]="viewMode() === 'table'"
+                        (triggered)="setViewMode('table')">
+                  <hlm-dropdown-menu-radio-indicator />
+                  Table
+                </button>
+              </hlm-dropdown-menu-group>
+              <hlm-dropdown-menu-separator />
+            }
+            <button hlmDropdownMenuItem [hlmDropdownMenuTrigger]="sortSubMenu">
+              Sort
+              <hlm-dropdown-menu-item-sub-indicator />
+            </button>
+            <ng-template #sortSubMenu>
+              <hlm-dropdown-menu-sub>
+                <ng-container [ngTemplateOutlet]="sortGroup" [ngTemplateOutletInjector]="'outlet'" />
+              </hlm-dropdown-menu-sub>
+            </ng-template>
           </hlm-dropdown-menu>
         </ng-template>
       </div>
@@ -214,12 +295,23 @@ export const kindFilterFromParam = (v: string | null): KindFilter => (isKindFilt
           <div hlmEmptyDescription>No items match the current filters.</div>
         </div>
       </div>
-    } @else {
+    } @else if (viewMode() === 'table') {
       <app-inventory-table
         [rows]="sortedVisibleRows()"
         [sortState]="sort()"
         [columnVisibility]="columnVisibility()"
         (sortChange)="sort.set($event)"
+        (open)="onOpen($event)"
+        (edit)="onEdit($event)"
+        (viewContents)="viewContents.emit($event)"
+        (viewDetails)="onViewDetails($event)"
+        (archiveRestore)="onArchiveRestore($event)"
+        (delete)="onDeleteRequest($event)"
+      />
+    } @else {
+      <app-inventory-card-grid
+        [rows]="sortedVisibleRows()"
+        [columnVisibility]="columnVisibility()"
         (open)="onOpen($event)"
         (edit)="onEdit($event)"
         (viewContents)="viewContents.emit($event)"
@@ -278,6 +370,8 @@ export class InventoryItemsViewComponent implements OnInit {
   private consumableApi = inject(InventoryConsumableApiService);
   private errorHandler = inject(ErrorHandlerService);
   private router = inject(Router);
+  private prefs = inject(UserPreferencesService);
+  private readonly narrow = injectIsNarrowViewport();
 
   private readonly allSortFields: readonly InventorySortFieldOption[] = [
     { id: 'name', label: 'Name', defaultDesc: false },
@@ -308,8 +402,10 @@ export class InventoryItemsViewComponent implements OnInit {
   scopeLabel = input<string | null>(null);
   /** Parent is mid-fetch (e.g. a container drill): show the spinner instead of "Nothing matches". */
   loading = input(false);
-  /** Per-column visibility passed straight to the table — Browse hides Location. */
+  /** Per-column visibility passed straight to the table/card grid — Browse hides Location. */
   columnVisibility = input<VisibilityState>({});
+  /** Browse passes false — the drilled list inherits the pref but shows no second toggle. */
+  showViewToggle = input(true);
 
   changed = output<void>();
   openDurable = output<DurableResponse>();
@@ -374,6 +470,18 @@ export class InventoryItemsViewComponent implements OnInit {
   });
 
   sortedVisibleRows = computed(() => sortRows(this.visibleRows(), this.sort()));
+
+  // Three-state preference: an explicit table/card choice wins everywhere; unset falls back to the
+  // viewport, so phones get cards and desktops the table without anyone having to pick.
+  viewMode = computed<'table' | 'card'>(() => {
+    const stored = this.prefs.inventoryItemViewMode();
+    if (stored === 'table' || stored === 'card') return stored;
+    return this.narrow() ? 'card' : 'table';
+  });
+
+  setViewMode(mode: 'table' | 'card'): void {
+    this.prefs.inventoryItemViewMode.set(mode);
+  }
 
   sortFieldLabel = computed(() =>
     this.allSortFields.find(f => f.id === this.sort().id)?.label ?? 'Sort');

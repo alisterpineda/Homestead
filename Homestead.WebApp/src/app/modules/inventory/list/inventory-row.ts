@@ -6,7 +6,12 @@ import type { ItemStatus } from '@/api/generated/models/item-status';
 import type { ItemTagDto } from '@/api/generated/models/item-tag-dto';
 import { formatQty } from '../consumables/consumable-shared';
 import { itemStatusLabel } from '../shared/item-status-meta';
-import { durableLocationPath, locationPathText } from '../shared/location-path';
+import {
+  durableLocationPath,
+  locationPathText,
+  stockEntryLocationPath,
+  type LocationPathView,
+} from '../shared/location-path';
 
 export type InventoryKind = 'durable' | 'consumable';
 
@@ -141,6 +146,47 @@ export function placeConsumableToRow(pc: PlaceConsumableResponse): InventoryRow 
     onHand: pc.localQuantity,
     onHandHint: pc.localQuantity !== total ? `of ${formatQty(total)} total` : undefined,
   };
+}
+
+/**
+ * What a row's Location reads as, before any one surface decides how to draw it: a real path worth
+ * rendering as crumbs, an italic placeholder standing in for "nowhere", or plain summary text.
+ */
+export type LocationCellView =
+  /** Render as crumbs (collapsed) — a durable's resolved path, or a consumable's single stock entry. */
+  | { readonly kind: 'path'; readonly view: LocationPathView }
+  /** Nothing to link to: no stock at all ('—'), or an item that resolves to the Unplaced bucket. */
+  | { readonly kind: 'placeholder'; readonly text: 'Unplaced' | '—' }
+  /** Flat summary text, e.g. "3 locations" or an unresolved stock label. */
+  | { readonly kind: 'text'; readonly text: string };
+
+/**
+ * The Location branch rule for one row, decided once for every surface that shows it (the table
+ * cell, the card). Kept beside the row model rather than inside a renderer so the table and the
+ * cards can never disagree about *what* a row's location is while differing on how it's drawn.
+ */
+export function locationCellView(row: InventoryRow): LocationCellView {
+  const durable = row.durable;
+  if (durable) {
+    const view = durableLocationPath(durable);
+    // A lone muted crumb with no prefix is the synthetic Unplaced root standing alone — there is no
+    // real path to render, so it reads as the placeholder rather than a one-crumb trail.
+    if (view.crumbs.length === 1 && view.crumbs[0].muted && !view.prefix) {
+      return { kind: 'placeholder', text: 'Unplaced' };
+    }
+    return { kind: 'path', view };
+  }
+  // A consumable held in exactly one place reads like a durable's path; spread stock is a count,
+  // and stock whose entry resolved to nothing keeps the flat label below.
+  const single = row.consumable?.stockLocations;
+  if (single?.length === 1 && single[0].path.length > 0) {
+    return { kind: 'path', view: stockEntryLocationPath(single[0]) };
+  }
+  const text = row.locationText;
+  if (text === '—' || text === 'Unplaced') {
+    return { kind: 'placeholder', text };
+  }
+  return { kind: 'text', text };
 }
 
 function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, b: T) => number): number {

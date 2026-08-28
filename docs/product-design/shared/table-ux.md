@@ -43,7 +43,7 @@ Desktop → mobile transformations:
 
 The zone rules still hold; controls just collapse to icons through progressive disclosure.
 
-The breakpoint is **768px**, matching the sidebar primitive (`useIsMobile()` equivalent — see `UserPreferencesService` / sidebar conventions in the WebApp).
+The breakpoint is **768px** — the exact complement of Tailwind `md:`, i.e. a `(min-width: 768px)` media query negated (`injectIsNarrowViewport()` in the WebApp). Don't reuse the sidebar primitive's `isMobile()` for breakpoint-sensitive layout: its `(max-width: 768px)` query is inclusive at exactly 768px, so JS-driven behaviour would disagree with the `md:` classes at that one width.
 
 ## Filter pattern — unified popover
 

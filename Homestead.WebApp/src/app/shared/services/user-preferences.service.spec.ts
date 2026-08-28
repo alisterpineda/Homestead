@@ -98,6 +98,25 @@ describe('UserPreferencesService', () => {
     });
   });
 
+  describe('inventoryItemViewMode', () => {
+    it('should default to null (no explicit choice yet)', () => {
+      const service = createService();
+      expect(service.inventoryItemViewMode()).toBeNull();
+    });
+
+    it('should load a valid view mode from storage', () => {
+      mockStorage['homestead-inventory-item-view-mode'] = '"card"';
+      const service = createService();
+      expect(service.inventoryItemViewMode()).toBe('card');
+    });
+
+    it('should reject an invalid view mode and use default', () => {
+      mockStorage['homestead-inventory-item-view-mode'] = '"grid"';
+      const service = createService();
+      expect(service.inventoryItemViewMode()).toBeNull();
+    });
+  });
+
   describe('column visibility signals', () => {
     it('should default to empty object for document columns', () => {
       const service = createService();
