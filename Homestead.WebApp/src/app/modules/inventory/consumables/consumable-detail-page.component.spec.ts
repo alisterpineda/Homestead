@@ -5,6 +5,7 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter, Router } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { of, throwError } from 'rxjs';
+import { toast } from '@spartan-ng/brain/sonner';
 import { ConsumableDetailPageComponent } from './consumable-detail-page.component';
 import { InventoryConsumableApiService } from '@/api/services/inventory-consumable-api.service';
 import { InventoryDurableApiService } from '@/api/services/inventory-durable-api.service';
@@ -57,8 +58,10 @@ class StubConsumableApi {
   };
   getConsumableMovements = (p: { id: string; Page: number; PageSize: number }) =>
     of({ items: [] as StockMovementResponse[], page: p.Page, pageSize: p.PageSize, totalCount: 0, totalPages: 0 });
+  patchFailure: HttpErrorResponse | null = null;
   patchConsumable = (p: { id: string; body: unknown }) => {
     this.patchCalls.push(p);
+    if (this.patchFailure) return throwError(() => this.patchFailure);
     return of(this.detail.consumable);
   };
   deleteConsumable = (p: { id: string }) => {
@@ -197,13 +200,19 @@ describe('ConsumableDetailPageComponent', () => {
     expect(text(harness)).not.toContain('may have been deleted');
   });
 
-  it('archives an active consumable: patches status → Archived and refreshes the detail', async () => {
+  it('archives an active consumable only after confirmation: patches status → Archived and refreshes the detail', async () => {
     const { harness, component } = await navigate('/inventory/items/c1');
     expect(consumableApi.getConsumableCalls).toBe(1);
 
+    component.onArchiveRestore(component.consumable()!);
+    expect(component.archiveState()).toBe('open');
+    expect(consumableApi.patchCalls).toEqual([]); // nothing until the user confirms
+
     // The refresh fired after the patch returns the now-archived record.
     consumableApi.detail = makeDetail({ consumable: makeConsumable({ status: 'Archived' }) });
-    component.onArchiveRestore(component.consumable()!);
+    let closed = false;
+    component.confirmArchive({ close: () => { closed = true; } });
+    expect(closed).toBe(true);
     harness.detectChanges();
     await harness.fixture.whenStable();
     harness.detectChanges();
@@ -230,6 +239,44 @@ describe('ConsumableDetailPageComponent', () => {
       { id: 'c1', body: [{ op: 'replace', path: '/status', value: 'Active' }] },
     ]);
     expect(component.consumable()?.status).toBe('Active');
+  });
+
+  it('keeps the archive dialog open with the rejection reason inline when the archive is blocked', async () => {
+    const { harness, component } = await navigate('/inventory/items/c1');
+    consumableApi.patchFailure = new HttpErrorResponse({ status: 400, error: { detail: 'Cannot archive this consumable.' } });
+
+    component.onArchiveRestore(component.consumable()!);
+    let closed = false;
+    component.confirmArchive({ close: () => { closed = true; } });
+    harness.detectChanges();
+
+    expect(closed).toBe(false);
+    expect(component.archiveError()).toBe('Cannot archive this consumable.');
+    expect(component.archiving()).toBe(false);
+    expect(consumableApi.getConsumableCalls).toBe(1); // no refresh on failure
+
+    // Re-requesting starts with a clean slate.
+    consumableApi.patchFailure = null;
+    component.onArchiveRestore(component.consumable()!);
+    expect(component.archiveError()).toBe('');
+  });
+
+  it('toasts a restore failure on 4xx only (5xx is the interceptor\'s), and clears the busy flag', async () => {
+    const toastError = vi.spyOn(toast, 'error').mockImplementation(() => '' as never);
+    consumableApi.detail = makeDetail({ consumable: makeConsumable({ status: 'Archived' }) });
+    const { component } = await navigate('/inventory/items/c1');
+
+    consumableApi.patchFailure = new HttpErrorResponse({ status: 409, error: { detail: 'Consumable was modified elsewhere.' } });
+    component.onArchiveRestore(component.consumable()!);
+    expect(toastError).toHaveBeenCalledWith('Consumable was modified elsewhere.');
+    expect(component.archiving()).toBe(false);
+    expect(component.archiveState()).toBe('closed');
+
+    toastError.mockClear();
+    consumableApi.patchFailure = new HttpErrorResponse({ status: 500 });
+    component.onArchiveRestore(component.consumable()!);
+    expect(toastError).not.toHaveBeenCalled();
+    expect(component.archiving()).toBe(false);
   });
 
   it('shows a "from {source}" token in the movement meta line when a receive recorded one', async () => {

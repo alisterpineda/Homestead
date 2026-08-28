@@ -447,6 +447,26 @@ import { toast } from '@spartan-ng/brain/sonner';
       (closed)="editState.set('closed')"
     />
 
+    <hlm-alert-dialog [state]="archiveState()" (stateChanged)="archiveState.set($event)">
+      <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
+        <div hlmAlertDialogHeader>
+          <h2 hlmAlertDialogTitle>Archive {{ durable()?.name ?? 'durable' }}?</h2>
+          <p hlmAlertDialogDescription>
+            The durable is kept in records, but it leaves the default list. Containers with live contents cannot be archived. You can restore it later.
+          </p>
+        </div>
+        @if (archiveError()) {
+          <p class="text-sm text-destructive">{{ archiveError() }}</p>
+        }
+        <div hlmAlertDialogFooter>
+          <button hlmAlertDialogCancel (click)="ctx.close()">Cancel</button>
+          <button hlmAlertDialogAction (click)="confirmArchive(ctx)" [disabled]="archiving()">
+            {{ archiving() ? 'Archiving...' : 'Archive' }}
+          </button>
+        </div>
+      </hlm-alert-dialog-content>
+    </hlm-alert-dialog>
+
     <hlm-alert-dialog [state]="deleteState()" (stateChanged)="deleteState.set($event)">
       <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
         <div hlmAlertDialogHeader>
@@ -647,7 +667,7 @@ export class DurableDetailPageComponent {
   protected activityLoaded = computed(() => this.activityPage() !== null);
 
   // Hosted leaf-durable quick panel (opened from the contents list). This panel, the edit sheet, and
-  // the delete dialog all reset to 'closed' when the routed durable changes: the component is reused on
+  // the delete/archive dialogs all reset to 'closed' when the routed durable changes: the component is reused on
   // a :id-only navigation, so without the reset an overlay opened for the previous durable would linger
   // over the newly-loaded one (e.g. the leaf panel's own "View details" routes to this component).
   quickPanelDurable = signal<DurableResponse | null>(null);
@@ -657,11 +677,13 @@ export class DurableDetailPageComponent {
   editDurable = signal<DurableResponse | null>(null);
   editState = seededLinkedSignal<string | null, BrnDialogState>(this.durableId, () => 'closed');
 
-  // Delete dialog state.
+  // Delete / archive dialog state (both reset on :id navigation, see above).
   deleteState = seededLinkedSignal<string | null, BrnDialogState>(this.durableId, () => 'closed');
   deleting = signal(false);
   deleteError = signal('');
+  archiveState = seededLinkedSignal<string | null, BrnDialogState>(this.durableId, () => 'closed');
   archiving = signal(false);
+  archiveError = signal('');
   storingItems = signal(false);
 
   onChanged(): void {
@@ -710,17 +732,42 @@ export class DurableDetailPageComponent {
     void this.router.navigate(['/inventory/items', durable.id]);
   }
 
+  /** Restore is immediate; archive asks first (it hides the item and can be blocked by live contents). */
   onArchiveRestore(durable: DurableResponse): void {
-    const terminal = isTerminalStatus(durable.status);
-    const newStatus = terminal ? 'Active' : 'Archived';
+    if (isTerminalStatus(durable.status)) {
+      this.setStatus(durable, 'Active');
+      return;
+    }
+    this.archiveError.set('');
+    this.archiveState.set('open');
+  }
+
+  confirmArchive(ctx: { close: () => void }): void {
+    const it = this.durable();
+    if (!it) return;
+    this.setStatus(it, 'Archived', ctx);
+  }
+
+  private setStatus(durable: DurableResponse, newStatus: 'Active' | 'Archived', ctx?: { close: () => void }): void {
     this.archiving.set(true);
+    this.archiveError.set('');
     this.durableApi.patchDurable({ id: durable.id, body: [replace('/status', newStatus)] }).pipe(
       takeUntilDestroyed(this.destroyRef),
-      handleMutationError(this.errorHandler, this.archiving, 'Failed to update durable.'),
-    ).subscribe(() => {
-      this.archiving.set(false);
-      toast.success(terminal ? 'Durable restored.' : 'Durable archived.');
-      this.onChanged();
+    ).subscribe({
+      next: () => {
+        this.archiving.set(false);
+        ctx?.close();
+        toast.success(newStatus === 'Active' ? 'Durable restored.' : 'Durable archived.');
+        this.onChanged();
+      },
+      // With the confirm dialog open, the rejection reason ("container has live contents") is shown
+      // inline where the user is looking; a restore has no dialog, so it toasts like other mutations.
+      error: (err: unknown) => {
+        this.archiving.set(false);
+        const message = this.errorHandler.getErrorMessage(err, 'Failed to update durable.');
+        if (ctx) this.archiveError.set(message);
+        else if (!this.errorHandler.isServerOrNetworkError(err)) toast.error(message);
+      },
     });
   }
 

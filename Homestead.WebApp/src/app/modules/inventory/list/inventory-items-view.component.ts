@@ -44,7 +44,6 @@ import { injectIsNarrowViewport } from '@/shared/utils/viewport';
 import { UserPreferencesService } from '@/shared/services/user-preferences.service';
 import { sortRows, type InventoryRow, type InventorySortId, type InventorySortState } from './inventory-row';
 import { replace } from '@/shared/json-patch';
-import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import type { VisibilityState } from '@tanstack/angular-table';
 import type { DurableResponse } from '@/api/generated/models/durable-response';
@@ -335,6 +334,30 @@ export const kindFilterFromParam = (v: string | null): KindFilter => (isKindFilt
       (closed)="onConsumableSheetClosed()"
     />
 
+    <hlm-alert-dialog [state]="archiveState()" (stateChanged)="archiveState.set($event)">
+      <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
+        <div hlmAlertDialogHeader>
+          <h2 hlmAlertDialogTitle>Archive {{ pendingArchive()?.name ?? 'entry' }}?</h2>
+          <p hlmAlertDialogDescription>
+            @if (pendingArchive()?.kind === 'consumable') {
+              The consumable and its stock history are kept, but it leaves the default list. You can restore it later.
+            } @else {
+              The durable is kept in records, but it leaves the default list. Containers with live contents cannot be archived. You can restore it later.
+            }
+          </p>
+        </div>
+        @if (archiveError()) {
+          <p class="text-sm text-destructive">{{ archiveError() }}</p>
+        }
+        <div hlmAlertDialogFooter>
+          <button hlmAlertDialogCancel (click)="ctx.close()">Cancel</button>
+          <button hlmAlertDialogAction (click)="confirmArchive(ctx)" [disabled]="archiving()">
+            {{ archiving() ? 'Archiving...' : 'Archive' }}
+          </button>
+        </div>
+      </hlm-alert-dialog-content>
+    </hlm-alert-dialog>
+
     <hlm-alert-dialog [state]="deleteState()" (stateChanged)="deleteState.set($event)">
       <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
         <div hlmAlertDialogHeader>
@@ -431,7 +454,11 @@ export class InventoryItemsViewComponent implements OnInit {
   deleteState = signal<BrnDialogState>('closed');
   deleting = signal(false);
   deleteError = signal('');
+
+  pendingArchive = signal<InventoryRow | null>(null);
+  archiveState = signal<BrnDialogState>('closed');
   archiving = signal(false);
+  archiveError = signal('');
 
   // Seed the filter signals from the initial* inputs once. ngOnInit (not the constructor) because
   // signal inputs aren't bound until the first change detection; running here is synchronous and
@@ -558,21 +585,47 @@ export class InventoryItemsViewComponent implements OnInit {
     this.selectedConsumable.set(null);
   }
 
+  /** Restore is immediate; archive asks first (it hides the item and can be blocked by live contents). */
   onArchiveRestore(row: InventoryRow): void {
-    const terminal = isTerminalStatus(row.status);
-    const newStatus = terminal ? 'Active' : 'Archived';
+    if (isTerminalStatus(row.status)) {
+      this.setStatus(row, 'Active');
+      return;
+    }
+    this.pendingArchive.set(row);
+    this.archiveError.set('');
+    this.archiveState.set('open');
+  }
+
+  confirmArchive(ctx: { close: () => void }): void {
+    const row = this.pendingArchive();
+    if (!row) return;
+    this.setStatus(row, 'Archived', ctx);
+  }
+
+  private setStatus(row: InventoryRow, newStatus: 'Active' | 'Archived', ctx?: { close: () => void }): void {
     const isConsumable = row.kind === 'consumable';
     const noun = isConsumable ? 'Consumable' : 'Durable';
     this.archiving.set(true);
+    this.archiveError.set('');
     const request$: Observable<unknown> = isConsumable
       ? this.consumableApi.patchConsumable({ id: row.id, body: [replace('/status', newStatus)] })
       : this.durableApi.patchDurable({ id: row.id, body: [replace('/status', newStatus)] });
-    request$.pipe(
-      handleMutationError(this.errorHandler, this.archiving, `Failed to update ${noun.toLowerCase()}.`),
-    ).subscribe(() => {
-      this.archiving.set(false);
-      toast.success(terminal ? `${noun} restored.` : `${noun} archived.`);
-      this.changed.emit();
+    request$.subscribe({
+      next: () => {
+        this.archiving.set(false);
+        ctx?.close();
+        this.pendingArchive.set(null);
+        toast.success(newStatus === 'Active' ? `${noun} restored.` : `${noun} archived.`);
+        this.changed.emit();
+      },
+      // With the confirm dialog open, the rejection reason ("container has live contents") is shown
+      // inline where the user is looking; a restore has no dialog, so it toasts like other mutations.
+      error: (err: unknown) => {
+        this.archiving.set(false);
+        const message = this.errorHandler.getErrorMessage(err, `Failed to update ${noun.toLowerCase()}.`);
+        if (ctx) this.archiveError.set(message);
+        else if (!this.errorHandler.isServerOrNetworkError(err)) toast.error(message);
+      },
     });
   }
 

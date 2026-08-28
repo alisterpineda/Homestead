@@ -5,6 +5,7 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { of, throwError } from 'rxjs';
+import { toast } from '@spartan-ng/brain/sonner';
 import { DurableDetailPageComponent } from './durable-detail-page.component';
 import { InventoryDurableApiService } from '@/api/services/inventory-durable-api.service';
 import { InventoryPlaceApiService } from '@/api/services/inventory-place-api.service';
@@ -123,8 +124,10 @@ class StubDurableApi {
   };
   // Used by the hosted quick panel's contents-count probe (containers only).
   getDurables = () => of({ items: [], page: 1, pageSize: 1, totalCount: 0 });
+  patchFailure: HttpErrorResponse | null = null;
   patchDurable = (params: { id: string; body: unknown }) => {
     this.patchCalls.push(params);
+    if (this.patchFailure) return throwError(() => this.patchFailure);
     return of(this.item);
   };
   deleteDurable = (params: { id: string }) => {
@@ -402,6 +405,67 @@ describe('DurableDetailPageComponent', () => {
     expect(durableApi.patchCalls).toEqual([
       { id: 'item1', body: [{ op: 'replace', path: '/isContainer', value: true }] },
     ]);
+  });
+
+  it('archives only after confirmation, and restores immediately', async () => {
+    const { component } = await navigate('/inventory/items/item1');
+    const durable = component.durable()!;
+
+    component.onArchiveRestore(durable);
+    expect(component.archiveState()).toBe('open');
+    expect(durableApi.patchCalls).toEqual([]); // nothing until the user confirms
+
+    let closed = false;
+    component.confirmArchive({ close: () => { closed = true; component.archiveState.set('closed'); } });
+    expect(closed).toBe(true);
+    expect(durableApi.patchCalls).toEqual([
+      { id: 'item1', body: [{ op: 'replace', path: '/status', value: 'Archived' }] },
+    ]);
+
+    component.onArchiveRestore({ ...durable, status: 'Archived' });
+    expect(component.archiveState()).toBe('closed');
+    expect(durableApi.patchCalls[1]).toEqual(
+      { id: 'item1', body: [{ op: 'replace', path: '/status', value: 'Active' }] },
+    );
+  });
+
+  it('keeps the archive dialog open with the rejection reason inline when the archive is blocked', async () => {
+    const { component } = await navigate('/inventory/items/item1');
+    durableApi.patchFailure = new HttpErrorResponse({
+      status: 400, error: { detail: 'Cannot mark a container Sold/Discarded/Archived while it has active contents.' },
+    });
+
+    component.onArchiveRestore(component.durable()!);
+    let closed = false;
+    component.confirmArchive({ close: () => { closed = true; } });
+
+    expect(closed).toBe(false);
+    expect(component.archiveError()).toBe('Cannot mark a container Sold/Discarded/Archived while it has active contents.');
+    expect(component.archiving()).toBe(false);
+    expect(durableApi.getDurableCalls).toBe(1); // no refresh on failure
+
+    // Re-requesting starts with a clean slate.
+    durableApi.patchFailure = null;
+    component.onArchiveRestore(component.durable()!);
+    expect(component.archiveError()).toBe('');
+  });
+
+  it('toasts a restore failure on 4xx only (5xx is the interceptor\'s), and clears the busy flag', async () => {
+    const toastError = vi.spyOn(toast, 'error').mockImplementation(() => '' as never);
+    const { component } = await navigate('/inventory/items/item1');
+    const archived = { ...component.durable()!, status: 'Archived' as const };
+
+    durableApi.patchFailure = new HttpErrorResponse({ status: 409, error: { detail: 'Durable was modified elsewhere.' } });
+    component.onArchiveRestore(archived);
+    expect(toastError).toHaveBeenCalledWith('Durable was modified elsewhere.');
+    expect(component.archiving()).toBe(false);
+    expect(component.archiveState()).toBe('closed');
+
+    toastError.mockClear();
+    durableApi.patchFailure = new HttpErrorResponse({ status: 500 });
+    component.onArchiveRestore(archived);
+    expect(toastError).not.toHaveBeenCalled();
+    expect(component.archiving()).toBe(false);
   });
 
   it('renders the activity history feed with each summary', async () => {

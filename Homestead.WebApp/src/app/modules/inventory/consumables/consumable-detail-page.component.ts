@@ -55,7 +55,7 @@ import { UnitPipe } from './unit.pipe';
 import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
 import { formatRelativeAge } from '@/shared/utils/relative-age';
 import { replace } from '@/shared/json-patch';
-import { handleMutationError, handleDetailLoadError } from '@/shared/utils/rxjs-error.utils';
+import { handleDetailLoadError } from '@/shared/utils/rxjs-error.utils';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { toast } from '@spartan-ng/brain/sonner';
 import type { ConsumableResponse } from '@/api/generated/models/consumable-response';
@@ -376,6 +376,26 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
       (closed)="editState.set('closed')"
     />
 
+    <hlm-alert-dialog [state]="archiveState()" (stateChanged)="archiveState.set($event)">
+      <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
+        <div hlmAlertDialogHeader>
+          <h2 hlmAlertDialogTitle>Archive {{ consumable()?.name ?? 'consumable' }}?</h2>
+          <p hlmAlertDialogDescription>
+            The consumable and its stock history are kept, but it leaves the default list. You can restore it later.
+          </p>
+        </div>
+        @if (archiveError()) {
+          <p class="text-sm text-destructive">{{ archiveError() }}</p>
+        }
+        <div hlmAlertDialogFooter>
+          <button hlmAlertDialogCancel (click)="ctx.close()">Cancel</button>
+          <button hlmAlertDialogAction (click)="confirmArchive(ctx)" [disabled]="archiving()">
+            {{ archiving() ? 'Archiving...' : 'Archive' }}
+          </button>
+        </div>
+      </hlm-alert-dialog-content>
+    </hlm-alert-dialog>
+
     <hlm-alert-dialog [state]="deleteState()" (stateChanged)="deleteState.set($event)">
       <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
         <div hlmAlertDialogHeader>
@@ -518,7 +538,9 @@ export class ConsumableDetailPageComponent {
   deleteState = signal<BrnDialogState>('closed');
   deleting = signal(false);
   deleteError = signal('');
+  archiveState = signal<BrnDialogState>('closed');
   archiving = signal(false);
+  archiveError = signal('');
 
   private toOpLocation(entry: StockEntryResponse): StockOpLocation {
     return {
@@ -593,17 +615,42 @@ export class ConsumableDetailPageComponent {
     this.refreshTrigger.update((v) => v + 1);
   }
 
+  /** Restore is immediate; archive asks first. */
   onArchiveRestore(consumable: ConsumableResponse): void {
-    const terminal = isTerminalStatus(consumable.status);
-    const newStatus = terminal ? 'Active' : 'Archived';
+    if (isTerminalStatus(consumable.status)) {
+      this.setStatus(consumable, 'Active');
+      return;
+    }
+    this.archiveError.set('');
+    this.archiveState.set('open');
+  }
+
+  confirmArchive(ctx: { close: () => void }): void {
+    const s = this.consumable();
+    if (!s) return;
+    this.setStatus(s, 'Archived', ctx);
+  }
+
+  private setStatus(consumable: ConsumableResponse, newStatus: 'Active' | 'Archived', ctx?: { close: () => void }): void {
     this.archiving.set(true);
+    this.archiveError.set('');
     this.consumableApi.patchConsumable({ id: consumable.id, body: [replace('/status', newStatus)] }).pipe(
       takeUntilDestroyed(this.destroyRef),
-      handleMutationError(this.errorHandler, this.archiving, 'Failed to update consumable.'),
-    ).subscribe(() => {
-      this.archiving.set(false);
-      toast.success(terminal ? 'Consumable restored.' : 'Consumable archived.');
-      this.refreshTrigger.update((v) => v + 1);
+    ).subscribe({
+      next: () => {
+        this.archiving.set(false);
+        ctx?.close();
+        toast.success(newStatus === 'Active' ? 'Consumable restored.' : 'Consumable archived.');
+        this.refreshTrigger.update((v) => v + 1);
+      },
+      // With the confirm dialog open, the rejection reason is shown inline where the user is looking;
+      // a restore has no dialog, so it toasts like other mutations.
+      error: (err: unknown) => {
+        this.archiving.set(false);
+        const message = this.errorHandler.getErrorMessage(err, 'Failed to update consumable.');
+        if (ctx) this.archiveError.set(message);
+        else if (!this.errorHandler.isServerOrNetworkError(err)) toast.error(message);
+      },
     });
   }
 

@@ -5,6 +5,7 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter, Router } from '@angular/router';
 import { By } from '@angular/platform-browser';
 import { of, throwError } from 'rxjs';
+import { toast } from '@spartan-ng/brain/sonner';
 import { InventoryItemsViewComponent } from './inventory-items-view.component';
 import { InventoryTableComponent } from './inventory-table.component';
 import { InventoryCardGridComponent } from './inventory-card-grid.component';
@@ -195,17 +196,82 @@ describe('InventoryItemsViewComponent', () => {
     expect(navigate).toHaveBeenCalledWith(['/inventory/items', 'wrench']);
   });
 
-  it('archives/restores via the matching API and signals changed', () => {
+  it('restores a terminal row immediately and signals changed', () => {
+    let changed = 0;
+    component.changed.subscribe(() => changed++);
+
+    component.onArchiveRestore(durableToRow(ARCHIVED));
+    expect(durableApi.patchDurable).toHaveBeenCalledWith({ id: 'archived', body: [{ op: 'replace', path: '/status', value: 'Active' }] });
+    expect(component.archiveState()).toBe('closed');
+    expect(changed).toBe(1);
+
+    component.onArchiveRestore(consumableToRow(OLDGLUE));
+    expect(consumableApi.patchConsumable).toHaveBeenCalledWith({ id: 'oldglue', body: [{ op: 'replace', path: '/status', value: 'Active' }] });
+    expect(changed).toBe(2);
+  });
+
+  it('archives only after confirmation, via the matching API, and signals changed', () => {
     let changed = 0;
     component.changed.subscribe(() => changed++);
 
     component.onArchiveRestore(durableToRow(WRENCH));
-    expect(durableApi.patchDurable).toHaveBeenCalled();
+    expect(component.archiveState()).toBe('open');
+    expect(component.pendingArchive()?.id).toBe('wrench');
+    expect(durableApi.patchDurable).not.toHaveBeenCalled();
+    expect(changed).toBe(0);
+
+    let closed = false;
+    component.confirmArchive({ close: () => { closed = true; } });
+    expect(durableApi.patchDurable).toHaveBeenCalledWith({ id: 'wrench', body: [{ op: 'replace', path: '/status', value: 'Archived' }] });
+    expect(closed).toBe(true);
+    expect(component.pendingArchive()).toBeNull();
     expect(changed).toBe(1);
 
     component.onArchiveRestore(consumableToRow(TAPE));
-    expect(consumableApi.patchConsumable).toHaveBeenCalled();
+    component.confirmArchive({ close: () => {} });
+    expect(consumableApi.patchConsumable).toHaveBeenCalledWith({ id: 'tape', body: [{ op: 'replace', path: '/status', value: 'Archived' }] });
     expect(changed).toBe(2);
+  });
+
+  it('shows the rejection reason inline and keeps the dialog open when an archive is blocked', () => {
+    durableApi.patchDurable = vi.fn(() => throwError(() => new HttpErrorResponse({
+      status: 400,
+      error: { detail: 'Container has live contents — empty it first.' },
+    })));
+
+    component.onArchiveRestore(durableToRow(WRENCH));
+    let closed = false;
+    component.confirmArchive({ close: () => { closed = true; } });
+
+    expect(closed).toBe(false);
+    expect(component.archiveError()).toBe('Container has live contents — empty it first.');
+    expect(component.pendingArchive()?.id).toBe('wrench');
+    expect(component.archiving()).toBe(false);
+
+    // Re-requesting an archive starts with a clean slate.
+    component.onArchiveRestore(consumableToRow(TAPE));
+    expect(component.archiveError()).toBe('');
+  });
+
+  it("toasts a restore failure on 4xx only (5xx is the interceptor's), and clears the busy flag", () => {
+    const toastError = vi.spyOn(toast, 'error').mockImplementation(() => '' as never);
+    let changed = 0;
+    component.changed.subscribe(() => changed++);
+
+    durableApi.patchDurable = vi.fn(() => throwError(() => new HttpErrorResponse({
+      status: 409, error: { detail: 'Durable was modified elsewhere.' },
+    })));
+    component.onArchiveRestore(durableToRow(ARCHIVED));
+    expect(toastError).toHaveBeenCalledWith('Durable was modified elsewhere.');
+    expect(component.archiving()).toBe(false);
+    expect(component.archiveState()).toBe('closed');
+    expect(changed).toBe(0);
+
+    toastError.mockClear();
+    durableApi.patchDurable = vi.fn(() => throwError(() => new HttpErrorResponse({ status: 500 })));
+    component.onArchiveRestore(durableToRow(ARCHIVED));
+    expect(toastError).not.toHaveBeenCalled();
+    expect(component.archiving()).toBe(false);
   });
 
   it('deletes on confirm and signals changed', () => {
