@@ -185,11 +185,15 @@ resize (it lives on the component, not inside the tabs).
 | `/inventory/browse/area/:areaId` | InventoryBrowsePageComponent (drilled area — same instance reused) |
 | `/inventory/browse/container/:containerId` | InventoryBrowsePageComponent (drilled container; "Details" button routes out to `/inventory/items/:id`) |
 | `/inventory/browse/unplaced` | InventoryBrowsePageComponent (unplaced items) |
-| `/inventory/items` | InventoryListPageComponent (unified items + supplies list; search/filter, container drill) |
-| `/inventory/items/:id` | ItemDetailPageComponent (header breadcrumb `Items › {name}`; containers show a Contents drill) |
+| `/inventory/items` | InventoryListPageComponent (unified durables + consumables list; search/filter, container drill) |
+| `/inventory/items/:id` | ItemDetailPageComponent — the unified detail page for **both** kinds (header breadcrumb `Items › {name}`; containers show a Contents drill) |
 | `/inventory/areas` | AreaListPageComponent |
-| `/inventory/supplies` | redirects → `/inventory/items` (supplies merged into the list) |
-| `/inventory/supplies/:id` | SupplyDetailPageComponent (legacy deep links) |
+| `/inventory/tags` | TagListComponent |
+| `/inventory/brands` | BrandListComponent |
+| `/inventory/consumables` | redirects → `/inventory/items` |
+
+There is **no `/inventory/supplies` route**, list or detail, and no `SupplyDetailPageComponent` —
+navigating there throws `NG04002: Cannot match any routes` and dumps you at `/`.
 
 Browse drill nodes all share `InventoryBrowsePageComponent` — the URL names only the current node; the
 ancestor trail comes from the API's `PlaceContentsResponse.path`.
@@ -294,6 +298,10 @@ Selector traps:
     `/targets/{key}/validate` (`POST`), `/targets/{key}/connection` (`DELETE`)
 
   All admin-only. Runs and schedules are **source**-scoped, not target-scoped.
+- Inventory areas: `/api/v1/inventory/areas` (`GET`/`POST`), `/areas/{id}` (`PATCH`/`DELETE`). There is
+  no `PUT` (405), and the `PATCH` is **JSON Patch** — it accepts only
+  `application/json-patch+json`, so a plain `application/json` body is rejected with 415. Re-parent
+  through the UI dialog instead (see Known gotchas).
 
 ### Known gotchas
 
@@ -304,5 +312,9 @@ Selector traps:
 - **Dark mode**: sidebar user menu → **Theme** → a dialog with Light / Dark / System radios. The
   `<input type=radio>` is intercepted by its wrapping `<label>` — click the label, not the radio, or
   Playwright times out.
+- **Re-parenting an area is behind "Rename", not a "Move".** The area row's actions menu offers only
+  Rename and Delete; Rename opens a dialog titled **Edit area** that carries the `Parent area` picker
+  ("Moving an area takes its contents with it"). This is the only straightforward way to restructure
+  an area tree while seeding — see the API note on why you can't do it over HTTP.
 - **Logging out takes two confirmations**, which is not a bug: an in-app `alertdialog` "Log out?"
   (Cancel / Log out), then Keycloak's own "Do you want to log out?" page.
