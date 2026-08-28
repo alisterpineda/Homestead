@@ -33,7 +33,7 @@ import { UnitPipe } from '../consumables/unit.pipe';
 import { escapeHtml } from '@/shared/utils';
 import { TagBadgeComponent } from '@/shared/components/tag-badge/tag-badge.component';
 import type { InventoryRow, InventorySortId, InventorySortState } from './inventory-row';
-import { formatPath } from './inventory-row';
+import { durableLocationPath, locationPathText } from '../shared/location-path';
 
 export type { InventorySortId, InventorySortState } from './inventory-row';
 
@@ -260,23 +260,23 @@ export class InventoryTableComponent {
         const row = info.row.original;
         const durable = row.durable;
         if (durable) {
-          // A component (child of a non-container) reads as composition, not a storage breadcrumb —
-          // formatPath is the single source for the "Part of {parent}" wording.
-          if (durable.parentIsContainer === false) {
-            const partOf = escapeHtml(formatPath(durable));
-            return `<span class="block truncate text-sm" title="${partOf}">${partOf}</span>`;
-          }
-          const path = durable.path ?? [];
-          if (path.length === 0) {
+          // Deliberately plain text, not the linked <app-location-path>: the row itself is the click
+          // target (opening the quick panel, which does carry links), and the cell truncates from the
+          // end — so the leaf, the segment worth clicking, is the first thing cut. The rule still comes
+          // from durableLocationPath, so this can't drift from the linked surfaces.
+          const view = durableLocationPath(durable);
+          if (view.crumbs.length === 1 && view.crumbs[0].muted && !view.prefix) {
             return '<span class="text-sm italic text-muted-foreground">Unplaced</span>';
           }
-          const names = path.map(s => escapeHtml(s.name)).join(' › ');
+          const title = escapeHtml(locationPathText(view));
           // A chain rooted at an unplaced container has no area segment — flag that visually.
-          const prefix = durable.resolvedAreaId == null
-            ? '<span class="italic text-muted-foreground">Unplaced</span> › '
-            : '';
-          const title = escapeHtml(formatPath(durable));
-          return `<span class="block truncate text-sm" title="${title}">${prefix}${names}</span>`;
+          const inner = view.crumbs
+            .map(c => c.muted
+              ? `<span class="italic text-muted-foreground">${escapeHtml(c.label)}</span>`
+              : escapeHtml(c.label))
+            .join(' › ');
+          const prefix = view.prefix ? `${escapeHtml(view.prefix)} ` : '';
+          return `<span class="block truncate text-sm" title="${title}">${prefix}${inner}</span>`;
         }
         const text = row.locationText;
         if (text === '—' || text === 'Unplaced') {

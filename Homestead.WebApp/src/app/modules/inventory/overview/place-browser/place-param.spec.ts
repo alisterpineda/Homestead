@@ -1,4 +1,4 @@
-import { placeRefToLink, segmentToRef, placeKey, placeDisplayName } from './place-param';
+import { placeRefToLink, segmentToLink, placeKey, placeDisplayName } from './place-param';
 import type { LocationSegmentResponse } from '@/api/generated/models/location-segment-response';
 import type { PlaceContentsResponse } from '@/api/generated/models/place-contents-response';
 
@@ -30,15 +30,20 @@ describe('place-param', () => {
     });
   });
 
-  describe('segmentToRef', () => {
-    it('maps an Area segment to an area ref', () => {
+  describe('segmentToLink', () => {
+    it('drills an Area segment in Browse', () => {
       const seg: LocationSegmentResponse = { id: 'garage', name: 'Garage', kind: 'Area' };
-      expect(segmentToRef(seg)).toEqual({ kind: 'area', id: 'garage' });
+      expect(segmentToLink(seg)).toEqual(['/inventory/browse/area', 'garage']);
     });
 
-    it('maps a Container segment to a container ref', () => {
+    it('drills a Container segment in Browse', () => {
       const seg: LocationSegmentResponse = { id: 'chest', name: 'Tool chest', kind: 'Container' };
-      expect(segmentToRef(seg)).toEqual({ kind: 'container', id: 'chest' });
+      expect(segmentToLink(seg)).toEqual(['/inventory/browse/container', 'chest']);
+    });
+
+    it('routes an Item segment to its detail page — an assembly is not a place', () => {
+      const seg: LocationSegmentResponse = { id: 'pc', name: 'Gaming PC', kind: 'Item' };
+      expect(segmentToLink(seg)).toEqual(['/inventory/items', 'pc']);
     });
   });
 

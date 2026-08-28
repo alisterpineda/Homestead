@@ -23,7 +23,7 @@ import { InventoryPlaceApiService } from '@/api/services/inventory-place-api.ser
 import { PageHeaderService } from '@/shared/services/page-header.service';
 import { handleQueryError } from '@/shared/utils/rxjs-error.utils';
 import { PlaceBrowserComponent } from '../overview/place-browser/place-browser.component';
-import { placeRefToLink, segmentToRef, placeKey, placeDisplayName, type PlaceRef } from '../overview/place-browser/place-param';
+import { segmentToLink, placeKey, placeDisplayName, type PlaceRef } from '../overview/place-browser/place-param';
 import { InventoryWarningPanelsComponent, type WarningPanelsScope } from './inventory-warning-panels.component';
 import { InventoryRecentlyUpdatedComponent } from './inventory-recently-updated.component';
 import { DurableQuickPanelComponent } from '../durables/durable-quick-panel/durable-quick-panel.component';
@@ -73,7 +73,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
               @if (last) {
                 <span hlmBreadcrumbPage class="truncate">{{ seg.name }}</span>
               } @else {
-                <a hlmBreadcrumbLink class="truncate" [link]="placeRefToLink(segmentToRef(seg))">{{ seg.name }}</a>
+                <a hlmBreadcrumbLink class="truncate" [link]="segmentToLink(seg)">{{ seg.name }}</a>
               }
             </li>
           } @empty {
@@ -159,8 +159,7 @@ export class InventoryBrowsePageComponent implements OnDestroy {
   private route = inject(ActivatedRoute);
   private pageHeaderService = inject(PageHeaderService);
 
-  protected readonly placeRefToLink = placeRefToLink;
-  protected readonly segmentToRef = segmentToRef;
+  protected readonly segmentToLink = segmentToLink;
 
   loading = signal(true);
   error = signal(false);
@@ -329,10 +328,10 @@ export class InventoryBrowsePageComponent implements OnDestroy {
       }
     });
 
-    // A non-container (an assembly) is not a Browse place. The container drill route still resolves one
-    // (a deep link, or a breadcrumb segment for a non-container an item is nested under — segments carry
-    // no container flag), so when the drilled scope turns out to be a non-container, bounce to its
-    // detail page where its components live.
+    // A non-container (an assembly) is not a Browse place. Segments now carry the distinction, so no
+    // breadcrumb routes here any more — but a hand-typed or bookmarked `browse/container/:id` for a
+    // non-container still resolves one, so when the drilled scope turns out to be a non-container,
+    // bounce to its detail page where its components live.
     effect(() => {
       const ref = this.placeRef();
       if (ref?.kind === 'container' && this.placeContents()?.containerItem?.isContainer === false) {

@@ -6,6 +6,7 @@ import type { ItemStatus } from '@/api/generated/models/item-status';
 import type { ItemTagDto } from '@/api/generated/models/item-tag-dto';
 import { formatQty } from '../consumables/consumable-shared';
 import { itemStatusLabel } from '../shared/item-status-meta';
+import { durableLocationPath, locationPathText } from '../shared/location-path';
 
 export type InventoryKind = 'durable' | 'consumable';
 
@@ -65,18 +66,12 @@ export interface InventoryRow {
 }
 
 /**
- * Flattens a durable's resolved location path to display/sort text ("Garage › Cupboard › Bin"). A
- * directly-unplaced durable, or one whose chain resolves to Unplaced, is prefixed with "Unplaced".
- * A component (child of a non-container) reads as composition, not storage: "Part of {parent}".
+ * Flattens a durable's resolved location path to display/sort text ("Garage › Cupboard › Bin").
+ * The branches themselves live in {@link durableLocationPath}, which the linked surfaces render as
+ * crumbs — this is the same rule flattened, so text and links can never disagree.
  */
 export function formatPath(durable: DurableResponse): string {
-  const names = (durable.path ?? []).map(s => s.name);
-  // A component's immediate parent (the non-container) is the last path segment; fall through to the
-  // storage rendering only if it's somehow missing, rather than emitting a placeholder.
-  const parent = names.at(-1);
-  if (durable.parentIsContainer === false && parent) return `Part of ${parent}`;
-  if (names.length === 0) return 'Unplaced';
-  return (durable.resolvedAreaId == null ? ['Unplaced', ...names] : names).join(' › ');
+  return locationPathText(durableLocationPath(durable));
 }
 
 export function durableToRow(durable: DurableResponse): InventoryRow {

@@ -71,7 +71,9 @@ describe('DurableQuickPanelComponent', () => {
     TestBed.configureTestingModule({
       providers: [
         provideZonelessChangeDetection(),
-        provideRouter([]),
+        // A Location crumb click is a real navigation; without a matching route the router rejects
+        // asynchronously, after teardown (NG0205).
+        provideRouter([{ path: '**', children: [] }]),
         { provide: InventoryDurableApiService, useValue: api },
         { provide: ErrorHandlerService, useValue: errorHandler },
       ],
@@ -155,6 +157,37 @@ describe('DurableQuickPanelComponent', () => {
       expect(component.view()?.parentItemId).toBe('chest');
       expect(changedCount).toBe(1);
       expect(component['inlineForm']()).toBeNull();
+    });
+
+    it('re-renders the Location card from the patch response, not the stale input', async () => {
+      // The card reads view(), not durable(): the parent only re-seeds `durable` when a row is
+      // opened, so after an inline Move the input still carries the pre-move path. Pinned through
+      // the DOM because the two are indistinguishable at the signal level until one is rendered.
+      await open();
+      api.patchResult = makeItem({
+        areaId: null,
+        areaName: null,
+        parentItemId: 'chest',
+        resolvedAreaId: 'garage',
+        path: [
+          { id: 'garage', name: 'Garage', kind: 'Area' },
+          { id: 'chest', name: 'Tool chest', kind: 'Container' },
+        ],
+      });
+
+      component.openMove();
+      component.moveDest.set({ kind: 'container', id: 'chest' });
+      component.confirmMove();
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      const body = (fixture.nativeElement as HTMLElement).ownerDocument.body;
+      const hrefs = Array.from(
+        body.querySelectorAll<HTMLAnchorElement>('app-location-path a[href]'),
+      ).map(a => a.getAttribute('href'));
+      expect(hrefs).toContain('/inventory/browse/container/chest');
+      // The input is still the pre-move item — proving the card followed view(), not durable().
+      expect(component.durable()?.path).toEqual([{ id: 'garage', name: 'Garage', kind: 'Area' }]);
     });
 
     it('seeds the move destination from the current location', async () => {
@@ -359,6 +392,33 @@ describe('DurableQuickPanelComponent', () => {
       let closedCount = 0;
       component.closed.subscribe(() => closedCount++);
       component.onStateChanged('closed');
+      expect(closedCount).toBe(1);
+    });
+
+    it('emits closed when a Location crumb is clicked, before the router runs', async () => {
+      // Browse reuses one page instance across same-kind drills, so a sheet left open would strand
+      // over the newly-drilled place — the panel closes itself on the way out.
+      await open(makeItem({
+        path: [
+          { id: 'garage', name: 'Garage', kind: 'Area' },
+          { id: 'chest', name: 'Tool chest', kind: 'Container' },
+        ],
+        areaId: null,
+        areaName: null,
+        parentItemId: 'chest',
+        resolvedAreaId: 'garage',
+      }));
+      let closedCount = 0;
+      component.closed.subscribe(() => closedCount++);
+
+      const body = (fixture.nativeElement as HTMLElement).ownerDocument.body;
+      const crumb = body.querySelector<HTMLAnchorElement>(
+        'app-location-path a[href="/inventory/browse/area/garage"]',
+      );
+      expect(crumb).not.toBeNull();
+      crumb!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await fixture.whenStable(); // let the router's navigation settle before teardown
+
       expect(closedCount).toBe(1);
     });
   });

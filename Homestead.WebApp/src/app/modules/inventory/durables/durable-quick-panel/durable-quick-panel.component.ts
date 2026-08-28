@@ -31,6 +31,8 @@ import { TagBadgeComponent } from '@/shared/components/tag-badge/tag-badge.compo
 import { ALL_ITEM_STATUSES, itemStatusLabel } from '../../shared/item-status-meta';
 import { injectSheetSide } from '../../shared/sheet-side';
 import { formatPath } from '../../list/inventory-row';
+import { durableLocationPath, type LocationPathView } from '../../shared/location-path';
+import { LocationPathComponent } from '../../shared/location-path.component';
 import { acquisitionSummary } from '../acquisition-summary';
 import { formatRelativeAge } from '@/shared/utils/relative-age';
 import { replace } from '@/shared/json-patch';
@@ -65,6 +67,7 @@ type InlineForm = 'move' | 'lent' | null;
     HlmItemImports,
     HlmDropdownMenuImports,
     LocationPickerComponent,
+    LocationPathComponent,
     ItemStatusBadgeComponent,
     TagBadgeComponent,
   ],
@@ -102,7 +105,13 @@ type InlineForm = 'move' | 'lent' | null;
             <div hlmItem variant="outline">
               <div hlmItemContent class="min-w-0">
                 <span class="text-sm text-muted-foreground">Location</span>
-                <p class="truncate text-sm font-medium" [title]="locationText()">{{ locationText() }}</p>
+                <!-- Not truncated: a wrapped 2-line path keeps every segment clickable, and the card
+                     is already multi-line (the Compartment sub-line). Closing first is load-bearing —
+                     Browse reuses one page instance across same-kind drills, so a still-open sheet
+                     would strand over the newly-drilled place. -->
+                <p class="text-sm font-medium" [title]="locationText()">
+                  <app-location-path [path]="locationPath()" (navigated)="closed.emit()" />
+                </p>
                 @if (it.compartment) {
                   <p class="text-xs text-muted-foreground">Compartment: {{ it.compartment }}</p>
                 }
@@ -295,6 +304,12 @@ export class DurableQuickPanelComponent {
 
   view = computed(() => this.current() ?? this.durable());
 
+  protected locationPath = computed<LocationPathView>(() => {
+    // view(), not durable(): an inline Move patches the location and the card must follow it.
+    const it = this.view();
+    return it ? durableLocationPath(it) : { prefix: null, crumbs: [] };
+  });
+  // Still text: the `title` tooltip on the (now wrapping, un-truncated) card.
   protected locationText = computed(() => {
     const it = this.view();
     return it ? formatPath(it) : '';

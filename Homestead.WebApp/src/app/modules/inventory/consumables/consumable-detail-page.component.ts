@@ -38,6 +38,8 @@ import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog'
 import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-menu';
 import { InventoryConsumableApiService } from '@/api/services/inventory-consumable-api.service';
 import { ItemStatusBadgeComponent } from '../shared/item-status-badge.component';
+import { stockEntryLocationPath } from '../shared/location-path';
+import { LocationPathComponent } from '../shared/location-path.component';
 import { TagBadgeComponent } from '@/shared/components/tag-badge/tag-badge.component';
 import { isTerminalStatus, LOW_STOCK_BADGE_CLASS } from '../shared/item-status-meta';
 import { EditConsumableSheetComponent } from './edit-consumable-sheet/edit-consumable-sheet.component';
@@ -76,6 +78,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
     HlmAlertDialogImports,
     HlmDropdownMenuImports,
     ItemStatusBadgeComponent,
+    LocationPathComponent,
     TagBadgeComponent,
     EditConsumableSheetComponent,
     StockOpSheetComponent,
@@ -210,7 +213,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
                 <tbody hlmTBody>
                   @for (entry of locations(); track entry.id) {
                     <tr hlmTr>
-                      <td hlmTd>{{ entry.locationLabel ?? '(unknown)' }}</td>
+                      <td hlmTd><app-location-path [path]="stockEntryLocationPath(entry)" /></td>
                       <td hlmTd class="text-right tabular-nums">{{ formatQty(entry.quantity) }} {{ s.unit | unit }}</td>
                       <td hlmTd class="whitespace-nowrap text-right">
                         <button hlmBtn variant="ghost" size="sm" (click)="openConsume(entry)">Use</button>
@@ -404,6 +407,7 @@ export class ConsumableDetailPageComponent {
   private locale = inject(LOCALE_ID);
 
   protected readonly formatQty = formatQty;
+  protected readonly stockEntryLocationPath = stockEntryLocationPath;
   protected readonly isWholeCount = isWholeCount;
   protected readonly lowStockBadgeClass = LOW_STOCK_BADGE_CLASS;
 

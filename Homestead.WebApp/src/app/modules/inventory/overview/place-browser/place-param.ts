@@ -31,11 +31,20 @@ export function placeRefToLink(ref: PlaceRef): unknown[] {
   }
 }
 
-/** A breadcrumb segment's drill target comes from its KIND, never its position in the path. */
-export function segmentToRef(seg: LocationSegmentResponse): PlaceRef {
-  return seg.kind === 'Area'
-    ? { kind: 'area', id: seg.id }
-    : { kind: 'container', id: seg.id };
+/**
+ * A segment's target comes from its KIND, never its position in the path: areas and containers drill
+ * in Browse; an assembly is not a place, so it routes to its detail page (see locations.md
+ * "Containment vs composition").
+ */
+export function segmentToLink(seg: LocationSegmentResponse): unknown[] {
+  switch (seg.kind) {
+    case 'Area':
+      return ['/inventory/browse/area', seg.id];
+    case 'Container':
+      return ['/inventory/browse/container', seg.id];
+    case 'Item':
+      return ['/inventory/items', seg.id];
+  }
 }
 
 /** A stable identity string for a PlaceRef — used to tell a place change from a same-place refresh. */

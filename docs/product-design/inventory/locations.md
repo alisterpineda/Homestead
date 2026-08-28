@@ -115,6 +115,28 @@ Resolved-Unplaced is the semantics every Unplaced surface uses — the area filt
 
 **Components count toward their resolved area, but are not in the area's Browse drill-in.** Because a component resolves through its (non-container) parent to an area, it **counts** toward that area's resolved place-card count and appears in the area-filtered Items list (card count == area-filtered list, consistent by design). It is *not* listed in the area's Browse drill-in contents — its parent is the assembly, not the area — and the assembly itself renders as a plain item row in the area, never a drillable place card. The assembly's components are reached through its detail page's Components section instead.
 
+### Rendering a resolved path
+
+A resolved path is rendered as **links** — one per segment — wherever the path is the *subject* of the line: the durable detail headline, the durable quick-panel's Location card, and the consumable detail page's "By location" table. Each segment's target derives from its **kind**, never its position:
+
+| Segment kind | Target |
+|---|---|
+| `Area` | the area's Browse node |
+| `Container` | the container's Browse node |
+| `Item` | the item's **detail page** — a non-container is not a place (see [Containment vs composition](#containment-vs-composition)) |
+
+`Unplaced` — the synthetic root prefixed onto a chain that resolves to no area, and the whole path for a directly-unplaced item — links to the Unplaced bucket and renders muted. A `Part of {assembly}` line links only the assembly. Segment text is unchanged from the plain-text rendering (`Garage › Cupboard › Bin`); the links are additive.
+
+These are **inline links, not a breadcrumb landmark**: only the Browse header renders a `<nav>` breadcrumb, so a page never announces two.
+
+Three surfaces deliberately stay **plain text**, and should not be "fixed for consistency" later:
+
+- **The Items list Location column** — the row itself is the click target (it opens the quick panel, which *does* carry links), so links there would mean swallowing the row click plus 2–4 extra tab stops *per row*. The cell also truncates from the end, cutting the leaf — the segment worth clicking — first. The cost of skipping is one extra click.
+- **The consumable quick-panel's per-location rows** — same pathology in a ~448px sheet, where the label shares one line with a quantity stepper and two actions. It is also the only surface with pending optimistic stepper writes that are deliberately flushed before navigating away. The panel footer's "View details" already reaches the detail table, where the links live.
+- **Browse's "Recently updated" chips** — each row is a `<button>`, and an `<a>` inside a `<button>` is invalid HTML.
+
+Because a path rendered as links and a path rendered as text must never disagree, both come from one view model; the plain-text form is that view model flattened, not a parallel implementation.
+
 **Never denormalise this.** Caching a resolved `AreaId` onto nested rows is explicitly disallowed — it is precisely the optimisation that reintroduces move-with-contents drift. The walk is short and cheap at household scale; the codebase already resolves hierarchies in application code rather than via stored rollups or recursive SQL, and Inventory follows that idiom. The *mechanism* (in-memory walk, a recursive query, or a mapped view) is an implementation choice left open; the **invariant — resolved location is derived, never stored — is locked.**
 
 ## Move-with-contents

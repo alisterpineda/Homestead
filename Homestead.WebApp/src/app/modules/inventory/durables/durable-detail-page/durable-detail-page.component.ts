@@ -45,6 +45,8 @@ import { DurableQuickPanelComponent } from '../durable-quick-panel/durable-quick
 import { CreateEntryDialogComponent } from '../../list/create-entry-dialog/create-entry-dialog.component';
 import type { ItemLocationValue } from '../../shared/location-picker/location-picker.component';
 import { formatPath } from '../../list/inventory-row';
+import { durableLocationPath, type LocationPathView } from '../../shared/location-path';
+import { LocationPathComponent } from '../../shared/location-path.component';
 import { acquisitionSummary } from '../acquisition-summary';
 import { formatQty } from '../../consumables/consumable-shared';
 import { UnitPipe } from '../../consumables/unit.pipe';
@@ -80,6 +82,7 @@ import { toast } from '@spartan-ng/brain/sonner';
     HlmAlertDialogImports,
     HlmDropdownMenuImports,
     ItemStatusBadgeComponent,
+    LocationPathComponent,
     TagBadgeComponent,
     EditDurableSheetComponent,
     DurableQuickPanelComponent,
@@ -129,7 +132,7 @@ import { toast } from '@spartan-ng/brain/sonner';
             <p class="flex items-center gap-1.5 text-lg font-medium"
                [class.text-muted-foreground]="locationText() === 'Unplaced'">
               <ng-icon hlm name="lucideMapPin" size="sm" class="shrink-0 text-muted-foreground" />
-              <span class="break-words">{{ locationText() }}</span>
+              <app-location-path class="break-words" [path]="locationPath()" />
               @if (it.compartment) {
                 <span class="text-muted-foreground">&middot; {{ it.compartment }}</span>
               }
@@ -537,6 +540,11 @@ export class DurableDetailPageComponent {
     return it ? isTerminalStatus(it.status) : false;
   });
 
+  protected locationPath = computed<LocationPathView>(() => {
+    const it = this.durable();
+    return it ? durableLocationPath(it) : { prefix: null, crumbs: [] };
+  });
+  // Still text: it drives the Unplaced check that mutes the whole headline line.
   protected locationText = computed(() => {
     const it = this.durable();
     return it ? formatPath(it) : '';

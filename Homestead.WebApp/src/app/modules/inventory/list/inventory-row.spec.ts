@@ -58,7 +58,9 @@ describe('formatPath', () => {
       resolvedAreaId: 'garage',
       path: [
         { id: 'garage', name: 'Garage', kind: 'Area' },
-        { id: 'pc', name: 'Gaming PC', kind: 'Container' },
+        // 'Item', not 'Container': parentIsContainer false means the resolver types this same row
+        // as a non-container assembly. 'Container' here is a shape the backend cannot emit.
+        { id: 'pc', name: 'Gaming PC', kind: 'Item' },
       ],
     });
     expect(formatPath(it)).toBe('Part of Gaming PC');

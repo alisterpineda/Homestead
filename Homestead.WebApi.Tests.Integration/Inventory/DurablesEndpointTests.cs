@@ -255,6 +255,27 @@ public class DurablesEndpointTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task CreateDurable_ComponentOfAssembly_ResolvesPathWithItemKind()
+    {
+        var client = await CreateAdminClientAsync();
+        var officeId = await CreateAreaAsync(client, "Office");
+        // A non-container: components hang off it by composition, so it is not a place.
+        var pc = await CreateDurableAsync(client,
+            new { name = "Gaming PC", areaId = officeId, isContainer = false });
+
+        var gpu = await CreateDurableAsync(client, new { name = "GPU", parentItemId = pc.Id });
+
+        Assert.Equal(officeId, gpu.ResolvedAreaId);
+        Assert.NotNull(gpu.Path);
+        Assert.Equal(2, gpu.Path!.Count);
+        Assert.Equal(officeId, gpu.Path[0].Id);
+        Assert.Equal("Area", gpu.Path[0].Kind);
+        Assert.Equal(pc.Id, gpu.Path[1].Id);
+        // Not "Container": the assembly routes to its detail page, never a Browse drill.
+        Assert.Equal("Item", gpu.Path[1].Kind);
+    }
+
+    [Fact]
     public async Task PatchItem_MoveAreaToContainer_ViaOpPair()
     {
         var client = await CreateAdminClientAsync();

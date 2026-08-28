@@ -41,7 +41,7 @@ public class ItemLocationResolver(AppDbContext db) : IItemLocationResolver
         // legitimately passes through terminal parents, so this is deliberately NOT filtered by status.
         var containers = await db.Items.AsNoTracking()
             .Where(i => i.Fungibility == Fungibility.NonFungible)
-            .Select(i => new ContainerNode(i.Id, i.Name, i.AreaId, i.ParentItemId))
+            .Select(i => new ContainerNode(i.Id, i.Name, i.AreaId, i.ParentItemId, i.IsContainer))
             .ToDictionaryAsync(c => c.Id, ct);
 
         return items.Select(item => Resolve(item, containers, areaNodes)).ToList();
@@ -104,7 +104,9 @@ public class ItemLocationResolver(AppDbContext db) : IItemLocationResolver
             {
                 Id = node.Id,
                 Name = node.Name,
-                Kind = LocationSegmentKind.Container,
+                // A chain legitimately passes through a non-container (composition), which is NOT a
+                // place — the frontend routes it to its detail page rather than a Browse drill.
+                Kind = node.IsContainer == true ? LocationSegmentKind.Container : LocationSegmentKind.Item,
             });
 
             if (node.AreaId is { } chainAreaId)
@@ -177,7 +179,7 @@ public class ItemLocationResolver(AppDbContext db) : IItemLocationResolver
         var containers = await db.Items.AsNoTracking()
             .Where(i => i.Fungibility == Fungibility.NonFungible
                 || referencedContainerIds.Contains(i.Id))
-            .Select(i => new ContainerNode(i.Id, i.Name, i.AreaId, i.ParentItemId))
+            .Select(i => new ContainerNode(i.Id, i.Name, i.AreaId, i.ParentItemId, i.IsContainer))
             .ToDictionaryAsync(c => c.Id, ct);
 
         var areaNodes = await LoadAreaNodesAsync(ct);
@@ -213,7 +215,10 @@ public class ItemLocationResolver(AppDbContext db) : IItemLocationResolver
             {
                 Id = node.Id,
                 Name = node.Name,
-                Kind = LocationSegmentKind.Container,
+                // As in Resolve, but the dictionary here also loads rows by referenced id, so a
+                // fungible one (IsContainer null by check constraint) can enter it — `== true`, not
+                // `!= false`, so a null falls to Item rather than claiming to be a container.
+                Kind = node.IsContainer == true ? LocationSegmentKind.Container : LocationSegmentKind.Item,
             });
 
             if (node.AreaId is { } chainAreaId)
@@ -231,7 +236,8 @@ public class ItemLocationResolver(AppDbContext db) : IItemLocationResolver
             : chain);
     }
 
-    private readonly record struct ContainerNode(Guid Id, string Name, Guid? AreaId, Guid? ParentItemId);
+    private readonly record struct ContainerNode(
+        Guid Id, string Name, Guid? AreaId, Guid? ParentItemId, bool? IsContainer);
 
     private readonly record struct AreaNode(string Name, Guid? ParentAreaId);
 }

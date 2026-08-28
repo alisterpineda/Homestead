@@ -109,6 +109,56 @@ public class ItemLocationResolverTests : IAsyncLifetime
 
         Assert.Equal(garage.Id, enriched.ResolvedAreaId);
         Assert.Equal(["Garage", "Gaming PC"], enriched.Path.Select(s => s.Name));
+        // The assembly is a passed-through item, NOT a container — the frontend routes an Item segment
+        // to its detail page instead of drilling into it in Browse.
+        Assert.Equal(
+            [LocationSegmentKind.Area, LocationSegmentKind.Item],
+            enriched.Path.Select(s => s.Kind));
+    }
+
+    [Fact]
+    public async Task ResolveHoldingLocations_ContainerNestedUnderAssembly_MarksAssemblySegmentAsItem()
+    {
+        // Stock sits in a bin that is itself bolted into a non-container assembly: the bin is a real
+        // Container, the assembly it passes through is an Item.
+        var garage = await AddAreaAsync("Garage");
+        var workbench = await AddContainerAsync("Workbench", areaId: garage.Id, isContainer: false);
+        var bin = await AddContainerAsync("Bin", parentItemId: workbench.Id);
+
+        var resolved = await _sut.ResolveHoldingLocationsAsync(
+            [new HoldingLocation(null, bin.Id)], Ct);
+
+        var path = resolved[new HoldingLocation(null, bin.Id)];
+        Assert.Equal(["Garage", "Workbench", "Bin"], path.Segments.Select(s => s.Name));
+        Assert.Equal(
+            [LocationSegmentKind.Area, LocationSegmentKind.Item, LocationSegmentKind.Container],
+            path.Segments.Select(s => s.Kind));
+    }
+
+    [Fact]
+    public async Task ResolveHoldingLocations_FungibleHolder_FallsBackToItemNotContainer()
+    {
+        // A fungible row has a null IsContainer (check constraint) but can still be loaded by
+        // referenced id — a null must fall to Item, never claim to be a drillable container.
+        var garage = await AddAreaAsync("Garage");
+        var fungible = new Item
+        {
+            Id = Guid.NewGuid(),
+            Name = "Bag of screws",
+            Fungibility = Fungibility.Fungible,
+            Status = ItemStatus.Active,
+            IsContainer = null,
+            AreaId = garage.Id,
+        };
+        _db.Items.Add(fungible);
+        await _db.SaveChangesAsync(Ct);
+
+        var resolved = await _sut.ResolveHoldingLocationsAsync(
+            [new HoldingLocation(null, fungible.Id)], Ct);
+
+        var path = resolved[new HoldingLocation(null, fungible.Id)];
+        Assert.Equal(["Garage", "Bag of screws"], path.Segments.Select(s => s.Name));
+        Assert.Equal(LocationSegmentKind.Item, path.Segments[^1].Kind);
     }
 
     [Fact]
