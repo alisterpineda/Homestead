@@ -128,8 +128,10 @@ import { toast } from '@spartan-ng/brain/sonner';
               <app-item-status-badge [status]="it.status" />
             </div>
             <!-- Headline answer: where the durable lives. The consumable's parallel is its on-hand
-                 metric; a place name isn't a single scannable number, so it's sized down deliberately. -->
-            <p class="flex items-center gap-1.5 text-lg font-medium"
+                 metric, but a place name isn't a single scannable number, so this is sized down hard:
+                 text-sm at normal weight, matching HlmBreadcrumbList. At text-lg/font-medium a
+                 four-segment path read as a second title competing with the text-2xl name. -->
+            <p class="flex items-center gap-1.5 text-sm"
                [class.text-muted-foreground]="locationText() === 'Unplaced'">
               <ng-icon hlm name="lucideMapPin" size="sm" class="shrink-0 text-muted-foreground" />
               <app-location-path class="break-words" [path]="locationPath()" />

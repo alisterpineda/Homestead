@@ -125,9 +125,14 @@ A resolved path is rendered as **links** — one per segment — wherever the pa
 | `Container` | the container's Browse node |
 | `Item` | the item's **detail page** — a non-container is not a place (see [Containment vs composition](#containment-vs-composition)) |
 
-`Unplaced` — the synthetic root prefixed onto a chain that resolves to no area, and the whole path for a directly-unplaced item — links to the Unplaced bucket and renders muted. A `Part of {assembly}` line links only the assembly. Segment text is unchanged from the plain-text rendering (`Garage › Cupboard › Bin`); the links are additive.
+`Unplaced` — the synthetic root prefixed onto a chain that resolves to no area, and the whole path for a directly-unplaced item — links to the Unplaced bucket and renders muted. A `Part of {assembly}` line links only the assembly, with the literal `Part of` muted. Segment *text* is unchanged from the plain-text rendering (`Garage › Cupboard › Bin`), so the flattened form used for sorting, tooltips and search stays a faithful reading of what's on screen.
 
-These are **inline links, not a breadcrumb landmark**: only the Browse header renders a `<nav>` breadcrumb, so a page never announces two.
+**It reads like a breadcrumb but is not a breadcrumb landmark.** Ancestor segments are muted and go foreground on hover, the leaf keeps the caller's own colour, and the separators are the same lucide chevron `HlmBreadcrumbSeparator` draws — the visual language of `HlmBreadcrumb`, deliberately reimplemented rather than reused:
+
+- `HlmBreadcrumb` hard-codes `role="navigation"` with an `aria-label` defaulting to "breadcrumb". Reusing it would put two identically-labelled landmarks on every detail page. Only page headers render a `<nav>` breadcrumb, so a page never announces two.
+- `HlmBreadcrumbList` hard-codes `text-muted-foreground` as well as `text-sm`, so it would paint the leaf too and defeat the leaf-keeps-the-caller's-colour rule above. The path component sets **no colour or size of its own** and is `display: inline`, so it inherits the caller's type scale and muted/not state — which is how the durable detail headline can mute the entire line when the item is Unplaced. All three call sites do sit at `text-sm` today, but none is pinned there by the component.
+
+The path is metadata, not a title: at `text-lg font-medium` a four-segment path competed with the `text-2xl` item name for the eye. The durable detail headline sits at `text-sm`, matching `HlmBreadcrumbList`.
 
 Three surfaces deliberately stay **plain text**, and should not be "fixed for consistency" later:
 
