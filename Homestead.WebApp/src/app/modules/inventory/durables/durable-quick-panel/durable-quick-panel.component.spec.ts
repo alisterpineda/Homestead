@@ -182,12 +182,28 @@ describe('DurableQuickPanelComponent', () => {
       await fixture.whenStable();
 
       const body = (fixture.nativeElement as HTMLElement).ownerDocument.body;
-      const hrefs = Array.from(
-        body.querySelectorAll<HTMLAnchorElement>('app-location-path a[href]'),
-      ).map(a => a.getAttribute('href'));
-      expect(hrefs).toContain('/inventory/browse/container/chest');
+      const rendered = body.querySelector('app-location-path')!.textContent!;
+      expect(rendered).toContain('Tool chest');
       // The input is still the pre-move item — proving the card followed view(), not durable().
       expect(component.durable()?.path).toEqual([{ id: 'garage', name: 'Garage', kind: 'Area' }]);
+    });
+
+    it('collapses a deep path in the Location card while the tooltip keeps the full one', async () => {
+      // The sheet is narrow by construction, so the component's default collapse stays on here.
+      await open(makeItem({
+        resolvedAreaId: 'house',
+        path: [
+          { id: 'house', name: 'House', kind: 'Area' },
+          { id: 'basement', name: 'Basement', kind: 'Area' },
+          { id: 'chest', name: 'Chest', kind: 'Container' },
+          { id: 'bin', name: 'Bin', kind: 'Container' },
+        ],
+      }));
+
+      const body = (fixture.nativeElement as HTMLElement).ownerDocument.body;
+      const path = body.querySelector('app-location-path')!;
+      expect(path.textContent!.replace(/\u00a0/g, ' ')).toBe('House › … › Bin');
+      expect(path.getAttribute('title')).toBe('House › Basement › Chest › Bin');
     });
 
     it('seeds the move destination from the current location', async () => {
@@ -392,33 +408,6 @@ describe('DurableQuickPanelComponent', () => {
       let closedCount = 0;
       component.closed.subscribe(() => closedCount++);
       component.onStateChanged('closed');
-      expect(closedCount).toBe(1);
-    });
-
-    it('emits closed when a Location crumb is clicked, before the router runs', async () => {
-      // Browse reuses one page instance across same-kind drills, so a sheet left open would strand
-      // over the newly-drilled place — the panel closes itself on the way out.
-      await open(makeItem({
-        path: [
-          { id: 'garage', name: 'Garage', kind: 'Area' },
-          { id: 'chest', name: 'Tool chest', kind: 'Container' },
-        ],
-        areaId: null,
-        areaName: null,
-        parentItemId: 'chest',
-        resolvedAreaId: 'garage',
-      }));
-      let closedCount = 0;
-      component.closed.subscribe(() => closedCount++);
-
-      const body = (fixture.nativeElement as HTMLElement).ownerDocument.body;
-      const crumb = body.querySelector<HTMLAnchorElement>(
-        'app-location-path a[href="/inventory/browse/area/garage"]',
-      );
-      expect(crumb).not.toBeNull();
-      crumb!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-      await fixture.whenStable(); // let the router's navigation settle before teardown
-
       expect(closedCount).toBe(1);
     });
   });

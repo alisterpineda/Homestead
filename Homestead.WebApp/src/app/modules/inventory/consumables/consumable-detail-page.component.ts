@@ -213,7 +213,11 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
                 <tbody hlmTBody>
                   @for (entry of locations(); track entry.id) {
                     <tr hlmTr>
-                      <td hlmTd><app-location-path [path]="stockEntryLocationPath(entry)" /></td>
+                      <!-- max-w-0 + w-full lets the truncating path clip inside this auto-layout
+                           table; the Quantity and action columns keep their intrinsic widths. -->
+                      <td hlmTd class="w-full max-w-0">
+                        <app-location-path [path]="stockEntryLocationPath(entry)" [collapse]="false" />
+                      </td>
                       <td hlmTd class="text-right tabular-nums">{{ formatQty(entry.quantity) }} {{ s.unit | unit }}</td>
                       <td hlmTd class="whitespace-nowrap text-right">
                         <button hlmBtn variant="ghost" size="sm" (click)="openConsume(entry)">Use</button>

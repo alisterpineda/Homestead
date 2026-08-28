@@ -38,6 +38,26 @@ function renderCell(cell: unknown, row: InventoryRow): string {
   return (cell as (info: any) => string)({ row: { original: row }, getValue: () => undefined });
 }
 
+/**
+ * The crumb spans of a rendered location cell: children of the outer flex box, minus the
+ * aria-hidden `›` separators. The cell is an HTML string, so parse it rather than pattern-match it.
+ */
+function cellSpans(html: string): HTMLElement[] {
+  const holder = document.createElement('div');
+  holder.innerHTML = html;
+  return Array.from(holder.querySelectorAll<HTMLElement>('span > span')).filter(
+    s => !s.hasAttribute('aria-hidden'),
+  );
+}
+
+function labels(html: string): string[] {
+  return cellSpans(html).map(s => s.textContent!);
+}
+
+function muted(html: string): boolean[] {
+  return cellSpans(html).map(s => s.classList.contains('text-muted-foreground'));
+}
+
 describe('InventoryTableComponent', () => {
   let fixture: ComponentFixture<InventoryTableComponent>;
   let component: InventoryTableComponent;
@@ -61,7 +81,7 @@ describe('InventoryTableComponent', () => {
   describe('location cell', () => {
     const col = () => component['_columns']().find(c => c.id === 'location')!;
 
-    it('renders an item resolved path joined with ›', () => {
+    it('renders each segment as its own span, muted above the leaf', () => {
       const row = durableToRow(makeItem({
         resolvedAreaId: 'garage',
         path: [
@@ -71,8 +91,52 @@ describe('InventoryTableComponent', () => {
         ],
       }));
       const html = renderCell(col().cell, row);
-      expect(html).toContain('Garage › Cupboard › Bin');
       expect(html).toContain('title="Garage › Cupboard › Bin"');
+      expect(labels(html)).toEqual(['Garage', 'Cupboard', 'Bin']);
+      // Same rule as every other surface: ancestors muted, leaf at the caller's colour.
+      expect(muted(html)).toEqual([true, true, false]);
+    });
+
+    it('lays the cell out as the component does — a nowrap flex row with › separators', () => {
+      const row = durableToRow(makeItem({
+        resolvedAreaId: 'garage',
+        path: [
+          { id: 'garage', name: 'Garage', kind: 'Area' },
+          { id: 'bin', name: 'Bin', kind: 'Container' },
+        ],
+      }));
+      const holder = document.createElement('div');
+      holder.innerHTML = renderCell(col().cell, row);
+      // Not the old single end-truncated string: that clipped the leaf first.
+      const outer = holder.firstElementChild as HTMLElement;
+      expect(outer.classList).toContain('flex');
+      expect(outer.classList).toContain('min-w-0');
+      expect(outer.classList).toContain('whitespace-nowrap');
+      expect(outer.classList).not.toContain('truncate');
+      // The same glyph the tooltip / sort key use, hidden from assistive tech.
+      const separators = Array.from(outer.querySelectorAll('span[aria-hidden="true"]'));
+      expect(separators).toHaveLength(1);
+      expect(separators[0].textContent).toContain('›');
+    });
+
+    it('collapses a four-segment path on screen while the tooltip keeps the full one', () => {
+      const row = durableToRow(makeItem({
+        resolvedAreaId: 'house',
+        path: [
+          { id: 'house', name: 'House', kind: 'Area' },
+          { id: 'basement', name: 'Basement', kind: 'Area' },
+          { id: 'chest', name: 'Chest', kind: 'Container' },
+          { id: 'bin', name: 'Bin', kind: 'Container' },
+        ],
+      }));
+      const html = renderCell(col().cell, row);
+      expect(labels(html)).toEqual(['House', '…', 'Bin']);
+      expect(muted(html)).toEqual([true, true, false]);
+      // Nothing is lost — the hidden middle moves into the tooltip, and only into it.
+      expect(html).toContain('title="House › Basement › Chest › Bin"');
+      expect(html.replace(/ title="[^"]*"/, '')).not.toContain('Basement');
+      // Muted, but NOT italic: the ellipsis stands in for hidden names, it isn't one.
+      expect(html).not.toContain('italic');
     });
 
     it('prepends an italic Unplaced for an item chain that resolves to Unplaced', () => {
@@ -84,9 +148,13 @@ describe('InventoryTableComponent', () => {
         ],
       }));
       const html = renderCell(col().cell, row);
-      expect(html).toContain('Unplaced');
-      expect(html).toContain('italic');
-      expect(html).toContain('Cupboard › Bin');
+      expect(labels(html)).toEqual(['Unplaced', 'Cupboard', 'Bin']);
+      // Italic marks the synthetic crumb only — the real ancestors above the leaf are just muted.
+      expect(cellSpans(html).map(s => s.classList.contains('italic'))).toEqual([
+        true,
+        false,
+        false,
+      ]);
     });
 
     it('renders an italic Unplaced label when the item is directly unplaced', () => {
@@ -105,8 +173,11 @@ describe('InventoryTableComponent', () => {
         ],
       }));
       const html = renderCell(col().cell, row);
-      expect(html).toContain('Part of Gaming PC');
-      expect(html).not.toContain('Garage › Gaming PC');
+      // The literal is its own non-shrinking span ahead of the crumbs, so read the text back out.
+      expect(labels(html).map(l => l.replace(/ /g, ' '))).toEqual(['Part of ', 'Gaming PC']);
+      expect(html).toContain('title="Part of Gaming PC"');
+      // Composition, not storage: the chain above the assembly is not shown.
+      expect(html).not.toContain('Garage');
     });
 
     it('renders a muted dash for a consumable with no stock', () => {
@@ -115,14 +186,30 @@ describe('InventoryTableComponent', () => {
       expect(html).toContain('italic');
     });
 
-    it('renders the single location label for a consumable stocked in one place', () => {
+    it('renders a consumable stocked in one place like a durable path — ancestors muted', () => {
       const row = consumableToRow(makeConsumable({
         stockLocations: [{
           id: 'e1', quantity: 12, areaId: 'garage',
-          path: [{ id: 'garage', name: 'Garage', kind: 'Area' }], locationLabel: 'Garage',
+          path: [
+            { id: 'garage', name: 'Garage', kind: 'Area' },
+            { id: 'chest', name: 'Tool chest', kind: 'Container' },
+          ],
+          locationLabel: 'Garage › Tool chest',
         }],
       }));
-      expect(renderCell(col().cell, row)).toContain('Garage');
+      const html = renderCell(col().cell, row);
+      expect(labels(html)).toEqual(['Garage', 'Tool chest']);
+      expect(muted(html)).toEqual([true, false]);
+      expect(html).toContain('title="Garage › Tool chest"');
+    });
+
+    it('keeps the flat label for a single stock entry whose chain resolved to nothing', () => {
+      const row = consumableToRow(makeConsumable({
+        stockLocations: [{ id: 'e1', quantity: 12, areaId: null, path: [], locationLabel: 'Somewhere' }],
+      }));
+      const html = renderCell(col().cell, row);
+      expect(html).toContain('Somewhere');
+      expect(html).toContain('block truncate');
     });
 
     it('summarizes a consumable spread across locations as a count', () => {

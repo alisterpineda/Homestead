@@ -117,7 +117,9 @@ import { toast } from '@spartan-ng/brain/sonner';
         }
         <!-- Header -->
         <div class="flex flex-wrap items-start justify-between gap-4">
-          <div class="space-y-1">
+          <!-- min-w-0: a flex item defaults to min-width:auto, which would let a long location path
+               push this block past the header instead of truncating inside it. -->
+          <div class="min-w-0 space-y-1">
             <div class="flex flex-wrap items-center gap-3">
               @if (it.isContainer) {
                 <ng-icon hlm name="lucideBox" size="sm" class="shrink-0 text-muted-foreground" aria-label="Container" />
@@ -134,9 +136,12 @@ import { toast } from '@spartan-ng/brain/sonner';
             <p class="flex items-center gap-1.5 text-sm"
                [class.text-muted-foreground]="locationText() === 'Unplaced'">
               <ng-icon hlm name="lucideMapPin" size="sm" class="shrink-0 text-muted-foreground" />
-              <app-location-path class="break-words" [path]="locationPath()" />
+              <!-- Full width here, so no middle collapse — segments only truncate if they must. -->
+              <app-location-path [path]="locationPath()" [collapse]="false" />
               @if (it.compartment) {
-                <span class="text-muted-foreground">&middot; {{ it.compartment }}</span>
+                <!-- min-w-0 + truncate: free text up to 256 chars, so it must be able to yield
+                     width inside this nowrap row rather than run off the header. -->
+                <span class="min-w-0 truncate text-muted-foreground">&middot; {{ it.compartment }}</span>
               }
             </p>
             <p class="text-xs text-muted-foreground">Updated {{ updatedRelative() }}</p>

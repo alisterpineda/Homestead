@@ -30,7 +30,6 @@ import { ItemStatusBadgeComponent } from '../../shared/item-status-badge.compone
 import { TagBadgeComponent } from '@/shared/components/tag-badge/tag-badge.component';
 import { ALL_ITEM_STATUSES, itemStatusLabel } from '../../shared/item-status-meta';
 import { injectSheetSide } from '../../shared/sheet-side';
-import { formatPath } from '../../list/inventory-row';
 import { durableLocationPath, type LocationPathView } from '../../shared/location-path';
 import { LocationPathComponent } from '../../shared/location-path.component';
 import { acquisitionSummary } from '../acquisition-summary';
@@ -105,13 +104,9 @@ type InlineForm = 'move' | 'lent' | null;
             <div hlmItem variant="outline">
               <div hlmItemContent class="min-w-0">
                 <span class="text-sm text-muted-foreground">Location</span>
-                <!-- Not truncated: a wrapped 2-line path keeps every segment clickable, and the card
-                     is already multi-line (the Compartment sub-line). Closing first is load-bearing —
-                     Browse reuses one page instance across same-kind drills, so a still-open sheet
-                     would strand over the newly-drilled place. -->
-                <p class="text-sm font-medium" [title]="locationText()">
-                  <app-location-path [path]="locationPath()" (navigated)="closed.emit()" />
-                </p>
+                <!-- One line always: the path collapses its middle and truncates; the full path is
+                     the title tooltip the component sets on itself. -->
+                <p class="text-sm font-medium"><app-location-path [path]="locationPath()" /></p>
                 @if (it.compartment) {
                   <p class="text-xs text-muted-foreground">Compartment: {{ it.compartment }}</p>
                 }
@@ -308,11 +303,6 @@ export class DurableQuickPanelComponent {
     // view(), not durable(): an inline Move patches the location and the card must follow it.
     const it = this.view();
     return it ? durableLocationPath(it) : { prefix: null, crumbs: [] };
-  });
-  // Still text: the `title` tooltip on the (now wrapping, un-truncated) card.
-  protected locationText = computed(() => {
-    const it = this.view();
-    return it ? formatPath(it) : '';
   });
 
   // Assembly-ness is derived: a non-container with live component children.

@@ -126,6 +126,29 @@ describe('ConsumableDetailPageComponent', () => {
     return Array.from((harness.routeNativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('button'));
   }
 
+  it('shows every segment of a deep stock-entry path in the By location table (no collapse)', async () => {
+    consumableApi.detail = makeDetail({
+      locations: [{
+        id: 'e1',
+        quantity: 12,
+        areaId: 'house',
+        locationLabel: 'House › Basement › Chest › Bin',
+        path: [
+          { id: 'house', name: 'House', kind: 'Area' },
+          { id: 'basement', name: 'Basement', kind: 'Area' },
+          { id: 'chest', name: 'Chest', kind: 'Container' },
+          { id: 'bin', name: 'Bin', kind: 'Container' },
+        ],
+      }],
+    });
+    const { harness } = await navigate('/inventory/items/c1');
+
+    const path = (harness.routeNativeElement as HTMLElement).querySelector('app-location-path')!;
+    // A full-width surface: the middle is shown, not collapsed into an ellipsis.
+    expect(path.textContent!.replace(/\u00a0/g, ' ')).toBe('House › Basement › Chest › Bin');
+    expect(path.textContent).not.toContain('…');
+  });
+
   it('shows the not-found state on a 404', async () => {
     consumableApi.getConsumableError = true;
     consumableApi.getConsumableErrorStatus = 404;

@@ -33,9 +33,47 @@ import { UnitPipe } from '../consumables/unit.pipe';
 import { escapeHtml } from '@/shared/utils';
 import { TagBadgeComponent } from '@/shared/components/tag-badge/tag-badge.component';
 import type { InventoryRow, InventorySortId, InventorySortState } from './inventory-row';
-import { durableLocationPath, locationPathText } from '../shared/location-path';
+import {
+  durableLocationPath,
+  stockEntryLocationPath,
+  locationPathText,
+  renderCrumbs,
+  CRUMB_CLASSES,
+  PATH_HOST_CLASSES,
+  PATH_PREFIX_CLASSES,
+  PATH_SEPARATOR,
+  PATH_SEPARATOR_CLASSES,
+  type LocationPathView,
+} from '../shared/location-path';
 
 export type { InventorySortId, InventorySortState } from './inventory-row';
+
+/**
+ * The Location cell as a plain HTML string, not <app-location-path>: the row itself is the click
+ * target (it opens the quick panel), and a string cell keeps thousands of rows light. The markup
+ * mirrors the component span for span, because the branch rule (durableLocationPath /
+ * stockEntryLocationPath), the collapse-plus-layout rule (renderCrumbs, CRUMB_CLASSES) and the
+ * line literals (PATH_HOST_CLASSES, PATH_PREFIX_CLASSES, PATH_SEPARATOR*) are shared with it — ancestors are muted here exactly as they are on every other surface. The column
+ * is narrow by construction, so the middle collapses; the tooltip is always the FULL path.
+ */
+function renderLocationCell(view: LocationPathView): string {
+  const title = escapeHtml(locationPathText(view));
+  // A chain rooted at an unplaced container has no area segment — flag that visually. Italic marks
+  // a synthetic crumb, and the only one a multi-crumb view can carry is that Unplaced root; plain
+  // ancestors and the ellipsis are muted, never italic.
+  const syntheticRoot = view.crumbs[0].muted;
+  const inner = renderCrumbs(view.crumbs)
+    .map(c => {
+      const muted = c.muted ? ' text-muted-foreground' : '';
+      const italic = syntheticRoot && c.role === 'root' ? ' italic' : '';
+      return `<span class="${CRUMB_CLASSES[c.role]}${muted}${italic}">${escapeHtml(c.label)}</span>`;
+    })
+    .join(`<span class="${PATH_SEPARATOR_CLASSES}" aria-hidden="true">${PATH_SEPARATOR}</span>`);
+  const prefix = view.prefix
+    ? `<span class="${PATH_PREFIX_CLASSES}">${escapeHtml(view.prefix)}&nbsp;</span>`
+    : '';
+  return `<span class="${PATH_HOST_CLASSES} text-sm" title="${title}">${prefix}${inner}</span>`;
+}
 
 interface InventoryTableMeta {
   onEdit: (row: InventoryRow) => void;
@@ -260,23 +298,17 @@ export class InventoryTableComponent {
         const row = info.row.original;
         const durable = row.durable;
         if (durable) {
-          // Deliberately plain text, not the linked <app-location-path>: the row itself is the click
-          // target (opening the quick panel, which does carry links), and the cell truncates from the
-          // end — so the leaf, the segment worth clicking, is the first thing cut. The rule still comes
-          // from durableLocationPath, so this can't drift from the linked surfaces.
           const view = durableLocationPath(durable);
           if (view.crumbs.length === 1 && view.crumbs[0].muted && !view.prefix) {
             return '<span class="text-sm italic text-muted-foreground">Unplaced</span>';
           }
-          const title = escapeHtml(locationPathText(view));
-          // A chain rooted at an unplaced container has no area segment — flag that visually.
-          const inner = view.crumbs
-            .map(c => c.muted
-              ? `<span class="italic text-muted-foreground">${escapeHtml(c.label)}</span>`
-              : escapeHtml(c.label))
-            .join(' › ');
-          const prefix = view.prefix ? `${escapeHtml(view.prefix)} ` : '';
-          return `<span class="block truncate text-sm" title="${title}">${prefix}${inner}</span>`;
+          return renderLocationCell(view);
+        }
+        // A consumable held in exactly one place reads like a durable's path; spread stock is a
+        // count, and stock whose entry resolved to nothing keeps the flat label below.
+        const single = row.consumable?.stockLocations;
+        if (single?.length === 1 && single[0].path.length > 0) {
+          return renderLocationCell(stockEntryLocationPath(single[0]));
         }
         const text = row.locationText;
         if (text === '—' || text === 'Unplaced') {
