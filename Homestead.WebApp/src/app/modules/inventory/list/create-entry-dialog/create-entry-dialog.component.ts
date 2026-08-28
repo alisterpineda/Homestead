@@ -1,6 +1,7 @@
 import {
   Component,
   ChangeDetectionStrategy,
+  ElementRef,
   inject,
   input,
   output,
@@ -8,29 +9,43 @@ import {
   computed,
   viewChild,
 } from '@angular/core';
+import { provideIcons } from '@ng-icons/core';
+import { lucideChevronRight } from '@ng-icons/lucide';
 import { BrnDialog } from '@spartan-ng/brain/dialog';
 import { HlmDialogImports } from '@/shared/components/spartan/dialog';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmToggleGroupImports } from '@/shared/components/spartan/toggle-group';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmLabel } from '@/shared/components/spartan/label';
+import { HlmIconImports } from '@/shared/components/spartan/icon';
+import { HlmCollapsibleImports } from '@/shared/components/spartan/collapsible';
 import type { BrandPickerValue } from '../../shared/brand-picker/brand-picker.component';
 import { InventoryDurableApiService } from '@/api/services/inventory-durable-api.service';
 import { InventoryConsumableApiService } from '@/api/services/inventory-consumable-api.service';
 import { LocationPickerComponent, type ItemLocationValue } from '../../shared/location-picker/location-picker.component';
 import { BrandPickerComponent } from '../../shared/brand-picker/brand-picker.component';
 import { TagInputComponent } from '../../tags/tag-input/tag-input.component';
+import { formatQty, resolveUnit } from '../../consumables/consumable-shared';
 import { toast } from '@spartan-ng/brain/sonner';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 
 type EntryKind = 'durable' | 'consumable';
 
 /**
- * Unified "New" dialog for the merged inventory list: a kind toggle swaps between the durable fields
- * (model, location) and the consumable fields (unit, restock threshold). The two field sets and
- * the two descriptions are grid-stacked into a shared cell, so the dialog reserves max(durable, consumable)
- * height and never reflows on toggle; the inactive variant is `invisible` + `inert`. Title and submit stay
- * kind-neutral — the toggle group is the kind selector. The rest is set later from the Edit sheet.
+ * Unified "New" dialog for the merged inventory list. The kind toggle is the only kind selector —
+ * title, description, and submit stay kind-neutral — and the form is ordered as a fast path:
+ * **Name → Location → Starting stock** (consumables only), with everything else (brand, tags, model /
+ * restock threshold, notes) folded into a collapsed "More details" section. Nothing is cut; the
+ * secondary fields are one click away.
+ *
+ * Location now applies to **both** kinds, so a consumable can be seeded with opening stock straight
+ * from create. Quantity and location are both-or-neither (the backend validator requires exactly
+ * that), and the dialog blocks the mismatch symmetrically via {@link stockHint} — a quantity with no
+ * place, or a place with no quantity, shows an inline hint and disables submit. Unplaced + blank
+ * quantity is the bare "define the type, stock it later" create.
+ *
+ * "Create & add another" keeps the dialog open for both kinds, retaining the kind and location while
+ * clearing the item-specific fields — the natural rhythm when unpacking a box into one place.
  */
 @Component({
   selector: 'app-create-entry-dialog',
@@ -41,10 +56,13 @@ type EntryKind = 'durable' | 'consumable';
     HlmToggleGroupImports,
     HlmInput,
     HlmLabel,
+    HlmIconImports,
+    HlmCollapsibleImports,
     LocationPickerComponent,
     BrandPickerComponent,
     TagInputComponent,
   ],
+  providers: [provideIcons({ lucideChevronRight })],
   template: `
     <hlm-dialog (stateChanged)="onStateChanged($event)">
       <button hlmBtn [size]="triggerSize()" hlmDialogTrigger>
@@ -57,18 +75,8 @@ type EntryKind = 'durable' | 'consumable';
       >
         <div hlmDialogHeader>
           <h2 hlmDialogTitle>New item</h2>
-          <p hlmDialogDescription class="grid grid-cols-1">
-            <span class="col-start-1 row-start-1" [class.invisible]="kind() !== 'durable'">
-              Add a tracked durable — one specific thing. Set serial, value, and more after creating.
-            </span>
-            <span class="col-start-1 row-start-1" [class.invisible]="kind() !== 'consumable'">
-              @if (placedInitialLocation()) {
-                Define a consumable type, counted in bulk. Optionally give it a starting quantity, or
-                add stock later.
-              } @else {
-                Define a consumable type, counted in bulk. Add stock to it afterwards.
-              }
-            </span>
+          <p hlmDialogDescription>
+            Name it and say where it lives. Everything else can be set later.
           </p>
         </div>
 
@@ -90,6 +98,7 @@ type EntryKind = 'durable' | 'consumable';
             <label hlmLabel for="create-entry-name">Name</label>
             <input
               hlmInput
+              #nameInput
               id="create-entry-name"
               maxlength="256"
               [placeholder]="kind() === 'consumable' ? 'e.g. Paper towels' : 'e.g. Cordless drill'"
@@ -98,116 +107,128 @@ type EntryKind = 'durable' | 'consumable';
             />
           </div>
 
-          <!-- Brand applies to both kinds, so it lives outside the kind-specific grid. -->
+          <!-- Location applies to both kinds: it places a durable, and holds a consumable's opening stock. -->
           <div class="flex flex-col gap-1.5">
-            <label hlmLabel>Brand (optional)</label>
-            <app-brand-picker
-              [value]="brand()"
-              (valueChange)="brand.set($event)"
-              ariaLabel="Brand"
+            <label hlmLabel>Location</label>
+            <app-location-picker
+              [value]="locationValue()"
+              (valueChange)="onLocationChange($event)"
+              [selectedLabel]="initialLocationLabel()"
+              ariaLabel="Location"
             />
           </div>
 
-          <!-- Tags apply to both kinds, so they live outside the kind-specific grid. -->
-          <div class="flex flex-col gap-1.5">
-            <label hlmLabel>Tags (optional)</label>
-            <app-tag-input [value]="tags()" (valueChange)="tags.set($event)" />
-          </div>
-
-          <!-- Both field sets share one grid cell so the dialog reserves max height and never reflows
-               on toggle; the inactive variant is hidden (still occupies space) and made inert. -->
-          <div class="grid grid-cols-1">
-            <div
-              class="col-start-1 row-start-1 flex flex-col gap-4"
-              [class.invisible]="kind() !== 'durable'"
-              [attr.inert]="kind() === 'durable' ? null : ''"
-            >
-              <div class="flex flex-col gap-1.5">
-                <label hlmLabel for="create-entry-model">Model (optional)</label>
+          @if (kind() === 'consumable') {
+            <div class="flex flex-col gap-1.5">
+              <label hlmLabel for="create-entry-initial-quantity">Starting stock</label>
+              <div class="grid grid-cols-[1fr_7rem] gap-2">
                 <input
                   hlmInput
-                  id="create-entry-model"
-                  maxlength="128"
-                  placeholder="e.g. MRW23"
-                  [value]="model()"
-                  (input)="model.set(asValue($event))"
+                  id="create-entry-initial-quantity"
+                  type="number"
+                  inputmode="decimal"
+                  step="0.001"
+                  min="0"
+                  placeholder="0"
+                  [value]="initialQuantity()"
+                  (input)="initialQuantity.set(asValue($event))"
                 />
-              </div>
-
-              <div class="flex flex-col gap-1.5">
-                <label hlmLabel>Location</label>
-                <app-location-picker
-                  [value]="locationValue()"
-                  (valueChange)="onLocationChange($event)"
-                  [selectedLabel]="initialLocationLabel()"
-                  ariaLabel="Location"
-                />
-              </div>
-            </div>
-
-            <div
-              class="col-start-1 row-start-1 flex flex-col gap-4"
-              [class.invisible]="kind() !== 'consumable'"
-              [attr.inert]="kind() === 'consumable' ? null : ''"
-            >
-              <div class="flex flex-col gap-1.5">
-                <label hlmLabel for="create-entry-unit">Unit</label>
                 <input
                   hlmInput
                   id="create-entry-unit"
+                  aria-label="Unit"
                   maxlength="32"
-                  placeholder="e.g. rolls (optional)"
+                  placeholder="unit, e.g. rolls"
                   [value]="unit()"
                   (input)="unit.set(asValue($event))"
                 />
               </div>
-
-              <div class="flex flex-col gap-1.5">
-                <label hlmLabel for="create-entry-threshold">Restock threshold (optional)</label>
-                <input
-                  hlmInput
-                  id="create-entry-threshold"
-                  type="number"
-                  step="0.001"
-                  min="0"
-                  placeholder="Flag as low at or below this total"
-                  [value]="threshold()"
-                  (input)="threshold.set(asValue($event))"
-                />
-              </div>
-
-              @if (placedInitialLocation()) {
-                <div class="flex flex-col gap-1.5">
-                  <label hlmLabel for="create-entry-initial-quantity">Starting quantity (optional)</label>
-                  <input
-                    hlmInput
-                    id="create-entry-initial-quantity"
-                    type="number"
-                    step="0.001"
-                    min="0"
-                    placeholder="0"
-                    [value]="initialQuantity()"
-                    (input)="initialQuantity.set(asValue($event))"
-                  />
-                  <p class="text-sm text-muted-foreground">
-                    at {{ initialLocationLabel() ?? 'this location' }}. Leave blank to add stock later.
-                  </p>
-                </div>
+              @if (stockHint(); as hint) {
+                <p class="text-sm text-destructive">{{ hint }}</p>
+              } @else if (!hasPlace()) {
+                <p class="text-sm text-muted-foreground">Leave blank to add stock later.</p>
               }
+            </div>
+          }
+
+          <div hlmCollapsible [(expanded)]="moreOpen">
+            <button
+              hlmCollapsibleTrigger
+              type="button"
+              class="flex items-center gap-1 text-sm text-muted-foreground"
+            >
+              <ng-icon
+                hlm
+                name="lucideChevronRight"
+                size="sm"
+                class="shrink-0 transition-transform"
+                [class.rotate-90]="moreOpen()"
+              />
+              More details
+            </button>
+            <div hlmCollapsibleContent>
+              <div class="flex flex-col gap-4 pt-3">
+                <div class="flex flex-col gap-1.5">
+                  <label hlmLabel>Brand</label>
+                  <app-brand-picker
+                    [value]="brand()"
+                    (valueChange)="brand.set($event)"
+                    ariaLabel="Brand"
+                  />
+                </div>
+
+                <div class="flex flex-col gap-1.5">
+                  <label hlmLabel>Tags</label>
+                  <app-tag-input [value]="tags()" (valueChange)="tags.set($event)" />
+                </div>
+
+                @if (kind() === 'durable') {
+                  <div class="flex flex-col gap-1.5">
+                    <label hlmLabel for="create-entry-model">Model</label>
+                    <input
+                      hlmInput
+                      id="create-entry-model"
+                      maxlength="128"
+                      placeholder="e.g. MRW23"
+                      [value]="model()"
+                      (input)="model.set(asValue($event))"
+                    />
+                  </div>
+                } @else {
+                  <div class="flex flex-col gap-1.5">
+                    <label hlmLabel for="create-entry-threshold">Restock threshold</label>
+                    <input
+                      hlmInput
+                      id="create-entry-threshold"
+                      type="number"
+                      inputmode="decimal"
+                      step="0.001"
+                      min="0"
+                      placeholder="Flag as low at or below this total"
+                      [value]="threshold()"
+                      (input)="threshold.set(asValue($event))"
+                    />
+                  </div>
+                }
+
+                <div class="flex flex-col gap-1.5">
+                  <label hlmLabel for="create-entry-notes">Notes</label>
+                  <textarea
+                    hlmInput
+                    id="create-entry-notes"
+                    rows="2"
+                    placeholder="Anything worth remembering"
+                    [value]="notes()"
+                    (input)="notes.set(asValue($event))"
+                  ></textarea>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div class="flex flex-col gap-1.5">
-            <label hlmLabel for="create-entry-notes">Notes (optional)</label>
-            <textarea
-              hlmInput
-              id="create-entry-notes"
-              rows="2"
-              placeholder="Anything worth remembering"
-              [value]="notes()"
-              (input)="notes.set(asValue($event))"
-            ></textarea>
-          </div>
+          @if (thresholdHint(); as hint) {
+            <p class="text-sm text-destructive">{{ hint }}</p>
+          }
 
           @if (createError()) {
             <p class="text-sm text-destructive">{{ createError() }}</p>
@@ -215,6 +236,16 @@ type EntryKind = 'durable' | 'consumable';
 
           <div hlmDialogFooter>
             <button hlmBtn variant="secondary" type="button" class="w-full sm:w-auto" hlmDialogClose>Cancel</button>
+            <button
+              hlmBtn
+              variant="outline"
+              type="button"
+              class="w-full sm:w-auto"
+              [disabled]="!canSubmit() || creating()"
+              (click)="submit(true)"
+            >
+              Create &amp; add another
+            </button>
             <button hlmBtn type="submit" class="w-full sm:w-auto" [disabled]="!canSubmit() || creating()">
               {{ creating() ? 'Creating...' : 'Create' }}
             </button>
@@ -226,7 +257,7 @@ type EntryKind = 'durable' | 'consumable';
 })
 export class CreateEntryDialogComponent {
   triggerSize = input<'default' | 'sm' | 'lg' | 'icon' | 'icon-sm' | 'icon-lg'>('default');
-  /** Pre-selected durable location on open ("Add here" from a drilled place); null = unplaced. */
+  /** Pre-selected location on open ("Add here" from a drilled place); null = unplaced. */
   initialLocation = input<ItemLocationValue | null>(null);
   /** Display name for the pre-selected location, shown before the picker's lazy lists load. */
   initialLocationLabel = input<string | null>(null);
@@ -239,40 +270,81 @@ export class CreateEntryDialogComponent {
   brand = signal<BrandPickerValue | null>(null);
   // Tags apply to both kinds (the desired path list; the backend upserts ancestors).
   tags = signal<string[]>([]);
-  // Durable fields
+  // Location applies to both kinds.
   areaId = signal<string | null>(null);
   parentItemId = signal<string | null>(null);
+  // Durable fields
   model = signal('');
   // Consumable fields
   unit = signal('');
   threshold = signal('');
-  /** Optional starting quantity to seed at the drilled place; only shown for a real pre-filled place. */
+  /** Opening stock to seed at the picked location; blank means "define the type, stock it later". */
   initialQuantity = signal('');
+  /** Whether the collapsed "More details" section is open. */
+  moreOpen = signal(false);
 
   creating = signal(false);
   createError = signal('');
+  /** A "Create & add another" batch has created something; the host hears about it once, on close. */
+  private pendingCreated = false;
 
   private dialog = viewChild(BrnDialog);
+  private nameInput = viewChild<ElementRef<HTMLInputElement>>('nameInput');
   private durableApi = inject(InventoryDurableApiService);
   private consumableApi = inject(InventoryConsumableApiService);
   private errorHandler = inject(ErrorHandlerService);
 
+  /** Whether the picked location is a real place (area or container) rather than Unplaced. */
+  hasPlace = computed(() => this.locationValue().kind !== 'unplaced');
+
   /**
-   * The drilled location only when it's a real place (area or container). A bare consumable can't be
-   * given starting stock from the Items page / Browse root / Unplaced, so the quantity field hides there.
+   * The typed starting quantity as a number, or `null` for "no opening stock" — blank and `0` both
+   * mean none yet. Unparseable / negative input yields `NaN`, which {@link stockHint} reports.
    */
-  placedInitialLocation = computed(() => {
-    const loc = this.initialLocation();
-    return loc && loc.kind !== 'unplaced' ? loc : null;
+  quantityValue = computed<number | null>(() => {
+    const raw = this.initialQuantity().trim();
+    if (raw === '') return null;
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n < 0) return Number.NaN;
+    return n === 0 ? null : n;
+  });
+
+  /**
+   * The symmetric both-or-neither block on quantity ↔ location: the backend requires a quantity and
+   * a place together or neither, so say which half is missing instead of failing on submit. Also
+   * names an invalid (negative / unparseable) quantity, so submit is never disabled silently.
+   */
+  stockHint = computed<string | null>(() => {
+    if (this.kind() !== 'consumable') return null;
+    const qty = this.quantityValue();
+    if (qty !== null && Number.isNaN(qty)) {
+      return 'Enter a starting quantity of 0 or more.';
+    }
+    if (qty !== null && qty > 0 && !this.hasPlace()) {
+      return 'Pick a location to hold this stock, or leave the quantity blank.';
+    }
+    if (this.hasPlace() && qty === null) {
+      return 'Enter a starting quantity, or set the location to Unplaced.';
+    }
+    return null;
+  });
+
+  /**
+   * Inline hint for an invalid (negative / unparseable) restock threshold. Rendered outside the
+   * collapsed "More details" section so the reason submit is disabled is never hidden with the field.
+   */
+  thresholdHint = computed<string | null>(() => {
+    if (this.kind() !== 'consumable') return null;
+    const t = this.threshold().trim();
+    if (t === '') return null;
+    const n = Number(t);
+    return Number.isFinite(n) && n >= 0 ? null : 'Restock threshold must be 0 or more.';
   });
 
   canSubmit = computed(() => {
     if (this.name().trim().length === 0) return false;
     if (this.kind() === 'durable') return true;
-    const t = this.threshold().trim();
-    if (t !== '' && !(Number.isFinite(Number(t)) && Number(t) >= 0)) return false;
-    const q = this.initialQuantity().trim();
-    return q === '' || (Number.isFinite(Number(q)) && Number(q) >= 0);
+    return this.thresholdHint() === null && this.stockHint() === null;
   });
 
   /** The location pair as a single discriminated value for the picker. */
@@ -312,38 +384,34 @@ export class CreateEntryDialogComponent {
 
   onStateChanged(state: 'open' | 'closed'): void {
     if (state === 'open') {
-      this.kind.set('durable');
-      this.name.set('');
-      this.notes.set('');
-      this.brand.set(null);
-      this.tags.set([]);
-      this.onLocationChange(this.initialLocation() ?? { kind: 'unplaced' });
-      this.model.set('');
-      this.unit.set('');
-      this.threshold.set('');
-      this.initialQuantity.set('');
-      this.creating.set(false);
-      this.createError.set('');
+      this.resetAll();
+      return;
+    }
+    if (this.pendingCreated) {
+      this.pendingCreated = false;
+      this.created.emit();
     }
   }
 
   handleSubmit(event: Event): void {
     event.preventDefault();
-    if (!this.canSubmit()) return;
+    this.submit(false);
+  }
+
+  /** Creates the entry; `keepOpen` is the "Create & add another" path. */
+  submit(keepOpen: boolean): void {
+    if (!this.canSubmit() || this.creating()) return;
 
     this.creating.set(true);
     this.createError.set('');
 
     if (this.kind() === 'consumable') {
       const t = this.threshold().trim();
-      // Only seed stock when opened from a real place AND a positive quantity was entered; otherwise
-      // create a bare consumable (empty/0 quantity is a deliberate "stock it later" choice).
-      const loc = this.placedInitialLocation();
-      const q = this.initialQuantity().trim();
-      const qty = q === '' ? null : Number(q);
-      const placeStock = loc !== null && qty !== null && qty > 0;
-      const successMessage = placeStock
-        ? `Consumable created with ${qty} at ${this.initialLocationLabel() ?? 'this location'}.`
+      const qty = this.quantityValue();
+      // Quantity and place are both-or-neither — the backend validator rejects one without the other.
+      const seedStock = qty !== null && this.hasPlace();
+      const successMessage = seedStock
+        ? `Consumable created with ${formatQty(qty)} ${resolveUnit(this.unit())}.`
         : 'Consumable created.';
       this.consumableApi.createConsumable({
         body: {
@@ -353,12 +421,12 @@ export class CreateEntryDialogComponent {
           brandId: this.brand()?.id ?? null,
           tags: this.tags(),
           notes: this.notes().trim() ? this.notes().trim() : null,
-          initialQuantity: placeStock ? qty : null,
-          initialAreaId: placeStock && loc!.kind === 'area' ? loc!.id : null,
-          initialContainerItemId: placeStock && loc!.kind === 'container' ? loc!.id : null,
+          initialQuantity: seedStock ? qty : null,
+          initialAreaId: seedStock ? this.areaId() : null,
+          initialContainerItemId: seedStock ? this.parentItemId() : null,
         },
       }).subscribe({
-        next: () => this.onCreated(successMessage),
+        next: () => this.onCreated(successMessage, keepOpen),
         error: (err: unknown) => this.onCreateError(err, 'Failed to create consumable.'),
       });
       return;
@@ -375,20 +443,61 @@ export class CreateEntryDialogComponent {
         notes: this.notes().trim() ? this.notes().trim() : null,
       },
     }).subscribe({
-      next: () => this.onCreated('Durable created.'),
+      next: () => this.onCreated('Durable created.', keepOpen),
       error: (err: unknown) => this.onCreateError(err, 'Failed to create durable.'),
     });
   }
 
-  private onCreated(message: string): void {
+  private onCreated(message: string, keepOpen: boolean): void {
     this.creating.set(false);
     toast.success(message);
-    this.dialog()?.close();
-    this.created.emit();
+    if (keepOpen) {
+      // Hold the host's `created` until the dialog closes: hosts mount this dialog inside data-gated
+      // `@if` blocks (empty states, "Add here" buttons) that a refetch flips, which would destroy and
+      // force-close the dialog mid-batch — and a batch warrants one refresh, not one per item.
+      this.pendingCreated = true;
+      this.resetForAnother();
+    } else {
+      this.pendingCreated = false;
+      this.created.emit();
+      this.dialog()?.close();
+    }
   }
 
   private onCreateError(err: unknown, fallback: string): void {
     this.creating.set(false);
     this.createError.set(this.errorHandler.getErrorMessage(err, fallback));
+  }
+
+  /** Full reset on open: back to a durable at the pre-filled location with every field blank. */
+  private resetAll(): void {
+    this.kind.set('durable');
+    this.onLocationChange(this.initialLocation() ?? { kind: 'unplaced' });
+    this.clearItemFields();
+    this.moreOpen.set(false);
+    this.creating.set(false);
+    this.pendingCreated = false;
+  }
+
+  /**
+   * Reset for "Create & add another": keeps the kind, the location, and the More-details disclosure
+   * (you're unpacking a box into one place), clears everything item-specific, and returns focus to Name.
+   */
+  private resetForAnother(): void {
+    this.clearItemFields();
+    this.nameInput()?.nativeElement.focus();
+  }
+
+  /** Clears every item-specific field — the one list both resets share, so a new field lands in both. */
+  private clearItemFields(): void {
+    this.name.set('');
+    this.notes.set('');
+    this.brand.set(null);
+    this.tags.set([]);
+    this.model.set('');
+    this.unit.set('');
+    this.threshold.set('');
+    this.initialQuantity.set('');
+    this.createError.set('');
   }
 }

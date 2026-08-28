@@ -41,6 +41,10 @@ There is at most one stock entry per `(item, area-or-container)` — a **unique 
 
 When an entry's quantity reaches zero (everything at that location was used, transferred away, or carved out), the **entry is deleted**, not left lingering at zero. The history of what happened there survives in the movement ledger; the stock entry table holds only places that currently have something. This keeps "which locations stock this item" honest and keeps `SUM(Quantity)` free of zero rows.
 
+### Born with stock
+
+A consumable may be created with an optional **starting quantity at one place** — an area or a container. That seed is not a special write path: it is received through the [same single service](#all-quantity-changes-go-through-one-service) as any later restock and lands as an ordinary `Flow` inflow with **no cost and no source** (those belong to a deliberate receive, not to cataloguing). Quantity and place are **both-or-neither**: the create form blocks either half on its own with an inline hint rather than silently dropping it, and leaving both empty is the honest way to register a bare type — Unplaced, zero on-hand — that gets its first stock later. If the seeding inflow fails, the whole create rolls back, so a failure never leaves an orphaned bare consumable behind. **"Create & add another"** keeps the kind and the place and clears the rest — the batch-stocking gesture for a shelf's worth of new consumables.
+
 ## Total on-hand and low stock
 
 - **Total on-hand** for a fungible item = `SUM(Quantity)` over its stock entries.

@@ -62,7 +62,7 @@ Bulk delete on tags has the same semantics as repeated single deletes, applied i
 
 Tags are applied to items two ways, both path-based:
 
-- **On the item forms** (the new-item dialog and the durable/consumable edit sheets), a chip input autocompletes existing tag paths and offers "Create 'X'" for a new path — full parity with the Documents tag input. Submitting an item sends its tag **paths**; the server resolves-or-creates each (upserting ancestors) and replaces the item's tag set with exactly those (whole-set replace: an omitted tag field leaves the set untouched, a present one replaces it entirely).
+- **On the item forms** (the new-item dialog and the durable/consumable edit sheets), a chip input autocompletes existing tag paths and offers "Create 'X'" for a new path — full parity with the Documents tag input (on the new-item dialog that input sits under the collapsed **"More details"** section, one tap off the fast path — still no detour to a tag-admin page). Submitting an item sends its tag **paths**; the server resolves-or-creates each (upserting ancestors) and replaces the item's tag set with exactly those (whole-set replace: an omitted tag field leaves the set untouched, a present one replaces it entirely).
 - **On the dedicated CRUD page** (`/inventory/tags`), tags are created, renamed, recoloured, re-parented, and deleted (single and bulk) independently of any item.
 
 The item create/patch endpoints accept tag **paths**; the filter facet works in tag **ids** and resolves chip labels through a `/resolve` endpoint (exactly as Documents does).

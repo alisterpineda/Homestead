@@ -358,12 +358,24 @@ describe('InventoryListPageComponent', () => {
     await settle();
   }
 
-  // Let the 300ms searchInput debounce fire and the resulting navigation/fetch settle. The margin
-  // over 300ms is generous on purpose: these are real timers, and the page's other debounced
-  // pipelines (tagOptions/tagChips) plus CPU contention under the build gate can otherwise steal the
-  // tail of a tight window and flake the commit assertion.
+  // Let the 300ms searchInput debounce fire and the resulting navigation/fetch settle. These are
+  // real timers on a shared worker, so no fixed sleep is safe: under full-suite CPU contention the
+  // debounce callback itself lands late and the router navigation it kicks off later still. Wait on
+  // the outcome instead — past the debounce window, poll until the URL's `search` param matches the
+  // trimmed input and no navigation is in flight. A no-op commit (whitespace-only, or a term already
+  // in the URL) is already in that state, so it costs nothing beyond the one debounce window.
   async function flushDebounce(): Promise<void> {
-    await new Promise(resolve => setTimeout(resolve, 700));
+    const router = TestBed.inject(Router);
+    const expected = component.searchInput().trim();
+    const committed = (): string => router.routerState.snapshot.root.queryParams['search'] ?? '';
+    const deadline = Date.now() + 5000; // well inside the 15s test timeout, even for two calls.
+
+    await new Promise(resolve => setTimeout(resolve, 350));
+    await settle();
+    while ((committed() !== expected || router.getCurrentNavigation() !== null) && Date.now() < deadline) {
+      await new Promise(resolve => setTimeout(resolve, 20));
+      await settle();
+    }
     await settle();
   }
 
