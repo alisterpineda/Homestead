@@ -1,0 +1,26 @@
+{
+  "skill_name": "spartan-regen",
+  "evals": [
+    {
+      "id": 0,
+      "name": "reinstall-select",
+      "prompt": "The select component is acting weird after we bumped the Spartan packages. Can you reinstall it fresh?",
+      "expected_output": "Deletes src/app/shared/components/spartan/select AND removes the @/shared/components/spartan/select tsconfig path alias (otherwise the CLI prints 'already installed' and skips), then runs `npx ng g @spartan-ng/cli:ui select` from Homestead.WebApp/. Verifies the alias was re-added and runs healthcheck + build + tests + self-qa.",
+      "files": []
+    },
+    {
+      "id": 1,
+      "name": "bulk-regen-keeps-icon",
+      "prompt": "Regenerate all the Spartan helm components from the current CLI templates.",
+      "expected_output": "Loops one `npx ng g @spartan-ng/cli:ui <name>` per component (utils first) rather than the interactive picker, strips the tsconfig aliases first, then restores the vendored `icon` helm via `git checkout HEAD -- Homestead.WebApp/src/app/shared/components/spartan/icon` and does NOT migrate `<ng-icon hlm size>` usages. Finishes with healthcheck, build, npm test, and the self-qa subagent.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "ng0309-after-regen",
+      "prompt": "After regenerating the alert-dialog helm, opening any confirm dialog throws NG0309 'matches multiple times'. What's wrong?",
+      "expected_output": "Identifies that hlmAlertDialogCancel/hlmAlertDialogAction now bring HlmButton via hostDirectives, so a button that also has hlmBtn double-applies BrnButton. Fix: remove the redundant hlmBtn and pass variant/size as inputs on the cancel/action directive.",
+      "files": []
+    }
+  ]
+}
