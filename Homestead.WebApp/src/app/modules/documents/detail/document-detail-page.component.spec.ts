@@ -958,7 +958,7 @@ describe('DocumentDetailPageComponent — backup state', () => {
   });
 
   // The latch lives on the COMPONENT, not inside <hlm-tabs>: there are two tab instances under
-  // @if (isMobile()), so a resize across 768px destroys whichever one holds the state.
+  // @if (narrow()), so a resize across 768px destroys whichever one holds the state.
   it('keeps the latch set once opened', () => {
     configure(true);
 

@@ -141,8 +141,8 @@ sends unauthenticated → `/login` and inactive → `/pending-activation`.
 | `/documents/:id/versions/:versionId` | DocumentDetailPageComponent | |
 
 **The detail page's tabs differ by breakpoint.** Desktop: Info / Content / Metadata / Activity. Mobile
-(≤768px): **Preview** / Info / Content / Metadata / Activity — two separate `<hlm-tabs>` instances under
-`@if (isMobile())`, so a resize destroys one and builds the other. The mobile instance defaults to
+(below `md`, <768px at default font size): **Preview** / Info / Content / Metadata / Activity — two separate
+`<hlm-tabs>` instances under `@if (narrow())`, so a resize destroys one and builds the other. The mobile instance defaults to
 **Preview**, so a mobile run must click Metadata explicitly.
 
 #### Backup section (Metadata tab, admin-only)

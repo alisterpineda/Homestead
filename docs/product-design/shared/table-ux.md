@@ -43,7 +43,7 @@ Desktop → mobile transformations:
 
 The zone rules still hold; controls just collapse to icons through progressive disclosure.
 
-The breakpoint is **768px** — the exact complement of Tailwind `md:`, i.e. a `(min-width: 768px)` media query negated (`injectIsNarrowViewport()` in the WebApp). Don't reuse the sidebar primitive's `isMobile()` for breakpoint-sensitive layout: its `(max-width: 768px)` query is inclusive at exactly 768px, so JS-driven behaviour would disagree with the `md:` classes at that one width.
+The breakpoint is Tailwind's **`md` (48rem)** — the exact complement of `md:`, i.e. the `(width >= 48rem)` media query Tailwind itself emits, negated (`injectIsNarrowViewport()` in `shared/utils/viewport.ts`). Don't reuse the sidebar primitive's `isMobile()` for breakpoint-sensitive layout: its `(max-width: 768px)` query is inclusive at exactly 768px, so JS-driven behaviour would disagree with the `md:` classes at that one width.
 
 ## Filter pattern — unified popover
 
@@ -84,7 +84,7 @@ Pseudo-code — exact APIs in `Homestead.WebApp/src/app/shared/components/sparta
 ```typescript
 @Component({
   template: `
-    @if (!isMobile()) {
+    @if (!narrow()) {
       <div hlmPopover>
         <button hlmPopoverTrigger ...><!-- filter button --></button>
         <div hlmPopoverContent *hlmPopoverPortal align="start" class="w-80">
@@ -198,4 +198,4 @@ These are not future considerations — apply them in any new table.
 | Page-size persistence | `UserPreferencesService.pageSize` — URL fallback |
 | Page reset rule | Filter/search/sort → `page=1` |
 | Bounded datasets | Paged fetch to a fixed cap + client-side sort + warn-and-truncate guard |
-| Mobile breakpoint | 768px (matches sidebar primitive) |
+| Mobile breakpoint | Tailwind `md` / 48rem (`injectIsNarrowViewport`) — **not** the sidebar primitive |

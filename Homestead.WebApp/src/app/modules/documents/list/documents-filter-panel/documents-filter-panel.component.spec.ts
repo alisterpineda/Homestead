@@ -1,26 +1,21 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { signal } from '@angular/core';
 import { DocumentsFilterPanelComponent } from './documents-filter-panel.component';
-import { HlmSidebarService } from '@/shared/components/spartan/sidebar';
+import { stubMatchMedia } from '@/shared/testing/match-media';
 
 describe('DocumentsFilterPanelComponent', () => {
   let fixture: ComponentFixture<DocumentsFilterPanelComponent>;
   let component: DocumentsFilterPanelComponent;
-  let isMobile: ReturnType<typeof signal<boolean>>;
+  let media: ReturnType<typeof stubMatchMedia>;
 
   beforeEach(() => {
-    isMobile = signal(false);
-    TestBed.configureTestingModule({
-      providers: [
-        {
-          provide: HlmSidebarService,
-          useValue: { isMobile },
-        },
-      ],
-    });
+    // injectIsNarrowViewport reads matchMedia at construction, so stub before creating.
+    media = stubMatchMedia(true);
+    TestBed.configureTestingModule({});
     fixture = TestBed.createComponent(DocumentsFilterPanelComponent);
     component = fixture.componentInstance;
   });
+
+  afterEach(() => vi.unstubAllGlobals());
 
   it('should create', () => {
     expect(component).toBeTruthy();
@@ -148,7 +143,6 @@ describe('DocumentsFilterPanelComponent', () => {
 
   describe('responsive wrapper', () => {
     it('renders the popover wrapper on desktop', () => {
-      isMobile.set(false);
       fixture.detectChanges();
       const host: HTMLElement = fixture.nativeElement;
       expect(host.querySelector('[hlmpopover]')).not.toBeNull();
@@ -156,7 +150,7 @@ describe('DocumentsFilterPanelComponent', () => {
     });
 
     it('renders the sheet wrapper on mobile', () => {
-      isMobile.set(true);
+      media.fireChange(false);
       fixture.detectChanges();
       const host: HTMLElement = fixture.nativeElement;
       expect(host.querySelector('hlm-sheet')).not.toBeNull();

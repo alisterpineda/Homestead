@@ -15,6 +15,7 @@ import { durableToRow, consumableToRow, type InventoryRow } from './inventory-ro
 import type { DurableResponse } from '@/api/generated/models/durable-response';
 import type { ConsumableResponse } from '@/api/generated/models/consumable-response';
 import type { ItemStatus } from '@/api/generated/models/item-status';
+import { stubMatchMedia } from '@/shared/testing/match-media';
 
 // brn-select (in the edit sheets) uses ResizeObserver; safe to stub for the rendered template.
 if (typeof globalThis.ResizeObserver === 'undefined') {
@@ -382,11 +383,7 @@ describe('InventoryItemsViewComponent', () => {
 
     it('defaults to the card grid below 768px with no stored preference', async () => {
       // injectIsNarrowViewport reads matchMedia at construction, so stub before creating.
-      vi.stubGlobal('matchMedia', vi.fn(() => ({
-        matches: false,
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-      })));
+      stubMatchMedia(false);
 
       const f = TestBed.createComponent(InventoryItemsViewComponent);
       f.componentRef.setInput('rows', ROWS);
@@ -399,11 +396,7 @@ describe('InventoryItemsViewComponent', () => {
     });
 
     it('lets an explicit table preference win over the narrow-viewport card fallback', async () => {
-      vi.stubGlobal('matchMedia', vi.fn(() => ({
-        matches: false,
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-      })));
+      stubMatchMedia(false);
       setViewPref('table');
 
       const f = TestBed.createComponent(InventoryItemsViewComponent);

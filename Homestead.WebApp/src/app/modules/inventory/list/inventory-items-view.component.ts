@@ -40,7 +40,7 @@ import { InventoryCardGridComponent } from './inventory-card-grid.component';
 import { EditDurableSheetComponent } from '../durables/edit-durable-sheet/edit-durable-sheet.component';
 import { EditConsumableSheetComponent } from '../consumables/edit-consumable-sheet/edit-consumable-sheet.component';
 import { isTerminalStatus } from '../shared/item-status-meta';
-import { injectIsNarrowViewport } from '../shared/sheet-side';
+import { injectIsNarrowViewport } from '@/shared/utils/viewport';
 import { UserPreferencesService } from '@/shared/services/user-preferences.service';
 import { sortRows, type InventoryRow, type InventorySortId, type InventorySortState } from './inventory-row';
 import { replace } from '@/shared/json-patch';

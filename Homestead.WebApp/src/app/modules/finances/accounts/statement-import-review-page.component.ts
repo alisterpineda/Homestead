@@ -46,7 +46,7 @@ import { HlmTableImports } from '@/shared/components/spartan/table';
 import { HlmToggleGroupImports } from '@/shared/components/spartan/toggle-group';
 import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog';
 import { HlmDatePicker, HlmDatePickerInput } from '@/shared/components/spartan/date-picker';
-import { HlmSidebarService } from '@/shared/components/spartan/sidebar';
+import { injectIsNarrowViewport } from '@/shared/utils/viewport';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { TableHeadSelection, TableRowSelection } from '@/shared/components/table/selection-column';
 import { isoDateBinding } from '@/shared/utils/date-picker-config';
@@ -190,7 +190,7 @@ function sameCategory(a: LineCategory | null, b: LineCategory | null): boolean {
           <div class="flex justify-center py-16"><hlm-spinner /></div>
         } @else {
           <!-- Desktop: two-panel resizable -->
-          @if (!isMobile()) {
+          @if (!narrow()) {
             <div hlmResizableGroup direction="horizontal" class="min-h-0 flex-1 rounded-md border">
               <div hlmResizablePanel [defaultSize]="40" [minSize]="35" class="overflow-hidden">
                 <ng-container [ngTemplateOutlet]="previewPanel" />
@@ -632,7 +632,6 @@ export class StatementImportReviewPageComponent {
   private documentApi = inject(DocumentApiService);
   private errorHandler = inject(ErrorHandlerService);
   private sanitizer = inject(DomSanitizer);
-  private sidebarService = inject(HlmSidebarService);
   private destroyRef = inject(DestroyRef);
 
   // Whether the payee → category pre-fill is on (mirrors the server's AutoCategoriseFromPayee, default on).
@@ -663,7 +662,7 @@ export class StatementImportReviewPageComponent {
     return extra.length ? [...fetched, ...extra] : fetched;
   });
 
-  isMobile = this.sidebarService.isMobile;
+  protected readonly narrow = injectIsNarrowViewport();
 
   refreshTrigger = signal(0);
   loading = signal(false);

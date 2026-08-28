@@ -59,7 +59,7 @@ import { HlmSeparatorImports } from '@/shared/components/spartan/separator';
 import { HlmScrollAreaImports } from '@/shared/components/spartan/scroll-area';
 import { HlmInputGroupImports } from '@/shared/components/spartan/input-group';
 import { HlmDatePicker, HlmDatePickerInput } from '@/shared/components/spartan/date-picker';
-import { HlmSidebarService } from '@/shared/components/spartan/sidebar';
+import { injectIsNarrowViewport } from '@/shared/utils/viewport';
 import { NgScrollbar } from 'ngx-scrollbar';
 import { HlmTooltipImports } from '@/shared/components/spartan/tooltip';
 import { TagInputComponent } from '../tags/tag-input/tag-input.component';
@@ -758,7 +758,7 @@ import { toast } from '@spartan-ng/brain/sonner';
         </div>
       </ng-template>
 
-      @if (isMobile()) {
+      @if (narrow()) {
         <!-- Mobile: single tabbed layout -->
         <hlm-tabs
           tab="preview"
@@ -806,7 +806,7 @@ import { toast } from '@spartan-ng/brain/sonner';
 
           <!-- Info/Text tabs panel -->
           <div hlmResizablePanel [defaultSize]="25" [minSize]="20" class="flex flex-col overflow-hidden">
-            <!-- Both instances wire this: they are separate elements under @if (isMobile()), so a
+            <!-- Both instances wire this: they are separate elements under @if (narrow()), so a
                  resize across 768px recreates one and destroys the other. -->
             <hlm-tabs
               tab="info"
@@ -886,11 +886,10 @@ export class DocumentDetailPageComponent implements OnDestroy {
 
   formatBytes = formatBytes;
 
-  private sidebarService = inject(HlmSidebarService);
   private openDocumentsService = inject(OpenDocumentsService);
   private editStateService = inject(DocumentEditStateService);
   private destroyRef = inject(DestroyRef);
-  isMobile = this.sidebarService.isMobile;
+  protected readonly narrow = injectIsNarrowViewport();
 
   private documentApi = inject(DocumentApiService);
   private versionApi = inject(DocumentVersionApiService);
@@ -1104,7 +1103,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
    * for a page nobody looked at that deeply.
    *
    * Held on the COMPONENT rather than inside the tabs. There are two `<hlm-tabs>` instances — mobile
-   * and desktop — under `@if (isMobile())`, so crossing 768px destroys and recreates them; anything
+   * and desktop — under `@if (narrow())`, so crossing 768px destroys and recreates them; anything
    * latched inside would be lost on every resize, and the section would blank out mid-read.
    */
   metadataOpened = signal(false);

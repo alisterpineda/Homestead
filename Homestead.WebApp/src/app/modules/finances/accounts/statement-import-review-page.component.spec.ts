@@ -1,4 +1,4 @@
-import { provideZonelessChangeDetection, signal } from '@angular/core';
+import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
@@ -11,7 +11,6 @@ import { FinancesCategoryApiService } from '@/api/services/finances-category-api
 import { FinancesSettingsApiService } from '@/api/services/finances-settings-api.service';
 import { FinancesCommodityApiService } from '@/api/services/finances-commodity-api.service';
 import { DocumentApiService } from '@/api/services/document-api.service';
-import { HlmSidebarService } from '@/shared/components/spartan/sidebar';
 import type { StatementImportResponse } from '@/api/generated/models/statement-import-response';
 import type { AccountResponse } from '@/api/generated/models/account-response';
 import type { CommodityResponse } from '@/api/generated/models/commodity-response';
@@ -148,7 +147,6 @@ describe('StatementImportReviewPageComponent', () => {
         { provide: FinancesSettingsApiService, useValue: { getFinanceSettings: () => settings$.asObservable() } },
         { provide: FinancesCommodityApiService, useValue: { getCommodity: () => of(CAD) } },
         { provide: DocumentApiService, useValue: { getDocumentFile: () => of(null) } },
-        { provide: HlmSidebarService, useValue: { isMobile: signal(false) } },
         { provide: Router, useValue: { navigate: () => Promise.resolve(true) } },
         {
           provide: ActivatedRoute,

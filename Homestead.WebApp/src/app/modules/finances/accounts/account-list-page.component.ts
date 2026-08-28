@@ -33,7 +33,7 @@ import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmPopoverImports } from '@/shared/components/spartan/popover';
 import { HlmSeparatorImports } from '@/shared/components/spartan/separator';
 import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-menu';
-import { HlmSidebarService } from '@/shared/components/spartan/sidebar';
+import { injectIsNarrowViewport } from '@/shared/utils/viewport';
 import { FinancesAccountApiService } from '@/api/services/finances-account-api.service';
 import { FinanceSettingsService } from '../shared/finance-settings.service';
 import { UserPreferencesService } from '@/shared/services/user-preferences.service';
@@ -347,7 +347,7 @@ export class AccountListPageComponent {
   protected settingsService = inject(FinanceSettingsService);
   private errorHandler = inject(ErrorHandlerService);
   private prefs = inject(UserPreferencesService);
-  private sidebar = inject(HlmSidebarService);
+  private readonly narrow = injectIsNarrowViewport();
 
   readonly sortFields: readonly AccountSortFieldOption[] = [
     { id: 'name', label: 'Name', defaultDesc: false },
@@ -366,7 +366,7 @@ export class AccountListPageComponent {
   viewMode = computed<'table' | 'card'>(() => {
     const stored = this.prefs.accountViewMode();
     if (stored === 'table' || stored === 'card') return stored;
-    return this.sidebar.isMobile() ? 'card' : 'table';
+    return this.narrow() ? 'card' : 'table';
   });
 
   selectedAccount = signal<AccountResponse | null>(null);

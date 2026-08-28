@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, inject, input, output, signal, computed, effect, WritableSignal } from '@angular/core';
+import { Component, ChangeDetectionStrategy, input, output, signal, computed, effect, WritableSignal } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideListFilter } from '@ng-icons/lucide';
@@ -10,7 +10,7 @@ import { HlmSeparatorImports } from '@/shared/components/spartan/separator';
 import { HlmComboboxImports } from '@/shared/components/spartan/combobox';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmBadge } from '@/shared/components/spartan/badge';
-import { HlmSidebarService } from '@/shared/components/spartan/sidebar';
+import { injectIsNarrowViewport } from '@/shared/utils/viewport';
 
 export interface FilterOption {
   id: string;
@@ -34,7 +34,7 @@ export interface FilterOption {
   ],
   providers: [provideIcons({ lucideListFilter })],
   template: `
-    @if (!isMobile()) {
+    @if (!narrow()) {
       <div hlmPopover>
         <button hlmPopoverTrigger hlmBtn variant="outline" aria-label="Filter documents">
           <ng-icon hlm name="lucideListFilter" size="sm" class="text-muted-foreground" />
@@ -165,8 +165,7 @@ export class DocumentsFilterPanelComponent {
   partySearchChange = output<string>();
   reset = output<void>();
 
-  private sidebarService = inject(HlmSidebarService);
-  isMobile = this.sidebarService.isMobile;
+  protected readonly narrow = injectIsNarrowViewport();
 
   tagSearch = signal('');
   partySearch = signal('');
