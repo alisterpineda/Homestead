@@ -332,7 +332,7 @@ function moneyPairError(
             </div>
 
             <div class="space-y-2">
-              <label hlmLabel for="durable-notes">Notes</label>
+              <label hlmLabel for="durable-notes">Description</label>
               <textarea
                 hlmInput
                 id="durable-notes"

@@ -48,6 +48,7 @@ import { formatPath } from '../../list/inventory-row';
 import { durableLocationPath, type LocationPathView } from '../../shared/location-path';
 import { LocationPathComponent } from '../../shared/location-path.component';
 import { acquisitionSummary } from '../acquisition-summary';
+import { hasDurableDetails } from '../has-durable-details';
 import { formatQty } from '../../consumables/consumable-shared';
 import { UnitPipe } from '../../consumables/unit.pipe';
 import { formatRelativeAge } from '@/shared/utils/relative-age';
@@ -63,7 +64,7 @@ import { toast } from '@spartan-ng/brain/sonner';
 
 /**
  * The canonical surface for a non-fungible durable, rendered by the `/inventory/items/:id` dispatcher:
- * full record (value, serial, status, location, notes) with full editing via the shared edit sheet,
+ * full record (value, serial, status, location, description) with full editing via the shared edit sheet,
  * and — when the durable is a container — its direct contents, or — when an assembly — its
  * components. Durable↔consumable parity with
  * {@link ConsumableDetailPageComponent}; containers are drilled *into* here rather than acted *on*, so
@@ -145,9 +146,6 @@ import { toast } from '@spartan-ng/brain/sonner';
               }
             </p>
             <p class="text-xs text-muted-foreground">Updated {{ updatedRelative() }}</p>
-            @if (it.notes) {
-              <p class="max-w-prose whitespace-pre-wrap text-sm text-muted-foreground">{{ it.notes }}</p>
-            }
             @if (it.tags?.length) {
               <div class="flex flex-wrap gap-1 pt-1">
                 @for (t of it.tags ?? []; track t.id) {
@@ -184,8 +182,8 @@ import { toast } from '@spartan-ng/brain/sonner';
           </div>
         </div>
 
-        <!-- Details — hidden entirely when the durable carries no value/serial/acquired/lent fields
-             (the common case in current data); location now leads as the headline above. -->
+        <!-- Details — hidden entirely when the durable carries no value/serial/acquired/lent/description
+             fields (the common case in current data); location now leads as the headline above. -->
         @if (hasDetails()) {
           <section class="space-y-2">
             <h2 class="text-sm font-medium text-muted-foreground">Details</h2>
@@ -219,6 +217,10 @@ import { toast } from '@spartan-ng/brain/sonner';
               @if (it.status === 'Lent' && it.lentTo) {
                 <dt class="text-muted-foreground">Lent to</dt>
                 <dd class="break-words">{{ it.lentTo }}</dd>
+              }
+              @if (it.notes) {
+                <dt class="text-muted-foreground">Description</dt>
+                <dd class="whitespace-pre-wrap break-words">{{ it.notes }}</dd>
               }
             </dl>
           </section>
@@ -585,14 +587,10 @@ export class DurableDetailPageComponent {
     return it ? acquisitionSummary(it, this.locale) : null;
   });
 
-  // Drives whether the Details box renders at all — when value/serial/acquired/lent are all empty it
-  // would be an empty card, so it's hidden (location now leads as the headline, not a Details row).
-  protected hasDetails = computed(() => {
-    const it = this.durable();
-    return !!it && (it.value != null || !!it.serial || !!it.model || !!it.brandId
-      || this.acquisitionLine() !== null
-      || (it.status === 'Lent' && !!it.lentTo));
-  });
+  // Drives whether the Details box renders at all — when every Details row is empty it would be an
+  // empty card, so it's hidden (location now leads as the headline, not a Details row). The predicate
+  // is shared with the quick panel so the two surfaces stay in lockstep.
+  protected hasDetails = computed(() => hasDurableDetails(this.durable(), this.locale));
 
   protected updatedRelative = computed(() => {
     const updatedAt = this.durable()?.updatedAt;

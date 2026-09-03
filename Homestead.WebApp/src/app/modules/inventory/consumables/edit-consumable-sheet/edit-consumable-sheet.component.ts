@@ -121,7 +121,7 @@ import { openGeneration } from '@/shared/utils/open-generation';
             </div>
 
             <div class="space-y-2">
-              <label hlmLabel for="consumable-notes">Notes</label>
+              <label hlmLabel for="consumable-notes">Description</label>
               <textarea
                 hlmInput
                 id="consumable-notes"

@@ -32,6 +32,7 @@ import { QuickPanelComponent } from '../../shared/quick-panel/quick-panel.compon
 import { durableLocationPath, type LocationPathView } from '../../shared/location-path';
 import { LocationPathComponent } from '../../shared/location-path.component';
 import { acquisitionSummary } from '../acquisition-summary';
+import { hasDurableDetails } from '../has-durable-details';
 import { formatRelativeAge } from '@/shared/utils/relative-age';
 import { replace } from '@/shared/json-patch';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
@@ -190,7 +191,7 @@ type InlineForm = 'move' | 'lent' | null;
               </hlm-dropdown-menu>
             </ng-template>
 
-            <!-- Details — hidden when serial/value/acquired/lent/notes are all empty (status now lives
+            <!-- Details — hidden when serial/value/acquired/lent/description are all empty (status now lives
                  in the header and Updated in the footer, so nothing keeps this card permanently filled). -->
             @if (hasDetails()) {
               <div hlmItem variant="outline">
@@ -226,10 +227,12 @@ type InlineForm = 'move' | 'lent' | null;
                       <dt class="text-muted-foreground">Lent to</dt>
                       <dd class="truncate">{{ it.lentTo }}</dd>
                     }
+                    @if (it.notes) {
+                      <!-- Multi-line free text: wrap, don't truncate like the single-line rows above. -->
+                      <dt class="text-muted-foreground">Description</dt>
+                      <dd class="whitespace-pre-wrap break-words">{{ it.notes }}</dd>
+                    }
                   </dl>
-                  @if (it.notes) {
-                    <p class="whitespace-pre-wrap text-sm text-muted-foreground">{{ it.notes }}</p>
-                  }
                 </div>
               </div>
             }
@@ -320,18 +323,10 @@ export class DurableQuickPanelComponent {
     return it ? acquisitionSummary(it, this.locale) : null;
   });
 
-  // Drives whether the Details card renders at all — when serial/value/acquired/lent/notes are all
-  // empty it would be an empty box (status moved to the header, Updated to the footer). Mirrors
-  // `hasDetails` on durable-detail-page, plus notes (which live inside this card, not the header here).
-  protected hasDetails = computed(() => {
-    const it = this.view();
-    return (
-      !!it &&
-      (it.value != null || !!it.serial || !!it.model || !!it.brandId
-        || this.acquisitionLine() !== null
-        || (it.status === 'Lent' && !!it.lentTo) || !!it.notes)
-    );
-  });
+  // Drives whether the Details card renders at all — when every Details row is empty it would be an
+  // empty box (status moved to the header, Updated to the footer). The predicate is shared with
+  // durable-detail-page so the two surfaces stay in lockstep.
+  protected hasDetails = computed(() => hasDurableDetails(this.view(), this.locale));
 
   protected updatedRelative = computed(() => {
     const updatedAt = this.view()?.updatedAt;

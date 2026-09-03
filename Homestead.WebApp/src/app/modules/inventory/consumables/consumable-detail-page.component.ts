@@ -145,7 +145,12 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
               </p>
             }
             @if (s.notes) {
-              <p class="max-w-prose text-sm text-muted-foreground">{{ s.notes }}</p>
+              <!-- No Details card on this page (unlike the durable page), so the description stays in
+                   the header with a small label; same weight as the "Brand:" prefix above. -->
+              <div class="max-w-prose text-sm text-muted-foreground">
+                <p>Description</p>
+                <p class="whitespace-pre-wrap text-foreground">{{ s.notes }}</p>
+              </div>
             }
             @if (s.tags?.length) {
               <div class="flex flex-wrap gap-1 pt-1">
@@ -237,7 +242,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 
         <!-- Movement ledger -->
         <section class="space-y-2">
-          <h2 class="text-sm font-medium text-muted-foreground">History</h2>
+          <h2 class="text-sm font-medium text-muted-foreground">Movements</h2>
           @if (movements().length === 0) {
             <div class="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
               No movements recorded yet.

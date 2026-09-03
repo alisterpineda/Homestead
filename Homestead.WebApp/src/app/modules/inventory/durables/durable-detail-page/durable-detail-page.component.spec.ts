@@ -275,6 +275,27 @@ describe('DurableDetailPageComponent', () => {
     expect(content).toContain('Gift');
   });
 
+  it('shows the Details box with a Description row when only a description is set', async () => {
+    // The standing free-text field (`notes` on the wire) is labelled Description and lives in the
+    // Details box, so a description alone must bring the box out — not leave it hidden.
+    durableApi.item = {
+      id: 'bare3', name: 'Described Thing', fungibility: 'NonFungible', status: 'Active',
+      isContainer: false, path: [], createdAt: '', updatedAt: '2025-06-01T00:00:00Z',
+      notes: 'Keep dry',
+    };
+    const { harness } = await navigate('/inventory/items/bare3');
+
+    expect(text(harness)).toContain('Details');
+    // Scope to the Details list (the page's only <dl>) rather than the whole route: the upcoming
+    // Activity feed puts an "All | Notes" toggle on this page, which must not fail this test.
+    const details = (harness.routeNativeElement as HTMLElement).querySelector('dl')!;
+    expect(details).not.toBeNull();
+    const rows = details.textContent ?? '';
+    expect(rows).toContain('Description');
+    expect(rows).toContain('Keep dry');
+    expect(rows).not.toContain('Notes');
+  });
+
   it('shows Unplaced as the location headline for an unplaced durable', async () => {
     durableApi.item = {
       id: 'floating', name: 'Floating Thing', fungibility: 'NonFungible', status: 'Active',

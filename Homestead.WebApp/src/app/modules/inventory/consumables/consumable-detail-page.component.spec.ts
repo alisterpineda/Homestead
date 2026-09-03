@@ -129,6 +129,17 @@ describe('ConsumableDetailPageComponent', () => {
     return Array.from((harness.routeNativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('button'));
   }
 
+  it('renders the description as a labelled block in the header', async () => {
+    // The standing free-text field (`notes` on the wire) is labelled Description everywhere.
+    consumableApi.detail = makeDetail({ consumable: makeConsumable({ notes: 'Store cool' }) });
+    const { harness } = await navigate('/inventory/items/c1');
+
+    const content = text(harness);
+    expect(content).toContain('Description');
+    expect(content).toContain('Store cool');
+    expect(content).not.toContain('Notes');
+  });
+
   it('shows every segment of a deep stock-entry path in the By location table (no collapse)', async () => {
     consumableApi.detail = makeDetail({
       locations: [{
@@ -296,6 +307,17 @@ describe('ConsumableDetailPageComponent', () => {
     const { harness } = await navigate('/inventory/items/c1');
 
     expect(text(harness)).toContain('weekly run · from Costco');
+  });
+
+  it('titles the movement ledger Movements, not History', async () => {
+    // Headed Movements so the upcoming Activity section reads distinctly. Scoped to the section
+    // headings, not the page text, so unrelated copy containing "History" cannot trip it.
+    const { harness } = await navigate('/inventory/items/c1');
+
+    const headings = Array.from((harness.routeNativeElement as HTMLElement).querySelectorAll('h2'))
+      .map(h => h.textContent?.trim());
+    expect(headings).toContain('Movements');
+    expect(headings).not.toContain('History');
   });
 
   it('renders the movement meta line without a source token when none was recorded', async () => {

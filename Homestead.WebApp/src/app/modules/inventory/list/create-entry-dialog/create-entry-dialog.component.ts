@@ -35,7 +35,7 @@ type EntryKind = 'durable' | 'consumable';
  * Unified "New" dialog for the merged inventory list. The kind toggle is the only kind selector —
  * title, description, and submit stay kind-neutral — and the form is ordered as a fast path:
  * **Name → Location → Starting stock** (consumables only), with everything else (brand, tags, model /
- * restock threshold, notes) folded into a collapsed "More details" section. Nothing is cut; the
+ * restock threshold, description) folded into a collapsed "More details" section. Nothing is cut; the
  * secondary fields are one click away.
  *
  * Location now applies to **both** kinds, so a consumable can be seeded with opening stock straight
@@ -212,7 +212,7 @@ type EntryKind = 'durable' | 'consumable';
                 }
 
                 <div class="flex flex-col gap-1.5">
-                  <label hlmLabel for="create-entry-notes">Notes</label>
+                  <label hlmLabel for="create-entry-notes">Description</label>
                   <textarea
                     hlmInput
                     id="create-entry-notes"

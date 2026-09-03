@@ -365,6 +365,13 @@ describe('DurableQuickPanelComponent', () => {
 
       await open(makeItem({ id: 'd-notes', notes: 'Keep dry' }));
       expect(component['hasDetails']()).toBe(true);
+      // The field is labelled Description on every surface (the wire name stays `notes`). The sheet
+      // renders into an overlay, so read the document body rather than the host element.
+      const details = (fixture.nativeElement as HTMLElement).ownerDocument.body
+        .querySelector('hlm-sheet-content dl')!;
+      expect(details.textContent).toContain('Description');
+      expect(details.textContent).toContain('Keep dry');
+      expect(details.textContent).not.toContain('Notes');
     });
 
     it('is true when only an acquisition field is present', async () => {

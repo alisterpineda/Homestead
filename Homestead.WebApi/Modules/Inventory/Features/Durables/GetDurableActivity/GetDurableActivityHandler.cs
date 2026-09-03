@@ -31,7 +31,9 @@ public class GetDurableActivityHandler(AppDbContext db)
         // to "type" so activity reads consistently across the schema's history.
         ["IsContainer"] = "type",
         ["DurableKind"] = "type",
-        ["Notes"] = "notes",
+        // The column and audit field stay "Notes"; the UI calls the field Description, so historical
+        // and future rows both read "updated description".
+        ["Notes"] = "description",
         ["Unit"] = "unit",
         ["RestockThreshold"] = "restock threshold",
     };

@@ -297,6 +297,20 @@ describe('CreateEntryDialogComponent', () => {
     expect(successToast).toHaveBeenCalledWith('Consumable created with 12 units.');
   });
 
+  it('labels the free-text field Description under "More details"', async () => {
+    const fixture = create();
+    const component = fixture.componentInstance;
+    // The dialog body only mounts (into an overlay) once the BrnDialog is actually opened.
+    (dialogOf(component) as unknown as { open: () => void }).open();
+    component.moreOpen.set(true);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const label = document.querySelector<HTMLLabelElement>('label[for="create-entry-notes"]');
+    expect(label?.textContent?.trim()).toBe('Description');
+  });
+
   it('keeps the dialog open and retains kind + location for "Create & add another"', () => {
     const fixture = create();
     const component = fixture.componentInstance;

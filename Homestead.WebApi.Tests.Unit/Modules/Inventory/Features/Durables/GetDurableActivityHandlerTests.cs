@@ -134,6 +134,21 @@ public class GetDurableActivityHandlerTests : IDisposable
     }
 
     [Fact]
+    public async Task Handle_LabelsNotesFieldAsDescription()
+    {
+        var item = await AddItemAsync();
+        var alice = await AddUserAsync("Alice", "alice@test.com");
+        // The audit field is still "Notes" (column name), but every UI surface labels it Description.
+        await AddAuditAsync(item.Id, AuditAction.Updated, alice.Id, DateTimeOffset.UtcNow,
+            changes: [new ScalarFieldChange("Notes", null, "x")]);
+
+        var result = await _sut.Handle(new GetDurableActivityQuery { Id = item.Id }, Ct);
+
+        Assert.NotNull(result);
+        Assert.Equal("Alice updated description", Assert.Single(result.Items).Summary);
+    }
+
+    [Fact]
     public async Task Handle_OrdersDeterministically_WhenTimestampsTie()
     {
         var item = await AddItemAsync();
