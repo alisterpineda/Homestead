@@ -18,7 +18,7 @@ CLAUDE.md files (`/CLAUDE.md`, `Homestead.WebApi/CLAUDE.md`,
 |---|---|---|
 | **Documents** | Yes | [overview](documents/overview.md) · [search](documents/search.md) · [tags](documents/tags.md) · [versions](documents/versions.md) |
 | **Finances** | Yes | [overview](finances/overview.md) · [accounts](finances/accounts.md) · [commodities](finances/commodities.md) · [transactions](finances/transactions.md) · [payees](finances/payees.md) · [valuation](finances/valuation.md) |
-| **Inventory** | Yes | [overview](inventory/overview.md) · [locations](inventory/locations.md) · [stock](inventory/stock.md) |
+| **Inventory** | Yes | [overview](inventory/overview.md) · [locations](inventory/locations.md) · [stock](inventory/stock.md) · [tags](inventory/tags.md) · [brands](inventory/brands.md) · [activity](inventory/activity.md) |
 | **Processing** | Read-only status surface | [overview](processing/overview.md) |
 | **Admin**, **Identity**, **Status** | Admin-only · indirect · none | No product doc (infrastructure) — see the CLAUDE.md files. |
 
