@@ -16,6 +16,11 @@ using Homestead.WebApi.Modules.Inventory.Features.Durables.GetDurableActivity;
 using Homestead.WebApi.Modules.Inventory.Features.Durables.GetDurables;
 using Homestead.WebApi.Modules.Inventory.Features.Durables.PatchDurable;
 using Homestead.WebApi.Modules.Inventory.Features.Items.GetItem;
+using Homestead.WebApi.Modules.Inventory.Features.Items.GetItemActivity;
+using Homestead.WebApi.Modules.Inventory.Features.Items.Notes.CreateNote;
+using Homestead.WebApi.Modules.Inventory.Features.Items.Notes.DeleteNote;
+using Homestead.WebApi.Modules.Inventory.Features.Items.Notes.GetNoteSubjects;
+using Homestead.WebApi.Modules.Inventory.Features.Items.Notes.UpdateNote;
 using Homestead.WebApi.Modules.Inventory.Features.Overview.GetInventoryOverview;
 using Homestead.WebApi.Modules.Inventory.Features.Places.GetPlaceContents;
 using Homestead.WebApi.Modules.Inventory.Features.Consumables.AdjustStock;
@@ -54,6 +59,11 @@ public static class InventoryModule
 
         var items = v1.MapGroup("/items");
         GetItemEndpoint.Map(items);
+        GetItemActivityEndpoint.Map(items);
+        GetItemNoteSubjectsEndpoint.Map(items);
+        CreateItemNoteEndpoint.Map(items);
+        UpdateItemNoteEndpoint.Map(items);
+        DeleteItemNoteEndpoint.Map(items);
 
         var places = v1.MapGroup("/places");
         GetPlaceContentsEndpoint.Map(places);

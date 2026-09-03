@@ -56,6 +56,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<StockMovement> StockMovements { get; set; }
     public DbSet<Domain.Inventory.Tag> InventoryTags { get; set; }
     public DbSet<Domain.Inventory.ItemTag> ItemTags { get; set; }
+    public DbSet<ItemNote> ItemNotes { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

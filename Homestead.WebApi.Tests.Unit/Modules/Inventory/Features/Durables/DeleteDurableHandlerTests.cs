@@ -74,4 +74,44 @@ public class DeleteDurableHandlerTests : IDisposable
         // Container survives the blocked delete.
         Assert.Contains(_db.Items, i => i.Id == container.Id);
     }
+
+    private async Task<ItemNote> AddNoteAsync(Guid itemId)
+    {
+        var note = new ItemNote
+        {
+            Id = Guid.NewGuid(), ItemId = itemId, Subject = "Oil change", Body = "",
+            OccurredAt = DateTimeOffset.UtcNow, CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow,
+        };
+        _db.ItemNotes.Add(note);
+        await _db.SaveChangesAsync(Ct);
+        return note;
+    }
+
+    [Fact]
+    public async Task Handle_WithNotes_Throws()
+    {
+        // Notes are user-authored history (activity.md §Delete gate): the FK would cascade, so the
+        // handler is what refuses and points at archive instead.
+        var item = await AddItemAsync();
+        await AddNoteAsync(item.Id);
+
+        var ex = await Assert.ThrowsAsync<BusinessRuleException>(() =>
+            _sut.Handle(new DeleteDurableCommand(item.Id), Ct));
+
+        Assert.Contains("notes", ex.Message);
+        Assert.Contains(_db.Items, i => i.Id == item.Id);
+        Assert.Single(_db.ItemNotes);
+    }
+
+    [Fact]
+    public async Task Handle_AfterNotesDeleted_Deletes()
+    {
+        var item = await AddItemAsync();
+        var note = await AddNoteAsync(item.Id);
+        _db.ItemNotes.Remove(note);
+        await _db.SaveChangesAsync(Ct);
+
+        Assert.True(await _sut.Handle(new DeleteDurableCommand(item.Id), Ct));
+        Assert.Empty(_db.Items);
+    }
 }

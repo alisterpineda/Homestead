@@ -23,6 +23,12 @@ public class DeleteConsumableHandler(AppDbContext db, IAuditContext audit, IUnit
         if (hasHistory)
             throw new BusinessRuleException("Consumable has stock history and cannot be deleted. Archive it instead.");
 
+        // Notes are user-authored history (activity.md §Delete gate). The FK cascades, so this handler check
+        // is the friendly guard; archive is the way to retire an item and keep its story.
+        var hasNotes = await db.ItemNotes.AnyAsync(n => n.ItemId == item.Id, ct);
+        if (hasNotes)
+            throw new BusinessRuleException("Item has notes and cannot be deleted. Delete its notes first, or archive it instead.");
+
         db.Items.Remove(item);
         audit.Deleted("Item", item.Id, item.Name);
         await unitOfWork.SaveChangesAsync(ct);

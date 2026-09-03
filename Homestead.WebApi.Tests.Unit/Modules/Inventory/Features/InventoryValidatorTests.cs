@@ -4,6 +4,8 @@ using Homestead.WebApi.Modules.Inventory.Features.Durables.CreateDurable;
 using Homestead.WebApi.Modules.Inventory.Features.Consumables.CollapseDurables;
 using Homestead.WebApi.Modules.Inventory.Features.Consumables.CreateConsumable;
 using Homestead.WebApi.Modules.Inventory.Features.Consumables.TrackDurable;
+using Homestead.WebApi.Modules.Inventory.Features.Items.Notes.CreateNote;
+using Homestead.WebApi.Modules.Inventory.Features.Items.Notes.UpdateNote;
 
 namespace Homestead.WebApi.Tests.Unit.Modules.Inventory.Features;
 
@@ -434,5 +436,151 @@ public class CollapseDurablesCommandValidatorTests
         var result = await _sut.ValidateAsync(
             new CollapseDurablesCommand { ConsumableId = Guid.NewGuid(), Body = new() { ItemIds = [Guid.NewGuid()], AreaId = Guid.NewGuid() } }, Ct);
         Assert.True(result.IsValid);
+    }
+}
+
+public class CreateItemNoteCommandValidatorTests
+{
+    private readonly CreateItemNoteCommandValidator _sut = new();
+
+    private static CancellationToken Ct => TestContext.Current.CancellationToken;
+
+    [Fact]
+    public async Task SubjectOnly_IsValid()
+    {
+        var result = await _sut.ValidateAsync(new CreateItemNoteCommand { Subject = "Inspected" }, Ct);
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public async Task BodyOnly_IsValid()
+    {
+        var result = await _sut.ValidateAsync(new CreateItemNoteCommand { Body = "Replaced the belt" }, Ct);
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public async Task NeitherSubjectNorBody_IsInvalid_OnBody()
+    {
+        var result = await _sut.ValidateAsync(new CreateItemNoteCommand(), Ct);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == "Body" && e.ErrorMessage == "A note needs a subject or a body.");
+    }
+
+    [Fact]
+    public async Task WhitespaceOnlyBoth_IsInvalid()
+    {
+        var result = await _sut.ValidateAsync(new CreateItemNoteCommand { Subject = "  ", Body = " \n " }, Ct);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == "Body");
+    }
+
+    [Fact]
+    public async Task SubjectOver200_IsInvalid()
+    {
+        var result = await _sut.ValidateAsync(new CreateItemNoteCommand { Subject = new string('a', 201) }, Ct);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == "Subject");
+    }
+
+    [Fact]
+    public async Task BodyOver4000_IsInvalid()
+    {
+        var result = await _sut.ValidateAsync(new CreateItemNoteCommand { Body = new string('a', 4001) }, Ct);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == "Body");
+    }
+
+    [Fact]
+    public async Task OccurredAtFiveMinutesAhead_IsInvalid()
+    {
+        var result = await _sut.ValidateAsync(
+            new CreateItemNoteCommand { Body = "x", OccurredAt = DateTimeOffset.UtcNow.AddMinutes(5) }, Ct);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == "OccurredAt");
+    }
+
+    [Fact]
+    public async Task OccurredAtThirtySecondsAhead_IsValid()
+    {
+        // One minute of clock-skew tolerance, the same slack StockService gives movements.
+        var result = await _sut.ValidateAsync(
+            new CreateItemNoteCommand { Body = "x", OccurredAt = DateTimeOffset.UtcNow.AddSeconds(30) }, Ct);
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public async Task NullOccurredAt_IsValid()
+    {
+        var result = await _sut.ValidateAsync(new CreateItemNoteCommand { Body = "x", OccurredAt = null }, Ct);
+        Assert.True(result.IsValid);
+    }
+}
+
+public class UpdateItemNoteCommandValidatorTests
+{
+    private readonly UpdateItemNoteCommandValidator _sut = new();
+
+    private static CancellationToken Ct => TestContext.Current.CancellationToken;
+
+    private static UpdateItemNoteCommand Command(string? subject = null, string? body = null, DateTimeOffset? at = null) =>
+        new() { OccurredAt = at ?? DateTimeOffset.UtcNow.AddDays(-1), Subject = subject, Body = body };
+
+    [Fact]
+    public async Task SubjectOnly_IsValid()
+    {
+        Assert.True((await _sut.ValidateAsync(Command(subject: "Inspected"), Ct)).IsValid);
+    }
+
+    [Fact]
+    public async Task BodyOnly_IsValid()
+    {
+        Assert.True((await _sut.ValidateAsync(Command(body: "Replaced the belt"), Ct)).IsValid);
+    }
+
+    [Fact]
+    public async Task NeitherSubjectNorBody_IsInvalid_OnBody()
+    {
+        var result = await _sut.ValidateAsync(Command(), Ct);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == "Body");
+    }
+
+    [Fact]
+    public async Task WhitespaceOnlyBoth_IsInvalid()
+    {
+        var result = await _sut.ValidateAsync(Command(subject: "  ", body: "\t"), Ct);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == "Body");
+    }
+
+    [Fact]
+    public async Task SubjectOver200_IsInvalid()
+    {
+        var result = await _sut.ValidateAsync(Command(subject: new string('a', 201)), Ct);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == "Subject");
+    }
+
+    [Fact]
+    public async Task BodyOver4000_IsInvalid()
+    {
+        var result = await _sut.ValidateAsync(Command(body: new string('a', 4001)), Ct);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == "Body");
+    }
+
+    [Fact]
+    public async Task OccurredAtFiveMinutesAhead_IsInvalid()
+    {
+        var result = await _sut.ValidateAsync(Command(body: "x", at: DateTimeOffset.UtcNow.AddMinutes(5)), Ct);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == "OccurredAt");
+    }
+
+    [Fact]
+    public async Task OccurredAtThirtySecondsAhead_IsValid()
+    {
+        Assert.True((await _sut.ValidateAsync(Command(body: "x", at: DateTimeOffset.UtcNow.AddSeconds(30)), Ct)).IsValid);
     }
 }

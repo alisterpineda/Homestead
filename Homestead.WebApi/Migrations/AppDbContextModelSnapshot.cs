@@ -1396,6 +1396,53 @@ namespace Homestead.WebApi.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Homestead.WebApi.Domain.Inventory.ItemNote", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Subject")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("UpdatedByUserId");
+
+                    b.HasIndex("ItemId", "OccurredAt");
+
+                    b.ToTable("item_notes", "inventory", t =>
+                        {
+                            t.HasCheckConstraint("CK_item_notes_subject_or_body", "\"Subject\" IS NOT NULL OR \"Body\" <> ''");
+                        });
+                });
+
             modelBuilder.Entity("Homestead.WebApi.Domain.Inventory.ItemTag", b =>
                 {
                     b.Property<Guid>("ItemId")
@@ -2423,6 +2470,31 @@ namespace Homestead.WebApi.Migrations
                     b.Navigation("UpdatedByUser");
 
                     b.Navigation("ValueCurrency");
+                });
+
+            modelBuilder.Entity("Homestead.WebApi.Domain.Inventory.ItemNote", b =>
+                {
+                    b.HasOne("Homestead.WebApi.Domain.Identity.AppUser", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Homestead.WebApi.Domain.Inventory.Item", "Item")
+                        .WithMany()
+                        .HasForeignKey("ItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Homestead.WebApi.Domain.Identity.AppUser", "UpdatedByUser")
+                        .WithMany()
+                        .HasForeignKey("UpdatedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("CreatedByUser");
+
+                    b.Navigation("Item");
+
+                    b.Navigation("UpdatedByUser");
                 });
 
             modelBuilder.Entity("Homestead.WebApi.Domain.Inventory.ItemTag", b =>

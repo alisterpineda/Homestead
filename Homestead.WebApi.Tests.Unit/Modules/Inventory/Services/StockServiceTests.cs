@@ -89,6 +89,35 @@ public class StockServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task ReceiveAsync_FutureOccurredAt_Throws()
+    {
+        // The shared DateTimeOffsetValidationRules.IsInFuture rule: one minute of skew is tolerated,
+        // anything beyond is rejected before any stock is touched.
+        var screws = await AddConsumableAsync();
+        var bin = await AddHolderAsync(true);
+
+        var ex = await Assert.ThrowsAsync<BusinessRuleException>(() =>
+            _sut.ReceiveAsync(screws.Id, new StockReceiveRequest(
+                StockLocation.InContainer(bin.Id), 5m, null, null, DateTimeOffset.UtcNow.AddMinutes(5), null, null), Ct));
+
+        Assert.Equal("OccurredAt cannot be in the future.", ex.Message);
+        Assert.Empty(_db.StockEntries);
+    }
+
+    [Fact]
+    public async Task ReceiveAsync_OccurredAtWithinSkewTolerance_Accepted()
+    {
+        var screws = await AddConsumableAsync();
+        var bin = await AddHolderAsync(true);
+
+        await _sut.ReceiveAsync(screws.Id, new StockReceiveRequest(
+            StockLocation.InContainer(bin.Id), 5m, null, null, DateTimeOffset.UtcNow.AddSeconds(30), null, null), Ct);
+        await _db.SaveChangesAsync(Ct);
+
+        Assert.Single(_db.StockEntries);
+    }
+
+    [Fact]
     public async Task ReceiveAsync_WithSource_PersistsTrimmedSource()
     {
         var screws = await AddConsumableAsync();

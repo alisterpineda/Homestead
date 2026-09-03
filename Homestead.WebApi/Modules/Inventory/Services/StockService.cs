@@ -431,7 +431,7 @@ public class StockService(
     private static DateTimeOffset ResolveOccurredAt(DateTimeOffset? occurredAt)
     {
         var resolved = occurredAt ?? DateTimeOffset.UtcNow;
-        if (resolved > DateTimeOffset.UtcNow.AddMinutes(1))
+        if (DateTimeOffsetValidationRules.IsInFuture(resolved))
             throw new BusinessRuleException("OccurredAt cannot be in the future.");
         return resolved;
     }

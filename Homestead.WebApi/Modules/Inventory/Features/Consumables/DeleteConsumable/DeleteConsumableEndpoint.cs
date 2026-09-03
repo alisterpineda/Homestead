@@ -14,6 +14,7 @@ public static class DeleteConsumableEndpoint
         })
         .WithName("DeleteConsumable")
         .Produces(StatusCodes.Status204NoContent)
+        .Produces(StatusCodes.Status400BadRequest)
         .Produces(StatusCodes.Status404NotFound)
         .RequireAuthorization(AuthPolicies.RequireContributor);
     }
