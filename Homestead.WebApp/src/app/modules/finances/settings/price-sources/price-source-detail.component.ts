@@ -29,7 +29,6 @@ import { PageHeaderService } from '@/shared/services/page-header.service';
 import { handleMutationError, handleQueryError } from '@/shared/utils/rxjs-error.utils';
 import type { GetPriceSourceResponse } from '@/api/generated/models/get-price-source-response';
 import type { CommodityPriceSource } from '@/api/generated/models/commodity-price-source';
-import { PriceSourceConfigFormComponent } from './price-source-config-form.component';
 
 @Component({
   selector: 'app-price-source-detail',
@@ -39,7 +38,6 @@ import { PriceSourceConfigFormComponent } from './price-source-config-form.compo
     HlmButton, HlmInput, HlmLabel, HlmBadge, HlmCheckbox,
     NgIcon, HlmIconImports,
     HlmBreadcrumbImports,
-    PriceSourceConfigFormComponent,
   ],
   providers: [provideIcons({ lucideX, lucidePlus })],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
@@ -78,16 +76,48 @@ import { PriceSourceConfigFormComponent } from './price-source-config-form.compo
           </div>
 
           @if (d.kind === 'External') {
-            <div class="flex items-center gap-2">
-              <hlm-checkbox
-                inputId="enabled"
-                [checked]="isEnabled()"
-                (checkedChange)="setEnabled($event)"
-              />
-              <label hlmLabel for="enabled">Enabled</label>
-              <button hlmBtn class="ml-auto" (click)="saveEnabled()" [disabled]="!enabledDirty() || saving()">
-                {{ saving() ? 'Saving...' : 'Save' }}
-              </button>
+            <!-- Read-only: enablement and credentials are deployment config (PriceSources:{Source}:*),
+                 mirroring the admin AI status page. -->
+            <div class="flex flex-col gap-2" data-testid="provider-readout">
+              <div class="flex items-center gap-2">
+                <span hlmBadge [variant]="d.isEnabled ? 'default' : 'outline'"
+                  [class]="d.isEnabled ? '' : '!text-muted-foreground'">
+                  {{ d.isEnabled ? 'Enabled' : 'Disabled' }}
+                </span>
+                <!-- "Configured" means enabled AND valid, so for a disabled source the badge would only
+                     restate "Disabled"; the validation verdict still shows below when there is one. -->
+                @if (d.isEnabled) {
+                  <span hlmBadge [variant]="d.isConfigured ? 'default' : 'outline'"
+                    [class]="d.isConfigured ? '' : '!text-muted-foreground'">
+                    {{ d.isConfigured ? 'Configured' : 'Not configured' }}
+                  </span>
+                }
+              </div>
+              @if (d.configurationError) {
+                <p class="text-sm text-destructive">{{ d.configurationError }}</p>
+              }
+              <div class="flex flex-col">
+                @if (d.hasApiKey != null) {
+                  <div class="flex items-center gap-3 py-1">
+                    <span class="w-32 shrink-0 text-sm text-muted-foreground">API key</span>
+                    <span class="flex-1 text-sm">{{ d.hasApiKey ? 'Set' : 'Not set' }}</span>
+                  </div>
+                }
+                @if (d.baseUrl) {
+                  <div class="flex items-center gap-3 py-1">
+                    <span class="w-32 shrink-0 text-sm text-muted-foreground">Base URL</span>
+                    <span class="min-w-0 flex-1 truncate font-mono text-sm" [title]="d.baseUrl">{{ d.baseUrl }}</span>
+                  </div>
+                }
+              </div>
+              <p class="text-xs text-muted-foreground">
+                Enablement and credentials are deployment configuration. Set
+                <span class="font-mono">PriceSources:{{ d.source }}:Enabled</span>
+                (plus <span class="font-mono">:ApiKey</span> where required, optionally
+                <span class="font-mono">:BaseUrl</span>) in AppHost user-secrets, or as
+                <span class="font-mono">PriceSources__{{ d.source }}__…</span> environment variables in Docker.
+                See the project README.
+              </p>
             </div>
             <div class="text-sm grid grid-cols-2 gap-2 pt-2 border-t border-border">
               <div>
@@ -129,18 +159,6 @@ import { PriceSourceConfigFormComponent } from './price-source-config-form.compo
             </div>
           }
         </section>
-
-        @if (d.kind === 'External' && d.configSchema.fields.length > 0) {
-          <section class="rounded-lg border border-border bg-card p-4 text-card-foreground space-y-3">
-            <h3 class="text-base font-semibold">Configuration</h3>
-            <app-price-source-config-form
-              [schema]="d.configSchema"
-              [initialJson]="d.config ?? null"
-              [saving]="savingConfig()"
-              (saved)="saveConfig($event)"
-            />
-          </section>
-        }
 
         @if (d.supportedPairs.length > 0) {
           <section data-testid="coverage-section" class="rounded-lg border border-border bg-card p-4 text-card-foreground space-y-3">
@@ -270,11 +288,17 @@ import { PriceSourceConfigFormComponent } from './price-source-config-form.compo
               </div>
             </div>
             <div>
-              <button hlmBtn (click)="runNow()" [disabled]="!d.isEnabled || running()">
+              <button hlmBtn (click)="runNow()" [disabled]="!d.isEnabled || !d.isConfigured || running()">
                 {{ running() ? 'Enqueuing...' : 'Run now' }}
               </button>
               @if (!d.isEnabled) {
-                <p class="text-xs text-destructive mt-1">Enable the source before running an import.</p>
+                <p class="text-xs text-destructive mt-1">
+                  This source is disabled — set <span class="font-mono">PriceSources:{{ d.source }}:Enabled</span> before running an import.
+                </p>
+              } @else if (!d.isConfigured) {
+                <p class="text-xs text-destructive mt-1">
+                  This source is not configured{{ d.configurationError ? ': ' + d.configurationError : '.' }}
+                </p>
               }
             </div>
           </section>
@@ -294,10 +318,6 @@ export class PriceSourceDetailComponent implements OnDestroy {
   error = signal(false);
   data = signal<GetPriceSourceResponse | null>(null);
 
-  isEnabled = signal(false);
-  saving = signal(false);
-  savingConfig = signal(false);
-
   pairAllowList = signal<string[]>([]);
   pairAllowInput = signal('');
   savingPairs = signal(false);
@@ -309,8 +329,6 @@ export class PriceSourceDetailComponent implements OnDestroy {
   runFromAt = signal<string | null>(null);
   runToAt = signal<string | null>(null);
   running = signal(false);
-
-  enabledDirty = computed(() => this.isEnabled() !== (this.data()?.isEnabled ?? false));
 
   pairAllowDirty = computed(() => {
     const current = [...this.pairAllowList()].sort();
@@ -346,11 +364,10 @@ export class PriceSourceDetailComponent implements OnDestroy {
         this.loading.set(false);
         if (r) {
           // Don't clobber unsaved watch-list edits when a refresh is triggered by saving
-          // another section (enabled/config/schedule/run-now). Evaluate dirtiness against
-          // the still-current data() before replacing it.
+          // another section (schedule/run-now). Evaluate dirtiness against the still-current
+          // data() before replacing it.
           const pairsDirty = this.pairAllowDirty();
           this.data.set(r);
-          this.isEnabled.set(r.isEnabled);
           if (!pairsDirty) this.pairAllowList.set(r.pairAllowList ?? []);
           if (r.schedule) {
             this.cronExpression.set(r.schedule.cronExpression);
@@ -360,32 +377,6 @@ export class PriceSourceDetailComponent implements OnDestroy {
             this.scheduleEnabled.set(true);
           }
         }
-      });
-  }
-
-  setEnabled(value: boolean): void {
-    this.isEnabled.set(value);
-  }
-
-  saveEnabled(): void {
-    this.saving.set(true);
-    this.api.patch(this.source(), { isEnabled: this.isEnabled() })
-      .pipe(handleMutationError(this.errorHandler, this.saving, 'Failed to save.'))
-      .subscribe(() => {
-        this.saving.set(false);
-        toast.success('Saved.');
-        this.refresh();
-      });
-  }
-
-  saveConfig(json: string): void {
-    this.savingConfig.set(true);
-    this.api.patch(this.source(), { config: json })
-      .pipe(handleMutationError(this.errorHandler, this.savingConfig, 'Failed to save config.'))
-      .subscribe(() => {
-        this.savingConfig.set(false);
-        toast.success('Config saved.');
-        this.refresh();
       });
   }
 

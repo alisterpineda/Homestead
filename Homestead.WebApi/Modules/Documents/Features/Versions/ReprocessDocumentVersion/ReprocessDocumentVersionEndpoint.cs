@@ -16,7 +16,7 @@ public static class ReprocessDocumentVersionEndpoint
                 DocumentId = documentId,
                 VersionId = versionId,
                 // body?. — an omitted body has always been legal here and must keep meaning
-                // "use the household default", not "no engine".
+                // "use the configured default", not "no engine".
                 EngineKey = body?.EngineKey
             };
             var response = await sender.Send(request, ct);

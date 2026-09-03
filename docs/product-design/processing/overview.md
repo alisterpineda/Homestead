@@ -230,7 +230,7 @@ Triggered when a new version of an existing document is uploaded. Same shape as 
 
 Re-runs text extraction on an existing document version (e.g., after the user changes the OCR engine, or to re-extract one document with a different engine). The handler reads the file from its hash-addressed location, re-extracts text, and writes the diff to the audit log via `auditLogger.ForUser(job.CreatedByUserId)`. Persisting the new extracted text fires the database trigger that refreshes the parent document's search vector (when the reprocessed version is the latest) — there is no app-side vector update.
 
-The engine is **not** resolved here: the payload carries an already-resolved, non-nullable `EngineKey`, stamped at enqueue (see [Documents › versions](../documents/versions.md)). A bulk fan-out copies the parent's key into every child, so one batch can never split across engines if the household default changes mid-run. Reprocess also records extraction provenance onto the version alongside the text.
+The engine is **not** resolved here: the payload carries an already-resolved, non-nullable `EngineKey`, stamped at enqueue (see [Documents › versions](../documents/versions.md)). A bulk fan-out copies the parent's key into every child, so one batch can never split across engines if the configured default (`Ocr:DefaultEngine`) changes between deploys mid-run. Reprocess also records extraction provenance onto the version alongside the text.
 
 Failures here are loud: text extraction failure throws `TextExtractionFailedException` (no graceful "proceed without text" path, unlike upload). When run as a child of a `BulkReprocessDocuments` parent, this handler suppresses its own success notification — the parent's progress updates are the sole channel.
 
@@ -274,8 +274,8 @@ This is the only v1 job type whose `Payload` carries result data after completio
 
 The Finances module's commodity-price import (handler under `Modules/Finances/Processing/`). Enqueued ad-hoc by the admin *Run import now* action (`POST /api/v1/finances/settings/price-sources/{source}/runs`) and recurringly by per-source schedules managed via `PUT`/`DELETE /api/v1/finances/settings/price-sources/{source}/schedule`. The payload names the price source plus optional commodity-ID and date-window overrides. The handler:
 
-1. Verifies the source is external and enabled (`CommodityPriceSourceSettings`).
-2. Resolves the source's keyed `IPriceProvider` (Bank of Canada Valet for FX, Alpha Vantage for equities).
+1. Verifies the source is external, and resolves its keyed `IPriceProvider` (Bank of Canada Valet for FX, Alpha Vantage for equities).
+2. Verifies the provider is enabled and configured (`PriceSources:{Source}:*` — deployment config, not a settings row); otherwise fails with `source_disabled` / `source_not_configured`.
 3. Builds the commodity set: held commodities (split commodities, unit-price commodities, reporting currencies) plus the source's pair allow-list, filtered to provider-supported pairs/exchanges.
 4. Computes the import window — explicit payload override, else a watermark anchor (the earliest of each held pair's latest price, minus the provider's revision lookback), else earliest account activity.
 5. Imports observations and applies them via `ApplyCommodityPriceObservationsCommand` through the standard unit-of-work pipeline. Scheduled runs stay system-attributed in the audit log; manual runs are attributed to the initiating user.

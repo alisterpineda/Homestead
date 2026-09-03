@@ -3,5 +3,4 @@
 
 export interface DocumentSettingsResponse {
   autoClassifyOnUpload?: (boolean | null);
-  defaultEngineKey?: (string | null);
 }

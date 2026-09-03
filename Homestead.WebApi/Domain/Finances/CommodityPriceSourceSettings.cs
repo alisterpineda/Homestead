@@ -6,10 +6,8 @@ public class CommodityPriceSourceSettings
 {
     public CommodityPriceSource Source { get; set; }
 
-    public bool IsEnabled { get; set; }
-
-    public string? Config { get; set; }
-
+    // Enablement and credentials are NOT here: they are deployment config ("PriceSources:{Source}:*").
+    // This row carries only product data — the watch-list plus import bookkeeping.
     public string? PairAllowList { get; set; }
 
     /// <summary>

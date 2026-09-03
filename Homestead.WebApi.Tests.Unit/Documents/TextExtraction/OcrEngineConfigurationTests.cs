@@ -256,4 +256,29 @@ public class OcrEngineConfigurationTests
         Assert.Equal("/usr/share/tessdata", options.TessDataPath);
         Assert.Null(OcrEngineConfiguration.Validate(key, options));
     }
+
+    [Fact]
+    public void ReadDefaultEngineKey_Blank_IsNull_SetValue_IsTrimmed()
+    {
+        Assert.Null(OcrEngineConfiguration.ReadDefaultEngineKey(Config([])));
+        Assert.Null(OcrEngineConfiguration.ReadDefaultEngineKey(Config(new()
+        {
+            ["Ocr:DefaultEngine"] = "   ",
+        })));
+        Assert.Equal("azure-layout", OcrEngineConfiguration.ReadDefaultEngineKey(Config(new()
+        {
+            ["Ocr:DefaultEngine"] = " azure-layout ",
+        })));
+    }
+
+    // The key side of the resolution chain: configured default -> built-in. No sole-instance arm (contrast
+    // AiProviderConfiguration): the built-in engine always exists, so "unset" already has an answer. A
+    // dangling default is returned VERBATIM — the fallback with provenance is TextExtractionHelper's job.
+    [Fact]
+    public void ResolveDefaultKey_Null_IsBuiltIn_Configured_ReturnedVerbatim()
+    {
+        Assert.Equal(OcrEngineOptions.BuiltInTesseractKey, OcrEngineConfiguration.ResolveDefaultKey(null));
+        Assert.Equal("azure-layout", OcrEngineConfiguration.ResolveDefaultKey("azure-layout"));
+        Assert.Equal("typo", OcrEngineConfiguration.ResolveDefaultKey("typo"));
+    }
 }

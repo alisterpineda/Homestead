@@ -93,6 +93,10 @@ AI features (document classify / summarize, statement parsing) use **Microsoft.E
 - **Degradation ladder:** `GetResponseWithFallbackAsync` retries an HTTP 400 up to 3 attempts, dropping a custom `Temperature` and/or structured output as `DiagnoseUnsupportedOption` implicates them — so a model that rejects strict `json_schema` or a non-default temperature still succeeds with reduced options. A 400 that implicates neither is rethrown unchanged.
 - **Signal:** the `"Retrying with reduced options"` warning in `aspire logs homestead-webapi` means the model rejected the strict schema or temperature and the ladder kicked in; its absence means both were accepted on the first attempt.
 
+## Text extraction engines
+
+Engines are **named config instances** under `Ocr:Engines:{key}` — `OcrEngineOptions` (one bag per instance) and `OcrEngineConfiguration` (read + per-type validation, error-string posture, no `ValidateOnStart`), registered as `IEnumerable<ITextExtractionEngine>` singletons in `Infrastructure/TextExtraction/`; the built-in `tesseract` instance is always seeded. **Which engine to use is also config:** `Ocr:DefaultEngine`, resolved by the singleton `ITextExtractionEngineResolver` (same directory) — chain: explicit per-run key → `Ocr:DefaultEngine` → `tesseract`. A dangling default is returned **verbatim** by the resolver and substituted only by `TextExtractionHelper`, which records the fallback in the version's provenance; an explicit pick is never substituted (unknown/unavailable → `BusinessRuleException` at enqueue). The Documents settings page only *reports* engines and the default. Price sources follow the same rule: `PriceSources:{Source}:*` (enablement + credentials) is read into per-provider options bags, and `IPriceSourceRegistry` (scoped, over the keyed `IPriceProvider`s) is the single definition of enabled/configured for valuation and imports.
+
 ## Audit Logging
 
 Field-level change tracking in `auditing.audit_logs` (JSONB). No FK constraints — survives entity deletion.

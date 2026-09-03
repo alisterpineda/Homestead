@@ -108,7 +108,7 @@ export class BulkReprocessDialogComponent {
     this.reprocessing.set(true);
 
     this.documentApi.bulkReprocessDocuments({
-      // Empty means no explicit pick, which the backend resolves to the household default.
+      // Empty means no explicit pick, which the backend resolves to the configured default.
       body: { ids, engineKey: this.engineKey() || null },
     }).pipe(
       handleMutationError(this.errorHandler, this.reprocessing, 'Failed to start text extraction reprocessing.'),

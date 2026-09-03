@@ -8,24 +8,23 @@ namespace Homestead.WebApi.Tests.Unit.Modules.Finances.PriceProviders.AlphaVanta
 
 public class AlphaVantagePriceProviderTests
 {
-    private static (AlphaVantagePriceProvider provider, FakeHttpHandler handler, List<TimeSpan> delays) CreateSut()
+    private static (AlphaVantagePriceProvider provider, FakeHttpHandler handler, List<TimeSpan> delays) CreateSut(
+        AlphaVantageOptions? options = null)
     {
         var handler = new FakeHttpHandler();
         var http = new HttpClient(handler) { BaseAddress = null };
         var client = new AlphaVantageClient(http);
         var delays = new List<TimeSpan>();
-        var provider = new AlphaVantagePriceProvider(client, (ts, _) =>
-        {
-            delays.Add(ts);
-            return Task.CompletedTask;
-        });
+        var provider = new AlphaVantagePriceProvider(
+            client,
+            options ?? new AlphaVantageOptions { Enabled = true, ApiKey = "TEST-KEY" },
+            (ts, _) =>
+            {
+                delays.Add(ts);
+                return Task.CompletedTask;
+            });
         return (provider, handler, delays);
     }
-
-    private static string ConfigJson(string apiKey = "TEST-KEY", string? baseUrl = null) =>
-        baseUrl is null
-            ? $$"""{ "ApiKey": "{{apiKey}}" }"""
-            : $$"""{ "ApiKey": "{{apiKey}}", "BaseUrl": "{{baseUrl}}" }""";
 
     private static Commodity Currency(string symbol) =>
         new() { Id = Guid.NewGuid(), Symbol = symbol, Name = symbol, Kind = CommodityKind.Currency };
@@ -64,21 +63,30 @@ public class AlphaVantagePriceProviderTests
     }
 
     [Fact]
-    public void ConfigSchema_DeclaresApiKeyAsRequiredSecret_AndBaseUrlAsOptionalString()
+    public void IsConfigured_RequiresEnabledAndApiKey()
     {
-        var (provider, _, _) = CreateSut();
-        var fields = provider.ConfigSchema.Fields;
-        Assert.Equal(2, fields.Count);
+        var (configured, _, _) = CreateSut();
+        Assert.True(configured.IsEnabled);
+        Assert.True(configured.IsConfigured);
+        Assert.Null(configured.ConfigurationError);
+        Assert.True(configured.HasApiKey);
+        Assert.Equal(AlphaVantageOptions.DefaultBaseUrl, configured.BaseUrl);
 
-        var apiKey = Assert.Single(fields, f => f.Key == "ApiKey");
-        Assert.Equal(PriceProviderConfigFieldType.Secret, apiKey.Type);
-        Assert.True(apiKey.IsRequired);
-        Assert.Null(apiKey.DefaultValue);
+        // Disabled but valid: enabled=false, error=null → not configured.
+        var (disabled, _, _) = CreateSut(new AlphaVantageOptions { Enabled = false, ApiKey = "TEST-KEY" });
+        Assert.False(disabled.IsEnabled);
+        Assert.Null(disabled.ConfigurationError);
+        Assert.False(disabled.IsConfigured);
+    }
 
-        var baseUrl = Assert.Single(fields, f => f.Key == "BaseUrl");
-        Assert.Equal(PriceProviderConfigFieldType.String, baseUrl.Type);
-        Assert.False(baseUrl.IsRequired);
-        Assert.Equal(AlphaVantageConfig.DefaultBaseUrl, baseUrl.DefaultValue);
+    [Fact]
+    public void ConfigurationError_MissingApiKey()
+    {
+        var (provider, _, _) = CreateSut(new AlphaVantageOptions { Enabled = true });
+        Assert.True(provider.IsEnabled);
+        Assert.Equal("ApiKey is required.", provider.ConfigurationError);
+        Assert.False(provider.IsConfigured);
+        Assert.False(provider.HasApiKey);
     }
 
     [Fact]
@@ -116,8 +124,7 @@ public class AlphaVantagePriceProviderTests
         await provider.ImportAsync(
             new PriceImportRequest(new[] { usd, aapl },
                 DateTimeOffset.UtcNow.AddDays(-365), DateTimeOffset.UtcNow,
-                PriceImportAnchorSource.Watermark,
-                ConfigJson()),
+                PriceImportAnchorSource.Watermark),
             TestContext.Current.CancellationToken);
 
         Assert.Equal(1, handler.CallCount);
@@ -137,8 +144,7 @@ public class AlphaVantagePriceProviderTests
             new PriceImportRequest(new[] { usd, aapl },
                 new DateTimeOffset(2026, 4, 29, 0, 0, 0, TimeSpan.Zero),
                 new DateTimeOffset(2026, 4, 29, 0, 0, 0, TimeSpan.Zero),
-                PriceImportAnchorSource.Watermark,
-                ConfigJson()),
+                PriceImportAnchorSource.Watermark),
             TestContext.Current.CancellationToken);
 
         Assert.Null(result.Warning);
@@ -163,8 +169,7 @@ public class AlphaVantagePriceProviderTests
         var result = await provider.ImportAsync(
             new PriceImportRequest(new[] { usd, lse },
                 DateTimeOffset.UtcNow.AddDays(-7), DateTimeOffset.UtcNow,
-                PriceImportAnchorSource.Watermark,
-                ConfigJson()),
+                PriceImportAnchorSource.Watermark),
             TestContext.Current.CancellationToken);
 
         Assert.Empty(result.Observations);
@@ -184,8 +189,7 @@ public class AlphaVantagePriceProviderTests
         await provider.ImportAsync(
             new PriceImportRequest(new[] { usd, eur, aapl },
                 DateTimeOffset.UtcNow.AddDays(-7), DateTimeOffset.UtcNow,
-                PriceImportAnchorSource.Watermark,
-                ConfigJson()),
+                PriceImportAnchorSource.Watermark),
             TestContext.Current.CancellationToken);
 
         Assert.Equal(1, handler.CallCount);
@@ -205,8 +209,7 @@ public class AlphaVantagePriceProviderTests
             new PriceImportRequest(new[] { cad, veqt },
                 new DateTimeOffset(2026, 4, 29, 0, 0, 0, TimeSpan.Zero),
                 new DateTimeOffset(2026, 4, 29, 0, 0, 0, TimeSpan.Zero),
-                PriceImportAnchorSource.Watermark,
-                ConfigJson()),
+                PriceImportAnchorSource.Watermark),
             TestContext.Current.CancellationToken);
 
         var obs = Assert.Single(result.Observations);
@@ -232,8 +235,7 @@ public class AlphaVantagePriceProviderTests
             new PriceImportRequest(new[] { usd, cad, aapl, veqt },
                 new DateTimeOffset(2026, 4, 29, 0, 0, 0, TimeSpan.Zero),
                 new DateTimeOffset(2026, 4, 29, 0, 0, 0, TimeSpan.Zero),
-                PriceImportAnchorSource.Watermark,
-                ConfigJson()),
+                PriceImportAnchorSource.Watermark),
             TestContext.Current.CancellationToken);
 
         Assert.Equal(2, result.Observations.Count);
@@ -254,8 +256,7 @@ public class AlphaVantagePriceProviderTests
         var result = await provider.ImportAsync(
             new PriceImportRequest(new[] { usd, veqt },
                 DateTimeOffset.UtcNow.AddDays(-7), DateTimeOffset.UtcNow,
-                PriceImportAnchorSource.Watermark,
-                ConfigJson()),
+                PriceImportAnchorSource.Watermark),
             TestContext.Current.CancellationToken);
 
         Assert.Empty(result.Observations);
@@ -275,8 +276,7 @@ public class AlphaVantagePriceProviderTests
         var result = await provider.ImportAsync(
             new PriceImportRequest(new[] { cad, aapl },
                 DateTimeOffset.UtcNow.AddDays(-7), DateTimeOffset.UtcNow,
-                PriceImportAnchorSource.Watermark,
-                ConfigJson()),
+                PriceImportAnchorSource.Watermark),
             TestContext.Current.CancellationToken);
 
         Assert.Empty(result.Observations);
@@ -301,8 +301,7 @@ public class AlphaVantagePriceProviderTests
             new PriceImportRequest(new[] { usd, aapl, msft, goog },
                 new DateTimeOffset(2026, 4, 29, 0, 0, 0, TimeSpan.Zero),
                 new DateTimeOffset(2026, 4, 29, 0, 0, 0, TimeSpan.Zero),
-                PriceImportAnchorSource.Watermark,
-                ConfigJson()),
+                PriceImportAnchorSource.Watermark),
             TestContext.Current.CancellationToken);
 
         Assert.NotNull(result.Warning);
@@ -328,8 +327,7 @@ public class AlphaVantagePriceProviderTests
             new PriceImportRequest(new[] { usd, aapl, msft },
                 new DateTimeOffset(2026, 4, 29, 0, 0, 0, TimeSpan.Zero),
                 new DateTimeOffset(2026, 4, 29, 0, 0, 0, TimeSpan.Zero),
-                PriceImportAnchorSource.Watermark,
-                ConfigJson()),
+                PriceImportAnchorSource.Watermark),
             TestContext.Current.CancellationToken);
 
         Assert.NotNull(result.Warning);
@@ -351,8 +349,7 @@ public class AlphaVantagePriceProviderTests
             new PriceImportRequest(new[] { usd, aapl },
                 new DateTimeOffset(2026, 4, 29, 0, 0, 0, TimeSpan.Zero),
                 new DateTimeOffset(2026, 4, 29, 0, 0, 0, TimeSpan.Zero),
-                PriceImportAnchorSource.Watermark,
-                ConfigJson()),
+                PriceImportAnchorSource.Watermark),
             TestContext.Current.CancellationToken);
 
         Assert.NotNull(result.Warning);
@@ -376,8 +373,7 @@ public class AlphaVantagePriceProviderTests
             new PriceImportRequest(new[] { usd, bogus, aapl },
                 new DateTimeOffset(2026, 4, 29, 0, 0, 0, TimeSpan.Zero),
                 new DateTimeOffset(2026, 4, 29, 0, 0, 0, TimeSpan.Zero),
-                PriceImportAnchorSource.Watermark,
-                ConfigJson()),
+                PriceImportAnchorSource.Watermark),
             TestContext.Current.CancellationToken);
 
         Assert.NotNull(result.Warning);
@@ -405,8 +401,7 @@ public class AlphaVantagePriceProviderTests
             new PriceImportRequest(new[] { usd, aapl },
                 new DateTimeOffset(2026, 4, 27, 0, 0, 0, TimeSpan.Zero),
                 new DateTimeOffset(2026, 4, 28, 0, 0, 0, TimeSpan.Zero),
-                PriceImportAnchorSource.Watermark,
-                ConfigJson()),
+                PriceImportAnchorSource.Watermark),
             TestContext.Current.CancellationToken);
 
         Assert.Equal(2, result.Observations.Count);
@@ -426,8 +421,7 @@ public class AlphaVantagePriceProviderTests
         await provider.ImportAsync(
             new PriceImportRequest(new[] { usd, aapl },
                 DateTimeOffset.UtcNow.AddDays(-7), DateTimeOffset.UtcNow,
-                PriceImportAnchorSource.Watermark,
-                ConfigJson()),
+                PriceImportAnchorSource.Watermark),
             TestContext.Current.CancellationToken);
 
         Assert.Contains("outputsize=compact", handler.LastRequestUrl);
@@ -448,8 +442,7 @@ public class AlphaVantagePriceProviderTests
         await provider.ImportAsync(
             new PriceImportRequest(new[] { usd, aapl },
                 DateTimeOffset.UtcNow.AddDays(-365), DateTimeOffset.UtcNow,
-                PriceImportAnchorSource.ExplicitOverride,
-                ConfigJson()),
+                PriceImportAnchorSource.ExplicitOverride),
             TestContext.Current.CancellationToken);
 
         Assert.Equal(2, handler.CallCount);
@@ -485,8 +478,7 @@ public class AlphaVantagePriceProviderTests
             new PriceImportRequest(new[] { usd, aapl },
                 new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero),
                 new DateTimeOffset(2026, 5, 1, 0, 0, 0, TimeSpan.Zero),
-                PriceImportAnchorSource.ExplicitOverride,
-                ConfigJson()),
+                PriceImportAnchorSource.ExplicitOverride),
             TestContext.Current.CancellationToken);
 
         var dates = result.Observations.Select(o => o.PriceAt).ToList();
@@ -527,8 +519,7 @@ public class AlphaVantagePriceProviderTests
             new PriceImportRequest(new[] { usd, aapl },
                 fromAt,
                 new DateTimeOffset(2026, 5, 1, 0, 0, 0, TimeSpan.Zero),
-                PriceImportAnchorSource.ExplicitOverride,
-                ConfigJson()),
+                PriceImportAnchorSource.ExplicitOverride),
             TestContext.Current.CancellationToken);
 
         Assert.All(result.Observations, o => Assert.True(o.PriceAt >= fromAt,
@@ -552,8 +543,7 @@ public class AlphaVantagePriceProviderTests
         var result = await provider.ImportAsync(
             new PriceImportRequest(new[] { usd, aapl },
                 DateTimeOffset.UtcNow.AddYears(-2), DateTimeOffset.UtcNow,
-                PriceImportAnchorSource.Watermark,
-                ConfigJson()),
+                PriceImportAnchorSource.Watermark),
             TestContext.Current.CancellationToken);
 
         Assert.Empty(result.Observations);
@@ -575,8 +565,7 @@ public class AlphaVantagePriceProviderTests
             new PriceImportRequest(new[] { usd, aapl },
                 new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero),
                 new DateTimeOffset(2026, 5, 1, 0, 0, 0, TimeSpan.Zero),
-                PriceImportAnchorSource.ExplicitOverride,
-                ConfigJson()),
+                PriceImportAnchorSource.ExplicitOverride),
             TestContext.Current.CancellationToken);
 
         Assert.NotNull(result.Warning);
@@ -601,8 +590,7 @@ public class AlphaVantagePriceProviderTests
         await provider.ImportAsync(
             new PriceImportRequest(new[] { usd, aapl, msft, goog },
                 DateTimeOffset.UtcNow.AddDays(-7), DateTimeOffset.UtcNow,
-                PriceImportAnchorSource.Watermark,
-                ConfigJson()),
+                PriceImportAnchorSource.Watermark),
             TestContext.Current.CancellationToken);
 
         Assert.Equal(2, delays.Count);
@@ -627,8 +615,7 @@ public class AlphaVantagePriceProviderTests
             new PriceImportRequest(new[] { usd, aapl, msft },
                 new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero),
                 new DateTimeOffset(2026, 5, 1, 0, 0, 0, TimeSpan.Zero),
-                PriceImportAnchorSource.ExplicitOverride,
-                ConfigJson()),
+                PriceImportAnchorSource.ExplicitOverride),
             TestContext.Current.CancellationToken);
 
         Assert.Equal(3, delays.Count);
@@ -639,24 +626,51 @@ public class AlphaVantagePriceProviderTests
     [Fact]
     public async Task ImportAsync_MissingApiKey_Throws()
     {
-        var (provider, _, _) = CreateSut();
+        var (provider, handler, _) = CreateSut(new AlphaVantageOptions
+        {
+            Enabled = true,
+            BaseUrl = "https://example.test/query",
+        });
 
         var usd = Currency("USD");
         var aapl = Security("AAPL", "NASDAQ");
 
-        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
             await provider.ImportAsync(
                 new PriceImportRequest(new[] { usd, aapl },
                     DateTimeOffset.UtcNow.AddDays(-7), DateTimeOffset.UtcNow,
-                    PriceImportAnchorSource.Watermark,
-                    """{ "BaseUrl": "https://example.test/query" }"""),
+                    PriceImportAnchorSource.Watermark),
                 TestContext.Current.CancellationToken));
+
+        Assert.Contains("ApiKey is required.", ex.Message);
+        Assert.Equal(0, handler.CallCount);
+    }
+
+    [Fact]
+    public async Task ImportAsync_Disabled_Throws()
+    {
+        var (provider, handler, _) = CreateSut(new AlphaVantageOptions { Enabled = false, ApiKey = "TEST-KEY" });
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await provider.ImportAsync(
+                new PriceImportRequest(new[] { Currency("USD"), Security("AAPL", "NASDAQ") },
+                    DateTimeOffset.UtcNow.AddDays(-7), DateTimeOffset.UtcNow,
+                    PriceImportAnchorSource.Watermark),
+                TestContext.Current.CancellationToken));
+
+        Assert.Contains("disabled", ex.Message);
+        Assert.Equal(0, handler.CallCount);
     }
 
     [Fact]
     public async Task ImportAsync_UsesConfigBaseUrl()
     {
-        var (provider, handler, _) = CreateSut();
+        var (provider, handler, _) = CreateSut(new AlphaVantageOptions
+        {
+            Enabled = true,
+            ApiKey = "TEST-KEY",
+            BaseUrl = "https://example.test/query",
+        });
         handler.ResponseBody = DailyJson(("2026-04-29", "100.00"));
 
         var usd = Currency("USD");
@@ -665,8 +679,7 @@ public class AlphaVantagePriceProviderTests
         await provider.ImportAsync(
             new PriceImportRequest(new[] { usd, aapl },
                 DateTimeOffset.UtcNow.AddDays(-7), DateTimeOffset.UtcNow,
-                PriceImportAnchorSource.Watermark,
-                ConfigJson(baseUrl: "https://example.test/query")),
+                PriceImportAnchorSource.Watermark),
             TestContext.Current.CancellationToken);
 
         Assert.StartsWith("https://example.test/query?", handler.LastRequestUrl);

@@ -22,7 +22,7 @@ public class GetAccountHandlerTests : IAsyncLifetime
         await _db.SaveChangesAsync();
         await SetDisplayCurrencyAsync(_cad.Id);
 
-        _sut = new GetAccountHandler(_db, new ValuationService(_db));
+        _sut = new GetAccountHandler(_db, new ValuationService(_db, new StubPriceSourceRegistry()));
     }
 
     public ValueTask DisposeAsync()

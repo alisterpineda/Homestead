@@ -1,5 +1,6 @@
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Modules.Finances.PriceProviders;
+using Homestead.WebApi.Modules.Finances.PriceProviders.BankOfCanada;
 
 namespace Homestead.WebApi.Tests.Integration.Infrastructure;
 
@@ -16,12 +17,18 @@ namespace Homestead.WebApi.Tests.Integration.Infrastructure;
 /// another scope (e.g. a RunNow enqueue from a different test) cannot overwrite it.
 /// </para>
 /// </summary>
-public sealed class FakePriceProvider : IPriceProvider
+public sealed class FakePriceProvider(BankOfCanadaOptions options) : IPriceProvider
 {
     public CommodityPriceSource Source => CommodityPriceSource.BankOfCanada;
 
-    // Empty is non-null, so GetPriceSource_External_ReturnsConfigSchemaAndSupportedPairs still sees a schema.
-    public PriceProviderConfigSchema ConfigSchema => PriceProviderConfigSchema.Empty;
+    // Enablement comes from the same "PriceSources:BankOfCanada:*" config the real provider reads
+    // (HomesteadApiFactory pins Enabled=true), so the fake reports exactly what the readout endpoint
+    // would show for a healthy real provider.
+    public bool IsEnabled => options.Enabled;
+    public string? ConfigurationError => null;
+    public bool IsConfigured => IsEnabled;
+    public bool? HasApiKey => null;
+    public string BaseUrl => options.ResolveBaseUrl();
 
     // Kept non-empty so the provider-introspection endpoint test continues to see supported pairs, and so
     // held USD/EUR positions survive ImportCommodityPricesJobHandler.ResolveCommoditiesAsync's filter.

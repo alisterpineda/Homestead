@@ -11,9 +11,10 @@ class FakeApi {
   list() {
     return of<GetPriceSourcesResponse>({
       items: [
-        { source: 'Transaction', displayName: 'Transaction', kind: 'Transaction', isEnabled: true, priceCount: 0 },
-        { source: 'Manual', displayName: 'Manual', kind: 'Manual', isEnabled: true, priceCount: 5 },
-        { source: 'BankOfCanada', displayName: 'Bank of Canada', kind: 'External', isEnabled: false, priceCount: 0 },
+        { source: 'Transaction', displayName: 'Transaction', kind: 'Transaction', isEnabled: true, isConfigured: true, priceCount: 0 },
+        { source: 'Manual', displayName: 'Manual', kind: 'Manual', isEnabled: true, isConfigured: true, priceCount: 5 },
+        { source: 'BankOfCanada', displayName: 'Bank of Canada', kind: 'External', isEnabled: false, isConfigured: false, priceCount: 0 },
+        { source: 'AlphaVantage', displayName: 'Alpha Vantage', kind: 'External', isEnabled: true, isConfigured: false, priceCount: 0 },
       ],
     });
   }
@@ -30,17 +31,29 @@ describe('PriceSourceListComponent', () => {
     });
   });
 
-  it('renders the three sources', () => {
+  it('renders the four sources', () => {
     const fixture = TestBed.createComponent(PriceSourceListComponent);
     fixture.detectChanges();
-    expect(fixture.componentInstance.data()?.items.length).toBe(3);
+    expect(fixture.componentInstance.data()?.items.length).toBe(4);
+  });
+
+  // An enabled source whose config is invalid is the one state the Enabled/Disabled pair cannot show.
+  it('shows a Not configured badge for an enabled source with invalid config', () => {
+    const fixture = TestBed.createComponent(PriceSourceListComponent);
+    fixture.detectChanges();
+    const rows = Array.from(fixture.nativeElement.querySelectorAll('tbody tr')) as HTMLElement[];
+    const alphaVantage = rows.find(r => r.textContent?.includes('Alpha Vantage'))!;
+    expect(alphaVantage.textContent).toContain('Not configured');
+    const bankOfCanada = rows.find(r => r.textContent?.includes('Bank of Canada'))!;
+    expect(bankOfCanada.textContent).toContain('Disabled');
+    expect(bankOfCanada.textContent).not.toContain('Not configured');
   });
 
   it('maps Failed status to destructive variant', () => {
     const fixture = TestBed.createComponent(PriceSourceListComponent);
     const item: PriceSourceSummary = {
       source: 'BankOfCanada', displayName: 'Bank of Canada', kind: 'External',
-      isEnabled: true, priceCount: 0,
+      isEnabled: true, isConfigured: true, priceCount: 0,
       lastImportAt: '2026-04-28T10:00:00Z',
       lastImportStatus: 'Failed',
     };
@@ -51,7 +64,7 @@ describe('PriceSourceListComponent', () => {
     const fixture = TestBed.createComponent(PriceSourceListComponent);
     const item: PriceSourceSummary = {
       source: 'BankOfCanada', displayName: 'Bank of Canada', kind: 'External',
-      isEnabled: true, priceCount: 0,
+      isEnabled: true, isConfigured: true, priceCount: 0,
       lastImportAt: '2026-04-28T10:00:00Z',
       lastImportStatus: 'Success',
     };
@@ -62,7 +75,7 @@ describe('PriceSourceListComponent', () => {
     const fixture = TestBed.createComponent(PriceSourceListComponent);
     const item: PriceSourceSummary = {
       source: 'BankOfCanada', displayName: 'Bank of Canada', kind: 'External',
-      isEnabled: true, priceCount: 0,
+      isEnabled: true, isConfigured: true, priceCount: 0,
     };
     expect(fixture.componentInstance.statusPill(item)).toEqual({ label: 'Never run', variant: 'outline' });
   });
@@ -71,7 +84,7 @@ describe('PriceSourceListComponent', () => {
     const fixture = TestBed.createComponent(PriceSourceListComponent);
     const item: PriceSourceSummary = {
       source: 'BankOfCanada', displayName: 'Bank of Canada', kind: 'External',
-      isEnabled: true, priceCount: 0,
+      isEnabled: true, isConfigured: true, priceCount: 0,
       lastImportAt: '2026-04-28T10:00:00Z',
       lastImportStatus: 'PartialSuccess',
     };

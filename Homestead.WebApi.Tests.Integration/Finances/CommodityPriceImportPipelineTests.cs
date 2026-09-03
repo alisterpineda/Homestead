@@ -39,7 +39,7 @@ public class CommodityPriceImportPipelineTests : IntegrationTestBase
         var cadId = await CommodityIdAsync("CAD");
         var eurId = await CommodityIdAsync("EUR");
 
-        await EnsureBankOfCanadaEnabledAsync();
+        await EnsureBankOfCanadaSettingsRowAsync();
 
         // A held account with USD + EUR positions so both currencies survive commodity resolution.
         using (var scope = CreateScope())
@@ -175,24 +175,21 @@ public class CommodityPriceImportPipelineTests : IntegrationTestBase
         return await db.Commodities.Where(c => c.Symbol == symbol).Select(c => c.Id).SingleAsync(CT);
     }
 
-    private async Task EnsureBankOfCanadaEnabledAsync()
+    // Enablement is config (HomesteadApiFactory sets PriceSources:BankOfCanada:Enabled); the settings row
+    // only carries the watch-list + import bookkeeping, and is ensured here so LastImport* has somewhere
+    // to land.
+    private async Task EnsureBankOfCanadaSettingsRowAsync()
     {
         using var scope = CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var settings = await db.CommodityPriceSourceSettings
-            .FirstOrDefaultAsync(s => s.Source == CommodityPriceSource.BankOfCanada, CT);
-        if (settings is null)
+        var exists = await db.CommodityPriceSourceSettings
+            .AnyAsync(s => s.Source == CommodityPriceSource.BankOfCanada, CT);
+        if (exists) return;
+
+        db.CommodityPriceSourceSettings.Add(new CommodityPriceSourceSettings
         {
-            db.CommodityPriceSourceSettings.Add(new CommodityPriceSourceSettings
-            {
-                Source = CommodityPriceSource.BankOfCanada,
-                IsEnabled = true,
-            });
-        }
-        else
-        {
-            settings.IsEnabled = true;
-        }
+            Source = CommodityPriceSource.BankOfCanada,
+        });
         await db.SaveChangesAsync(CT);
     }
 

@@ -5,7 +5,8 @@ import { TextExtractionEngineType } from '../models/text-extraction-engine-type'
 export interface TextExtractionEngineResponse {
   configurationError: (string | null);
   isConfigured: boolean;
+  isDefault: boolean;
   key: string;
   name: string;
-  type: TextExtractionEngineType;
+  type: (null | TextExtractionEngineType);
 }

@@ -7,13 +7,12 @@ using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Processing;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Homestead.WebApi.Modules.Finances.Processing;
 
 public class ImportCommodityPricesJobHandler(
     AppDbContext db,
-    IServiceProvider serviceProvider,
+    IPriceSourceRegistry sources,
     ISender sender,
     IServiceScopeFactory scopeFactory,
     ILogger<ImportCommodityPricesJobHandler> logger) : IJobHandler
@@ -48,21 +47,17 @@ public class ImportCommodityPricesJobHandler(
         ImportCommodityPricesPayload payload,
         CancellationToken ct)
     {
+        var provider = sources.Get(payload.Source);
+        if (PriceSourceConfiguration.ImportBlocker(provider, payload.Source) is { } blocked)
+            throw new PriceImportException(blocked.Code, blocked.Message);
+
+        // The settings row only carries product data now (the watch-list), so it no longer gates the
+        // import: here its absence just means an empty allow-list. The seeder guarantees one per external
+        // source, and ApplyCommodityPriceObservationsCommand still requires it to stamp LastImport*.
         var settings = await db.CommodityPriceSourceSettings
             .FirstOrDefaultAsync(s => s.Source == payload.Source, ct);
 
-        if (settings is null || !settings.IsEnabled)
-            throw new PriceImportException(
-                "source_disabled",
-                $"Price source '{payload.Source}' is not enabled.");
-
-        var provider = serviceProvider.GetKeyedService<IPriceProvider>(payload.Source);
-        if (provider is null)
-            throw new PriceImportException(
-                "provider_not_registered",
-                $"No provider is registered for price source '{payload.Source}'.");
-
-        var commodities = await ResolveCommoditiesAsync(provider, settings, payload, ct);
+        var commodities = await ResolveCommoditiesAsync(provider!, settings?.PairAllowList, payload, ct);
 
         var now = DateTimeOffset.UtcNow;
         var (fromAt, anchorSource) = payload.FromAt is { } explicitFrom
@@ -76,7 +71,7 @@ public class ImportCommodityPricesJobHandler(
                 payload.Source, commodities.Count, anchorSource, fromAt, toAt);
 
         var result = await provider.ImportAsync(
-            new PriceImportRequest(commodities, fromAt, toAt, anchorSource, settings.Config), ct);
+            new PriceImportRequest(commodities, fromAt, toAt, anchorSource), ct);
 
         if (logger.IsEnabled(LogLevel.Information))
             logger.LogInformation(
@@ -98,7 +93,7 @@ public class ImportCommodityPricesJobHandler(
 
     private async Task<IReadOnlyCollection<Commodity>> ResolveCommoditiesAsync(
         IPriceProvider provider,
-        CommodityPriceSourceSettings settings,
+        string? pairAllowList,
         ImportCommodityPricesPayload payload,
         CancellationToken ct)
     {
@@ -115,7 +110,7 @@ public class ImportCommodityPricesJobHandler(
             .Select(a => a.ReportingCurrencyId);
 
         var heldQuery = heldFromSplits.Concat(heldFromUnitPrice).Concat(reportingCurrencies).Distinct();
-        var allowSymbols = ParseAllowList(settings.PairAllowList);
+        var allowSymbols = ParseAllowList(pairAllowList);
 
         var heldCommodities = await db.Commodities
             .Where(c => heldQuery.Contains(c.Id) || allowSymbols.Contains(c.Symbol))

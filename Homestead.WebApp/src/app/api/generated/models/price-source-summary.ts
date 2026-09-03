@@ -5,6 +5,7 @@ import { CommodityPriceSource } from '../models/commodity-price-source';
 import { CommodityPriceSourceKind } from '../models/commodity-price-source-kind';
 export interface PriceSourceSummary {
   displayName: string;
+  isConfigured: boolean;
   isEnabled: boolean;
   kind: CommodityPriceSourceKind;
   lastImportAt?: (string | null);

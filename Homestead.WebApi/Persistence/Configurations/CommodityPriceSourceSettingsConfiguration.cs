@@ -23,13 +23,6 @@ public class CommodityPriceSourceSettingsConfiguration : IEntityTypeConfiguratio
             .IsRequired()
             .HasConversion<string>();
 
-        builder.Property(s => s.IsEnabled)
-            .IsRequired()
-            .HasDefaultValue(false);
-
-        builder.Property(s => s.Config)
-            .HasColumnType("jsonb");
-
         builder.Property(s => s.PairAllowList)
             .HasColumnType("jsonb");
 

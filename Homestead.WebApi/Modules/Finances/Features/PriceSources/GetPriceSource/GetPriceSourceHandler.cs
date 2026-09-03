@@ -6,13 +6,12 @@ using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Persistence;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Homestead.WebApi.Modules.Finances.Features.PriceSources.GetPriceSource;
 
 public class GetPriceSourceHandler(
     AppDbContext db,
-    IServiceProvider serviceProvider,
+    IPriceSourceRegistry sources,
     IPriceSourceScheduleStore scheduleStore)
     : IRequestHandler<GetPriceSourceQuery, GetPriceSourceResponse>
 {
@@ -29,9 +28,8 @@ public class GetPriceSourceHandler(
             .AsNoTracking()
             .CountAsync(p => p.Source == request.Source, ct);
 
-        var provider = serviceProvider.GetKeyedService<IPriceProvider>(request.Source);
+        var provider = sources.Get(request.Source);
         var kind = request.Source.Kind();
-        var configJson = JsonSecretConfig.Mask(settings?.Config, SecretKeys(provider?.ConfigSchema));
 
         PriceSourceScheduleSummary? scheduleSummary = null;
         if (kind == CommodityPriceSourceKind.External)
@@ -66,13 +64,15 @@ public class GetPriceSourceHandler(
             Source = request.Source,
             DisplayName = request.Source.DisplayName(),
             Kind = kind,
-            IsEnabled = CommodityPriceSourceQueryExtensions.IsEnabledSource(request.Source, settings),
-            Config = configJson,
+            IsEnabled = sources.IsEnabled(request.Source),
+            IsConfigured = sources.IsConfigured(request.Source),
+            ConfigurationError = provider?.ConfigurationError,
+            HasApiKey = provider?.HasApiKey,
+            BaseUrl = provider?.BaseUrl,
             PairAllowList = pairAllowList,
             LastImportAt = settings?.LastImportAt,
             LastImportStatus = settings?.LastImportStatus,
             LastImportMessage = settings?.LastImportMessage,
-            ConfigSchema = provider?.ConfigSchema ?? PriceProviderConfigSchema.Empty,
             SupportedPairs = provider?.SupportedPairs ?? Array.Empty<PriceProviderSupportedPair>(),
             CoveredSecurityExchanges = provider?.CoveredSecurityExchanges ?? Array.Empty<string>(),
             CoveredQuoteCurrencies = provider?.CoveredQuoteCurrencies ?? Array.Empty<string>(),
@@ -80,8 +80,4 @@ public class GetPriceSourceHandler(
             PriceCount = priceCount,
         };
     }
-
-    private static IEnumerable<string> SecretKeys(PriceProviderConfigSchema? schema) =>
-        schema?.Fields.Where(f => f.Type == PriceProviderConfigFieldType.Secret).Select(f => f.Key)
-            ?? Array.Empty<string>();
 }

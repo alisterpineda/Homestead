@@ -8,12 +8,13 @@ namespace Homestead.WebApi.Tests.Unit.Modules.Finances.PriceProviders.BankOfCana
 
 public class BankOfCanadaPriceProviderTests
 {
-    private static (BankOfCanadaPriceProvider provider, FakeHttpHandler handler) CreateSut()
+    private static (BankOfCanadaPriceProvider provider, FakeHttpHandler handler) CreateSut(
+        BankOfCanadaOptions? options = null)
     {
         var handler = new FakeHttpHandler();
         var http = new HttpClient(handler) { BaseAddress = null };
         var client = new BankOfCanadaValetClient(http);
-        return (new BankOfCanadaPriceProvider(client), handler);
+        return (new BankOfCanadaPriceProvider(client, options ?? new BankOfCanadaOptions { Enabled = true }), handler);
     }
 
     [Fact]
@@ -24,11 +25,19 @@ public class BankOfCanadaPriceProviderTests
     }
 
     [Fact]
-    public void ConfigSchema_DeclaresBaseUrl()
+    public void IsConfigured_WhenEnabled_HasApiKeyIsNull()
     {
         var (provider, _) = CreateSut();
-        Assert.Single(provider.ConfigSchema.Fields);
-        Assert.Equal("BaseUrl", provider.ConfigSchema.Fields[0].Key);
+        Assert.True(provider.IsEnabled);
+        Assert.True(provider.IsConfigured);
+        Assert.Null(provider.ConfigurationError);
+        Assert.Null(provider.HasApiKey);
+        Assert.Equal(BankOfCanadaOptions.DefaultBaseUrl, provider.BaseUrl);
+
+        var (disabled, _) = CreateSut(new BankOfCanadaOptions());
+        Assert.False(disabled.IsEnabled);
+        Assert.False(disabled.IsConfigured);
+        Assert.Null(disabled.ConfigurationError);
     }
 
     [Fact]
@@ -45,7 +54,7 @@ public class BankOfCanadaPriceProviderTests
         var result = await provider.ImportAsync(
             new PriceImportRequest(Array.Empty<Commodity>(),
                 DateTimeOffset.UtcNow.AddDays(-7), DateTimeOffset.UtcNow,
-                PriceImportAnchorSource.Watermark, null),
+                PriceImportAnchorSource.Watermark),
             TestContext.Current.CancellationToken);
         Assert.Empty(result.Observations);
         Assert.Null(result.Warning);
@@ -71,7 +80,7 @@ public class BankOfCanadaPriceProviderTests
             new PriceImportRequest(new[] { cad, usd },
                 new DateTimeOffset(2026, 4, 28, 0, 0, 0, TimeSpan.Zero),
                 new DateTimeOffset(2026, 4, 28, 0, 0, 0, TimeSpan.Zero),
-                PriceImportAnchorSource.Watermark, null),
+                PriceImportAnchorSource.Watermark),
             TestContext.Current.CancellationToken);
 
         var obs = Assert.Single(result.Observations);
@@ -95,7 +104,7 @@ public class BankOfCanadaPriceProviderTests
         var result = await provider.ImportAsync(
             new PriceImportRequest(new[] { cad, xyz },
                 DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow,
-                PriceImportAnchorSource.Watermark, null),
+                PriceImportAnchorSource.Watermark),
             TestContext.Current.CancellationToken);
 
         Assert.Empty(result.Observations);
@@ -105,22 +114,36 @@ public class BankOfCanadaPriceProviderTests
     [Fact]
     public async Task ImportAsync_UsesConfigBaseUrl()
     {
-        var (provider, handler) = CreateSut();
+        var customBaseUrl = "https://example.test/valet/";
+        var (provider, handler) = CreateSut(new BankOfCanadaOptions { Enabled = true, BaseUrl = customBaseUrl });
         handler.ResponseBody = """{"observations":[]}""";
 
         var cad = new Commodity { Id = Guid.NewGuid(), Symbol = "CAD", Name = "CAD", Kind = CommodityKind.Currency };
         var usd = new Commodity { Id = Guid.NewGuid(), Symbol = "USD", Name = "USD", Kind = CommodityKind.Currency };
 
-        var customBaseUrl = "https://example.test/valet/";
-        var configJson = $$"""{ "BaseUrl": "{{customBaseUrl}}" }""";
-
         await provider.ImportAsync(
             new PriceImportRequest(new[] { cad, usd },
                 DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow,
-                PriceImportAnchorSource.Watermark, configJson),
+                PriceImportAnchorSource.Watermark),
             TestContext.Current.CancellationToken);
 
         Assert.StartsWith(customBaseUrl, handler.LastRequestUrl);
+    }
+
+    [Fact]
+    public async Task ImportAsync_Disabled_Throws()
+    {
+        var (provider, handler) = CreateSut(new BankOfCanadaOptions { Enabled = false });
+
+        var cad = new Commodity { Id = Guid.NewGuid(), Symbol = "CAD", Name = "CAD", Kind = CommodityKind.Currency };
+        var usd = new Commodity { Id = Guid.NewGuid(), Symbol = "USD", Name = "USD", Kind = CommodityKind.Currency };
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => provider.ImportAsync(
+            new PriceImportRequest(new[] { cad, usd },
+                DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow,
+                PriceImportAnchorSource.Watermark),
+            TestContext.Current.CancellationToken));
+        Assert.Equal(0, handler.CallCount);
     }
 
     private class FakeHttpHandler : HttpMessageHandler

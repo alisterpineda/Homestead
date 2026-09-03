@@ -32,9 +32,7 @@ internal record VersionItem(Guid Id, int VersionNumber, string? Label, string Co
 
 internal record ProblemDetailsResponse(string? Type, string? Title, int? Status, string? Detail, string? ErrorCode);
 
-internal record DocumentSettingsItem(
-    bool? AutoClassifyOnUpload = null,
-    string? DefaultEngineKey = null);
+internal record DocumentSettingsItem(bool? AutoClassifyOnUpload = null);
 
 internal record BulkClassifyResult(IReadOnlyList<Guid> JobIds);
 

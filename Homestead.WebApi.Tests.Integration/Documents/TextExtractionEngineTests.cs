@@ -7,7 +7,7 @@ public class TextExtractionEngineTests : IntegrationTestBase
 {
     public TextExtractionEngineTests(PostgresFixture fixture) : base(fixture) { }
 
-    private record EngineItem(string Key, string Name, string Type, bool IsConfigured, string? ConfigurationError);
+    private record EngineItem(string Key, string Name, string? Type, bool IsConfigured, string? ConfigurationError, bool IsDefault);
 
     // The factory configures no Ocr:Engines section at all, which is exactly the zero-config case: the
     // built-in tesseract instance is seeded and nothing else exists.
@@ -97,7 +97,7 @@ public class TextExtractionEngineTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
-    // An omitted body has always been legal and must keep meaning "use the household default".
+    // An omitted body has always been legal and must keep meaning "use the configured default".
     [Fact]
     public async Task ReprocessVersion_NoBody_StillAccepted()
     {
@@ -143,7 +143,7 @@ public class TextExtractionEngineTests : IntegrationTestBase
         Assert.Equal("eng", provenance.Language);
         Assert.NotEqual(default, provenance.ExtractedAt);
 
-        // Nothing was substituted: the household default resolved to a usable engine.
+        // Nothing was substituted: the configured default resolved to a usable engine.
         Assert.Null(provenance.RequestedEngineKey);
         Assert.Null(provenance.FallbackReason);
 
@@ -229,35 +229,17 @@ public class TextExtractionEngineTests : IntegrationTestBase
         Assert.Equal("tesseract", after.TextExtraction.EngineKey);
     }
 
+    // The factory leaves Ocr:DefaultEngine unset, so the built-in engine is what the list marks as default —
+    // the reprocess dialogs label their empty option from this flag.
     [Fact]
-    public async Task DocumentSettings_UnknownDefaultEngineKey_Returns400()
+    public async Task GetTextExtractionEngines_NoConfig_MarksTesseractDefault()
     {
         var client = await CreateAdminClientAsync();
 
-        var response = await SendJsonPatchAsync(client, "/api/v1/documents/settings", new[]
-        {
-            new { op = "replace", path = "/defaultEngineKey", value = "azure-typo" }
-        });
+        var engines = await client.GetFromJsonAsync<List<EngineItem>>("/api/v1/documents/text-extraction-engines", CT);
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task DocumentSettings_ConfiguredDefaultEngineKey_RoundTrips()
-    {
-        var client = await CreateAdminClientAsync();
-
-        var response = await SendJsonPatchAsync(client, "/api/v1/documents/settings", new[]
-        {
-            new { op = "replace", path = "/defaultEngineKey", value = "tesseract" }
-        });
-        response.EnsureSuccessStatusCode();
-
-        var patched = await response.Content.ReadFromJsonAsync<DocumentSettingsItem>(CT);
-        Assert.Equal("tesseract", patched!.DefaultEngineKey);
-
-        var get = await client.GetAsync("/api/v1/documents/settings", CT);
-        var fetched = await get.Content.ReadFromJsonAsync<DocumentSettingsItem>(CT);
-        Assert.Equal("tesseract", fetched!.DefaultEngineKey);
+        var engine = Assert.Single(engines!, e => e.IsDefault);
+        Assert.Equal("tesseract", engine.Key);
+        Assert.True(engine.IsConfigured);
     }
 }

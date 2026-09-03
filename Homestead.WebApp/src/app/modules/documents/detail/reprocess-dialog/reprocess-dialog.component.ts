@@ -85,7 +85,7 @@ export class ReprocessDialogComponent {
     this.versionApi.reprocessDocumentVersion({
       documentId: docId,
       versionId: verId,
-      // Empty means no explicit pick, which the backend resolves to the household default.
+      // Empty means no explicit pick, which the backend resolves to the configured default.
       body: { engineKey: this.engineKey() || null },
     }).pipe(
       handleMutationError(this.errorHandler, this.reprocessing, 'Failed to start text extraction reprocessing.'),

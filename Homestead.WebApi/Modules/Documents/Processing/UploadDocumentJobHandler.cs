@@ -45,9 +45,9 @@ public class UploadDocumentJobHandler(
                 throw new FileNotFoundException($"Staged file not found: {stagingPath}");
 
             // Text extraction. Uploads have no explicit pick — nobody is at a dialog choosing an engine —
-            // so they take the household default, which falls back to the built-in engine if it has gone
-            // stale (recorded in the version's provenance metadata).
-            var engineKey = await engineResolver.ResolveDefaultKeyAsync(ct);
+            // so they take the configured default (Ocr:DefaultEngine), which falls back to the built-in
+            // engine if it names nothing usable (recorded in the version's provenance metadata).
+            var engineKey = engineResolver.DefaultKey;
             var extractionResult = await textExtractionHelper.ExtractTextSafeAsync(
                 stagingPath, payload.ContentType, engineKey, ct);
 

@@ -13,7 +13,7 @@ public class EngineKeyValidationTests
     private static BulkReprocessDocumentsCommandValidator BulkValidator() =>
         new(TestTextExtraction.Engines());
 
-    // An omitted body / null key means "use the household default" and must stay valid.
+    // An omitted body / null key means "use the configured default" and must stay valid.
     [Theory]
     [InlineData(null)]
     [InlineData("")]

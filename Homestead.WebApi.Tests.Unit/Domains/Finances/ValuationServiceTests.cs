@@ -4,6 +4,7 @@ using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Domain.Settings;
 using Homestead.WebApi.Modules.Finances.Features.Settings;
 using Homestead.WebApi.Modules.Finances.Services;
+using Homestead.WebApi.Tests.Unit.Modules.Finances;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Tests.Unit.Domains.Finances;
@@ -11,6 +12,7 @@ namespace Homestead.WebApi.Tests.Unit.Domains.Finances;
 public class ValuationServiceTests : IAsyncLifetime
 {
     private TestAppDbContext _db = null!;
+    private StubPriceSourceRegistry _sources = null!;
     private ValuationService _sut = null!;
 
     private Commodity _cad = null!;
@@ -29,7 +31,8 @@ public class ValuationServiceTests : IAsyncLifetime
         _db.Commodities.AddRange(_cad, _usd, _eur, _veqt);
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        _sut = new ValuationService(_db);
+        _sources = new StubPriceSourceRegistry();
+        _sut = new ValuationService(_db, _sources);
     }
 
     public ValueTask DisposeAsync()
@@ -74,17 +77,10 @@ public class ValuationServiceTests : IAsyncLifetime
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
     }
 
-    private async Task SetSourceEnabledAsync(CommodityPriceSource source, bool isEnabled)
-    {
-        _db.CommodityPriceSourceSettings.Add(new CommodityPriceSourceSettings
-        {
-            Source = source,
-            IsEnabled = isEnabled,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow,
-        });
-        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
-    }
+    // Enablement is static config ("PriceSources:{Source}:Enabled"), so the stub registry is toggled
+    // directly rather than via a settings row.
+    private void SetSourceEnabled(CommodityPriceSource source, bool isEnabled) =>
+        _sources.Set(source, enabled: isEnabled, configured: isEnabled);
 
     private async Task<Account> AddAccountAsync(AccountKind kind, Guid reportingCurrencyId, string name = "Acct")
     {
@@ -367,17 +363,14 @@ public class ValuationServiceTests : IAsyncLifetime
         // BankOfCanada price exists, but the source is disabled → should not be used.
         var priceAt = DateTimeOffset.UtcNow.AddDays(-1);
         await AddPriceAsync(_usd.Id, _cad.Id, 1.35m, priceAt, CommodityPriceSource.BankOfCanada);
-        await SetSourceEnabledAsync(CommodityPriceSource.BankOfCanada, isEnabled: false);
+        SetSourceEnabled(CommodityPriceSource.BankOfCanada, isEnabled: false);
         await SetDisplayCurrencyAsync(_cad.Id);
 
         var ctxDisabled = await _sut.LoadContextAsync(TestContext.Current.CancellationToken);
         Assert.Null(ctxDisabled.ConvertToDisplay(_usd.Id, 100m));
 
         // Toggle on → restored.
-        var settings = await _db.CommodityPriceSourceSettings
-            .SingleAsync(s => s.Source == CommodityPriceSource.BankOfCanada, TestContext.Current.CancellationToken);
-        settings.IsEnabled = true;
-        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        SetSourceEnabled(CommodityPriceSource.BankOfCanada, isEnabled: true);
 
         var ctxEnabled = await _sut.LoadContextAsync(TestContext.Current.CancellationToken);
         Assert.Equal(135m, ctxEnabled.ConvertToDisplay(_usd.Id, 100m));
@@ -392,7 +385,7 @@ public class ValuationServiceTests : IAsyncLifetime
         await AddPriceAsync(_usd.Id, _cad.Id, 1.10m, priceAt, CommodityPriceSource.BankOfCanada);
         await AddPriceAsync(_usd.Id, _cad.Id, 1.20m, priceAt, CommodityPriceSource.Transaction);
         await AddPriceAsync(_usd.Id, _cad.Id, 1.30m, priceAt, CommodityPriceSource.Manual);
-        await SetSourceEnabledAsync(CommodityPriceSource.BankOfCanada, isEnabled: true);
+        SetSourceEnabled(CommodityPriceSource.BankOfCanada, isEnabled: true);
         await SetDisplayCurrencyAsync(_cad.Id);
 
         var ctx = await _sut.LoadContextAsync(TestContext.Current.CancellationToken);
@@ -426,7 +419,7 @@ public class ValuationServiceTests : IAsyncLifetime
         var priceAt = DateTimeOffset.UtcNow.AddDays(-1);
         await AddPriceAsync(_usd.Id, _cad.Id, 1.35m, priceAt, CommodityPriceSource.BankOfCanada);
         await AddPriceAsync(_usd.Id, _cad.Id, 1.40m, priceAt, CommodityPriceSource.Manual);
-        await SetSourceEnabledAsync(CommodityPriceSource.BankOfCanada, isEnabled: true);
+        SetSourceEnabled(CommodityPriceSource.BankOfCanada, isEnabled: true);
         await SetDisplayCurrencyAsync(_cad.Id);
 
         var ctx = await _sut.LoadContextAsync(TestContext.Current.CancellationToken);

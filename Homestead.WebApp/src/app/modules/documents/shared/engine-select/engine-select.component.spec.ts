@@ -7,13 +7,14 @@ import { DocumentApiService } from '@/api/services/document-api.service';
 import type { TextExtractionEngineResponse } from '@/api/generated/models/text-extraction-engine-response';
 
 const ENGINES: TextExtractionEngineResponse[] = [
-  { key: 'tesseract', name: 'Tesseract', type: 'Tesseract', isConfigured: true, configurationError: null },
+  { key: 'tesseract', name: 'Tesseract', type: 'Tesseract', isConfigured: true, configurationError: null, isDefault: true },
   {
     key: 'azure-layout',
     name: 'Azure Document Intelligence',
     type: 'AzureDocumentIntelligence',
     isConfigured: false,
     configurationError: 'Endpoint is required.',
+    isDefault: false,
   },
 ];
 
@@ -36,8 +37,20 @@ describe('EngineSelectComponent', () => {
     expect(setup().componentInstance.engines().map(e => e.key)).toEqual(['tesseract', 'azure-layout']);
   });
 
-  it('labels the empty selection with the default label', () => {
-    expect(setup().componentInstance.engineToString('')).toBe('Household default');
+  // The empty option names the configured default so a user pinning nothing can see what they will get.
+  it('labels the empty selection with the default engine key', () => {
+    expect(setup().componentInstance.engineToString('')).toBe('Default (tesseract)');
+  });
+
+  it('falls back to a generic label when no engine is marked default', () => {
+    const fixture = setup(() => of([]));
+    expect(fixture.componentInstance.engineToString('')).toBe('Default engine');
+  });
+
+  it('honours an explicit defaultLabel override', () => {
+    const fixture = setup();
+    fixture.componentRef.setInput('defaultLabel', 'No preference');
+    expect(fixture.componentInstance.engineToString('')).toBe('No preference');
   });
 
   it('labels an engine by key and name', () => {
@@ -62,7 +75,7 @@ describe('EngineSelectComponent', () => {
   // a bare marker if it ever stopped.
   it('falls back to a bare marker when an unavailable engine has no reason', () => {
     const fixture = setup(() => of([
-      { key: 'broken', name: 'Broken', type: 'Tesseract', isConfigured: false, configurationError: null },
+      { key: 'broken', name: 'Broken', type: 'Tesseract', isConfigured: false, configurationError: null, isDefault: true },
     ]));
 
     expect(fixture.componentInstance.unavailableReason(fixture.componentInstance.engines()[0]))

@@ -12,23 +12,16 @@ public class PriceSourcesEndpointTests : IntegrationTestBase
 {
     public PriceSourcesEndpointTests(PostgresFixture fixture) : base(fixture) { }
 
-    private async Task EnsureSettingsRowAsync(CommodityPriceSource source, bool isEnabled)
+    // Enablement is config: HomesteadApiFactory pins PriceSources:BankOfCanada:Enabled=true and leaves
+    // AlphaVantage unset (disabled + not configured). The settings row only carries product data.
+    private async Task EnsureSettingsRowAsync(CommodityPriceSource source)
     {
         using var scope = CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var existing = await db.CommodityPriceSourceSettings.FirstOrDefaultAsync(s => s.Source == source, CT);
-        if (existing is null)
-        {
-            db.CommodityPriceSourceSettings.Add(new CommodityPriceSourceSettings
-            {
-                Source = source,
-                IsEnabled = isEnabled,
-            });
-        }
-        else
-        {
-            existing.IsEnabled = isEnabled;
-        }
+        var exists = await db.CommodityPriceSourceSettings.AnyAsync(s => s.Source == source, CT);
+        if (exists) return;
+
+        db.CommodityPriceSourceSettings.Add(new CommodityPriceSourceSettings { Source = source });
         await db.SaveChangesAsync(CT);
     }
 
@@ -54,9 +47,9 @@ public class PriceSourcesEndpointTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task GetPriceSource_External_ReturnsConfigSchemaAndSupportedPairs()
+    public async Task GetPriceSource_External_ReturnsProviderReadoutAndSupportedPairs()
     {
-        await EnsureSettingsRowAsync(CommodityPriceSource.BankOfCanada, isEnabled: false);
+        await EnsureSettingsRowAsync(CommodityPriceSource.BankOfCanada);
         var client = await CreateAdminClientAsync();
         var response = await client.GetAsync("/api/v1/finances/settings/price-sources/BankOfCanada", CT);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -64,7 +57,35 @@ public class PriceSourcesEndpointTests : IntegrationTestBase
         Assert.NotNull(body);
         Assert.Equal("BankOfCanada", body!.Source);
         Assert.NotEmpty(body.SupportedPairs);
-        Assert.NotNull(body.ConfigSchema);
+        Assert.True(body.IsEnabled);
+        Assert.True(body.IsConfigured);
+        Assert.Null(body.ConfigurationError);
+        Assert.Null(body.HasApiKey);
+        Assert.NotNull(body.BaseUrl);
+    }
+
+    [Fact]
+    public async Task GetPriceSource_AlphaVantage_Unset_ReportsDisabledAndNotConfigured()
+    {
+        // No PriceSources:AlphaVantage:* config in the test host → disabled, and invalid (no ApiKey).
+        await EnsureSettingsRowAsync(CommodityPriceSource.AlphaVantage);
+        var client = await CreateAdminClientAsync();
+        var response = await client.GetAsync("/api/v1/finances/settings/price-sources/AlphaVantage", CT);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<DetailResponse>(CT);
+        Assert.NotNull(body);
+        Assert.False(body!.IsEnabled);
+        Assert.False(body.IsConfigured);
+        Assert.Equal("ApiKey is required.", body.ConfigurationError);
+        Assert.False(body.HasApiKey);
+        Assert.NotNull(body.BaseUrl);
+
+        var list = await (await client.GetAsync("/api/v1/finances/settings/price-sources", CT))
+            .Content.ReadFromJsonAsync<ListResponse>(CT);
+        var item = Assert.Single(list!.Items, i => i.Source == "AlphaVantage");
+        Assert.False(item.IsEnabled);
+        Assert.False(item.IsConfigured);
+        Assert.True(Assert.Single(list.Items, i => i.Source == "BankOfCanada").IsConfigured);
     }
 
     [Fact]
@@ -73,33 +94,38 @@ public class PriceSourcesEndpointTests : IntegrationTestBase
         var client = await CreateAdminClientAsync();
         var response = await client.PatchAsJsonAsync(
             "/api/v1/finances/settings/price-sources/Manual",
-            new { isEnabled = true },
+            new { pairAllowList = new[] { "CAD" } },
             CT);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]
-    public async Task PatchPriceSource_SetIsEnabled_Persists()
+    public async Task PatchPriceSource_PairAllowList_Persists()
     {
-        await EnsureSettingsRowAsync(CommodityPriceSource.BankOfCanada, isEnabled: false);
+        await EnsureSettingsRowAsync(CommodityPriceSource.BankOfCanada);
         var client = await CreateAdminClientAsync();
+        // CAD is seeded as a commodity, so the allow-list resolves.
         var response = await client.PatchAsJsonAsync(
             "/api/v1/finances/settings/price-sources/BankOfCanada",
-            new { isEnabled = true },
+            new { pairAllowList = new[] { " CAD ", "cad" } },
             CT);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<PatchResponse>(CT);
+        Assert.NotNull(body);
+        Assert.Equal("BankOfCanada", body!.Source);
+        Assert.Equal(new[] { "CAD" }, body.PairAllowList);
 
         using var scope = CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var settings = await db.CommodityPriceSourceSettings
             .FirstAsync(s => s.Source == CommodityPriceSource.BankOfCanada, CT);
-        Assert.True(settings.IsEnabled);
+        Assert.Contains("CAD", settings.PairAllowList);
     }
 
     [Fact]
     public async Task UpsertSchedule_CreatesNewSchedule()
     {
-        await EnsureSettingsRowAsync(CommodityPriceSource.BankOfCanada, isEnabled: true);
+        await EnsureSettingsRowAsync(CommodityPriceSource.BankOfCanada);
         var client = await CreateAdminClientAsync();
         var response = await client.PutAsJsonAsync(
             "/api/v1/finances/settings/price-sources/BankOfCanada/schedule",
@@ -119,7 +145,7 @@ public class PriceSourcesEndpointTests : IntegrationTestBase
     [Fact]
     public async Task UpsertSchedule_ReplacesExistingForSameSource()
     {
-        await EnsureSettingsRowAsync(CommodityPriceSource.BankOfCanada, isEnabled: true);
+        await EnsureSettingsRowAsync(CommodityPriceSource.BankOfCanada);
         var client = await CreateAdminClientAsync();
         var first = await client.PutAsJsonAsync(
             "/api/v1/finances/settings/price-sources/BankOfCanada/schedule",
@@ -142,7 +168,7 @@ public class PriceSourcesEndpointTests : IntegrationTestBase
     [Fact]
     public async Task DeleteSchedule_RemovesEntity()
     {
-        await EnsureSettingsRowAsync(CommodityPriceSource.BankOfCanada, isEnabled: true);
+        await EnsureSettingsRowAsync(CommodityPriceSource.BankOfCanada);
         var client = await CreateAdminClientAsync();
         await client.PutAsJsonAsync(
             "/api/v1/finances/settings/price-sources/BankOfCanada/schedule",
@@ -163,19 +189,45 @@ public class PriceSourcesEndpointTests : IntegrationTestBase
     [Fact]
     public async Task RunNow_DisabledSource_Returns400()
     {
-        await EnsureSettingsRowAsync(CommodityPriceSource.BankOfCanada, isEnabled: false);
+        // AlphaVantage has no PriceSources config in the test host → disabled.
+        await EnsureSettingsRowAsync(CommodityPriceSource.AlphaVantage);
         var client = await CreateAdminClientAsync();
         var response = await client.PostAsJsonAsync(
-            "/api/v1/finances/settings/price-sources/BankOfCanada/runs",
+            "/api/v1/finances/settings/price-sources/AlphaVantage/runs",
             new { },
             CT);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problem = await response.Content.ReadAsStringAsync(CT);
+        Assert.Contains("is disabled", problem);
+    }
+
+    [Fact]
+    public async Task RunNow_NotConfiguredSource_Returns400WithReason()
+    {
+        // Enabled by config but with no ApiKey: the readout says why, and Run-now refuses with the reason.
+        using var factory = Factory.WithWebHostBuilder(b =>
+            b.UseSetting("PriceSources:AlphaVantage:Enabled", "true"));
+        var client = await AuthHelper.CreateAdminClientAsync(factory);
+
+        var detail = await client.GetFromJsonAsync<DetailResponse>(
+            "/api/v1/finances/settings/price-sources/AlphaVantage", CT);
+        Assert.True(detail!.IsEnabled);
+        Assert.False(detail.IsConfigured);
+        Assert.Equal("ApiKey is required.", detail.ConfigurationError);
+
+        var response = await client.PostAsJsonAsync(
+            "/api/v1/finances/settings/price-sources/AlphaVantage/runs",
+            new { },
+            CT);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problem = await response.Content.ReadAsStringAsync(CT);
+        Assert.Contains("is not configured: ApiKey is required.", problem);
     }
 
     [Fact]
     public async Task RunNow_EnabledSource_EnqueuesJob()
     {
-        await EnsureSettingsRowAsync(CommodityPriceSource.BankOfCanada, isEnabled: true);
+        await EnsureSettingsRowAsync(CommodityPriceSource.BankOfCanada);
         var client = await CreateAdminClientAsync();
         var response = await client.PostAsJsonAsync(
             "/api/v1/finances/settings/price-sources/BankOfCanada/runs",
@@ -214,6 +266,7 @@ public class PriceSourcesEndpointTests : IntegrationTestBase
         string DisplayName,
         string Kind,
         bool IsEnabled,
+        bool IsConfigured,
         int PriceCount,
         DateTimeOffset? LastImportAt,
         string? LastImportStatus);
@@ -223,18 +276,19 @@ public class PriceSourcesEndpointTests : IntegrationTestBase
         string DisplayName,
         string Kind,
         bool IsEnabled,
-        string? Config,
+        bool IsConfigured,
+        string? ConfigurationError,
+        bool? HasApiKey,
+        string? BaseUrl,
         IReadOnlyList<string>? PairAllowList,
         DateTimeOffset? LastImportAt,
         string? LastImportStatus,
         string? LastImportMessage,
-        ConfigSchema ConfigSchema,
         IReadOnlyList<SupportedPair> SupportedPairs,
         ScheduleSummary? Schedule,
         int PriceCount);
 
-    private record ConfigSchema(IReadOnlyList<ConfigField> Fields);
-    private record ConfigField(string Key, string Label, string Type, bool IsRequired, string? Help, string? DefaultValue);
+    private record PatchResponse(string Source, IReadOnlyList<string> PairAllowList);
     private record SupportedPair(string CommoditySymbol, string? Exchange, string QuoteCurrencySymbol);
     private record ScheduleSummary(
         Guid Id,

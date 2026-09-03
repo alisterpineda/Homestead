@@ -3,15 +3,16 @@
 
 import { CommodityPriceSource } from '../models/commodity-price-source';
 import { CommodityPriceSourceKind } from '../models/commodity-price-source-kind';
-import { PriceProviderConfigSchema } from '../models/price-provider-config-schema';
 import { PriceProviderSupportedPair } from '../models/price-provider-supported-pair';
 import { PriceSourceScheduleSummary } from '../models/price-source-schedule-summary';
 export interface GetPriceSourceResponse {
-  config?: (string | null);
-  configSchema: PriceProviderConfigSchema;
+  baseUrl?: (string | null);
+  configurationError?: (string | null);
   coveredQuoteCurrencies: Array<string>;
   coveredSecurityExchanges: Array<string>;
   displayName: string;
+  hasApiKey?: (boolean | null);
+  isConfigured: boolean;
   isEnabled: boolean;
   kind: CommodityPriceSourceKind;
   lastImportAt?: (string | null);

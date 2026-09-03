@@ -28,7 +28,7 @@ public class GetNetWorthHistoryHandlerTests : IAsyncLifetime
         _db.Commodities.AddRange(_cad, _usd, _veqt);
         await _db.SaveChangesAsync();
 
-        _valuations = new ValuationService(_db);
+        _valuations = new ValuationService(_db, new StubPriceSourceRegistry());
         _sut = new GetNetWorthHistoryHandler(_db, _valuations);
     }
 

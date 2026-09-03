@@ -148,13 +148,14 @@ Each enum value falls into one of three **kinds** (a property of the value, not 
 
 **System values** (`Transaction`, `Manual`) are always enabled, never disable-able, and have no configuration. They have **no settings row** — the lookup just always considers them in scope.
 
-**External values** carry their configurable knobs in a settings table:
+**External values** split their knobs by what kind of fact each is, the same rule as text-extraction engines and AI providers (see [documents/versions.md](../documents/versions.md#text-extraction-engine)):
+
+- **Enablement and credentials are deployment configuration**, under `PriceSources:{Source}:*` keyed by the enum name — `Enabled` (bool, default `false`), plus per-provider fields (`ApiKey`, `BaseUrl`). Endpoints and API keys are deployment facts that belong in env vars / user-secrets, so there is no secret masking and no API keys in a `pg_dump`. Two derived readouts: **`IsEnabled`** is the flag; **`ConfigurationError`** is the per-provider validation verdict, independent of the flag; **`IsConfigured`** is `IsEnabled && ConfigurationError is null`. Validation is an error string, never a startup failure — an enabled-but-broken source shows "not configured, with reason" rather than stopping the app.
+- **Product data** lives in the settings table:
 
 ```
 CommodityPriceSourceSettings {
   Source: CommodityPriceSource    (PK; one row per External enum value)
-  IsEnabled: bool                 (default false on seed)
-  Config: jsonb?                  (provider-specific; schema declared by the IPriceProvider impl)
   PairAllowList: jsonb?           (opt-in fixed list — see Import scope)
   LastImportAt: DateTimeOffset?
   LastImportStatus: string?       (Success | PartialSuccess | Failed; null until first run)
@@ -163,9 +164,9 @@ CommodityPriceSourceSettings {
 }
 ```
 
-**Seeding.** On startup, the application ensures a settings row exists for every External enum value not already in the table — defaulting to `IsEnabled=false`. New providers added in code are picked up on next startup. Enum values that have been removed from code but still have orphan settings rows are ignored (no foreign key, so they don't block anything); a maintenance migration prunes them when convenient.
+**Seeding.** On startup, the application ensures a settings row exists for every External enum value not already in the table (a row carries no enablement — that is config). New providers added in code are picked up on next startup. Enum values that have been removed from code but still have orphan settings rows are ignored (no foreign key, so they don't block anything); a maintenance migration prunes them when convenient.
 
-**Disabling an external source** (`IsEnabled=false` on its settings row) hides all of its prices from valuation lookup *and* stops new imports. Re-enabling restores its rows to the lookup pool — the rows themselves stay in storage while disabled. Enable/disable is the lever for "treat this source as if it weren't here." There is no separate "pause imports but keep prices live" mode — that would silently widen carry-forward gaps without the admin noticing.
+**Disabling an external source** (`PriceSources:{Source}:Enabled=false`, the default) hides all of its prices from valuation lookup *and* stops new imports. Re-enabling restores its rows to the lookup pool — the rows themselves stay in storage while disabled. Enable/disable is the lever for "treat this source as if it weren't here." Valuation's active-source pool uses `IsEnabled` alone: an enabled source whose credentials have since broken keeps contributing the prices it already imported. Imports (scheduled and *Run now*) require `IsConfigured`. There is no separate "pause imports but keep prices live" mode — that would silently widen carry-forward gaps without the admin noticing.
 
 **There is no "delete source" action.** A source exists as long as its enum value exists in code. To stop using a source, disable it. Removing an enum value is a deploy-time decision, paired with a migration that decides what to do with its historical rows (typically: leave them in place, since they remain valid observations even after the provider stops being maintained).
 
@@ -268,13 +269,11 @@ Never default an unpriced holding to zero or NaN — silent holes in net worth d
 
 Route: `/finances/settings/price-sources` (under the existing Finances settings area, sibling of any other finance-wide settings).
 
-**List view** shows every registered source — system and external — with: display name · kind · IsEnabled · `LastImportAt` · last-import-status pill · # prices contributed. The status pill is the at-a-glance health indicator (success / failed / never-run / disabled). Display names come from a per-enum-value localisation entry in code, not a stored column.
+**List view** shows every registered source — system and external — with: display name · kind · state (enabled / disabled / *not configured* for an enabled source with invalid config) · `LastImportAt` · last-import-status pill · # prices contributed. The status pill is the at-a-glance health indicator (success / failed / never-run / disabled). Display names come from a per-enum-value localisation entry in code, not a stored column.
 
 The list is statically the set of registered enum values — there is no "create source" affordance. New providers come in through code releases.
 
-**Edit** (external sources only): IsEnabled, Config, PairAllowList. Kind is rendered but immutable — it *is* the enum value. The Config form is rendered from a per-provider schema declared by the `IPriceProvider` implementation. The endpoint upserts the corresponding `CommodityPriceSourceSettings` row (creates one on first edit if seeding hasn't yet covered it).
-
-**Config field types.** The schema supports four field types: `String`, `Integer`, `Boolean`, and `Secret`. `Secret` fields (e.g., API keys) are rendered as `type="password"` in the form, masked in the source-detail GET response (`••••` plus the last 4 chars when long enough), and treated as no-op on PATCH when the submitted value is empty or matches the masked form — so an admin saving the form without re-entering the key keeps the existing value.
+**Edit** (external sources only): `PairAllowList` only. Kind is rendered but immutable — it *is* the enum value. Enablement and credentials are **read-only** on the page: it shows Enabled/Disabled and Configured/Not configured badges, the `ConfigurationError` when there is one, whether an API key is set (never the key itself) and the resolved base URL, with a pointer to the `PriceSources:{Source}:*` config keys. The PATCH endpoint updates the corresponding `CommodityPriceSourceSettings` row.
 
 **System sources** (`Transaction`, `Manual`) appear in the list for visibility — clicking opens a read-only detail page showing aggregate stats (the number of prices that source has contributed) but offering no edit/disable actions. There is no settings row to edit.
 
@@ -284,8 +283,8 @@ The list is statically the set of registered enum values — there is no "create
 
 A new `ProcessingJobType.ImportCommodityPrices`. Payload: `{ Source, FromAt?, ToAt?, CommodityIds? }` where `Source` is the enum value. Handler:
 
-1. Loads the source's settings row. If the enum value is a system value (Kind=Transaction or Manual), fails with `IStructuredJobError` ("source is system-managed"). If no settings row exists or `IsEnabled=false`, fails with "source disabled".
-2. Resolves the provider strategy by enum value. Each External enum value is registered with exactly one `IPriceProvider` implementation via DI.
+1. If the enum value is a system value (Kind=Transaction or Manual), fails with `IStructuredJobError` ("source is system-managed"). Resolves the provider strategy by enum value — each External enum value is registered with exactly one `IPriceProvider` implementation via DI (`provider_not_registered` otherwise). If the provider is not enabled, fails with `source_disabled`; if enabled but invalid, with `source_not_configured` (message carries the reason).
+2. Loads the source's settings row for its `PairAllowList`. A missing row means an empty allow-list, not a failure.
 3. Computes the target commodity set — see *Import scope*.
 4. Fetches observations from the provider for the target commodities over `[FromAt, ToAt]`.
 5. Upserts rows under the source enum value, keyed by `(CommodityId, QuoteCurrencyId, PriceAt, Source)`. Existing rows have their `Rate` updated; new rows are inserted. On success, updates the settings row's `LastImportAt = now()`, `LastImportStatus = Success`, `LastImportMessage = null`. On partial success (see below), `LastImportStatus = PartialSuccess`, `LastImportMessage = <provider-supplied warning>`.
@@ -304,7 +303,7 @@ On failure, the handler updates the settings row's `LastImportStatus = Failed` /
 **v1 providers.** Two providers ship in v1, covering FX and equities respectively:
 
 - **Bank of Canada Valet** — FX rates; free, no API key. Declares an explicit `SupportedPairs` currency list.
-- **Alpha Vantage** — equity quotes for NASDAQ / NYSE / AMEX (quoted in USD) and TSX (quoted in CAD); requires a free API key (configured per-source via its `ConfigSchema`). Declares `CoveredSecurityExchanges` for those exchanges and owns the Homestead-code → API-suffix translation.
+- **Alpha Vantage** — equity quotes for NASDAQ / NYSE / AMEX (quoted in USD) and TSX (quoted in CAD); requires a free API key (`PriceSources:AlphaVantage:ApiKey`). Declares `CoveredSecurityExchanges` for those exchanges and owns the Homestead-code → API-suffix translation.
 
 Each registers a `CommodityPriceSource` enum value and an `IPriceProvider` implementation, and declares its coverage (`SupportedPairs` and/or `CoveredSecurityExchanges` — see *Provider coverage model*) so import scope can intersect with the household's holdings.
 
@@ -339,7 +338,7 @@ This honours the existing rule: *Prices are captured forward from the user's ear
 
 ## Future-compatibility
 
-- **More providers.** Add an enum value, implement `IPriceProvider`, register it against the new value, optionally declare a config schema for the source-edit form. No schema change.
+- **More providers.** Add an enum value, implement `IPriceProvider`, bind a `PriceSources:{Source}` options bag (with `Enabled` plus whatever credentials it needs) and register it against the new value. No schema change.
 - **Source priority.** v1 picks the most recent observation across all enabled sources (with a Kind-based tiebreaker). If a household ever wants "trust X over Y even when Y is fresher" — e.g., a paid Bloomberg feed should outrank a free fallback — add a `Priority` column to `CommodityPriceSourceSettings` and adjust the lookup to a priority-then-freshness pick. Additive; no migration of existing rows.
 - **Per-pair source overrides.** "BoC for FX, AlphaVantage for stocks" via a `CommodityPriceSourcePairOverride` table keyed by `(Source, CommodityId, QuoteCurrencyId)`. Out of scope for v1 — global enable/disable + per-source `PairAllowList` covers the early use cases.
 - **Durable per-row suppression of external prices.** v1 lets users delete external rows but leaves no record that the row was deleted, so the next import can re-insert it. If transient-delete proves insufficient (users repeatedly re-deleting the same row), add a per-`(Source, Commodity, Quote, PriceAt)` suppression record the importer respects on upsert.

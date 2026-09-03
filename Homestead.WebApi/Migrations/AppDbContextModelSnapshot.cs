@@ -18,7 +18,7 @@ namespace Homestead.WebApi.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.7")
+                .HasAnnotation("ProductVersion", "10.0.11")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "pg_trgm");
@@ -930,9 +930,6 @@ namespace Homestead.WebApi.Migrations
                     b.Property<string>("Source")
                         .HasColumnType("text");
 
-                    b.Property<string>("Config")
-                        .HasColumnType("jsonb");
-
                     b.Property<DateTimeOffset>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -940,11 +937,6 @@ namespace Homestead.WebApi.Migrations
 
                     b.Property<Guid?>("CreatedByUserId")
                         .HasColumnType("uuid");
-
-                    b.Property<bool>("IsEnabled")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
 
                     b.Property<DateTimeOffset?>("LastImportAt")
                         .HasColumnType("timestamp with time zone");

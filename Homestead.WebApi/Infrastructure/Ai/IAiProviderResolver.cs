@@ -1,9 +1,9 @@
 namespace Homestead.WebApi.Infrastructure.Ai;
 
 // Resolves which configured AI provider a call should use. Chain: explicit key -> Ai:DefaultProvider ->
-// the sole defined provider -> null. Lives in Infrastructure as a singleton (contrast
-// ITextExtractionEngineResolver in Modules/Documents/Services): the AI choice is config-only, so there is
-// no settings read and no DbContext.
+// the sole defined provider -> null. A config-only singleton like ITextExtractionEngineResolver; the one
+// difference is the terminus: OCR always has the built-in "tesseract" to land on, AI has nothing, hence
+// the sole-provider convenience and the null result here.
 public interface IAiProviderResolver
 {
     // Null means UNRESOLVED — no provider is defined and none was asked for. That is "AI is not

@@ -87,6 +87,8 @@ type StatusPill = { label: string; variant: 'default' | 'destructive' | 'seconda
                     <td hlmTd>
                       @if (item.kind !== 'External') {
                         <span hlmBadge variant="outline">System</span>
+                      } @else if (item.isEnabled && !item.isConfigured) {
+                        <span hlmBadge variant="destructive">Not configured</span>
                       } @else if (item.isEnabled) {
                         <span hlmBadge variant="default">Enabled</span>
                       } @else {

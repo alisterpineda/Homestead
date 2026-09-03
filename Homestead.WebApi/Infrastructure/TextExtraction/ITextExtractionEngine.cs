@@ -11,8 +11,8 @@ public record TextExtractionOutput(string? Text, TextExtractionMetadata Metadata
 // One configured engine instance. Instances are built from config at DI registration and registered as
 // IEnumerable<ITextExtractionEngine> — never keyed, because MS DI cannot enumerate keyed registrations
 // and the picker needs to enumerate them. Engines are singletons over their own options bag and must
-// never touch AppDbContext (mirroring the AI providers): the engine CHOICE is product data, but an
-// engine's DEFINITION is a deployment fact.
+// never touch AppDbContext (mirroring the AI providers): an engine's DEFINITION ("Ocr:Engines:{key}") and
+// the CHOICE of default ("Ocr:DefaultEngine") are both deployment facts, never product data.
 public interface ITextExtractionEngine
 {
     // The config instance name ("tesseract", "azure-layout"). Unique across registrations; the registry

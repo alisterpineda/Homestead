@@ -8,8 +8,6 @@ namespace Homestead.WebApi.Modules.Finances.PriceProviders.AlphaVantage;
 
 public class AlphaVantagePriceProvider : IPriceProvider
 {
-    private static readonly JsonSerializerOptions _jsonOptions = new() { PropertyNameCaseInsensitive = true };
-
     private static readonly TimeSpan _interCallDelay = TimeSpan.FromSeconds(12);
 
     private static readonly IReadOnlyDictionary<string, string> _exchangeToQuote =
@@ -28,37 +26,31 @@ public class AlphaVantagePriceProvider : IPriceProvider
         };
 
     private readonly AlphaVantageClient _client;
+    private readonly AlphaVantageOptions _options;
     private readonly Func<TimeSpan, CancellationToken, Task> _delay;
     private readonly ILogger<AlphaVantagePriceProvider> _logger;
 
     public AlphaVantagePriceProvider(
         AlphaVantageClient client,
+        AlphaVantageOptions options,
         Func<TimeSpan, CancellationToken, Task>? delay = null,
         ILogger<AlphaVantagePriceProvider>? logger = null)
     {
         _client = client;
+        _options = options;
         _delay = delay ?? Task.Delay;
         _logger = logger ?? NullLogger<AlphaVantagePriceProvider>.Instance;
+        // Computed once at construction: config is static, so the verdict never changes.
+        ConfigurationError = PriceSourceConfiguration.Validate(options);
     }
 
     public CommodityPriceSource Source => CommodityPriceSource.AlphaVantage;
 
-    public PriceProviderConfigSchema ConfigSchema { get; } = new(new[]
-    {
-        new PriceProviderConfigField(
-            Key: "ApiKey",
-            Label: "API key",
-            Type: PriceProviderConfigFieldType.Secret,
-            IsRequired: true,
-            Help: "Alpha Vantage API key. Get one free at https://www.alphavantage.co/support/#api-key."),
-        new PriceProviderConfigField(
-            Key: "BaseUrl",
-            Label: "Base URL",
-            Type: PriceProviderConfigFieldType.String,
-            IsRequired: false,
-            Help: "Alpha Vantage query endpoint URL.",
-            DefaultValue: AlphaVantageConfig.DefaultBaseUrl),
-    });
+    public bool IsEnabled => _options.Enabled;
+    public string? ConfigurationError { get; }
+    public bool IsConfigured => IsEnabled && ConfigurationError is null;
+    public bool? HasApiKey => !string.IsNullOrWhiteSpace(_options.ApiKey);
+    public string BaseUrl => _options.ResolveBaseUrl();
 
     public IReadOnlyList<PriceProviderSupportedPair> SupportedPairs { get; } =
         Array.Empty<PriceProviderSupportedPair>();
@@ -83,11 +75,12 @@ public class AlphaVantagePriceProvider : IPriceProvider
             return PriceImportResult.Success(Array.Empty<PriceObservation>());
         }
 
-        var config = ParseConfig(request.Config);
-        if (string.IsNullOrWhiteSpace(config.ApiKey))
-            throw new InvalidOperationException("AlphaVantage API key is not configured.");
+        if (!IsConfigured)
+            throw new InvalidOperationException(
+                $"Price source '{Source}' is unavailable: {ConfigurationError ?? "disabled"}");
 
-        var baseUri = new Uri(config.BaseUrl, UriKind.Absolute);
+        // ApiKey is non-null here: Validate requires it, and the IsConfigured guard runs first.
+        var baseUri = new Uri(BaseUrl, UriKind.Absolute);
 
         var quoteCurrenciesBySymbol = new Dictionary<string, Commodity>(StringComparer.OrdinalIgnoreCase);
         var candidateSecurities = new List<Commodity>();
@@ -167,7 +160,7 @@ public class AlphaVantagePriceProvider : IPriceProvider
                 await _delay(_interCallDelay, ct);
 
             var dailyResponse = await _client.GetDailyTimeSeriesAsync(
-                baseUri, apiSymbol, config.ApiKey!, "compact", ct);
+                baseUri, apiSymbol, _options.ApiKey!, "compact", ct);
 
             if (dailyResponse is null)
             {
@@ -237,7 +230,7 @@ public class AlphaVantagePriceProvider : IPriceProvider
 
                 var weeklyObservationsBefore = observations.Count;
                 var weeklyResponse = await _client.GetWeeklyTimeSeriesAsync(
-                    baseUri, apiSymbol, config.ApiKey!, ct);
+                    baseUri, apiSymbol, _options.ApiKey!, ct);
 
                 if (weeklyResponse is null)
                 {
@@ -348,24 +341,5 @@ public class AlphaVantagePriceProvider : IPriceProvider
             return null;
 
         return new PriceObservation(securityId, quoteCurrencyId, priceAt, close);
-    }
-
-    private static AlphaVantageConfig ParseConfig(string? rawConfig)
-    {
-        if (string.IsNullOrWhiteSpace(rawConfig))
-            return new AlphaVantageConfig();
-        try
-        {
-            var parsed = JsonSerializer.Deserialize<AlphaVantageConfig>(rawConfig, _jsonOptions);
-            if (parsed is null)
-                return new AlphaVantageConfig();
-            if (string.IsNullOrWhiteSpace(parsed.BaseUrl))
-                parsed = parsed with { BaseUrl = AlphaVantageConfig.DefaultBaseUrl };
-            return parsed;
-        }
-        catch (JsonException)
-        {
-            return new AlphaVantageConfig();
-        }
     }
 }

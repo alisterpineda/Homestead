@@ -38,7 +38,7 @@ public class ReprocessDocumentVersionJobHandler(
 
         // Re-extract text (the failure-prone step stays in the job handler). The engine key was resolved
         // and stamped into the payload at enqueue, so a bulk run cannot split across engines if the
-        // household default flips mid-run, and this path needs no settings read.
+        // configured default flips mid-run, and this path needs no settings read.
         var extractionResult = await textExtractionHelper.ExtractTextSafeAsync(
             filePath, version.ContentType, payload.EngineKey, ct);
 

@@ -23,7 +23,6 @@ public class GetDocumentSettingsHandler(AppDbContext db)
         return new DocumentSettingsResponse
         {
             AutoClassifyOnUpload = settings.AutoClassifyOnUpload,
-            DefaultEngineKey = settings.DefaultEngineKey
         };
     }
 }

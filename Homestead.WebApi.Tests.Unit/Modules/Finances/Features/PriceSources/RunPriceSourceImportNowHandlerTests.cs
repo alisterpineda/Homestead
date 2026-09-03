@@ -8,56 +8,68 @@ using NSubstitute;
 
 namespace Homestead.WebApi.Tests.Unit.Modules.Finances.Features.PriceSources;
 
-public class RunPriceSourceImportNowHandlerTests : IDisposable
+public class RunPriceSourceImportNowHandlerTests
 {
-    private readonly TestAppDbContext _db;
     private readonly IJobQueue _queue;
     private readonly ICurrentUserAccessor _currentUser;
+    private readonly StubPriceSourceRegistry _sources;
 
     public RunPriceSourceImportNowHandlerTests()
     {
-        _db = TestAppDbContext.Create();
         _queue = Substitute.For<IJobQueue>();
         _currentUser = Substitute.For<ICurrentUserAccessor>();
         _currentUser.UserId.Returns(Guid.NewGuid());
+        _sources = new StubPriceSourceRegistry();
     }
 
-    public void Dispose() => _db.Dispose();
+    private RunPriceSourceImportNowHandler Sut() => new(_queue, _currentUser, _sources);
 
     [Fact]
     public async Task SystemSource_Throws()
     {
-        var sut = new RunPriceSourceImportNowHandler(_db, _queue, _currentUser);
-        await Assert.ThrowsAsync<BusinessRuleException>(() => sut.Handle(
+        await Assert.ThrowsAsync<BusinessRuleException>(() => Sut().Handle(
             new RunPriceSourceImportNowCommand { Source = CommodityPriceSource.Manual },
             TestContext.Current.CancellationToken));
     }
 
     [Fact]
-    public async Task DisabledSource_Throws()
+    public async Task UnregisteredSource_Throws()
     {
-        _db.CommodityPriceSourceSettings.Add(new CommodityPriceSourceSettings
-        {
-            Source = CommodityPriceSource.BankOfCanada,
-            IsEnabled = false,
-        });
-        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
-
-        var sut = new RunPriceSourceImportNowHandler(_db, _queue, _currentUser);
-        await Assert.ThrowsAsync<BusinessRuleException>(() => sut.Handle(
+        var ex = await Assert.ThrowsAsync<BusinessRuleException>(() => Sut().Handle(
             new RunPriceSourceImportNowCommand { Source = CommodityPriceSource.BankOfCanada },
             TestContext.Current.CancellationToken));
+        Assert.Contains("No provider is registered", ex.Message);
+    }
+
+    [Fact]
+    public async Task DisabledSource_Throws()
+    {
+        _sources.Providers[CommodityPriceSource.BankOfCanada] =
+            TestPriceSources.Provider(CommodityPriceSource.BankOfCanada, enabled: false, configured: false);
+
+        var ex = await Assert.ThrowsAsync<BusinessRuleException>(() => Sut().Handle(
+            new RunPriceSourceImportNowCommand { Source = CommodityPriceSource.BankOfCanada },
+            TestContext.Current.CancellationToken));
+        Assert.Contains("is disabled", ex.Message);
+    }
+
+    [Fact]
+    public async Task NotConfiguredSource_Throws_WithReason()
+    {
+        _sources.Providers[CommodityPriceSource.AlphaVantage] = TestPriceSources.Provider(
+            CommodityPriceSource.AlphaVantage, enabled: true, configured: false, error: "ApiKey is required.");
+
+        var ex = await Assert.ThrowsAsync<BusinessRuleException>(() => Sut().Handle(
+            new RunPriceSourceImportNowCommand { Source = CommodityPriceSource.AlphaVantage },
+            TestContext.Current.CancellationToken));
+        Assert.Contains("is not configured: ApiKey is required.", ex.Message);
     }
 
     [Fact]
     public async Task EnabledSource_EnqueuesJobWithCreator()
     {
-        _db.CommodityPriceSourceSettings.Add(new CommodityPriceSourceSettings
-        {
-            Source = CommodityPriceSource.BankOfCanada,
-            IsEnabled = true,
-        });
-        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        _sources.Providers[CommodityPriceSource.BankOfCanada] =
+            TestPriceSources.Provider(CommodityPriceSource.BankOfCanada);
 
         var userId = Guid.NewGuid();
         _currentUser.UserId.Returns(userId);
@@ -83,8 +95,7 @@ public class RunPriceSourceImportNowHandlerTests : IDisposable
                 configure?.Invoke(captured);
             });
 
-        var sut = new RunPriceSourceImportNowHandler(_db, _queue, _currentUser);
-        var response = await sut.Handle(
+        var response = await Sut().Handle(
             new RunPriceSourceImportNowCommand { Source = CommodityPriceSource.BankOfCanada },
             TestContext.Current.CancellationToken);
 

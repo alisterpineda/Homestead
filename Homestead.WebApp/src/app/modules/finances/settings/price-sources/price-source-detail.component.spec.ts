@@ -12,7 +12,10 @@ function makeResponse(overrides: Partial<GetPriceSourceResponse> = {}): GetPrice
     displayName: 'Bank of Canada',
     kind: 'External',
     isEnabled: false,
-    configSchema: { fields: [] },
+    isConfigured: false,
+    configurationError: null,
+    hasApiKey: null,
+    baseUrl: 'https://www.bankofcanada.ca/valet/',
     supportedPairs: [],
     coveredSecurityExchanges: [],
     coveredQuoteCurrencies: [],
@@ -24,7 +27,7 @@ function makeResponse(overrides: Partial<GetPriceSourceResponse> = {}): GetPrice
 class FakeApi {
   response: GetPriceSourceResponse = makeResponse();
   get() { return of<GetPriceSourceResponse>(this.response); }
-  patch() { return of({ source: 'BankOfCanada', isEnabled: true }); }
+  patch() { return of({ source: 'BankOfCanada', pairAllowList: [] }); }
   upsertSchedule() { return of({ id: 'abc', nextRunAt: '2026-04-29T00:00:00Z' }); }
   deleteSchedule() { return of(undefined); }
   runNow() { return of({ jobId: 'xyz' }); }
@@ -44,6 +47,15 @@ describe('PriceSourceDetailComponent', () => {
     });
   });
 
+  function readout(fixture: { nativeElement: HTMLElement }): HTMLElement {
+    return fixture.nativeElement.querySelector('[data-testid="provider-readout"]') as HTMLElement;
+  }
+
+  function runNowButton(fixture: { nativeElement: HTMLElement }): HTMLButtonElement {
+    const buttons = Array.from(fixture.nativeElement.querySelectorAll('button')) as HTMLButtonElement[];
+    return buttons.find(b => b.textContent?.includes('Run now'))!;
+  }
+
   it('loads detail for the source', () => {
     const fixture = TestBed.createComponent(PriceSourceDetailComponent);
     fixture.detectChanges();
@@ -51,10 +63,80 @@ describe('PriceSourceDetailComponent', () => {
     expect(fixture.componentInstance.data()!.source).toBe('BankOfCanada');
   });
 
-  it('initialises isEnabled from response', () => {
+  // Enablement and credentials are deployment config, so the page only reports them.
+  it('renders Enabled and Configured badges from the response', () => {
+    api.response = makeResponse({ isEnabled: true, isConfigured: true });
     const fixture = TestBed.createComponent(PriceSourceDetailComponent);
     fixture.detectChanges();
-    expect(fixture.componentInstance.isEnabled()).toBe(false);
+    const text = readout(fixture).textContent!;
+    expect(text).toContain('Enabled');
+    expect(text).toContain('Configured');
+    expect(text).not.toContain('Not configured');
+    expect(text).toContain('PriceSources:BankOfCanada:Enabled');
+    // Bank of Canada takes no key, so no API key row.
+    expect(text).not.toContain('API key');
+    expect(text).toContain('https://www.bankofcanada.ca/valet/');
+  });
+
+  // A disabled source never earns "Configured", so that badge would only restate "Disabled"; the
+  // validation reason and key state still show so the operator knows what else to set.
+  it('renders Disabled with the reason and API key state, without a Configured badge', () => {
+    api.response = makeResponse({
+      source: 'AlphaVantage',
+      displayName: 'Alpha Vantage',
+      isEnabled: false,
+      isConfigured: false,
+      configurationError: 'ApiKey is required.',
+      hasApiKey: false,
+    });
+    const fixture = TestBed.createComponent(PriceSourceDetailComponent);
+    fixture.detectChanges();
+    const text = readout(fixture).textContent!;
+    expect(text).toContain('Disabled');
+    expect(text).not.toContain('Not configured');
+    expect(text).toContain('ApiKey is required.');
+    expect(text).toContain('API key');
+    expect(text).toContain('Not set');
+  });
+
+  it('renders Enabled / Not configured with the reason when enabled but invalid', () => {
+    api.response = makeResponse({
+      source: 'AlphaVantage',
+      displayName: 'Alpha Vantage',
+      isEnabled: true,
+      isConfigured: false,
+      configurationError: 'ApiKey is required.',
+      hasApiKey: false,
+    });
+    const fixture = TestBed.createComponent(PriceSourceDetailComponent);
+    fixture.detectChanges();
+    const text = readout(fixture).textContent!;
+    expect(text).toContain('Enabled');
+    expect(text).toContain('Not configured');
+    expect(text).toContain('ApiKey is required.');
+  });
+
+  it('disables Run now when the source is disabled', () => {
+    api.response = makeResponse({ isEnabled: false, isConfigured: false });
+    const fixture = TestBed.createComponent(PriceSourceDetailComponent);
+    fixture.detectChanges();
+    expect(runNowButton(fixture).disabled).toBe(true);
+    expect(fixture.nativeElement.textContent).toContain('This source is disabled');
+  });
+
+  it('disables Run now with the reason when enabled but not configured', () => {
+    api.response = makeResponse({ isEnabled: true, isConfigured: false, configurationError: 'ApiKey is required.' });
+    const fixture = TestBed.createComponent(PriceSourceDetailComponent);
+    fixture.detectChanges();
+    expect(runNowButton(fixture).disabled).toBe(true);
+    expect(fixture.nativeElement.textContent).toContain('This source is not configured: ApiKey is required.');
+  });
+
+  it('enables Run now when enabled and configured', () => {
+    api.response = makeResponse({ isEnabled: true, isConfigured: true });
+    const fixture = TestBed.createComponent(PriceSourceDetailComponent);
+    fixture.detectChanges();
+    expect(runNowButton(fixture).disabled).toBe(false);
   });
 
   it('renders a badge per supported pair', () => {

@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, computed, inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { catchError, of, shareReplay } from 'rxjs';
 
@@ -16,13 +16,20 @@ export class TextExtractionEnginesService {
 
   readonly engines = toSignal(
     this.documentApi.getTextExtractionEngines().pipe(
-      // An empty list degrades the picker to "household default" only, rather than breaking the dialog
+      // An empty list degrades the picker to the default option only, rather than breaking the dialog
       // it is embedded in.
       catchError(() => of<TextExtractionEngineResponse[]>([])),
       shareReplay(1),
     ),
     { initialValue: [] as TextExtractionEngineResponse[] },
   );
+
+  /**
+   * The engine Ocr:DefaultEngine names (or, unset, the built-in one). Undefined only while the list is
+   * still loading or could not be fetched — the backend always marks exactly one row, appending a
+   * synthetic unavailable row when the configured default names nothing.
+   */
+  readonly defaultEngine = computed(() => this.engines().find(e => e.isDefault));
 
   find(key: string): TextExtractionEngineResponse | undefined {
     return this.engines().find(e => e.key === key);

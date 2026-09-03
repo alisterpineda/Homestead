@@ -1,12 +1,13 @@
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Modules.Finances.Features.Settings;
+using Homestead.WebApi.Modules.Finances.PriceProviders;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Services;
 
-public class ValuationService(AppDbContext db) : IValuationService
+public class ValuationService(AppDbContext db, IPriceSourceRegistry sources) : IValuationService
 {
     public Task<ValuationContext> LoadContextAsync(CancellationToken ct) =>
         LoadContextAsync(CurrentDayCutoffUtc(), ct);
@@ -19,7 +20,7 @@ public class ValuationService(AppDbContext db) : IValuationService
         var settings = await FinanceSettings.LoadAsync(db, ct);
         var displayCurrencyId = settings.DisplayCurrencyId;
 
-        var activeSources = await CommodityPriceSourceQueryExtensions.GetEnabledSourcesAsync(db, ct);
+        var activeSources = sources.EnabledSources;
 
         var prices = await db.CommodityPrices
             .AsNoTracking()

@@ -3,6 +3,6 @@
 
 import { CommodityPriceSource } from '../models/commodity-price-source';
 export interface PatchPriceSourceResponse {
-  isEnabled: boolean;
+  pairAllowList: Array<string>;
   source: CommodityPriceSource;
 }

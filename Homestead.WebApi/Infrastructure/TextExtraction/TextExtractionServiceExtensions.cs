@@ -16,6 +16,12 @@ public static class TextExtractionServiceExtensions
         foreach (var (key, options) in OcrEngineConfiguration.ReadEngines(configuration))
             services.AddSingleton<ITextExtractionEngine>(sp => BuildEngine(sp, key, options));
 
+        // Singleton over static config (mirrors AddAiServices' resolver): the default is Ocr:DefaultEngine,
+        // not a settings row, so nothing here needs a DbContext.
+        var defaultEngineKey = OcrEngineConfiguration.ReadDefaultEngineKey(configuration);
+        services.AddSingleton<ITextExtractionEngineResolver>(sp =>
+            new TextExtractionEngineResolver(sp.GetServices<ITextExtractionEngine>(), defaultEngineKey));
+
         services.AddScoped<TextExtractionHelper>();
 
         return services;

@@ -73,7 +73,7 @@ describe('ReprocessDialogComponent', () => {
     });
   });
 
-  // No selection must mean "household default", not "no engine" — the backend distinguishes the two.
+  // No selection must mean "configured default", not "no engine" — the backend distinguishes the two.
   it('sends a null engine key when nothing is selected', () => {
     component.handleReprocess({ close: () => {} });
 

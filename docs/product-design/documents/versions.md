@@ -76,17 +76,17 @@ The asymmetry is deliberate. Uploads prioritise capturing the file safely; repro
 
 Two reprocess paths:
 
-- **Single-version reprocess.** Reruns extraction against a specific version's file. Updates the version's `ExtractedText`, refreshes the document's `SearchVector`, and surfaces failures inline. It may optionally pin a specific extraction engine for that one run — the reprocess dialog exposes an engine selector (`ReprocessDocumentVersionBody.EngineKey`); when none is chosen it uses the household-wide default.
-- **Bulk reprocess.** Enqueues a parent job that fans out to one child reprocess job per selected document, targeting each document's *latest* version. Older versions of a selected document are not reprocessed in bulk. Optionally pins an extraction engine for the entire run; otherwise the household-wide default is used. Progress is observable through the standard processing UI; the user is not blocked on completion.
+- **Single-version reprocess.** Reruns extraction against a specific version's file. Updates the version's `ExtractedText`, refreshes the document's `SearchVector`, and surfaces failures inline. It may optionally pin a specific extraction engine for that one run — the reprocess dialog exposes an engine selector (`ReprocessDocumentVersionBody.EngineKey`); when none is chosen it uses the configured default (`Ocr:DefaultEngine`).
+- **Bulk reprocess.** Enqueues a parent job that fans out to one child reprocess job per selected document, targeting each document's *latest* version. Older versions of a selected document are not reprocessed in bulk. Optionally pins an extraction engine for the entire run; otherwise the configured default is used. Progress is observable through the standard processing UI; the user is not blocked on completion.
 
 Bulk reprocess is the recovery path when the extraction engine has been swapped, the previous engine had a defect, or a batch of uploads failed extraction silently.
 
 ## Text-extraction engine
 
-Two different kinds of fact are deliberately kept apart:
+Both facts about engines are deployment configuration, not data:
 
-- **Which engines exist is deployment configuration**, not data. Engines are defined in config under `Ocr:Engines:{key}`, where `{key}` is an arbitrary instance name. Endpoints and API keys are deployment facts that belong in env vars / user-secrets, where the existing secret tooling already works — so there is no engines table, no admin CRUD, no secret masking, and no API keys in a `pg_dump`.
-- **Which engine to use is product data.** The household default lives in the Documents `AppSettings` row as `DefaultEngineKey` (a config instance key, e.g. `azure-layout`); a per-run override can be pinned on either reprocess path.
+- **Which engines exist** is defined in config under `Ocr:Engines:{key}`, where `{key}` is an arbitrary instance name. Endpoints and API keys are deployment facts that belong in env vars / user-secrets, where the existing secret tooling already works — so there is no engines table, no admin CRUD, no secret masking, and no API keys in a `pg_dump`.
+- **Which engine to use** is also configuration: `Ocr:DefaultEngine` names the default (a config instance key, e.g. `azure-layout`), exactly as `Ai:DefaultProvider` does for AI. The Documents settings page reports the engine list and the default **read-only**; a per-run override can still be pinned on either reprocess path.
 
 Engines are *named instances* selected by string key, not one-per-type: a single Azure resource serves several meaningfully different models, so `azure-layout` (`prebuilt-layout`) and `azure-read` (`prebuilt-read`) are both legitimate engines over the same credentials.
 
@@ -95,7 +95,7 @@ Two engine types ship:
 - **`tesseract`** — local, free, always present. For PDFs it takes a hybrid path: pages with an embedded text layer are read directly; only text-less pages are rasterized and OCR'd.
 - **Azure Document Intelligence** — metered per page, off unless configured. Sends the whole file regardless of text layer. With `prebuilt-layout` it returns Markdown containing **HTML table syntax** (`<table>/<tr>/<td>`, `rowspan`/`colspan` preserved), which is why it exists: born-digital documents like bank statements *have* a text layer, so Tesseract takes the text-layer branch and returns badly-spaced prose that loses the table structure entirely.
 
-A built-in `tesseract` instance always exists, seeded with defaults even when config defines no engines at all. It is the terminus of the resolution chain: **explicit per-run key → household `DefaultEngineKey` → built-in `tesseract`**. The default is shared by the entire household — there is no per-user override.
+A built-in `tesseract` instance always exists, seeded with defaults even when config defines no engines at all. It is the terminus of the resolution chain: **explicit per-run key → `Ocr:DefaultEngine` → built-in `tesseract`**. There is no sole-engine auto-pick and no per-user override.
 
 ### Availability and failure
 
@@ -108,7 +108,7 @@ Failure handling is deliberately asymmetric:
 
 Statement import sits on **neither** path — it does not extract at all. It consumes whatever `ExtractedText` a version already carries, and a version without any is rejected at initiate with a 400 (before a job row exists), pointing the user at reprocess. It was previously counted as a default path, but it never fit: an import is a blocking, user-initiated action with somebody watching a spinner, which the asymmetry above places on the loud side. It also never honoured the default path's provenance promise — its re-extract discarded its own result, writing neither text nor metadata. See [Statement import](../finances/transactions.md#statement-import).
 
-The engine is resolved **once, at enqueue**, and the concrete key is stamped into the job payload; a bulk fan-out copies the parent's key into every child. This makes a run deterministic — changing the household default mid-run cannot split a batch across two engines — and makes the 400-at-enqueue possible at all.
+The engine is resolved **once, at enqueue**, and the concrete key is stamped into the job payload; a bulk fan-out copies the parent's key into every child. This makes a run deterministic — changing `Ocr:DefaultEngine` between deploys mid-run cannot split a batch across two engines — and makes the 400-at-enqueue possible at all.
 
 ### Provenance
 

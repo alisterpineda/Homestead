@@ -118,7 +118,7 @@ public class BulkReprocessDocumentsJobHandlerTests : IDisposable
     }
 
     // The fan-out copies the parent's already-resolved key rather than re-resolving per child. Without
-    // this, flipping the household default mid-run would split one batch across two engines, with no
+    // this, flipping the configured default mid-run would split one batch across two engines, with no
     // record of which document got which.
     [Fact]
     public async Task HandleAsync_CopiesTheParentEngineKeyIntoEveryChild()

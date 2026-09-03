@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Homestead.WebApi.Domain.Finances;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -7,17 +6,20 @@ namespace Homestead.WebApi.Modules.Finances.PriceProviders.BankOfCanada;
 
 public class BankOfCanadaPriceProvider : IPriceProvider
 {
-    private static readonly JsonSerializerOptions _jsonOptions = new() { PropertyNameCaseInsensitive = true };
-
     private readonly BankOfCanadaValetClient _client;
+    private readonly BankOfCanadaOptions _options;
     private readonly ILogger<BankOfCanadaPriceProvider> _logger;
 
     public BankOfCanadaPriceProvider(
         BankOfCanadaValetClient client,
+        BankOfCanadaOptions options,
         ILogger<BankOfCanadaPriceProvider>? logger = null)
     {
         _client = client;
+        _options = options;
         _logger = logger ?? NullLogger<BankOfCanadaPriceProvider>.Instance;
+        // Computed once at construction: config is static, so the verdict never changes.
+        ConfigurationError = PriceSourceConfiguration.Validate(options);
     }
 
     private static readonly string[] _supportedSymbols =
@@ -29,16 +31,12 @@ public class BankOfCanadaPriceProvider : IPriceProvider
 
     public CommodityPriceSource Source => CommodityPriceSource.BankOfCanada;
 
-    public PriceProviderConfigSchema ConfigSchema { get; } = new(new[]
-    {
-        new PriceProviderConfigField(
-            Key: "BaseUrl",
-            Label: "Valet API base URL",
-            Type: PriceProviderConfigFieldType.String,
-            IsRequired: true,
-            Help: "Bank of Canada Valet API root URL.",
-            DefaultValue: BankOfCanadaConfig.DefaultBaseUrl),
-    });
+    public bool IsEnabled => _options.Enabled;
+    public string? ConfigurationError { get; }
+    public bool IsConfigured => IsEnabled && ConfigurationError is null;
+    // The Valet API takes no key.
+    public bool? HasApiKey => null;
+    public string BaseUrl => _options.ResolveBaseUrl();
 
     public IReadOnlyList<PriceProviderSupportedPair> SupportedPairs { get; } =
         _supportedSymbols.Select(s => new PriceProviderSupportedPair(s, null, "CAD")).ToArray();
@@ -61,8 +59,11 @@ public class BankOfCanadaPriceProvider : IPriceProvider
             return PriceImportResult.Success(Array.Empty<PriceObservation>());
         }
 
-        var config = ParseConfig(request.Config);
-        var baseUri = new Uri(config.BaseUrl, UriKind.Absolute);
+        if (!IsConfigured)
+            throw new InvalidOperationException(
+                $"Price source '{Source}' is unavailable: {ConfigurationError ?? "disabled"}");
+
+        var baseUri = new Uri(BaseUrl, UriKind.Absolute);
 
         var supported = new HashSet<string>(_supportedSymbols, StringComparer.OrdinalIgnoreCase);
 
@@ -153,22 +154,5 @@ public class BankOfCanadaPriceProvider : IPriceProvider
                 observations.Count, seriesToCommodity.Count, raw.Count);
 
         return PriceImportResult.Success(observations);
-    }
-
-    private static BankOfCanadaConfig ParseConfig(string? rawConfig)
-    {
-        if (string.IsNullOrWhiteSpace(rawConfig))
-            return new BankOfCanadaConfig();
-        try
-        {
-            var parsed = JsonSerializer.Deserialize<BankOfCanadaConfig>(rawConfig, _jsonOptions);
-            if (parsed is null || string.IsNullOrWhiteSpace(parsed.BaseUrl))
-                return new BankOfCanadaConfig();
-            return parsed;
-        }
-        catch (JsonException)
-        {
-            return new BankOfCanadaConfig();
-        }
     }
 }

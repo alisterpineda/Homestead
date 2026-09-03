@@ -6,7 +6,6 @@ using Homestead.WebApi.Modules.Documents.Features.Versions.ReprocessDocumentVers
 using Homestead.WebApi.Processing;
 using NSubstitute;
 using Homestead.WebApi.Infrastructure.TextExtraction;
-using Homestead.WebApi.Modules.Documents.Services;
 using Homestead.WebApi.Tests.Unit.Documents.TextExtraction;
 
 namespace Homestead.WebApi.Tests.Unit.Documents;
@@ -32,7 +31,7 @@ public class ReprocessDocumentVersionHandlerTests : IDisposable
         _jobQueue.EnqueueAsync(Arg.Any<ProcessingJobType>(), Arg.Any<Action<EnqueueJobRequest>?>(), Arg.Any<CancellationToken>())
             .Returns(Guid.NewGuid());
 
-        _resolver = new TextExtractionEngineResolver(_db, TestTextExtraction.Engines());
+        _resolver = new TextExtractionEngineResolver(TestTextExtraction.Engines(), defaultEngineKey: null);
         _sut = new ReprocessDocumentVersionHandler(_db, _currentUser, _resolver, _jobQueue);
 
         SeedDocumentAndVersion();
@@ -119,7 +118,7 @@ public class ReprocessDocumentVersionHandlerTests : IDisposable
     }
 
     // The key is resolved once here and stamped, so the job path needs no settings read and the run is
-    // deterministic regardless of what the household default does afterwards.
+    // deterministic regardless of what the configured default does afterwards.
     [Fact]
     public async Task Handle_ExplicitEngineKey_IsStampedIntoThePayload()
     {

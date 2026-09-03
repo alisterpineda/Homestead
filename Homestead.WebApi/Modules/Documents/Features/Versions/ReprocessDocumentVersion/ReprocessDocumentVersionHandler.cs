@@ -3,6 +3,7 @@ using Homestead.WebApi.Common;
 using MediatR;
 using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Modules.Documents.Processing;
+using Homestead.WebApi.Infrastructure.TextExtraction;
 using Homestead.WebApi.Modules.Documents.Services;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Processing;
@@ -34,7 +35,7 @@ public class ReprocessDocumentVersionHandler(
         // 400 synchronously, before a job row exists. Ordering is legal: the two AnyAsync reads above are
         // deliberately not hooked by CommandTransactionInterceptor, so nothing has opened the transaction
         // yet — jobQueue.EnqueueAsync below is still the first write.
-        var engineKey = await engineResolver.ResolveKeyAsync(request.EngineKey, ct);
+        var engineKey = engineResolver.ResolveKey(request.EngineKey);
 
         var payload = new ReprocessDocumentVersionPayload(request.DocumentId, request.VersionId, engineKey);
 

@@ -38,11 +38,7 @@ public static class CommodityPriceSourceSettingsSeeder
         foreach (var source in ExternalSources)
         {
             if (existing.Contains(source)) continue;
-            toAdd.Add(new CommodityPriceSourceSettings
-            {
-                Source = source,
-                IsEnabled = false,
-            });
+            toAdd.Add(new CommodityPriceSourceSettings { Source = source });
         }
         return toAdd;
     }

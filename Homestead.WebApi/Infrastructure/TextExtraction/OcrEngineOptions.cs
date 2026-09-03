@@ -13,8 +13,12 @@ public class OcrEngineOptions
 {
     public const string SectionName = "Ocr:Engines";
 
-    // The always-present engine. It is the terminus of the resolution chain (explicit key -> household
-    // default -> this), so it is seeded even when config defines no engines at all.
+    // Which engine uploads and un-pinned reprocess runs use — an "Ocr:Engines:{key}" name. Unset means
+    // the built-in engine. Deployment config, like the engines themselves (contrast Ai:DefaultProvider).
+    public const string DefaultEngineConfigKey = "Ocr:DefaultEngine";
+
+    // The always-present engine. It is the terminus of the resolution chain (explicit key ->
+    // Ocr:DefaultEngine -> this), so it is seeded even when config defines no engines at all.
     public const string BuiltInTesseractKey = "tesseract";
 
     // Nullable so "not configured" is distinguishable from Tesseract. A non-nullable enum would bind an

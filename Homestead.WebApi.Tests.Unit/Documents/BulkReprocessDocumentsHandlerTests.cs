@@ -8,7 +8,6 @@ using Homestead.WebApi.Processing;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 using Homestead.WebApi.Infrastructure.TextExtraction;
-using Homestead.WebApi.Modules.Documents.Services;
 using Homestead.WebApi.Tests.Unit.Documents.TextExtraction;
 
 namespace Homestead.WebApi.Tests.Unit.Documents;
@@ -34,7 +33,7 @@ public class BulkReprocessDocumentsHandlerTests : IDisposable
         _jobQueue.EnqueueAsync(Arg.Any<ProcessingJobType>(), Arg.Any<Action<EnqueueJobRequest>?>(), Arg.Any<CancellationToken>())
             .Returns(_ => Guid.NewGuid());
 
-        _resolver = new TextExtractionEngineResolver(_db, TestTextExtraction.Engines());
+        _resolver = new TextExtractionEngineResolver(TestTextExtraction.Engines(), defaultEngineKey: null);
         _sut = new BulkReprocessDocumentsHandler(_db, _currentUser, _queryService, _resolver, _jobQueue);
     }
 

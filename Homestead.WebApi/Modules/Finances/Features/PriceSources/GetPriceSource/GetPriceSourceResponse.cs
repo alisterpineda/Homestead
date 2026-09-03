@@ -19,12 +19,15 @@ public record GetPriceSourceResponse
     public required string DisplayName { get; init; }
     public required CommodityPriceSourceKind Kind { get; init; }
     public required bool IsEnabled { get; init; }
-    public string? Config { get; init; }
+    public required bool IsConfigured { get; init; }
+    public string? ConfigurationError { get; init; }
+    // Null when the provider takes no key at all (or the source has no provider).
+    public bool? HasApiKey { get; init; }
+    public string? BaseUrl { get; init; }
     public IReadOnlyList<string>? PairAllowList { get; init; }
     public DateTimeOffset? LastImportAt { get; init; }
     public string? LastImportStatus { get; init; }
     public string? LastImportMessage { get; init; }
-    public required PriceProviderConfigSchema ConfigSchema { get; init; }
     public required IReadOnlyList<PriceProviderSupportedPair> SupportedPairs { get; init; }
     public required IReadOnlyList<string> CoveredSecurityExchanges { get; init; }
     public required IReadOnlyList<string> CoveredQuoteCurrencies { get; init; }

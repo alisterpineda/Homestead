@@ -1,12 +1,12 @@
 using Homestead.WebApi.Domain.Finances;
-using Homestead.WebApi.Modules.Finances.Services;
+using Homestead.WebApi.Modules.Finances.PriceProviders;
 using Homestead.WebApi.Persistence;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Features.PriceSources.GetPriceSources;
 
-public class GetPriceSourcesHandler(AppDbContext db)
+public class GetPriceSourcesHandler(AppDbContext db, IPriceSourceRegistry registry)
     : IRequestHandler<GetPriceSourcesQuery, GetPriceSourcesResponse>
 {
     public async Task<GetPriceSourcesResponse> Handle(GetPriceSourcesQuery request, CancellationToken ct)
@@ -16,8 +16,6 @@ public class GetPriceSourcesHandler(AppDbContext db)
         var settingsBySource = await db.CommodityPriceSourceSettings
             .AsNoTracking()
             .ToDictionaryAsync(s => s.Source, ct);
-
-        var enabledSources = CommodityPriceSourceQueryExtensions.ComputeEnabledSources(settingsBySource);
 
         var counts = await db.CommodityPrices
             .AsNoTracking()
@@ -36,7 +34,8 @@ public class GetPriceSourcesHandler(AppDbContext db)
                 Source = source,
                 DisplayName = source.DisplayName(),
                 Kind = source.Kind(),
-                IsEnabled = enabledSources.Contains(source),
+                IsEnabled = registry.IsEnabled(source),
+                IsConfigured = registry.IsConfigured(source),
                 PriceCount = count,
                 LastImportAt = settings?.LastImportAt,
                 LastImportStatus = settings?.LastImportStatus,

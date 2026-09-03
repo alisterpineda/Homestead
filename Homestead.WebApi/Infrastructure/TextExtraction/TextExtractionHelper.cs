@@ -1,9 +1,10 @@
 namespace Homestead.WebApi.Infrastructure.TextExtraction;
 
 // Runs one extraction with a named engine. The key is required and concrete: callers on the reprocess
-// path get theirs stamped into the job payload at enqueue, and callers on the default path (uploads,
-// statement parsing) ask ITextExtractionEngineResolver for the household default first. This class stays
-// settings-free — it knows how to run an engine, not which one a household prefers.
+// path get theirs stamped into the job payload at enqueue, and callers on the default path (uploads) ask
+// ITextExtractionEngineResolver for the configured default (Ocr:DefaultEngine) first. This is the ONE
+// place a dangling default is substituted — the resolver returns it verbatim so the fallback can be
+// recorded in provenance here rather than vanishing silently.
 public class TextExtractionHelper(IEnumerable<ITextExtractionEngine> engines, ILogger<TextExtractionHelper> logger)
 {
     public async Task<TextExtractionResult> ExtractTextSafeAsync(

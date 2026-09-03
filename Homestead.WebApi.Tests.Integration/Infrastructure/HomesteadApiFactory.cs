@@ -3,6 +3,7 @@ using Homestead.WebApi.Infrastructure.Ai;
 using Homestead.WebApi.Infrastructure.Backup.GoogleDrive;
 using Homestead.WebApi.Modules.Documents.Services;
 using Homestead.WebApi.Modules.Finances.PriceProviders;
+using Homestead.WebApi.Modules.Finances.PriceProviders.BankOfCanada;
 using Homestead.WebApi.Modules.Finances.Services;
 using MediatR;
 using Microsoft.AspNetCore.Hosting;
@@ -118,6 +119,11 @@ public class HomesteadApiFactory : WebApplicationFactory<Program>
         // fake resolving — through the real resolver's explicit-default arm — no matter what else registers.
         builder.UseSetting("Ai:DefaultProvider", FakeAiProvider.ProviderKey);
 
+        // Enable the Bank of Canada source (its provider is swapped for a network-free fake below) so the
+        // import-pipeline and Run-now tests have an enabled + configured external source. AlphaVantage is
+        // deliberately left unset: disabled AND not configured (no ApiKey), which the 400 tests rely on.
+        builder.UseSetting("PriceSources:BankOfCanada:Enabled", "true");
+
         // Tesseract's tessdata path comes from the Ocr__Engines__tesseract__TessDataPath env var
         // (devcontainer remoteEnv / CI job env), provisioned by scripts/fetch-tessdata.sh.
         // The WebApi runs in-process here, so .NET's env-var config provider picks it up —
@@ -183,11 +189,14 @@ public class HomesteadApiFactory : WebApplicationFactory<Program>
             // Swap the Bank of Canada price provider for a network-free fake so the import-pipeline tests
             // exercise the real DB queries + unique-index enforcement without hitting the live Valet API.
             // Keyed registrations are additive and GetKeyedService returns the LAST registered for a key, so
-            // this fake wins over the production BankOfCanadaPriceProvider. SupportedPairs/ConfigSchema are
-            // kept non-empty/non-null so the provider-introspection endpoint test still passes, and any
-            // background ImportCommodityPrices job (e.g. a RunNow enqueue) now resolves the fake instead of
-            // making an outbound HTTP call.
-            services.AddKeyedScoped<IPriceProvider, FakePriceProvider>(CommodityPriceSource.BankOfCanada);
+            // this fake wins over the production BankOfCanadaPriceProvider. SupportedPairs is kept non-empty
+            // so the provider-introspection endpoint test still passes, and any background
+            // ImportCommodityPrices job (e.g. a RunNow enqueue) now resolves the fake instead of making an
+            // outbound HTTP call. The fake binds the same PriceSources:BankOfCanada options the real
+            // provider would, so enablement still flows from config.
+            services.AddKeyedScoped<IPriceProvider>(CommodityPriceSource.BankOfCanada, (sp, _) =>
+                new FakePriceProvider(PriceSourceConfiguration.Read<BankOfCanadaOptions>(
+                    sp.GetRequiredService<IConfiguration>(), CommodityPriceSource.BankOfCanada)));
 
             // Swap Google's two HTTP surfaces for network-free fakes. Everything else in the Drive path
             // stays real — the endpoints, the grant store's encryption, the connect-token protector, the

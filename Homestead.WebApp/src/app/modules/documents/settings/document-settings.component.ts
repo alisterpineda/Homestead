@@ -6,7 +6,8 @@ import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { HlmCheckboxImports } from '@/shared/components/spartan/checkbox';
-import { EngineSelectComponent } from '@/modules/documents/shared/engine-select/engine-select.component';
+import { HlmBadge } from '@/shared/components/spartan/badge';
+import { TextExtractionEnginesService } from '@/modules/documents/shared/text-extraction-engines.service';
 import { DocumentApiService } from '@/api/services/document-api.service';
 import type { JsonPatchDocument } from '@/api/generated/models/json-patch-document';
 import type { DocumentSettingsResponse } from '@/api/generated/models/document-settings-response';
@@ -24,7 +25,7 @@ import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
     HlmSpinner,
     HlmEmptyImports,
     HlmCheckboxImports,
-    EngineSelectComponent,
+    HlmBadge,
   ],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
   template: `
@@ -64,28 +65,41 @@ import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
             </div>
           </hlm-card>
 
-          <hlm-card>
+          <!-- Read-only: engines and the default are deployment config (Ocr:*), mirroring the admin AI
+               status page. -->
+          <hlm-card data-testid="text-extraction-card">
             <div hlmCardHeader>
               <h3 hlmCardTitle>Text Extraction</h3>
               <p hlmCardDescription>
-                Choose the engine used to extract text from uploads. Individual reprocess runs can override it.
+                Engines defined under <span class="font-mono">Ocr:Engines</span>. The default is what uploads
+                and un-pinned reprocess runs use.
               </p>
             </div>
-            <div hlmCardContent>
-              <div class="flex flex-col gap-2">
-                <label hlmLabel>Default engine</label>
-                <app-engine-select
-                  [value]="selectedEngineKey() ?? ''"
-                  defaultLabel="No preference (built-in Tesseract)"
-                  triggerClass="w-full max-w-sm"
-                  (valueChange)="onEngineKeyChange($event)"
-                />
-              </div>
-            </div>
-            <div hlmCardFooter>
-              <button hlmBtn (click)="saveEngine()" [disabled]="saving() || !hasEngineChanges()">
-                {{ saving() ? 'Saving...' : 'Save' }}
-              </button>
+            <div hlmCardContent class="flex flex-col">
+              @for (e of engines(); track e.key) {
+                <div class="flex flex-col gap-1 border-b border-border/50 py-3 first:pt-0 last:border-b-0 last:pb-0"
+                  data-testid="engine-row">
+                  <div class="flex items-center gap-2">
+                    <span class="font-mono text-sm font-medium">{{ e.key }}</span>
+                    <span class="text-xs text-muted-foreground">{{ e.name }}</span>
+                    @if (e.isDefault) {
+                      <span hlmBadge variant="secondary">Default</span>
+                    }
+                    <span hlmBadge [variant]="e.isConfigured ? 'default' : 'outline'"
+                      [class]="e.isConfigured ? '' : '!text-muted-foreground'">
+                      {{ e.isConfigured ? 'Configured' : 'Not configured' }}
+                    </span>
+                  </div>
+                  @if (!e.isConfigured) {
+                    <p class="text-sm text-destructive">{{ e.configurationError ?? 'Unavailable.' }}</p>
+                  }
+                </div>
+              }
+              <p class="mt-4 text-xs text-muted-foreground">
+                The default engine is set with <span class="font-mono">Ocr:DefaultEngine</span> in AppHost
+                user-secrets, or the <span class="font-mono">Ocr__DefaultEngine</span> environment variable in
+                Docker — unset means the built-in <span class="font-mono">tesseract</span>. See the project README.
+              </p>
             </div>
           </hlm-card>
         </div>
@@ -96,21 +110,19 @@ import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 export class DocumentSettingsComponent {
   private documentApi = inject(DocumentApiService);
   private errorHandler = inject(ErrorHandlerService);
+  private enginesService = inject(TextExtractionEnginesService);
 
   loading = signal(true);
   saving = signal(false);
   loadError = signal(false);
   selectedAutoClassify = signal<boolean | null>(null);
-  selectedEngineKey = signal<string | null>(null);
 
   private savedAutoClassify = signal<boolean | null>(null);
-  private savedEngineKey = signal<string | null>(null);
 
-  // Dirty state is per card, not per page. Each card has its own Save button, which implies the two
-  // settings are independent — so a pending engine change must not light up the AI card's Save, and
-  // saving one card must not quietly persist the other's edits.
   hasAiChanges = computed(() => this.selectedAutoClassify() !== this.savedAutoClassify());
-  hasEngineChanges = computed(() => this.selectedEngineKey() !== this.savedEngineKey());
+
+  // Read-only: the engine list (and which one is the default) is deployment config.
+  engines = this.enginesService.engines;
 
   constructor() {
     this.loadData();
@@ -118,11 +130,6 @@ export class DocumentSettingsComponent {
 
   onAutoClassifyChange(checked: boolean): void {
     this.selectedAutoClassify.set(checked);
-  }
-
-  // Empty means "no preference", which the backend resolves to the built-in tesseract engine.
-  onEngineKeyChange(key: string): void {
-    this.selectedEngineKey.set(key || null);
   }
 
   saveAi(): void {
@@ -135,19 +142,6 @@ export class DocumentSettingsComponent {
       });
   }
 
-  saveEngine(): void {
-    this.save(
-      [{ op: 'replace', path: '/defaultEngineKey', value: this.selectedEngineKey() }],
-      r => {
-        const saved = r.defaultEngineKey ?? null;
-        this.savedEngineKey.set(saved);
-        this.selectedEngineKey.set(saved);
-      });
-  }
-
-  // Only the saved card is re-seeded from the response. The response carries both fields (one
-  // AppSettings row backs both cards), but re-seeding the other card would throw away an edit the user
-  // has pending there and has not saved yet.
   private save(patch: JsonPatchDocument, applySaved: (r: DocumentSettingsResponse) => void): void {
     this.saving.set(true);
 
@@ -171,9 +165,6 @@ export class DocumentSettingsComponent {
         const savedAutoClassify = settings.autoClassifyOnUpload ?? null;
         this.savedAutoClassify.set(savedAutoClassify);
         this.selectedAutoClassify.set(savedAutoClassify);
-        const savedEngineKey = settings.defaultEngineKey ?? null;
-        this.savedEngineKey.set(savedEngineKey);
-        this.selectedEngineKey.set(savedEngineKey);
         this.loading.set(false);
       },
       error: () => {

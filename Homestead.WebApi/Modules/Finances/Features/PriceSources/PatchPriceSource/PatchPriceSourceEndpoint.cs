@@ -7,8 +7,6 @@ public static class PatchPriceSourceEndpoint
 {
     public record PatchPriceSourceBody
     {
-        public bool? IsEnabled { get; init; }
-        public string? Config { get; init; }
         public IReadOnlyList<string>? PairAllowList { get; init; }
     }
 
@@ -20,8 +18,6 @@ public static class PatchPriceSourceEndpoint
             var response = await sender.Send(new PatchPriceSourceCommand
             {
                 Source = source,
-                IsEnabled = body.IsEnabled,
-                Config = body.Config,
                 PairAllowList = body.PairAllowList,
             }, ct);
             return Results.Ok(response);

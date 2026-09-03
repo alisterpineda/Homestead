@@ -2,7 +2,8 @@ using Homestead.WebApi.Domain.Settings;
 
 namespace Homestead.WebApi.Infrastructure.TextExtraction;
 
-// Reads the "Ocr:Engines" section into named engine instances, and validates each per its Type.
+// Reads the "Ocr:Engines" section into named engine instances, validates each per its Type, and owns the
+// key side of the default-engine resolution chain ("Ocr:DefaultEngine").
 //
 // Validation returns an error string rather than throwing: there is deliberately no ValidateOnStart here
 // (mirroring AiOptions' no-startup-validator posture). A misconfigured engine must not stop the app from
@@ -21,8 +22,8 @@ public static class OcrEngineConfiguration
 
         // The built-in Tesseract engine is always present. Two jobs: it makes the zero-config case work
         // (no "Ocr:Engines" at all -> today's defaults, so existing deployments and tests are untouched),
-        // and it guarantees the resolution chain's terminus actually exists, so a dangling household
-        // default always has something real to fall back to.
+        // and it guarantees the resolution chain's terminus actually exists, so a dangling
+        // Ocr:DefaultEngine always has something real to fall back to.
         if (!engines.Any(e => string.Equals(e.Key, OcrEngineOptions.BuiltInTesseractKey, StringComparison.OrdinalIgnoreCase)))
         {
             engines.Insert(0, (OcrEngineOptions.BuiltInTesseractKey,
@@ -31,6 +32,20 @@ public static class OcrEngineConfiguration
 
         return engines;
     }
+
+    public static string? ReadDefaultEngineKey(IConfiguration configuration)
+    {
+        var key = configuration[OcrEngineOptions.DefaultEngineConfigKey];
+        return string.IsNullOrWhiteSpace(key) ? null : key.Trim();
+    }
+
+    // The key side of the resolution chain (no explicit request): the configured default when set —
+    // returned VERBATIM even when it names no defined engine, because turning a dangling default into a
+    // recorded fallback is TextExtractionHelper's job and substituting here would be silent — else the
+    // built-in engine. Unlike AiProviderConfiguration.ResolveDefaultKey there is no sole-instance
+    // convenience: the built-in engine always exists, so "unset" already has a well-defined answer.
+    public static string ResolveDefaultKey(string? configuredDefault) =>
+        configuredDefault ?? OcrEngineOptions.BuiltInTesseractKey;
 
     // Returns null when the instance is usable, else a human-readable reason shown in the picker.
     public static string? Validate(string key, OcrEngineOptions options) => options.ResolveType(key) switch

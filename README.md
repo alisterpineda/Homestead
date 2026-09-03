@@ -160,7 +160,33 @@ dotnet user-secrets set "Ai:DefaultProvider" "local"
 | `FileStorage__CachePath` | `/cache` | Path for generated thumbnail cache |
 | `Ocr__Engines__tesseract__TessDataPath` | `/usr/share/tessdata` | Directory of pinned Tesseract `.traineddata` models — see [OCR Models](#ocr-models-tesseract) |
 | `Ocr__Engines__{key}__*` | — | Defines an additional text-extraction engine instance — see [Text extraction engines](#text-extraction-engines) |
+| `Ocr__DefaultEngine` | `tesseract` | Which engine uploads and un-pinned reprocess runs use — an `Ocr__Engines__{key}` name. A name matching no engine falls back to `tesseract` and records the substitution in the version's provenance |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | — | OpenTelemetry collector endpoint (optional) |
+
+#### Price sources (optional)
+
+External commodity price sources (Bank of Canada FX rates, Alpha Vantage security prices) are **off by default**. Enablement and credentials are deployment facts, so they live in config under `PriceSources:{Source}` — never in the database. The Finances → Price sources pages report each source's state read-only; what they still edit is product data (the watch-list and the import schedule).
+
+| Variable | Default | Description |
+|---|---|---|
+| `PriceSources__BankOfCanada__Enabled` | `false` | Enable Bank of Canada Valet FX imports (no key needed) |
+| `PriceSources__BankOfCanada__BaseUrl` | `https://www.bankofcanada.ca/valet/` | Valet API root |
+| `PriceSources__AlphaVantage__Enabled` | `false` | Enable Alpha Vantage security-price imports |
+| `PriceSources__AlphaVantage__ApiKey` | — | **Required when enabled.** Get one free at <https://www.alphavantage.co/support/#api-key> |
+| `PriceSources__AlphaVantage__BaseUrl` | `https://www.alphavantage.co/query` | Alpha Vantage query endpoint |
+
+An enabled source with invalid config (e.g. Alpha Vantage without an `ApiKey`) never stops the app from starting — its page shows **Not configured, with the reason**, Run now is disabled, and scheduled imports fail with `source_not_configured`. Enablement alone still admits the source's *existing* prices to valuation.
+
+For local Aspire dev, set these in **AppHost user-secrets** — AppHost forwards the whole `PriceSources:` section verbatim as the env vars above:
+
+```bash
+cd Homestead.AppHost
+dotnet user-secrets set "PriceSources:BankOfCanada:Enabled" "true"
+dotnet user-secrets set "PriceSources:AlphaVantage:Enabled" "true"
+dotnet user-secrets set "PriceSources:AlphaVantage:ApiKey" "<key>"
+```
+
+> **Breaking (2026-09):** the in-app **Enabled** toggle and the API key / base URL fields on each price source's page are **no longer read**, and the `IsEnabled` / `Config` columns are dropped from `finances.commodity_price_source_settings`. Re-enter them as the config above — until you do, every external source is disabled and its prices are excluded from valuation.
 
 #### Backup targets
 
@@ -215,8 +241,8 @@ Admins can also pre-create users from the admin panel at `/admin` — pre-create
 Text extraction engines are **defined in configuration** under `Ocr:Engines:{key}`, where `{key}` is
 an arbitrary instance name you choose. Endpoints and API keys are deployment facts, so they live in
 env vars / user-secrets where your existing secret tooling already works — there is no engines table
-and no API keys in a `pg_dump`. Which engine to *use* is product data: the Documents settings page
-sets a household-wide default, and the reprocess dialogs can override it per run.
+and no API keys in a `pg_dump`. Which engine to *use* is also config: `Ocr:DefaultEngine` names the
+default (shown read-only on the Documents settings page); the reprocess dialogs can override it per run.
 
 Two types are supported:
 
@@ -266,6 +292,21 @@ in the version's extraction provenance, so it is never silent.
 > `Ocr:Engines:tesseract:*`. If you set `Ocr__Tesseract__TessDataPath`, rename it to
 > `Ocr__Engines__tesseract__TessDataPath` — the old name is now ignored, which silently falls back
 > to the relative `tessdata` default and breaks OCR.
+
+> ⚠️ **Breaking (2026-09):** the household default engine saved on the Documents settings page is
+> **no longer read**. Set `Ocr__DefaultEngine` instead — unset means `tesseract`, so a deployment that
+> had picked an Azure engine in-app silently goes back to local OCR until the variable is set.
+
+For local Aspire dev, set these in **AppHost user-secrets** — AppHost forwards the whole `Ocr:` section
+verbatim as the env vars above:
+
+```bash
+cd Homestead.AppHost
+dotnet user-secrets set "Ocr:Engines:azure-layout:Type" "AzureDocumentIntelligence"
+dotnet user-secrets set "Ocr:Engines:azure-layout:Endpoint" "https://<res>.cognitiveservices.azure.com"
+dotnet user-secrets set "Ocr:Engines:azure-layout:ApiKey" "<key>"
+dotnet user-secrets set "Ocr:DefaultEngine" "azure-layout"
+```
 
 > ⚠️ **Azure free tier (F0) analyzes only the first 2 pages** of a document and reports success. It
 > is not detectable from config, so a 30-page statement yields 2 pages of text. The app logs a

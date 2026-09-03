@@ -45,8 +45,8 @@ public class UploadDocumentVersionJobHandler(
             if (!File.Exists(stagingPath))
                 throw new FileNotFoundException($"Staged file not found: {stagingPath}");
 
-            // Text extraction on the household default — see UploadDocumentJobHandler.
-            var engineKey = await engineResolver.ResolveDefaultKeyAsync(ct);
+            // Text extraction on the configured default (Ocr:DefaultEngine) — see UploadDocumentJobHandler.
+            var engineKey = engineResolver.DefaultKey;
             var extractionResult = await textExtractionHelper.ExtractTextSafeAsync(
                 stagingPath, payload.ContentType, engineKey, ct);
 

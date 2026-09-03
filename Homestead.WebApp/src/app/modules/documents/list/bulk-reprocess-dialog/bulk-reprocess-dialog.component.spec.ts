@@ -7,13 +7,14 @@ import { DocumentApiService } from '@/api/services/document-api.service';
 import type { TextExtractionEngineResponse } from '@/api/generated/models/text-extraction-engine-response';
 
 const ENGINES: TextExtractionEngineResponse[] = [
-  { key: 'tesseract', name: 'Tesseract', type: 'Tesseract', isConfigured: true, configurationError: null },
+  { key: 'tesseract', name: 'Tesseract', type: 'Tesseract', isConfigured: true, configurationError: null, isDefault: true },
   {
     key: 'azure-layout',
     name: 'Azure Document Intelligence',
     type: 'AzureDocumentIntelligence',
     isConfigured: true,
     configurationError: null,
+    isDefault: false,
   },
 ];
 

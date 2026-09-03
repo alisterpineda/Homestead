@@ -30,7 +30,6 @@ public class ApplyCommodityPriceObservationsHandlerTests : IDisposable
         _db.CommodityPriceSourceSettings.Add(new CommodityPriceSourceSettings
         {
             Source = CommodityPriceSource.BankOfCanada,
-            IsEnabled = true,
         });
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
     }

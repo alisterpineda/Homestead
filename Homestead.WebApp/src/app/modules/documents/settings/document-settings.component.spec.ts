@@ -5,6 +5,19 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { of } from 'rxjs';
 import { DocumentSettingsComponent } from './document-settings.component';
 import { DocumentApiService } from '@/api/services/document-api.service';
+import type { TextExtractionEngineResponse } from '@/api/generated/models/text-extraction-engine-response';
+
+const ENGINES: TextExtractionEngineResponse[] = [
+  { key: 'tesseract', name: 'Tesseract', type: 'Tesseract', isConfigured: true, configurationError: null, isDefault: false },
+  {
+    key: 'azure-layout',
+    name: 'Azure Document Intelligence',
+    type: 'AzureDocumentIntelligence',
+    isConfigured: false,
+    configurationError: 'Endpoint is required.',
+    isDefault: true,
+  },
+];
 
 describe('DocumentSettingsComponent', () => {
   let fixture: ComponentFixture<DocumentSettingsComponent>;
@@ -19,7 +32,7 @@ describe('DocumentSettingsComponent', () => {
     });
 
     patchDocumentSettings = vi.fn().mockReturnValue(
-      of({ autoClassifyOnUpload: true, defaultEngineKey: 'tesseract' }),
+      of({ autoClassifyOnUpload: true }),
     );
 
     TestBed.configureTestingModule({
@@ -29,9 +42,9 @@ describe('DocumentSettingsComponent', () => {
         {
           provide: DocumentApiService,
           useValue: {
-            getDocumentSettings: () => of({ autoClassifyOnUpload: null, defaultEngineKey: null }),
+            getDocumentSettings: () => of({ autoClassifyOnUpload: null }),
             patchDocumentSettings,
-            getTextExtractionEngines: () => of([]),
+            getTextExtractionEngines: () => of(ENGINES),
           },
         },
       ],
@@ -59,27 +72,12 @@ describe('DocumentSettingsComponent', () => {
 
   it('should have no changes initially', () => {
     expect(component.hasAiChanges()).toBe(false);
-    expect(component.hasEngineChanges()).toBe(false);
   });
 
   it('should set selectedAutoClassify and report a change when toggled', () => {
     component.onAutoClassifyChange(true);
     expect(component.selectedAutoClassify()).toBe(true);
     expect(component.hasAiChanges()).toBe(true);
-  });
-
-  // Each card has its own Save button, which implies the two settings are independent — a pending
-  // engine change must not light up the AI card's Save.
-  it('tracks dirty state per card, not per page', () => {
-    component.onEngineKeyChange('tesseract');
-
-    expect(component.hasEngineChanges()).toBe(true);
-    expect(component.hasAiChanges()).toBe(false);
-  });
-
-  it('empty engine selection means no preference', () => {
-    component.onEngineKeyChange('');
-    expect(component.selectedEngineKey()).toBeNull();
   });
 
   it('saves only the AI op from the AI card', () => {
@@ -92,25 +90,26 @@ describe('DocumentSettingsComponent', () => {
     });
   });
 
-  it('saves only the engine op from the Text Extraction card', () => {
-    component.onEngineKeyChange('tesseract');
+  // The engine card is read-only: engines and the default come from Ocr:* config, so the page reports
+  // them the way the admin AI status page does.
+  it('lists the configured engines', () => {
+    fixture.detectChanges();
+    const rows = Array.from(fixture.nativeElement.querySelectorAll('[data-testid="engine-row"]')) as HTMLElement[];
 
-    component.saveEngine();
-
-    expect(patchDocumentSettings).toHaveBeenCalledWith({
-      body: [{ op: 'replace', path: '/defaultEngineKey', value: 'tesseract' }],
-    });
+    expect(rows.map(r => r.textContent)).toHaveLength(2);
+    expect(rows[0].textContent).toContain('tesseract');
+    expect(rows[0].textContent).toContain('Configured');
+    expect(rows[1].textContent).toContain('azure-layout');
+    expect(rows[1].textContent).toContain('Not configured');
+    expect(rows[1].textContent).toContain('Endpoint is required.');
+    expect(fixture.nativeElement.textContent).toContain('Ocr:DefaultEngine');
   });
 
-  // The response carries both fields, but re-seeding the card that was NOT saved would throw away an
-  // edit the user still has pending there.
-  it('saving one card leaves the other card\'s pending edit alone', () => {
-    component.onAutoClassifyChange(true);
-    component.onEngineKeyChange('azure-layout');
+  it('marks the default engine', () => {
+    fixture.detectChanges();
+    const rows = Array.from(fixture.nativeElement.querySelectorAll('[data-testid="engine-row"]')) as HTMLElement[];
 
-    component.saveAi();
-
-    expect(component.selectedEngineKey()).toBe('azure-layout');
-    expect(component.hasEngineChanges()).toBe(true);
+    expect(rows[0].textContent).not.toContain('Default');
+    expect(rows[1].textContent).toContain('Default');
   });
 });

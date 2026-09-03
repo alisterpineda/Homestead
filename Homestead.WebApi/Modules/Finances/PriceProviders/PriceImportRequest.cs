@@ -6,5 +6,4 @@ public record PriceImportRequest(
     IReadOnlyCollection<Commodity> Commodities,
     DateTimeOffset FromAt,
     DateTimeOffset ToAt,
-    PriceImportAnchorSource AnchorSource,
-    string? Config);
+    PriceImportAnchorSource AnchorSource);

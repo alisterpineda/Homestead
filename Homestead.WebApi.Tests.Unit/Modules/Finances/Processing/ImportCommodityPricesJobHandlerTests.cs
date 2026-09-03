@@ -15,8 +15,7 @@ public class ImportCommodityPricesJobHandlerTests : IDisposable
 {
     private readonly TestAppDbContext _db;
     private readonly IPriceProvider _provider;
-    private readonly ServiceProvider _services;
-    private readonly ServiceProvider _emptyServices;
+    private readonly StubPriceSourceRegistry _sources;
     private readonly ISender _sender;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ImportCommodityPricesJobHandler _sut;
@@ -28,16 +27,12 @@ public class ImportCommodityPricesJobHandlerTests : IDisposable
     {
         _db = TestAppDbContext.Create();
 
-        _provider = Substitute.For<IPriceProvider>();
-        _provider.Source.Returns(CommodityPriceSource.BankOfCanada);
+        // Enabled + configured by default: enablement is static config, not a settings row.
+        _provider = TestPriceSources.Provider(CommodityPriceSource.BankOfCanada);
         _provider.SupportedPairs.Returns(new[] { new PriceProviderSupportedPair("USD", null, "CAD") });
-        _provider.CoveredSecurityExchanges.Returns(Array.Empty<string>());
-        _provider.CoveredQuoteCurrencies.Returns(Array.Empty<string>());
 
-        var sc = new ServiceCollection();
-        sc.AddKeyedSingleton(CommodityPriceSource.BankOfCanada, _provider);
-        _services = sc.BuildServiceProvider();
-        _emptyServices = new ServiceCollection().BuildServiceProvider();
+        _sources = new StubPriceSourceRegistry();
+        _sources.Providers[CommodityPriceSource.BankOfCanada] = _provider;
 
         _sender = Substitute.For<ISender>();
 
@@ -49,7 +44,7 @@ public class ImportCommodityPricesJobHandlerTests : IDisposable
         _scopeFactory.CreateScope().Returns(scope);
 
         _sut = new ImportCommodityPricesJobHandler(
-            _db, _services, _sender, _scopeFactory, NullLogger<ImportCommodityPricesJobHandler>.Instance);
+            _db, _sources, _sender, _scopeFactory, NullLogger<ImportCommodityPricesJobHandler>.Instance);
 
         _cad = new Commodity { Id = Guid.NewGuid(), Symbol = "CAD", Name = "Canadian Dollar", Kind = CommodityKind.Currency };
         _usd = new Commodity { Id = Guid.NewGuid(), Symbol = "USD", Name = "US Dollar", Kind = CommodityKind.Currency };
@@ -57,12 +52,7 @@ public class ImportCommodityPricesJobHandlerTests : IDisposable
         _db.SaveChanges();
     }
 
-    public void Dispose()
-    {
-        _db.Dispose();
-        _services.Dispose();
-        _emptyServices.Dispose();
-    }
+    public void Dispose() => _db.Dispose();
 
     private ProcessingJob MakeJob(ImportCommodityPricesPayload payload, Guid? scheduleId = null, Guid? userId = null)
     {
@@ -89,23 +79,27 @@ public class ImportCommodityPricesJobHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task NoSettingsRow_Throws_SourceDisabled()
+    public async Task NoSettingsRow_ImportsWithEmptyAllowList()
     {
+        // The settings row only carries the watch-list now; its absence is not a failure.
+        await SeedHeldUsdAccountAsync();
+
+        IReadOnlyCollection<Commodity>? captured = null;
+        _provider.ImportAsync(Arg.Do<PriceImportRequest>(r => captured = r.Commodities), Arg.Any<CancellationToken>())
+            .Returns(PriceImportResult.Success(Array.Empty<PriceObservation>()));
+
         var job = MakeJob(new ImportCommodityPricesPayload(CommodityPriceSource.BankOfCanada));
-        var ex = await Assert.ThrowsAsync<PriceImportException>(
-            () => _sut.HandleAsync(job, TestContext.Current.CancellationToken));
-        Assert.Equal("source_disabled", ex.ErrorCode);
+        await _sut.HandleAsync(job, TestContext.Current.CancellationToken);
+
+        Assert.NotNull(captured);
+        Assert.Contains(captured!, c => c.Id == _usd.Id);
     }
 
     [Fact]
     public async Task DisabledSource_Throws_SourceDisabled()
     {
-        _db.CommodityPriceSourceSettings.Add(new CommodityPriceSourceSettings
-        {
-            Source = CommodityPriceSource.BankOfCanada,
-            IsEnabled = false,
-        });
-        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        _provider.IsEnabled.Returns(false);
+        _provider.IsConfigured.Returns(false);
 
         var job = MakeJob(new ImportCommodityPricesPayload(CommodityPriceSource.BankOfCanada));
         var ex = await Assert.ThrowsAsync<PriceImportException>(
@@ -114,21 +108,27 @@ public class ImportCommodityPricesJobHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task ProviderUnregistered_Throws_ProviderNotRegistered()
+    public async Task NotConfiguredSource_Throws_SourceNotConfigured()
     {
-        _db.CommodityPriceSourceSettings.Add(new CommodityPriceSourceSettings
-        {
-            Source = CommodityPriceSource.BankOfCanada,
-            IsEnabled = true,
-        });
-        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
-
-        var sut = new ImportCommodityPricesJobHandler(
-            _db, _emptyServices, _sender, _scopeFactory, NullLogger<ImportCommodityPricesJobHandler>.Instance);
+        _provider.IsEnabled.Returns(true);
+        _provider.IsConfigured.Returns(false);
+        _provider.ConfigurationError.Returns("ApiKey is required.");
 
         var job = MakeJob(new ImportCommodityPricesPayload(CommodityPriceSource.BankOfCanada));
         var ex = await Assert.ThrowsAsync<PriceImportException>(
-            () => sut.HandleAsync(job, TestContext.Current.CancellationToken));
+            () => _sut.HandleAsync(job, TestContext.Current.CancellationToken));
+        Assert.Equal("source_not_configured", ex.ErrorCode);
+        Assert.Contains("ApiKey is required.", ex.Message);
+    }
+
+    [Fact]
+    public async Task ProviderUnregistered_Throws_ProviderNotRegistered()
+    {
+        _sources.Providers.Clear();
+
+        var job = MakeJob(new ImportCommodityPricesPayload(CommodityPriceSource.BankOfCanada));
+        var ex = await Assert.ThrowsAsync<PriceImportException>(
+            () => _sut.HandleAsync(job, TestContext.Current.CancellationToken));
         Assert.Equal("provider_not_registered", ex.ErrorCode);
     }
 
@@ -139,12 +139,6 @@ public class ImportCommodityPricesJobHandlerTests : IDisposable
         // The job handler's responsibility is to hand the provider's observations off via the command.
         var ct = TestContext.Current.CancellationToken;
         await SeedHeldUsdAccountAsync();
-        _db.CommodityPriceSourceSettings.Add(new CommodityPriceSourceSettings
-        {
-            Source = CommodityPriceSource.BankOfCanada,
-            IsEnabled = true,
-        });
-        await _db.SaveChangesAsync(ct);
 
         var at1 = new DateTimeOffset(2026, 4, 1, 0, 0, 0, TimeSpan.Zero);
         var at2 = new DateTimeOffset(2026, 4, 2, 0, 0, 0, TimeSpan.Zero);
@@ -173,12 +167,6 @@ public class ImportCommodityPricesJobHandlerTests : IDisposable
     {
         var ct = TestContext.Current.CancellationToken;
         await SeedHeldUsdAccountAsync();
-        _db.CommodityPriceSourceSettings.Add(new CommodityPriceSourceSettings
-        {
-            Source = CommodityPriceSource.BankOfCanada,
-            IsEnabled = true,
-        });
-        await _db.SaveChangesAsync(ct);
 
         _provider.ImportAsync(Arg.Any<PriceImportRequest>(), Arg.Any<CancellationToken>())
             .Returns(PriceImportResult.Success(new[]
@@ -204,12 +192,6 @@ public class ImportCommodityPricesJobHandlerTests : IDisposable
     {
         var ct = TestContext.Current.CancellationToken;
         await SeedHeldUsdAccountAsync();
-        _db.CommodityPriceSourceSettings.Add(new CommodityPriceSourceSettings
-        {
-            Source = CommodityPriceSource.BankOfCanada,
-            IsEnabled = true,
-        });
-        await _db.SaveChangesAsync(ct);
 
         _provider.ImportAsync(Arg.Any<PriceImportRequest>(), Arg.Any<CancellationToken>())
             .Returns(PriceImportResult.Success(new[]
@@ -234,12 +216,6 @@ public class ImportCommodityPricesJobHandlerTests : IDisposable
     {
         var ct = TestContext.Current.CancellationToken;
         await SeedHeldUsdAccountAsync();
-        _db.CommodityPriceSourceSettings.Add(new CommodityPriceSourceSettings
-        {
-            Source = CommodityPriceSource.BankOfCanada,
-            IsEnabled = true,
-        });
-        await _db.SaveChangesAsync(ct);
 
         _provider.ImportAsync(Arg.Any<PriceImportRequest>(), Arg.Any<CancellationToken>())
             .Returns(PriceImportResult.Success(Array.Empty<PriceObservation>()));
@@ -257,12 +233,6 @@ public class ImportCommodityPricesJobHandlerTests : IDisposable
     public async Task PayloadCommodityIds_FilterApplied()
     {
         await SeedHeldUsdAccountAsync();
-        _db.CommodityPriceSourceSettings.Add(new CommodityPriceSourceSettings
-        {
-            Source = CommodityPriceSource.BankOfCanada,
-            IsEnabled = true,
-        });
-        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         IReadOnlyCollection<Commodity>? captured = null;
         _provider.ImportAsync(Arg.Do<PriceImportRequest>(r => captured = r.Commodities), Arg.Any<CancellationToken>())
@@ -322,11 +292,6 @@ public class ImportCommodityPricesJobHandlerTests : IDisposable
             Quantity = 10m,
             CreatedAt = DateTimeOffset.UtcNow,
             UpdatedAt = DateTimeOffset.UtcNow,
-        });
-        _db.CommodityPriceSourceSettings.Add(new CommodityPriceSourceSettings
-        {
-            Source = CommodityPriceSource.BankOfCanada,
-            IsEnabled = true,
         });
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
@@ -397,11 +362,6 @@ public class ImportCommodityPricesJobHandlerTests : IDisposable
             CreatedAt = DateTimeOffset.UtcNow,
             UpdatedAt = DateTimeOffset.UtcNow,
         });
-        _db.CommodityPriceSourceSettings.Add(new CommodityPriceSourceSettings
-        {
-            Source = CommodityPriceSource.BankOfCanada,
-            IsEnabled = true,
-        });
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         _provider.SupportedPairs.Returns(Array.Empty<PriceProviderSupportedPair>());
@@ -425,12 +385,6 @@ public class ImportCommodityPricesJobHandlerTests : IDisposable
     {
         var ct = TestContext.Current.CancellationToken;
         await SeedHeldUsdAccountAsync();
-        _db.CommodityPriceSourceSettings.Add(new CommodityPriceSourceSettings
-        {
-            Source = CommodityPriceSource.BankOfCanada,
-            IsEnabled = true,
-        });
-        await _db.SaveChangesAsync(ct);
 
         var priceAt = new DateTimeOffset(2026, 4, 15, 0, 0, 0, TimeSpan.Zero);
         _provider.ImportAsync(Arg.Any<PriceImportRequest>(), Arg.Any<CancellationToken>())
@@ -453,12 +407,6 @@ public class ImportCommodityPricesJobHandlerTests : IDisposable
     {
         var occurredAt = new DateTimeOffset(2026, 1, 15, 0, 0, 0, TimeSpan.Zero);
         await SeedHeldUsdAccountAsync(occurredAt);
-        _db.CommodityPriceSourceSettings.Add(new CommodityPriceSourceSettings
-        {
-            Source = CommodityPriceSource.BankOfCanada,
-            IsEnabled = true,
-        });
-        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         PriceImportRequest? captured = null;
         _provider.ImportAsync(Arg.Do<PriceImportRequest>(r => captured = r), Arg.Any<CancellationToken>())
@@ -476,11 +424,6 @@ public class ImportCommodityPricesJobHandlerTests : IDisposable
     public async Task RunImport_PriorPricesExist_AnchorsToMinMaxPriceAtMinusLookback()
     {
         await SeedHeldUsdAccountAsync();
-        _db.CommodityPriceSourceSettings.Add(new CommodityPriceSourceSettings
-        {
-            Source = CommodityPriceSource.BankOfCanada,
-            IsEnabled = true,
-        });
 
         var eur = new Commodity { Id = Guid.NewGuid(), Symbol = "EUR", Name = "Euro", Kind = CommodityKind.Currency };
         _db.Commodities.Add(eur);
@@ -558,11 +501,6 @@ public class ImportCommodityPricesJobHandlerTests : IDisposable
     public async Task RunImport_AppliesProviderRevisionLookback()
     {
         await SeedHeldUsdAccountAsync();
-        _db.CommodityPriceSourceSettings.Add(new CommodityPriceSourceSettings
-        {
-            Source = CommodityPriceSource.BankOfCanada,
-            IsEnabled = true,
-        });
 
         var watermark = new DateTimeOffset(2026, 5, 18, 0, 0, 0, TimeSpan.Zero);
         _db.CommodityPrices.Add(new CommodityPrice
@@ -592,11 +530,6 @@ public class ImportCommodityPricesJobHandlerTests : IDisposable
     public async Task RunImport_FrozenPairForArchivedCommodity_DoesNotDragAnchor()
     {
         await SeedHeldUsdAccountAsync();
-        _db.CommodityPriceSourceSettings.Add(new CommodityPriceSourceSettings
-        {
-            Source = CommodityPriceSource.BankOfCanada,
-            IsEnabled = true,
-        });
 
         var eur = new Commodity { Id = Guid.NewGuid(), Symbol = "EUR", Name = "Euro", Kind = CommodityKind.Currency };
         _db.Commodities.Add(eur);
@@ -669,11 +602,6 @@ public class ImportCommodityPricesJobHandlerTests : IDisposable
     public async Task RunImport_ExplicitPayloadFromAt_BypassesWatermark()
     {
         await SeedHeldUsdAccountAsync();
-        _db.CommodityPriceSourceSettings.Add(new CommodityPriceSourceSettings
-        {
-            Source = CommodityPriceSource.BankOfCanada,
-            IsEnabled = true,
-        });
         _db.CommodityPrices.Add(new CommodityPrice
         {
             Id = Guid.NewGuid(),
@@ -705,11 +633,6 @@ public class ImportCommodityPricesJobHandlerTests : IDisposable
     public async Task RunImport_ScheduledRun_DoesNotDropMidnightUtcObservations()
     {
         await SeedHeldUsdAccountAsync();
-        _db.CommodityPriceSourceSettings.Add(new CommodityPriceSourceSettings
-        {
-            Source = CommodityPriceSource.BankOfCanada,
-            IsEnabled = true,
-        });
 
         var yesterdayMidnight = new DateTimeOffset(2026, 5, 18, 0, 0, 0, TimeSpan.Zero);
         _db.CommodityPrices.Add(new CommodityPrice

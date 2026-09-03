@@ -9,15 +9,11 @@ using Homestead.WebApi.Persistence;
 using Microsoft.AspNetCore.JsonPatch.SystemTextJson;
 using Microsoft.EntityFrameworkCore;
 using NSubstitute;
-using Homestead.WebApi.Infrastructure.TextExtraction;
-using Homestead.WebApi.Modules.Documents.Services;
-using Homestead.WebApi.Tests.Unit.Documents.TextExtraction;
 
 namespace Homestead.WebApi.Tests.Unit.Admin;
 
 public class PatchDocumentSettingsHandlerTests : IDisposable
 {
-    private readonly List<ITextExtractionEngine> _engines;
     private readonly TestAppDbContext _db;
     private readonly ICurrentUserAccessor _currentUser;
     private readonly IAuditContext _audit;
@@ -33,8 +29,7 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
         _unitOfWork = Substitute.For<IUnitOfWork>();
         _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
             .Returns(ci => _db.SaveChangesAsync(ci.Arg<CancellationToken>()));
-        _engines = [TestTextExtraction.Engine("tesseract"), TestTextExtraction.Engine("azure-layout")];
-        _sut = new PatchDocumentSettingsHandler(_db, _currentUser, _audit, _unitOfWork, _engines);
+        _sut = new PatchDocumentSettingsHandler(_db, _currentUser, _audit, _unitOfWork);
     }
 
     public void Dispose()
@@ -48,60 +43,6 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
         var patchDoc = new JsonPatchDocument<DocumentSettings>();
         configure(patchDoc);
         return new PatchDocumentSettingsCommand { PatchDocument = patchDoc };
-    }
-
-    [Fact]
-    public async Task Handle_SetsDefaultEngineKey_PersistsAndReturnsIt()
-    {
-        var command = CreatePatchCommand(p => p.Replace(m => m.DefaultEngineKey, "azure-layout"));
-
-        var response = await _sut.Handle(command, TestContext.Current.CancellationToken);
-
-        // The Patch handler hand-maps its own response; a missed field here silently hands back a stale
-        // value even though the write succeeded.
-        Assert.Equal("azure-layout", response.DefaultEngineKey);
-
-        var saved = await _db.AppSettings.FirstAsync(s => s.Key == AppSetting.DocumentsModule, TestContext.Current.CancellationToken);
-        Assert.Contains("azure-layout", saved.Value);
-    }
-
-    // JSON Patch carries operations, not values, so ValidationBehavior never sees the key — the handler
-    // has to check it after applying the patch.
-    [Fact]
-    public async Task Handle_UnknownDefaultEngineKey_IsRejected()
-    {
-        var command = CreatePatchCommand(p => p.Replace(m => m.DefaultEngineKey, "azure-typo"));
-
-        var ex = await Assert.ThrowsAsync<BusinessRuleException>(
-            () => _sut.Handle(command, TestContext.Current.CancellationToken));
-
-        Assert.Contains("azure-typo", ex.Message);
-        Assert.Contains("'tesseract'", ex.Message);
-    }
-
-    [Fact]
-    public async Task Handle_ClearingDefaultEngineKey_IsAllowed()
-    {
-        var command = CreatePatchCommand(p => p.Replace(m => m.DefaultEngineKey, null));
-
-        var response = await _sut.Handle(command, TestContext.Current.CancellationToken);
-
-        Assert.Null(response.DefaultEngineKey);
-    }
-
-    // An engine that exists but is currently misconfigured is still a legitimate preference — an admin
-    // may be part-way through setting its credentials, and the picker already reports why it cannot run.
-    [Fact]
-    public async Task Handle_ConfiguredButUnavailableEngineKey_IsAccepted()
-    {
-        var handler = new PatchDocumentSettingsHandler(
-            _db, _currentUser, _audit, _unitOfWork,
-            [TestTextExtraction.Engine(), TestTextExtraction.UnavailableEngine()]);
-        var command = CreatePatchCommand(p => p.Replace(m => m.DefaultEngineKey, "azure-layout"));
-
-        var response = await handler.Handle(command, TestContext.Current.CancellationToken);
-
-        Assert.Equal("azure-layout", response.DefaultEngineKey);
     }
 
     [Fact]

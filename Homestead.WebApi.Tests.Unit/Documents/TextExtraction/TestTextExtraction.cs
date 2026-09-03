@@ -1,7 +1,6 @@
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Domain.Settings;
 using Homestead.WebApi.Infrastructure.TextExtraction;
-using Homestead.WebApi.Modules.Documents.Services;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 
@@ -58,12 +57,12 @@ public static class TestTextExtraction
     public static TextExtractionHelper Helper(params ITextExtractionEngine[] engines) =>
         new(engines, Substitute.For<ILogger<TextExtractionHelper>>());
 
-    // A resolver that always answers with the built-in key — the default path, with no household setting.
+    // A resolver that always answers with the built-in key — the default path, with no Ocr:DefaultEngine.
     public static ITextExtractionEngineResolver Resolver(string key = DefaultKey)
     {
         var resolver = Substitute.For<ITextExtractionEngineResolver>();
-        resolver.ResolveDefaultKeyAsync(Arg.Any<CancellationToken>()).Returns(key);
-        resolver.ResolveKeyAsync(Arg.Any<string?>(), Arg.Any<CancellationToken>()).Returns(key);
+        resolver.DefaultKey.Returns(key);
+        resolver.ResolveKey(Arg.Any<string?>()).Returns(key);
         return resolver;
     }
 }
