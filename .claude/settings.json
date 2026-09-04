@@ -6,7 +6,7 @@
     },
     "permissions": {
         "allow": [
-            "mcp__playwright",
+            "Bash(playwright-cli*)",
             "Bash(curl -sSf -o /dev/null -m 2 http://localhost:4200*)",
             "Bash(curl -sSf -o /dev/null -m 2 http://localhost:8080/*)",
             "Bash(aspire ps*)",

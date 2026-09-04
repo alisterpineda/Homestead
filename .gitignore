@@ -39,8 +39,8 @@ __pycache__/
 # document-anonymizer: optional Azure image-edit config (endpoint/key) — never commit
 .claude/skills/document-anonymizer/.env
 
-# Playwright MCP (Claude Code self-QA)
-.playwright-mcp/
+# playwright-cli output — snapshots, screenshots, saved login state (Claude Code self-QA)
+.playwright-cli/
 
 # AI eval harness: disk cache (under-test + judge responses), results store, and generated report
 **/.eval-reports/

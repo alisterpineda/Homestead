@@ -44,7 +44,7 @@ Generated files (`src/app/api/generated/` and `src/app/shared/components/spartan
 
 ## Self-QA
 
-Before declaring a UI-affecting change complete, validate it in a real browser via the **`self-qa` subagent** (`.claude/agents/self-qa.md`) — it drives Playwright against the running Aspire stack. The durable regression suite in `Homestead.E2E/` is separate.
+Before declaring a UI-affecting change complete, validate it in a real browser via the **`self-qa` subagent** (`.claude/agents/self-qa.md`) — it drives a real browser with `playwright-cli` against the running Aspire stack, reading only the relevant module file from `.claude/self-qa/` (routes, selectors, gotchas — keep those current when you change them). The durable regression suite in `Homestead.E2E/` is separate.
 
 ## Spartan.NG Patterns
 
