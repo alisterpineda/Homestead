@@ -21,13 +21,11 @@ import {
   lucideCpu,
   lucidePlus,
   lucideMapPin,
-  lucideChevronLeft,
   lucideChevronRight,
   lucideEllipsisVertical,
   lucideArchive,
   lucideArchiveRestore,
   lucideTrash2,
-  lucideHistory,
 } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
@@ -43,6 +41,7 @@ import { isTerminalStatus } from '../../shared/item-status-meta';
 import { EditDurableSheetComponent } from '../edit-durable-sheet/edit-durable-sheet.component';
 import { DurableQuickPanelComponent } from '../durable-quick-panel/durable-quick-panel.component';
 import { CreateEntryDialogComponent } from '../../list/create-entry-dialog/create-entry-dialog.component';
+import { ItemActivityFeedComponent } from '../../shared/activity/item-activity-feed.component';
 import type { ItemLocationValue } from '../../shared/location-picker/location-picker.component';
 import { formatPath } from '../../list/inventory-row';
 import { durableLocationPath, type LocationPathView } from '../../shared/location-path';
@@ -58,7 +57,6 @@ import { handleMutationError, handleDetailLoadError } from '@/shared/utils/rxjs-
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import type { DurableResponse } from '@/api/generated/models/durable-response';
 import type { PlaceContentsResponse } from '@/api/generated/models/place-contents-response';
-import type { GetDurableActivityResponse } from '@/api/generated/models/get-durable-activity-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { toast } from '@spartan-ng/brain/sonner';
 
@@ -88,6 +86,7 @@ import { toast } from '@spartan-ng/brain/sonner';
     EditDurableSheetComponent,
     DurableQuickPanelComponent,
     CreateEntryDialogComponent,
+    ItemActivityFeedComponent,
     UnitPipe,
   ],
   providers: [provideIcons({
@@ -98,13 +97,11 @@ import { toast } from '@spartan-ng/brain/sonner';
     lucideCpu,
     lucidePlus,
     lucideMapPin,
-    lucideChevronLeft,
     lucideChevronRight,
     lucideEllipsisVertical,
     lucideArchive,
     lucideArchiveRestore,
     lucideTrash2,
-    lucideHistory,
   })],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
   template: `
@@ -369,47 +366,8 @@ import { toast } from '@spartan-ng/brain/sonner';
           </section>
         }
 
-        <!-- History — a human-readable metadata activity feed (the actor is embedded in each summary). -->
-        <section class="space-y-2">
-          <h2 class="text-sm font-medium text-muted-foreground">History</h2>
-          @if (activityError()) {
-            <div class="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
-              Couldn't load history.
-              <button type="button" class="underline underline-offset-4 hover:text-foreground" (click)="onChanged()">Retry</button>
-            </div>
-          } @else if (!activityLoaded()) {
-            <div class="flex justify-center py-8"><hlm-spinner /></div>
-          } @else if (activity().length === 0) {
-            <div class="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
-              No activity recorded yet.
-            </div>
-          } @else {
-            <ul class="divide-y divide-border rounded-md border">
-              @for (a of activity(); track a.id) {
-                <li class="flex items-center gap-2.5 px-4 py-2">
-                  <ng-icon hlm name="lucideHistory" size="xs" class="shrink-0 text-muted-foreground" />
-                  <p class="text-xs text-muted-foreground">
-                    {{ a.summary }}
-                    <span class="mx-0.5">&middot;</span>
-                    {{ relativeAge(a.timestamp) }}
-                  </p>
-                </li>
-              }
-            </ul>
-
-            @if (activityTotalPages() > 1) {
-              <div class="flex items-center justify-end gap-2">
-                <span class="text-xs text-muted-foreground">Page {{ page() }} of {{ activityTotalPages() }}</span>
-                <button hlmBtn variant="outline" size="icon-sm" [disabled]="page() <= 1" (click)="prevPage()" aria-label="Previous page">
-                  <ng-icon hlm name="lucideChevronLeft" size="sm" />
-                </button>
-                <button hlmBtn variant="outline" size="icon-sm" [disabled]="page() >= activityTotalPages()" (click)="nextPage()" aria-label="Next page">
-                  <ng-icon hlm name="lucideChevronRight" size="sm" />
-                </button>
-              </div>
-            }
-          }
-        </section>
+        <!-- Activity — the shared feed: this item's audit projection interleaved with its notes. -->
+        <app-item-activity-feed [itemId]="it.id" [refreshTick]="refreshTrigger()" />
       } @else if (notFound()) {
         <div hlmEmpty>
           <div hlmEmptyHeader>
@@ -474,7 +432,7 @@ import { toast } from '@spartan-ng/brain/sonner';
         <div hlmAlertDialogHeader>
           <h2 hlmAlertDialogTitle>Delete {{ durable()?.name ?? 'durable' }}?</h2>
           <p hlmAlertDialogDescription>
-            This permanently removes the durable. Durables with contents cannot be deleted — archive them instead.
+            This permanently removes the durable. Durables with contents, stock, or notes cannot be deleted — archive them instead.
           </p>
         </div>
         @if (deleteError()) {
@@ -517,7 +475,6 @@ export class DurableDetailPageComponent {
   // A non-404 load/refetch failure — retryable, and never allowed to replace already-rendered data.
   loadError = signal(false);
   contentsError = signal(false);
-  activityError = signal(false);
 
   private detailKey = computed(() => ({ id: this.durableId(), tick: this.refreshTrigger() }));
 
@@ -629,41 +586,6 @@ export class DurableDetailPageComponent {
     && this.contentItems().length === 0
     && this.contentConsumables().length === 0);
 
-  // --- Activity history (every durable, leaf or container) ---
-  protected readonly relativeAge = formatRelativeAge;
-  // Resets to page 1 when the routed durable changes — Angular reuses this component on a :id-only
-  // navigation (a contents-list drill or the quick panel's "View details"), so a plain signal
-  // would carry the prior durable's page number into the new durable's activity query.
-  page = seededLinkedSignal(this.durableId, () => 1);
-
-  private activityKey = computed(() => ({
-    id: this.durableId(),
-    page: this.page(),
-    tick: this.refreshTrigger(),
-  }));
-
-  private activityPage = toSignal(
-    toObservable(this.activityKey).pipe(
-      switchMap(({ id, page }) => {
-        this.activityError.set(false);
-        if (!id) return of(null);
-        return this.durableApi.getDurableActivity({ id, Page: page, PageSize: 20 }).pipe(
-          catchError(() => {
-            this.activityError.set(true);
-            return of(null);
-          }),
-        );
-      }),
-    ),
-    { initialValue: null },
-  );
-
-  protected activity = computed<GetDurableActivityResponse[]>(() => this.activityPage()?.items ?? []);
-  protected activityTotalPages = computed(() => this.activityPage()?.totalPages ?? 1);
-  // Distinguishes the initial in-flight fetch (null) from a resolved-but-empty page, so the empty
-  // state can't flash before the first response lands.
-  protected activityLoaded = computed(() => this.activityPage() !== null);
-
   // Hosted leaf-durable quick panel (opened from the contents list). This panel, the edit sheet, and
   // the delete/archive dialogs all reset to 'closed' when the routed durable changes: the component is reused on
   // a :id-only navigation, so without the reset an overlay opened for the previous durable would linger
@@ -699,14 +621,6 @@ export class DurableDetailPageComponent {
       toast.success('This item is now a container.');
       this.onChanged();
     });
-  }
-
-  prevPage(): void {
-    this.page.update((p) => Math.max(1, p - 1));
-  }
-
-  nextPage(): void {
-    this.page.update((p) => Math.min(this.activityTotalPages(), p + 1));
   }
 
   openEdit(durable: DurableResponse): void {

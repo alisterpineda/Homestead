@@ -2,7 +2,7 @@
 // just-touched item, not a real future date — render it "just now" (it falls through to the
 // seconds branch below) rather than a jarring full date. Only timestamps well beyond the skew
 // window are treated as genuinely future and shown as a locale date.
-const SKEW_TOLERANCE_MS = 60_000;
+export const SKEW_TOLERANCE_MS = 60_000;
 
 export function formatRelativeAge(timestamp: string): string {
   const now = Date.now();

@@ -9,6 +9,8 @@ import { toast } from '@spartan-ng/brain/sonner';
 import { ConsumableDetailPageComponent } from './consumable-detail-page.component';
 import { InventoryConsumableApiService } from '@/api/services/inventory-consumable-api.service';
 import { InventoryDurableApiService } from '@/api/services/inventory-durable-api.service';
+import { InventoryItemApiService } from '@/api/services/inventory-item-api.service';
+import type { GetItemActivityResponse } from '@/api/generated/models/get-item-activity-response';
 import type { ConsumableResponse } from '@/api/generated/models/consumable-response';
 import type { ConsumableDetailResponse } from '@/api/generated/models/consumable-detail-response';
 import type { StockMovementResponse } from '@/api/generated/models/stock-movement-response';
@@ -70,11 +72,27 @@ class StubConsumableApi {
   };
 }
 
+// The hosted `app-item-activity-feed` reads through InventoryItemApiService.
+class StubItemApi {
+  rows: GetItemActivityResponse[] = [];
+  activityCalls: { id: string; Page: number; PageSize: number; notesOnly: boolean; filter?: string }[] = [];
+  getItemActivity = (p: { id: string; Page: number; PageSize: number; notesOnly: boolean; filter?: string }) => {
+    this.activityCalls.push(p);
+    return of({ items: this.rows, page: p.Page, pageSize: p.PageSize, totalCount: this.rows.length, totalPages: 1 });
+  };
+  getItemNoteSubjects = () => of([] as string[]);
+  createItemNote = () => of({});
+  updateItemNote = () => of({});
+  deleteItemNote = () => of(undefined);
+}
+
 describe('ConsumableDetailPageComponent', () => {
   let consumableApi: StubConsumableApi;
+  let itemApi: StubItemApi;
 
   beforeEach(() => {
     consumableApi = new StubConsumableApi();
+    itemApi = new StubItemApi();
     TestBed.configureTestingModule({
       providers: [
         provideZonelessChangeDetection(),
@@ -86,6 +104,7 @@ describe('ConsumableDetailPageComponent', () => {
         { provide: InventoryConsumableApiService, useValue: consumableApi },
         // The hosted collapse-durables dialog injects this, but only queries it while open (it's closed here).
         { provide: InventoryDurableApiService, useValue: {} },
+        { provide: InventoryItemApiService, useValue: itemApi },
       ],
     });
   });
@@ -137,7 +156,12 @@ describe('ConsumableDetailPageComponent', () => {
     const content = text(harness);
     expect(content).toContain('Description');
     expect(content).toContain('Store cool');
-    expect(content).not.toContain('Notes');
+    // Scoped to the description block: the Activity feed's All | Notes toggle legitimately says
+    // "Notes" further down the page, and must not fail the relabel assertion.
+    const description = Array.from((harness.routeNativeElement as HTMLElement).querySelectorAll('p'))
+      .find(el => el.textContent?.trim() === 'Description')!.parentElement!;
+    expect(description.textContent).toContain('Store cool');
+    expect(description.textContent).not.toContain('Notes');
   });
 
   it('shows every segment of a deep stock-entry path in the By location table (no collapse)', async () => {
@@ -309,15 +333,56 @@ describe('ConsumableDetailPageComponent', () => {
     expect(text(harness)).toContain('weekly run · from Costco');
   });
 
-  it('titles the movement ledger Movements, not History', async () => {
-    // Headed Movements so the upcoming Activity section reads distinctly. Scoped to the section
-    // headings, not the page text, so unrelated copy containing "History" cannot trip it.
+  it('titles the movement ledger Movements, not History, and puts Activity last', async () => {
+    // Headed Movements so the Activity section reads distinctly. Scoped to the section headings,
+    // not the page text, so unrelated copy containing "History" cannot trip it.
     const { harness } = await navigate('/inventory/items/c1');
 
     const headings = Array.from((harness.routeNativeElement as HTMLElement).querySelectorAll('h2'))
       .map(h => h.textContent?.trim());
-    expect(headings).toContain('Movements');
+    expect(headings).toEqual(['By location', 'Movements', 'Activity']);
     expect(headings).not.toContain('History');
+  });
+
+  it('paginates Movements independently of the Activity feed', async () => {
+    consumableApi.getConsumableMovements = (p: { id: string; Page: number; PageSize: number }) =>
+      of({ items: [] as StockMovementResponse[], page: p.Page, pageSize: p.PageSize, totalCount: 60, totalPages: 3 });
+    const { harness, component } = await navigate('/inventory/items/c1');
+
+    component.nextPage();
+    harness.detectChanges();
+    await harness.fixture.whenStable();
+
+    expect(component.page()).toBe(2);
+    // The feed owns its own page signal; paging Movements must not re-request the activity feed.
+    expect(itemApi.activityCalls).toEqual([
+      { id: 'c1', Page: 1, PageSize: 20, notesOnly: true, filter: undefined },
+      { id: 'c1', Page: 1, PageSize: 20, notesOnly: false, filter: undefined },
+    ]);
+  });
+
+  it('refreshes the hosted activity feed when a stock op bumps the page refresh tick', async () => {
+    const { harness, component } = await navigate('/inventory/items/c1');
+    const before = itemApi.activityCalls.length;
+
+    component.onStockUpdated();
+    harness.detectChanges();
+    await harness.fixture.whenStable();
+    harness.detectChanges();
+
+    expect(itemApi.activityCalls.length).toBe(before + 1);
+    expect(itemApi.activityCalls.at(-1)).toMatchObject({ id: 'c1', Page: 1 });
+  });
+
+  it('names notes among the reasons a consumable cannot be hard-deleted', async () => {
+    const { harness, component } = await navigate('/inventory/items/c1');
+    component.onDeleteRequest();
+    harness.detectChanges();
+    await harness.fixture.whenStable();
+
+    expect(document.body.textContent).toContain(
+      'Consumables with stock history or notes cannot be deleted',
+    );
   });
 
   it('renders the movement meta line without a source token when none was recorded', async () => {

@@ -319,6 +319,16 @@ export type { GetInventoryOverview$Params as GetInventoryOverview$Params } from 
 export { getInventoryOverview as getInventoryOverview } from './fn/inventory/get-inventory-overview';
 export type { GetItem$Params as GetItem$Params } from './fn/inventory/get-item';
 export { getItem as getItem } from './fn/inventory/get-item';
+export type { GetItemActivity$Params as GetItemActivity$Params } from './fn/inventory/get-item-activity';
+export { getItemActivity as getItemActivity } from './fn/inventory/get-item-activity';
+export type { GetItemNoteSubjects$Params as GetItemNoteSubjects$Params } from './fn/inventory/get-item-note-subjects';
+export { getItemNoteSubjects as getItemNoteSubjects } from './fn/inventory/get-item-note-subjects';
+export type { CreateItemNote$Params as CreateItemNote$Params } from './fn/inventory/create-item-note';
+export { createItemNote as createItemNote } from './fn/inventory/create-item-note';
+export type { UpdateItemNote$Params as UpdateItemNote$Params } from './fn/inventory/update-item-note';
+export { updateItemNote as updateItemNote } from './fn/inventory/update-item-note';
+export type { DeleteItemNote$Params as DeleteItemNote$Params } from './fn/inventory/delete-item-note';
+export { deleteItemNote as deleteItemNote } from './fn/inventory/delete-item-note';
 export type { GetPlaceContents$Params as GetPlaceContents$Params } from './fn/inventory/get-place-contents';
 export { getPlaceContents as getPlaceContents } from './fn/inventory/get-place-contents';
 export type { GetAreas$Params as GetAreas$Params } from './fn/inventory/get-areas';
@@ -361,8 +371,6 @@ export type { DeleteDurable$Params as DeleteDurable$Params } from './fn/inventor
 export { deleteDurable as deleteDurable } from './fn/inventory/delete-durable';
 export type { PatchDurable$Params as PatchDurable$Params } from './fn/inventory/patch-durable';
 export { patchDurable as patchDurable } from './fn/inventory/patch-durable';
-export type { GetDurableActivity$Params as GetDurableActivity$Params } from './fn/inventory/get-durable-activity';
-export { getDurableActivity as getDurableActivity } from './fn/inventory/get-durable-activity';
 export type { GetConsumables$Params as GetConsumables$Params } from './fn/inventory/get-consumables';
 export { getConsumables as getConsumables } from './fn/inventory/get-consumables';
 export type { CreateConsumable$Params as CreateConsumable$Params } from './fn/inventory/create-consumable';

@@ -7,20 +7,24 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
-import { PaginatedResponseOfGetDurableActivityResponse } from '../../models/paginated-response-of-get-durable-activity-response';
+import { PaginatedResponseOfGetItemActivityResponse } from '../../models/paginated-response-of-get-item-activity-response';
 
-export interface GetDurableActivity$Params {
+export interface GetItemActivity$Params {
   id: string;
   Page?: number;
   PageSize?: number;
+  notesOnly?: boolean;
+  filter?: string;
 }
 
-export function getDurableActivity(http: HttpClient, rootUrl: string, params: GetDurableActivity$Params, context?: HttpContext): Observable<StrictHttpResponse<PaginatedResponseOfGetDurableActivityResponse>> {
-  const rb = new RequestBuilder(rootUrl, getDurableActivity.PATH, 'get');
+export function getItemActivity(http: HttpClient, rootUrl: string, params: GetItemActivity$Params, context?: HttpContext): Observable<StrictHttpResponse<PaginatedResponseOfGetItemActivityResponse>> {
+  const rb = new RequestBuilder(rootUrl, getItemActivity.PATH, 'get');
   if (params) {
     rb.path('id', params.id, {});
     rb.query('Page', params.Page, {});
     rb.query('PageSize', params.PageSize, {});
+    rb.query('notesOnly', params.notesOnly, {});
+    rb.query('filter', params.filter, {});
   }
 
   return http.request(
@@ -28,9 +32,9 @@ export function getDurableActivity(http: HttpClient, rootUrl: string, params: Ge
   ).pipe(
     filter((r: any): r is HttpResponse<any> => r instanceof HttpResponse),
     map((r: HttpResponse<any>) => {
-      return r as StrictHttpResponse<PaginatedResponseOfGetDurableActivityResponse>;
+      return r as StrictHttpResponse<PaginatedResponseOfGetItemActivityResponse>;
     })
   );
 }
 
-getDurableActivity.PATH = '/api/v1/inventory/durables/{id}/activity';
+getItemActivity.PATH = '/api/v1/inventory/items/{id}/activity';

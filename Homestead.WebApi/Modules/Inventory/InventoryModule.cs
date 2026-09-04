@@ -12,7 +12,6 @@ using Homestead.WebApi.Modules.Inventory.Features.Brands.PatchBrand;
 using Homestead.WebApi.Modules.Inventory.Features.Durables.CreateDurable;
 using Homestead.WebApi.Modules.Inventory.Features.Durables.DeleteDurable;
 using Homestead.WebApi.Modules.Inventory.Features.Durables.GetDurable;
-using Homestead.WebApi.Modules.Inventory.Features.Durables.GetDurableActivity;
 using Homestead.WebApi.Modules.Inventory.Features.Durables.GetDurables;
 using Homestead.WebApi.Modules.Inventory.Features.Durables.PatchDurable;
 using Homestead.WebApi.Modules.Inventory.Features.Items.GetItem;
@@ -92,7 +91,6 @@ public static class InventoryModule
         var durables = v1.MapGroup("/durables");
         GetDurablesEndpoint.Map(durables);
         GetDurableEndpoint.Map(durables);
-        GetDurableActivityEndpoint.Map(durables);
         CreateDurableEndpoint.Map(durables);
         PatchDurableEndpoint.Map(durables);
         DeleteDurableEndpoint.Map(durables);

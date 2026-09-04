@@ -20,7 +20,7 @@ import { todayIso } from '../../shared/date';
 import { trimToNull } from '../../shared/trim-to-null';
 import { currencyInputPrecision } from '../../shared/format-currency';
 import { MoneyInputDirective } from '../../shared/money-input.directive';
-import { composeOccurredAt, decomposeOccurredAt } from '../../shared/occurred-at';
+import { composeOccurredAt, decomposeOccurredAt } from '@/shared/utils/occurred-at';
 import { commodityResource } from '../../shared/commodity-resource';
 import { CommodityPickerComponent } from '../../shared/commodity-picker/commodity-picker.component';
 import { OccurredAtFieldComponent } from '../../shared/occurred-at-field/occurred-at-field.component';

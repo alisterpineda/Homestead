@@ -50,6 +50,7 @@ import {
 } from './stock-op-sheet/stock-op-sheet.component';
 import { TrackDurableSheetComponent } from './track-durable-sheet/track-durable-sheet.component';
 import { CollapseDurablesDialogComponent } from './collapse-durables-dialog/collapse-durables-dialog.component';
+import { ItemActivityFeedComponent } from '../shared/activity/item-activity-feed.component';
 import { formatQty, movementDirection, isWholeCount } from './consumable-shared';
 import { UnitPipe } from './unit.pipe';
 import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
@@ -84,6 +85,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
     StockOpSheetComponent,
     TrackDurableSheetComponent,
     CollapseDurablesDialogComponent,
+    ItemActivityFeedComponent,
     UnitPipe,
   ],
   providers: [provideIcons({
@@ -319,6 +321,9 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
             }
           }
         </section>
+
+        <!-- Activity — the shared feed, last on the page. Movements keeps its own pager above. -->
+        <app-item-activity-feed [itemId]="s.id" [refreshTick]="refreshTrigger()" />
       } @else if (notFound()) {
         <div hlmEmpty>
           <div hlmEmptyHeader>
@@ -406,7 +411,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
         <div hlmAlertDialogHeader>
           <h2 hlmAlertDialogTitle>Delete {{ consumable()?.name ?? 'consumable' }}?</h2>
           <p hlmAlertDialogDescription>
-            This permanently removes the consumable. Consumables with stock history cannot be deleted — archive them instead.
+            This permanently removes the consumable. Consumables with stock history or notes cannot be deleted — archive them instead.
           </p>
         </div>
         @if (deleteError()) {

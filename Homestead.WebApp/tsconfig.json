@@ -142,6 +142,9 @@
       ],
       "@/shared/components/spartan/drawer": [
         "./src/app/shared/components/spartan/drawer/src/index.ts"
+      ],
+      "@/shared/components/spartan/autocomplete": [
+        "./src/app/shared/components/spartan/autocomplete/src/index.ts"
       ]
     }
   },

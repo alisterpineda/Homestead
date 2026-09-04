@@ -1,4 +1,5 @@
-import { provideZonelessChangeDetection } from '@angular/core';
+import { provideZonelessChangeDetection, type WritableSignal } from '@angular/core';
+import { By } from '@angular/platform-browser';
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient, HttpErrorResponse } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
@@ -7,11 +8,13 @@ import { RouterTestingHarness } from '@angular/router/testing';
 import { of, throwError } from 'rxjs';
 import { toast } from '@spartan-ng/brain/sonner';
 import { DurableDetailPageComponent } from './durable-detail-page.component';
+import { ItemActivityFeedComponent } from '../../shared/activity/item-activity-feed.component';
 import { InventoryDurableApiService } from '@/api/services/inventory-durable-api.service';
 import { InventoryPlaceApiService } from '@/api/services/inventory-place-api.service';
+import { InventoryItemApiService } from '@/api/services/inventory-item-api.service';
+import type { GetItemActivityResponse } from '@/api/generated/models/get-item-activity-response';
 import type { DurableResponse } from '@/api/generated/models/durable-response';
 import type { PlaceContentsResponse } from '@/api/generated/models/place-contents-response';
-import type { GetDurableActivityResponse } from '@/api/generated/models/get-durable-activity-response';
 
 // The hosted edit sheet / quick panel host pickers backed by ResizeObserver.
 if (typeof globalThis.ResizeObserver === 'undefined') {
@@ -117,11 +120,6 @@ class StubDurableApi {
       ? throwError(() => new HttpErrorResponse({ status: this.getDurableErrorStatus }))
       : of(this.item);
   };
-  activityCalls: { id: string; Page: number; PageSize: number }[] = [];
-  getDurableActivity = (p: { id: string; Page: number; PageSize: number }) => {
-    this.activityCalls.push(p);
-    return of({ items: [] as GetDurableActivityResponse[], page: p.Page, pageSize: p.PageSize, totalCount: 0, totalPages: 0 });
-  };
   // Used by the hosted quick panel's contents-count probe (containers only).
   getDurables = () => of({ items: [], page: 1, pageSize: 1, totalCount: 0 });
   patchFailure: HttpErrorResponse | null = null;
@@ -136,6 +134,22 @@ class StubDurableApi {
   };
 }
 
+// The hosted `app-item-activity-feed` reads through InventoryItemApiService.
+class StubItemApi {
+  rows: GetItemActivityResponse[] = [];
+  activityCalls: { id: string; Page: number; PageSize: number; notesOnly: boolean; filter?: string }[] = [];
+  activityFails = false;
+  getItemActivity = (p: { id: string; Page: number; PageSize: number; notesOnly: boolean; filter?: string }) => {
+    this.activityCalls.push(p);
+    if (this.activityFails) return throwError(() => new Error('boom'));
+    return of({ items: this.rows, page: p.Page, pageSize: p.PageSize, totalCount: this.rows.length, totalPages: 1 });
+  };
+  getItemNoteSubjects = () => of([] as string[]);
+  createItemNote = () => of({});
+  updateItemNote = () => of({});
+  deleteItemNote = () => of(undefined);
+}
+
 class StubPlaceApi {
   contents: PlaceContentsResponse = CHEST_CONTENTS;
   calls: Record<string, unknown>[] = [];
@@ -148,10 +162,12 @@ class StubPlaceApi {
 describe('DurableDetailPageComponent', () => {
   let durableApi: StubDurableApi;
   let placeApi: StubPlaceApi;
+  let itemApi: StubItemApi;
 
   beforeEach(() => {
     durableApi = new StubDurableApi();
     placeApi = new StubPlaceApi();
+    itemApi = new StubItemApi();
     TestBed.configureTestingModule({
       providers: [
         provideZonelessChangeDetection(),
@@ -162,6 +178,7 @@ describe('DurableDetailPageComponent', () => {
         ]),
         { provide: InventoryDurableApiService, useValue: durableApi },
         { provide: InventoryPlaceApiService, useValue: placeApi },
+        { provide: InventoryItemApiService, useValue: itemApi },
       ],
     });
   });
@@ -186,6 +203,13 @@ describe('DurableDetailPageComponent', () => {
     return Array.from(
       (harness.routeNativeElement as HTMLElement).querySelectorAll<HTMLAnchorElement>('a[href]'),
     ).map(a => decodeURIComponent(a.getAttribute('href') ?? ''));
+  }
+
+  /** The activity pager now lives inside the hosted feed, so reach it through the child component. */
+  function feedPage(harness: RouterTestingHarness): WritableSignal<number> {
+    const feed = harness.fixture.debugElement.query(By.directive(ItemActivityFeedComponent))
+      .componentInstance as unknown as { page: WritableSignal<number> };
+    return feed.page;
   }
 
   function buttons(harness: RouterTestingHarness): HTMLButtonElement[] {
@@ -489,18 +513,16 @@ describe('DurableDetailPageComponent', () => {
     expect(component.archiving()).toBe(false);
   });
 
-  it('renders the activity history feed with each summary', async () => {
-    durableApi.getDurableActivity = () => of({
-      items: [
-        { id: 'a1', summary: 'Alice updated value, location', timestamp: '2025-06-01T00:00:00Z', userDisplayName: 'Alice', userEmail: null },
-        { id: 'a2', summary: 'Someone added this item', timestamp: '2025-05-01T00:00:00Z', userDisplayName: null, userEmail: null },
-      ],
-      page: 1, pageSize: 20, totalCount: 2, totalPages: 1,
-    });
+  it('renders the shared Activity feed (not the old History section) with each summary', async () => {
+    itemApi.rows = [
+      { id: 'a1', type: 'audit_log', summary: 'Alice updated value, location', timestamp: '2025-06-01T00:00:00Z', userDisplayName: 'Alice', userEmail: null },
+      { id: 'a2', type: 'audit_log', summary: 'Someone added this item', timestamp: '2025-05-01T00:00:00Z', userDisplayName: null, userEmail: null },
+    ];
     const { harness } = await navigate('/inventory/items/item1');
 
     const content = text(harness);
-    expect(content).toContain('History');
+    expect(content).toContain('Activity');
+    expect(content).not.toContain('History');
     expect(content).toContain('Alice updated value, location');
     // A null/deleted actor still renders (summary says "Someone"), never vanishes.
     expect(content).toContain('Someone added this item');
@@ -514,13 +536,13 @@ describe('DurableDetailPageComponent', () => {
     harness.detectChanges();
     await harness.fixture.whenStable();
 
-    // Simulate user state: paged the history forward and opened the edit sheet + quick panel.
-    component.page.set(2);
+    // Simulate user state: paged the activity feed forward and opened the edit sheet + quick panel.
+    feedPage(harness).set(2);
     component.editState.set('open');
     component.durableQuickPanelState.set('open');
     harness.detectChanges();
     await harness.fixture.whenStable();
-    expect(durableApi.activityCalls.at(-1)).toMatchObject({ id: 'box1', Page: 2 });
+    expect(itemApi.activityCalls.at(-1)).toMatchObject({ id: 'box1', Page: 2 });
 
     // Navigate to a different item via the same route (Angular reuses the component instance).
     durableApi.item = LEAF_ITEM;
@@ -529,21 +551,45 @@ describe('DurableDetailPageComponent', () => {
     await harness.fixture.whenStable();
 
     expect(component2).toBe(component); // confirms the reuse the fix guards against
-    // page resets to 1, so the new item's history is fetched at page 1 — not the stale page 2.
-    expect(component2.page()).toBe(1);
-    expect(durableApi.activityCalls.at(-1)).toMatchObject({ id: 'item1', Page: 1 });
+    // The feed's page resets to 1, so the new item's activity is fetched at page 1 — not the stale page 2.
+    expect(feedPage(harness)()).toBe(1);
+    expect(itemApi.activityCalls.at(-1)).toMatchObject({ id: 'item1', Page: 1 });
     // overlays opened for the previous item are closed, not left hanging over the new one.
     expect(component2.editState()).toBe('closed');
     expect(component2.durableQuickPanelState()).toBe('closed');
   });
 
   it('shows an error state (not a false empty) when the activity fetch fails', async () => {
-    durableApi.getDurableActivity = () => throwError(() => new Error('boom'));
+    itemApi.activityFails = true;
     const { harness } = await navigate('/inventory/items/item1');
 
     const content = text(harness);
-    expect(content).toContain("Couldn't load history");
-    expect(content).not.toContain('No activity recorded yet.');
+    expect(content).toContain("Couldn't load activity.");
+    expect(content).not.toContain('No activity yet.');
+  });
+
+  it('refreshes the hosted activity feed when a mutation bumps the page refresh tick', async () => {
+    const { harness, component } = await navigate('/inventory/items/item1');
+    const before = itemApi.activityCalls.length;
+
+    component.onChanged();
+    harness.detectChanges();
+    await harness.fixture.whenStable();
+    harness.detectChanges();
+
+    expect(itemApi.activityCalls.length).toBe(before + 1);
+    expect(itemApi.activityCalls.at(-1)).toMatchObject({ id: 'item1', Page: 1 });
+  });
+
+  it('names notes among the reasons a durable cannot be hard-deleted', async () => {
+    const { harness, component } = await navigate('/inventory/items/item1');
+    component.onDeleteRequest();
+    harness.detectChanges();
+    await harness.fixture.whenStable();
+
+    expect(document.body.textContent).toContain(
+      'Durables with contents, stock, or notes cannot be deleted',
+    );
   });
 
   it('shows an error state (not an infinite spinner) when a container contents fetch fails', async () => {

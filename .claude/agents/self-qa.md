@@ -198,6 +198,15 @@ navigating there throws `NG04002: Cannot match any routes` and dumps you at `/`.
 Browse drill nodes all share `InventoryBrowsePageComponent` — the URL names only the current node; the
 ancestor trail comes from the API's `PlaceContentsResponse.path`.
 
+**`/inventory/items` rows do not navigate.** Clicking a row opens the item's **quick-panel dialog**;
+reaching `/inventory/items/:id` needs that panel's "Details" action, or a direct URL.
+
+Both detail pages end with a shared **Activity** feed (`app-item-activity-feed`) — audit rows
+interleaved with user notes, an All | Notes toggle, a subject filter, and a note composer. On first
+load with no stored preference it deliberately fires **two** requests (`notesOnly=true`, then
+`notesOnly=false` if the item has no notes); that is the default-view probe, not a bug. The toggle
+choice persists in `localStorage['homestead-inventory-activity-view']`.
+
 ### Admin  (`/admin`, **adminGuard on the whole module**)
 
 | Route | Component |
@@ -302,6 +311,13 @@ Selector traps:
   no `PUT` (405), and the `PATCH` is **JSON Patch** — it accepts only
   `application/json-patch+json`, so a plain `application/json` body is rejected with 415. Re-parent
   through the UI dialog instead (see Known gotchas).
+- Inventory item activity + notes: `/api/v1/inventory/items/{id}/activity` (`GET`, params `Page`,
+  `PageSize`, `notesOnly`, `filter`), `/items/{id}/activity/subjects` (`GET`),
+  `/items/{id}/activity/notes` (`POST`), `/items/{id}/activity/notes/{noteId}` (`PUT`/`DELETE`).
+  Notes live under **`/activity/notes`** — `/items/{id}/notes` is not a route (405). Writes require
+  Contributor; reads ride the group's ActiveUser policy.
+- Consumable movements are a different route family: `/api/v1/inventory/consumables/{id}/movements`
+  (`GET`, `PageSize=25`), paged independently of the item activity feed above.
 
 ### Known gotchas
 

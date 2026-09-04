@@ -1,10 +1,11 @@
-// Helpers for the `occurredAt` instant carried by the per-shape transaction editors
-// (trade, dividend). The UI splits the instant into a native `<input type="date">`
-// plus an optional `<input type="time">`. The time field is *collapsed* by default;
-// when collapsed the spec pins the instant to noon UTC on that calendar date — a
-// timezone-neutral anchor that keeps a date-only entry stable regardless of the
-// user's offset. When the user expands the time field, the date+time are read as
-// the browser's local wall clock and converted to UTC.
+// Helpers for an `occurredAt` instant entered as a calendar date, shared across modules:
+// the per-shape Finances transaction editors (trade, dividend, DRIP) and the Inventory
+// note composer. Finances splits the instant into a native `<input type="date">` plus an
+// optional `<input type="time">`; Inventory's date chip is date-only (time always null).
+// The time field is *collapsed* by default; when collapsed the spec pins the instant to
+// noon UTC on that calendar date — a timezone-neutral anchor that keeps a date-only entry
+// stable regardless of the user's offset. When the user expands the time field, the
+// date+time are read as the browser's local wall clock and converted to UTC.
 
 const NOON_UTC = 'T12:00:00.000Z';
 

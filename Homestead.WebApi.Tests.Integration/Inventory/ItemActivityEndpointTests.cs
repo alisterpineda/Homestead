@@ -471,16 +471,16 @@ public class ItemActivityEndpointTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.Forbidden, resp.StatusCode);
     }
 
-    // ----- Regression: the durable-only activity endpoint stays until Phase 2 -----
+    // ----- Regression: the durable-only route is gone -----
 
     [Fact]
-    public async Task GetDurableActivity_StillReturns200_ForADurable()
+    public async Task GetDurableActivity_Returns404_NowThatTheItemFeedReplacedIt()
     {
         var client = await CreateAdminClientAsync();
         var itemId = await CreateDurableAsync(client);
 
         var resp = await client.GetAsync($"/api/v1/inventory/durables/{itemId}/activity", CT);
 
-        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, resp.StatusCode);
     }
 }

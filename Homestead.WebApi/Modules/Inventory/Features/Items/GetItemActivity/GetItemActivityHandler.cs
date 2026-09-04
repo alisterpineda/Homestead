@@ -11,12 +11,10 @@ namespace Homestead.WebApi.Modules.Inventory.Features.Items.GetItemActivity;
 public class GetItemActivityHandler(AppDbContext db)
     : IRequestHandler<GetItemActivityQuery, PaginatedResponse<GetItemActivityResponse>?>
 {
-    // Duplicated verbatim from GetDurableActivityHandler for one commit: that handler (and its endpoint)
-    // stays until Phase 2 swaps the durable detail page onto this feed and deletes it.
-    //
-    // Item audit field → human label. AreaId/ParentItemId both read as "location" (a move emits one
-    // or both) and Value/ValueCurrencyId both as "value" (they travel as a both-or-neither pair); the
-    // summary de-dupes so a paired change reads once, not "location, location" / "value, value".
+    // The one item audit field → human label map (the durable-only projection it superseded is gone).
+    // AreaId/ParentItemId both read as "location" (a move emits one or both) and Value/ValueCurrencyId
+    // both as "value" (they travel as a both-or-neither pair); the summary de-dupes so a paired change
+    // reads once, not "location, location" / "value, value".
     private static readonly Dictionary<string, string> FieldDisplayNames = new()
     {
         ["Name"] = "name",

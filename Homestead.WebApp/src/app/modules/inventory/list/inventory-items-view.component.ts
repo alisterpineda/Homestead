@@ -364,9 +364,9 @@ export const kindFilterFromParam = (v: string | null): KindFilter => (isKindFilt
           <h2 hlmAlertDialogTitle>Delete {{ pendingDelete()?.name ?? 'entry' }}?</h2>
           <p hlmAlertDialogDescription>
             @if (pendingDelete()?.kind === 'consumable') {
-              This permanently removes the consumable. Consumables with stock history cannot be deleted — archive them instead.
+              This permanently removes the consumable. Consumables with stock history or notes cannot be deleted — archive them instead.
             } @else {
-              This permanently removes the durable. Durables with contents cannot be deleted — archive them instead.
+              This permanently removes the durable. Durables with contents, stock, or notes cannot be deleted — archive them instead.
             }
           </p>
         </div>
