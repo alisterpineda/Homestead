@@ -10,10 +10,4 @@ namespace Homestead.WebApi.Modules.Inventory.Features.Items.GetItemActivity;
 public record GetItemActivityQuery : PaginatedRequest, IRequest<PaginatedResponse<GetItemActivityResponse>?>
 {
     public Guid Id { get; init; }
-
-    /// <summary>Drop the audit rows and show notes only.</summary>
-    public bool NotesOnly { get; init; }
-
-    /// <summary>Case-insensitive substring over note subject/body; implies <see cref="NotesOnly"/>.</summary>
-    public string? Filter { get; init; }
 }

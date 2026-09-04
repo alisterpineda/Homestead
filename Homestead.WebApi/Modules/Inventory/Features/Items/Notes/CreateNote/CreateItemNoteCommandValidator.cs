@@ -7,13 +7,10 @@ public class CreateItemNoteCommandValidator : AbstractValidator<CreateItemNoteCo
 {
     public CreateItemNoteCommandValidator()
     {
-        RuleFor(x => x.Subject).MaximumLength(200);
-        RuleFor(x => x.Body).MaximumLength(4000);
-
-        RuleFor(x => x)
-            .Must(x => !string.IsNullOrWhiteSpace(x.Subject) || !string.IsNullOrWhiteSpace(x.Body))
-            .WithMessage("A note needs a subject or a body.")
-            .OverridePropertyName(nameof(CreateItemNoteCommand.Body));
+        // NotEmpty rejects null and whitespace-only alike, so the trimmed body is never blank.
+        RuleFor(x => x.Body)
+            .NotEmpty().WithMessage("A note needs a body.")
+            .MaximumLength(4000);
 
         RuleFor(x => x.OccurredAt!.Value)
             .NotInFuture()

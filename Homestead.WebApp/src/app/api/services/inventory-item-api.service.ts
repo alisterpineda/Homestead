@@ -5,7 +5,6 @@ import { map } from 'rxjs/operators';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { getItem } from '@/api/generated/fn/inventory/get-item';
 import { getItemActivity } from '@/api/generated/fn/inventory/get-item-activity';
-import { getItemNoteSubjects } from '@/api/generated/fn/inventory/get-item-note-subjects';
 import { createItemNote } from '@/api/generated/fn/inventory/create-item-note';
 import { updateItemNote } from '@/api/generated/fn/inventory/update-item-note';
 import { deleteItemNote } from '@/api/generated/fn/inventory/delete-item-note';
@@ -15,7 +14,6 @@ import type { ItemNoteResponse } from '@/api/generated/models/item-note-response
 
 export type { GetItem$Params } from '@/api/generated/fn/inventory/get-item';
 export type { GetItemActivity$Params } from '@/api/generated/fn/inventory/get-item-activity';
-export type { GetItemNoteSubjects$Params } from '@/api/generated/fn/inventory/get-item-note-subjects';
 export type { CreateItemNote$Params } from '@/api/generated/fn/inventory/create-item-note';
 export type { UpdateItemNote$Params } from '@/api/generated/fn/inventory/update-item-note';
 export type { DeleteItemNote$Params } from '@/api/generated/fn/inventory/delete-item-note';
@@ -33,10 +31,6 @@ export class InventoryItemApiService {
     params: Parameters<typeof getItemActivity>[2],
   ): Observable<PaginatedResponseOfGetItemActivityResponse> {
     return getItemActivity(this.http, this.config.rootUrl, params).pipe(map((r) => r.body));
-  }
-
-  getItemNoteSubjects(params: Parameters<typeof getItemNoteSubjects>[2]): Observable<string[]> {
-    return getItemNoteSubjects(this.http, this.config.rootUrl, params).pipe(map((r) => r.body));
   }
 
   createItemNote(params: Parameters<typeof createItemNote>[2]): Observable<ItemNoteResponse> {

@@ -37,7 +37,7 @@ internal static class ItemNoteTestData
 
     public static async Task<ItemNote> AddNoteAsync(
         TestAppDbContext db, Guid itemId, DateTimeOffset occurredAt,
-        string? subject = null, string body = "note body",
+        string body = "note body",
         DateTimeOffset? createdAt = null, DateTimeOffset? updatedAt = null,
         Guid? createdByUserId = null, Guid? updatedByUserId = null, Guid? id = null)
     {
@@ -47,7 +47,6 @@ internal static class ItemNoteTestData
             Id = id ?? Guid.NewGuid(),
             ItemId = itemId,
             OccurredAt = occurredAt,
-            Subject = subject,
             Body = body,
             CreatedAt = created,
             UpdatedAt = updatedAt ?? created,

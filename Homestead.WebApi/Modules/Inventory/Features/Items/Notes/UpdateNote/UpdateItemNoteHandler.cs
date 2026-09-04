@@ -26,18 +26,16 @@ public class UpdateItemNoteHandler(
 
         audit.Track<ItemNoteSnapshot, ItemNote>(note, "InventoryNote", note.Id, parentEntityId: note.ItemId);
 
-        var subject = ItemNoteText.Normalize(request.Subject);
         var body = ItemNoteText.NormalizeBody(request.Body);
         // Normalised to UTC: Npgsql refuses a non-zero offset on a timestamptz column.
         var occurredAt = request.OccurredAt.ToUniversalTime();
 
         // A save that changes nothing must not mark the note "edited" (IsEdited = UpdatedAt != CreatedAt),
         // so skip the write entirely; the tracked snapshot diffs to no changes and audits nothing.
-        var unchanged = note.OccurredAt == occurredAt && note.Subject == subject && note.Body == body;
+        var unchanged = note.OccurredAt == occurredAt && note.Body == body;
         if (!unchanged)
         {
             note.OccurredAt = occurredAt;
-            note.Subject = subject;
             note.Body = body;
             note.UpdatedAt = DateTimeOffset.UtcNow;
             note.UpdatedByUserId = currentUser.UserId;

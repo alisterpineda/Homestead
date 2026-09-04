@@ -57,22 +57,21 @@ public class UpdateItemNoteHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task Handle_ReplacesAllThreeFields_StampsUpdatedAtAndUser_SetsIsEdited()
+    public async Task Handle_ReplacesBothFields_StampsUpdatedAtAndUser_SetsIsEdited()
     {
         var item = await ItemNoteTestData.AddItemAsync(_db);
         var created = DateTimeOffset.UtcNow.AddDays(-1);
         var note = await ItemNoteTestData.AddNoteAsync(_db, item.Id, created,
-            subject: "Oil change", body: "5W-30", createdAt: created, createdByUserId: Guid.NewGuid());
+            body: "5W-30", createdAt: created, createdByUserId: Guid.NewGuid());
         var newDate = created.AddDays(-7);
 
         var response = await _sut.Handle(new UpdateItemNoteCommand
         {
-            ItemId = item.Id, NoteId = note.Id, OccurredAt = newDate, Subject = "  Belt  ", Body = "  replaced  ",
+            ItemId = item.Id, NoteId = note.Id, OccurredAt = newDate, Body = "  belt replaced  ",
         }, Ct);
 
         Assert.Equal(newDate, response.OccurredAt);
-        Assert.Equal("Belt", response.Subject);
-        Assert.Equal("replaced", response.Body);
+        Assert.Equal("belt replaced", response.Body);
         Assert.True(response.IsEdited);
         Assert.Equal(created, response.CreatedAt);
         Assert.True(response.UpdatedAt > created);
@@ -104,13 +103,13 @@ public class UpdateItemNoteHandlerTests : IDisposable
         var created = DateTimeOffset.UtcNow.AddDays(-1);
         var author = Guid.NewGuid();
         var note = await ItemNoteTestData.AddNoteAsync(_db, item.Id, created,
-            subject: "Oil change", body: "5W-30", createdAt: created, createdByUserId: author);
+            body: "5W-30", createdAt: created, createdByUserId: author);
 
         // Same values, differently padded: normalises to identical, so nothing is written and the note
         // must not become "edited".
         var response = await _sut.Handle(new UpdateItemNoteCommand
         {
-            ItemId = item.Id, NoteId = note.Id, OccurredAt = created, Subject = " Oil change ", Body = "5W-30 ",
+            ItemId = item.Id, NoteId = note.Id, OccurredAt = created, Body = " 5W-30 ",
         }, Ct);
 
         Assert.False(response.IsEdited);
@@ -118,22 +117,6 @@ public class UpdateItemNoteHandlerTests : IDisposable
         var stored = Assert.Single(_db.ItemNotes);
         Assert.Equal(created, stored.UpdatedAt);
         Assert.Equal(author, stored.UpdatedByUserId);
-    }
-
-    [Fact]
-    public async Task Handle_ClearingSubject_StoresNull()
-    {
-        var item = await ItemNoteTestData.AddItemAsync(_db);
-        var note = await ItemNoteTestData.AddNoteAsync(_db, item.Id, DateTimeOffset.UtcNow.AddDays(-1),
-            subject: "Oil change", body: "5W-30");
-
-        var response = await _sut.Handle(new UpdateItemNoteCommand
-        {
-            ItemId = item.Id, NoteId = note.Id, OccurredAt = note.OccurredAt, Subject = "", Body = "5W-30",
-        }, Ct);
-
-        Assert.Null(response.Subject);
-        Assert.True(response.IsEdited);
     }
 
     [Fact]

@@ -321,8 +321,6 @@ export type { GetItem$Params as GetItem$Params } from './fn/inventory/get-item';
 export { getItem as getItem } from './fn/inventory/get-item';
 export type { GetItemActivity$Params as GetItemActivity$Params } from './fn/inventory/get-item-activity';
 export { getItemActivity as getItemActivity } from './fn/inventory/get-item-activity';
-export type { GetItemNoteSubjects$Params as GetItemNoteSubjects$Params } from './fn/inventory/get-item-note-subjects';
-export { getItemNoteSubjects as getItemNoteSubjects } from './fn/inventory/get-item-note-subjects';
 export type { CreateItemNote$Params as CreateItemNote$Params } from './fn/inventory/create-item-note';
 export { createItemNote as createItemNote } from './fn/inventory/create-item-note';
 export type { UpdateItemNote$Params as UpdateItemNote$Params } from './fn/inventory/update-item-note';

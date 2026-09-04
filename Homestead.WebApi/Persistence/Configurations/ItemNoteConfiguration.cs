@@ -6,20 +6,13 @@ namespace Homestead.WebApi.Persistence.Configurations;
 
 public class ItemNoteConfiguration : IEntityTypeConfiguration<ItemNote>
 {
-    // A note is a subject, a body, or both — never neither (activity.md §The note).
-    private const string SubjectOrBodySql = "\"Subject\" IS NOT NULL OR \"Body\" <> ''";
-
     public void Configure(EntityTypeBuilder<ItemNote> builder)
     {
-        builder.ToTable("item_notes", "inventory", table =>
-        {
-            table.HasCheckConstraint("CK_item_notes_subject_or_body", SubjectOrBodySql);
-        });
+        builder.ToTable("item_notes", "inventory");
 
         builder.HasKey(n => n.Id);
 
-        builder.Property(n => n.Subject).HasMaxLength(200);
-
+        // Never empty: the validators reject a blank body (activity.md §The note), as DocumentComment's do.
         builder.Property(n => n.Body)
             .IsRequired()
             .HasMaxLength(4000);

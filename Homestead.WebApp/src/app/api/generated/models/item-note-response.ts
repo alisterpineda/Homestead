@@ -10,7 +10,6 @@ export interface ItemNoteResponse {
   isEdited: boolean;
   itemId: string;
   occurredAt: string;
-  subject?: (string | null);
   updatedAt: string;
   updatedByDisplayName?: (string | null);
   updatedByEmail?: (string | null);

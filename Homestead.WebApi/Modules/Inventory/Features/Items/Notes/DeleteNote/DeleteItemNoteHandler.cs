@@ -20,7 +20,7 @@ public class DeleteItemNoteHandler(AppDbContext db, IAuditContext audit, IUnitOf
         // The audit row keeps a one-line description so the deletion is still traceable.
         db.ItemNotes.Remove(note);
         audit.Deleted("InventoryNote", note.Id,
-            ItemNoteText.AuditDescription(note.Subject, note.Body), parentEntityId: note.ItemId);
+            ItemNoteText.AuditDescription(note.Body), parentEntityId: note.ItemId);
         await unitOfWork.SaveChangesAsync(ct);
 
         return true;

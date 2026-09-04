@@ -446,41 +446,26 @@ public class CreateItemNoteCommandValidatorTests
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
     [Fact]
-    public async Task SubjectOnly_IsValid()
-    {
-        var result = await _sut.ValidateAsync(new CreateItemNoteCommand { Subject = "Inspected" }, Ct);
-        Assert.True(result.IsValid);
-    }
-
-    [Fact]
-    public async Task BodyOnly_IsValid()
+    public async Task Body_IsValid()
     {
         var result = await _sut.ValidateAsync(new CreateItemNoteCommand { Body = "Replaced the belt" }, Ct);
         Assert.True(result.IsValid);
     }
 
     [Fact]
-    public async Task NeitherSubjectNorBody_IsInvalid_OnBody()
+    public async Task MissingBody_IsInvalid_OnBody()
     {
         var result = await _sut.ValidateAsync(new CreateItemNoteCommand(), Ct);
         Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.PropertyName == "Body" && e.ErrorMessage == "A note needs a subject or a body.");
+        Assert.Contains(result.Errors, e => e.PropertyName == "Body" && e.ErrorMessage == "A note needs a body.");
     }
 
     [Fact]
-    public async Task WhitespaceOnlyBoth_IsInvalid()
+    public async Task WhitespaceOnlyBody_IsInvalid()
     {
-        var result = await _sut.ValidateAsync(new CreateItemNoteCommand { Subject = "  ", Body = " \n " }, Ct);
+        var result = await _sut.ValidateAsync(new CreateItemNoteCommand { Body = " \n " }, Ct);
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == "Body");
-    }
-
-    [Fact]
-    public async Task SubjectOver200_IsInvalid()
-    {
-        var result = await _sut.ValidateAsync(new CreateItemNoteCommand { Subject = new string('a', 201) }, Ct);
-        Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.PropertyName == "Subject");
     }
 
     [Fact]
@@ -523,23 +508,17 @@ public class UpdateItemNoteCommandValidatorTests
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
-    private static UpdateItemNoteCommand Command(string? subject = null, string? body = null, DateTimeOffset? at = null) =>
-        new() { OccurredAt = at ?? DateTimeOffset.UtcNow.AddDays(-1), Subject = subject, Body = body };
+    private static UpdateItemNoteCommand Command(string? body = null, DateTimeOffset? at = null) =>
+        new() { OccurredAt = at ?? DateTimeOffset.UtcNow.AddDays(-1), Body = body };
 
     [Fact]
-    public async Task SubjectOnly_IsValid()
-    {
-        Assert.True((await _sut.ValidateAsync(Command(subject: "Inspected"), Ct)).IsValid);
-    }
-
-    [Fact]
-    public async Task BodyOnly_IsValid()
+    public async Task Body_IsValid()
     {
         Assert.True((await _sut.ValidateAsync(Command(body: "Replaced the belt"), Ct)).IsValid);
     }
 
     [Fact]
-    public async Task NeitherSubjectNorBody_IsInvalid_OnBody()
+    public async Task MissingBody_IsInvalid_OnBody()
     {
         var result = await _sut.ValidateAsync(Command(), Ct);
         Assert.False(result.IsValid);
@@ -547,19 +526,11 @@ public class UpdateItemNoteCommandValidatorTests
     }
 
     [Fact]
-    public async Task WhitespaceOnlyBoth_IsInvalid()
+    public async Task WhitespaceOnlyBody_IsInvalid()
     {
-        var result = await _sut.ValidateAsync(Command(subject: "  ", body: "\t"), Ct);
+        var result = await _sut.ValidateAsync(Command(body: "\t"), Ct);
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == "Body");
-    }
-
-    [Fact]
-    public async Task SubjectOver200_IsInvalid()
-    {
-        var result = await _sut.ValidateAsync(Command(subject: new string('a', 201)), Ct);
-        Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.PropertyName == "Subject");
     }
 
     [Fact]

@@ -4,5 +4,4 @@
 export interface UpdateItemNoteCommand {
   body?: (string | null);
   occurredAt: string;
-  subject?: (string | null);
 }

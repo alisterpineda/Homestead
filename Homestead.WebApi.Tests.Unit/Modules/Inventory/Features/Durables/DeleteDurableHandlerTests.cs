@@ -79,7 +79,7 @@ public class DeleteDurableHandlerTests : IDisposable
     {
         var note = new ItemNote
         {
-            Id = Guid.NewGuid(), ItemId = itemId, Subject = "Oil change", Body = "",
+            Id = Guid.NewGuid(), ItemId = itemId, Body = "Oil change",
             OccurredAt = DateTimeOffset.UtcNow, CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow,
         };
         _db.ItemNotes.Add(note);

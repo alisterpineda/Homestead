@@ -1,21 +1,10 @@
 import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
-import { By } from '@angular/platform-browser';
-import { BrnAutocomplete } from '@spartan-ng/brain/autocomplete';
 import {
   ItemNoteComposerComponent,
   type NotePayload,
   type NoteSeed,
 } from './item-note-composer.component';
-
-// The autocomplete anchors its popover with ResizeObserver.
-if (typeof globalThis.ResizeObserver === 'undefined') {
-  globalThis.ResizeObserver = class {
-    observe() {}
-    unobserve() {}
-    disconnect() {}
-  } as unknown as typeof ResizeObserver;
-}
 
 function todayIso(): string {
   const d = new Date();
@@ -39,10 +28,12 @@ describe('ItemNoteComposerComponent', () => {
   });
 
   const host = () => fixture.nativeElement as HTMLElement;
-  const bodyEl = () => host().querySelector('textarea')!;
+  const bodyEl = () => host().querySelector<HTMLInputElement>('input[hlmInputGroupInput]')!;
   const dateEl = () => host().querySelector<HTMLInputElement>('input[type="date"]')!;
   const sendBtn = () => host().querySelector<HTMLButtonElement>('button[aria-label="Add note"]')!;
   const chipBtn = () => host().querySelector<HTMLButtonElement>('button[aria-label^="Date:"]')!;
+  const saveBtn = () =>
+    Array.from(host().querySelectorAll<HTMLButtonElement>('button')).find((b) => b.textContent?.trim() === 'Save')!;
 
   function type(value: string): void {
     const el = bodyEl();
@@ -58,35 +49,18 @@ describe('ItemNoteComposerComponent', () => {
     fixture.detectChanges();
   }
 
-  function setSubject(value: string): void {
-    // The subject lives in the autocomplete's `search` model; drive it through the same handler the
-    // template binds to rather than through the overlay.
-    (fixture.componentInstance as unknown as { onSubjectInput(v: string): void }).onSubjectInput(value);
-    fixture.detectChanges();
-  }
-
-  it('submits on Enter in the body and inserts a newline on Shift+Enter', () => {
+  it('is a single-line input: submits on Enter', () => {
     type('Changed the oil');
 
-    bodyEl().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true, bubbles: true }));
+    const enter = new KeyboardEvent('keydown', { key: 'Enter', cancelable: true, bubbles: true });
+    bodyEl().dispatchEvent(enter);
+    expect(enter.defaultPrevented).toBe(true);
     expect(emitted).toHaveLength(1);
     expect(emitted[0].body).toBe('Changed the oil');
-
-    const shift = new KeyboardEvent('keydown', { key: 'Enter', shiftKey: true, cancelable: true, bubbles: true });
-    bodyEl().dispatchEvent(shift);
-    expect(emitted).toHaveLength(1); // no second submit
-    expect(shift.defaultPrevented).toBe(false); // the browser inserts the newline
   });
 
-  it('disables send until either the subject or the body has content', () => {
+  it('disables send until the body has content', () => {
     expect(sendBtn().disabled).toBe(true);
-
-    setSubject('Oil change');
-    expect(sendBtn().disabled).toBe(false);
-
-    setSubject('');
-    expect(sendBtn().disabled).toBe(true);
-
     type('  ');
     expect(sendBtn().disabled).toBe(true);
     type('anything');
@@ -108,7 +82,6 @@ describe('ItemNoteComposerComponent', () => {
   });
 
   it('keeps the picked date across clearText (sticky) while dropping the text', () => {
-    setSubject('Oil change');
     type('12k service');
     pickDate('2026-03-04');
 
@@ -120,22 +93,22 @@ describe('ItemNoteComposerComponent', () => {
 
     type('next one');
     sendBtn().click();
-    expect(emitted.at(-1)).toMatchObject({ subject: null, body: 'next one', occurredAt: '2026-03-04T12:00:00.000Z' });
+    expect(emitted.at(-1)).toEqual({ body: 'next one', occurredAt: '2026-03-04T12:00:00.000Z' });
   });
 
   it('caps the hidden date input at today so a future date cannot be picked', () => {
     expect(dateEl().getAttribute('max')).toBe(todayIso());
   });
 
-  it('trims the subject and body, and sends a blank subject as null', () => {
-    setSubject('  Oil change  ');
+  it('caps the input at 4000 characters and trims the body', () => {
+    expect(bodyEl().getAttribute('maxlength')).toBe('4000');
     type('  did it  ');
     sendBtn().click();
-    expect(emitted[0]).toMatchObject({ subject: 'Oil change', body: 'did it' });
+    expect(emitted[0].body).toBe('did it');
   });
 
   describe('edit mode', () => {
-    const SEED: NoteSeed = { subject: 'Oil change', body: 'At Midas', occurredAt: '2019-06-14T09:15:00.000Z' };
+    const SEED: NoteSeed = { body: 'At Midas', occurredAt: '2019-06-14T09:15:00.000Z' };
 
     beforeEach(() => {
       fixture.componentRef.setInput('mode', 'edit');
@@ -143,24 +116,31 @@ describe('ItemNoteComposerComponent', () => {
       fixture.detectChanges();
     });
 
-    it('seeds subject, body, and the chip date from the note', () => {
+    it('seeds the body and the chip date from the note, and swaps send for Cancel / Save', () => {
       expect(bodyEl().value).toBe('At Midas');
       expect(dateEl().value).toBe('2019-06-14');
       expect(chipBtn().textContent).not.toContain('Today');
+      expect(host().querySelector('button[aria-label="Add note"]')).toBeNull();
+      expect(saveBtn()).toBeDefined();
+    });
+
+    it('joins a legacy multi-line body with spaces, so the single-line input shows what Save sends', () => {
+      fixture.componentRef.setInput('initial', { ...SEED, body: 'Oil change\n5W-30, 4 quarts' });
+      fixture.detectChanges();
+      expect(bodyEl().value).toBe('Oil change 5W-30, 4 quarts');
+
+      saveBtn().click();
+      expect(emitted[0].body).toBe('Oil change 5W-30, 4 quarts');
     });
 
     it('sends the original occurredAt verbatim when the chip is untouched', () => {
-      host().querySelectorAll<HTMLButtonElement>('button').forEach((b) => {
-        if (b.textContent?.trim() === 'Save') b.click();
-      });
+      saveBtn().click();
       expect(emitted[0].occurredAt).toBe('2019-06-14T09:15:00.000Z');
     });
 
     it('re-pins to noon UTC once the chip is touched', () => {
       pickDate('2019-06-15');
-      host().querySelectorAll<HTMLButtonElement>('button').forEach((b) => {
-        if (b.textContent?.trim() === 'Save') b.click();
-      });
+      saveBtn().click();
       expect(emitted[0].occurredAt).toBe('2019-06-15T12:00:00.000Z');
     });
 
@@ -192,54 +172,5 @@ describe('ItemNoteComposerComponent', () => {
     expect(at).not.toBeNull();
     // The server allows one minute of skew; equal-format ISO strings compare lexicographically.
     expect(at! <= new Date().toISOString()).toBe(true);
-  });
-
-  describe('subject suggestions', () => {
-    beforeEach(() => {
-      fixture.componentRef.setInput('subjects', [
-        'Oil change', 'Oil filter', 'Tyres', 'Brakes', 'Battery',
-        'Coolant', 'Wipers', 'Air filter', 'Spark plugs',
-      ]);
-      fixture.detectChanges();
-    });
-
-    const suggestions = () =>
-      (fixture.componentInstance as unknown as { filteredSubjects(): readonly string[] }).filteredSubjects();
-
-    it('caps the unfiltered list at 8', () => {
-      expect(suggestions()).toHaveLength(8);
-    });
-
-    it('filters case-insensitively on the typed text', () => {
-      setSubject('oil');
-      expect(suggestions()).toEqual(['Oil change', 'Oil filter']);
-    });
-
-    it('still sets the subject when the same suggestion is re-picked after clearText', () => {
-      // Drive brain's own select(): its model only emits on a change, so a latched pick must be
-      // reset by clearText or the second pick is a silent no-op (the back-filling flow).
-      const brain = fixture.debugElement.query(By.css('hlm-autocomplete')).injector.get(BrnAutocomplete);
-      brain.select('Tyres');
-      fixture.detectChanges();
-      type('first');
-      sendBtn().click();
-      expect(emitted[0].subject).toBe('Tyres');
-
-      fixture.componentInstance.clearText();
-      fixture.detectChanges();
-      brain.select('Tyres');
-      fixture.detectChanges();
-      type('second');
-      sendBtn().click();
-      expect(emitted[1].subject).toBe('Tyres');
-    });
-
-    it('sets the subject when a suggestion is picked', () => {
-      (fixture.componentInstance as unknown as { onSubjectPicked(v: unknown): void }).onSubjectPicked('Tyres');
-      fixture.detectChanges();
-      type('x');
-      sendBtn().click();
-      expect(emitted[0].subject).toBe('Tyres');
-    });
   });
 });

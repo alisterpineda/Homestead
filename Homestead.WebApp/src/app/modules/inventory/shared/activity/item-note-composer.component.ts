@@ -15,163 +15,125 @@ import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideCalendar, lucideSend } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
-import { HlmInput } from '@/shared/components/spartan/input';
-import { HlmAutocompleteImports } from '@/shared/components/spartan/autocomplete';
-import { BrnAutocomplete } from '@spartan-ng/brain/autocomplete';
+import { HlmInputGroupImports } from '@/shared/components/spartan/input-group';
 import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
 import { composeOccurredAt, decomposeOccurredAt } from '@/shared/utils/occurred-at';
 import { toIsoDateString } from '@/shared/utils';
-import { matchSubjects } from './subject-suggestions';
 
 /** What the composer emits on submit. `occurredAt` null = "let the server stamp now". */
 export interface NotePayload {
-  subject: string | null;
   body: string;
   occurredAt: string | null;
 }
 
 /** Edit-mode seed: the note as it currently stands. */
 export interface NoteSeed {
-  subject: string | null;
   body: string;
   occurredAt: string;
 }
 
-const MAX_SUBJECT = 200;
 const MAX_BODY = 4000;
 
 /**
- * The note-entry form, used twice by {@link ItemActivityFeedComponent}: once at the head of the feed
+ * The note-entry line, used twice by {@link ItemActivityFeedComponent}: once at the head of the feed
  * for creating, and once in place of a row when that note is being edited.
  *
- * Three fields, stacked so nothing needs a width branch: a **Subject** line with per-item
- * autocomplete (free text lives in the autocomplete's `search` model; the parent supplies the
- * suggestions, brain does no filtering of its own), a **Body** textarea that grows with its content,
- * and a **date chip** that pins the entry to when it *happened*. Enter in the body submits and
- * Shift+Enter inserts a newline — the Documents composer gesture; Enter in the subject moves to the
- * body instead. The date is deliberately *sticky* across submits (the parent clears the text, not the
- * date) so back-filling a stack of receipts is one date change, not fifteen.
+ * The Documents comment composer — one input with a send button, Enter submits — plus a **date chip**
+ * ahead of it that pins the entry to when it *happened*. The date is deliberately *sticky* across
+ * submits (the parent clears the text, not the date) so back-filling a stack of receipts is one date
+ * change, not fifteen. In edit mode the send button gives way to Cancel / Save, and Escape cancels.
  */
 @Component({
   selector: 'app-item-note-composer',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgIcon, HlmIconImports, HlmButton, HlmInput, HlmAutocompleteImports],
+  imports: [NgIcon, HlmIconImports, HlmButton, HlmInputGroupImports],
   providers: [provideIcons({ lucideCalendar, lucideSend })],
   template: `
-    <div class="flex flex-col gap-2">
-      <label class="sr-only" [attr.for]="subjectInputId">Subject</label>
-      <hlm-autocomplete
-        [search]="subject()"
-        (searchChange)="onSubjectInput($event)"
-        (valueChange)="onSubjectPicked($event)"
-        [itemToString]="identity"
-        [disabled]="disabled()"
-      >
-        <hlm-autocomplete-input
-          [inputId]="subjectInputId"
-          placeholder="Subject (optional)"
-          [showSearch]="false"
-          (keydown.enter)="focusBody()"
+    <!-- flex-wrap only matters in edit mode, where Cancel / Save can drop to their own line at
+         narrow widths; the input keeps a basis so it never collapses beside the chip. -->
+    <div class="flex flex-wrap items-center gap-2">
+      <!-- relative: the native date input overlays the chip (transparent, click-through) so the
+           browser anchors its picker to the chip rather than to some distant ancestor. -->
+      <div class="relative inline-flex shrink-0">
+        <button
+          hlmBtn
+          variant="outline"
+          size="sm"
+          type="button"
+          [disabled]="disabled()"
+          [class.invisible]="pickerFallback()"
+          [attr.aria-label]="'Date: ' + chipLabel()"
+          (click)="openPicker()"
+        >
+          <ng-icon hlm name="lucideCalendar" size="sm" />
+          {{ chipLabel() }}
+        </button>
+        <input
+          #dateInput
+          type="date"
+          class="absolute inset-0 h-full w-full rounded-lg border-input bg-transparent px-2 text-base md:text-sm"
+          [class.opacity-0]="!pickerFallback()"
+          [class.pointer-events-none]="!pickerFallback()"
+          [class.border]="pickerFallback()"
+          [attr.aria-hidden]="pickerFallback() ? null : 'true'"
+          [attr.tabindex]="pickerFallback() ? null : -1"
+          [attr.aria-label]="pickerFallback() ? 'Date' : null"
+          [disabled]="disabled()"
+          [max]="todayIso()"
+          [value]="dateIso() ?? ''"
+          (change)="onDatePicked($event)"
         />
-        <hlm-autocomplete-content *hlmAutocompletePortal>
-          @if (filteredSubjects().length) {
-            <div hlmAutocompleteList>
-              @for (s of filteredSubjects(); track s) {
-                <hlm-autocomplete-item [value]="s">{{ s }}</hlm-autocomplete-item>
-              }
-            </div>
-          }
-        </hlm-autocomplete-content>
-      </hlm-autocomplete>
+      </div>
 
       <label class="sr-only" [attr.for]="bodyInputId">Note</label>
-      <!-- h-auto + field-sizing-content overrides hlmInput's fixed h-8 so the box grows with the
-           note (one row to about five, then scrolls); min-h-8 keeps it flush with the Subject
-           input above at rest, which content sizing alone leaves 2px short. -->
-      <textarea
-        #bodyInput
-        hlmInput
-        [id]="bodyInputId"
-        rows="1"
-        [attr.maxlength]="maxBody"
-        class="h-auto max-h-32 min-h-8 w-full resize-none field-sizing-content"
-        placeholder="Add a note…"
-        [disabled]="disabled()"
-        [value]="body()"
-        (input)="onBodyInput($event)"
-        (keydown)="onBodyKeydown($event)"
-      ></textarea>
-
-      <div class="flex items-center gap-2">
-        <!-- relative: the native date input overlays the chip (transparent, click-through) so the
-             browser anchors its picker to the chip rather than to some distant ancestor. -->
-        <div class="relative inline-flex">
-          <button
-            hlmBtn
-            variant="outline"
-            size="sm"
-            type="button"
-            [disabled]="disabled()"
-            [class.invisible]="pickerFallback()"
-            [attr.aria-label]="'Date: ' + chipLabel()"
-            (click)="openPicker()"
-          >
-            <ng-icon hlm name="lucideCalendar" size="sm" />
-            {{ chipLabel() }}
-          </button>
-          <input
-            #dateInput
-            type="date"
-            class="absolute inset-0 h-full w-full rounded-lg border-input bg-transparent px-2 text-base md:text-sm"
-            [class.opacity-0]="!pickerFallback()"
-            [class.pointer-events-none]="!pickerFallback()"
-            [class.border]="pickerFallback()"
-            [attr.aria-hidden]="pickerFallback() ? null : 'true'"
-            [attr.tabindex]="pickerFallback() ? null : -1"
-            [attr.aria-label]="pickerFallback() ? 'Date' : null"
-            [disabled]="disabled()"
-            [max]="todayIso()"
-            [value]="dateIso() ?? ''"
-            (change)="onDatePicked($event)"
-          />
-        </div>
-
-        @if (mode() === 'edit') {
-          <div class="ml-auto flex items-center gap-2">
-            <button hlmBtn variant="ghost" size="sm" type="button" (click)="cancelled.emit()">Cancel</button>
-            <button hlmBtn size="sm" type="button" [disabled]="!canSubmit()" (click)="submit()">
-              {{ busy() ? 'Saving...' : 'Save' }}
+      <div hlmInputGroup class="min-w-0 flex-1 basis-40">
+        <input
+          #bodyInput
+          hlmInputGroupInput
+          [id]="bodyInputId"
+          [attr.maxlength]="maxBody"
+          placeholder="Add a note..."
+          [disabled]="disabled()"
+          [value]="body()"
+          (input)="onBodyInput($event)"
+          (keydown)="onBodyKeydown($event)"
+        />
+        @if (mode() === 'create') {
+          <hlm-input-group-addon align="inline-end">
+            <button
+              hlmInputGroupButton
+              size="icon-xs"
+              type="button"
+              aria-label="Add note"
+              [disabled]="!canSubmit()"
+              (click)="submit()"
+            >
+              <ng-icon hlm name="lucideSend" size="sm" />
             </button>
-          </div>
-        } @else {
-          <button
-            hlmBtn
-            size="icon-sm"
-            type="button"
-            class="ml-auto"
-            aria-label="Add note"
-            [disabled]="!canSubmit()"
-            (click)="submit()"
-          >
-            <ng-icon hlm name="lucideSend" size="sm" />
-          </button>
+          </hlm-input-group-addon>
         }
       </div>
+
+      @if (mode() === 'edit') {
+        <div class="ml-auto flex items-center gap-2">
+          <button hlmBtn variant="ghost" size="sm" type="button" (click)="cancelled.emit()">Cancel</button>
+          <button hlmBtn size="sm" type="button" [disabled]="!canSubmit()" (click)="submit()">
+            {{ busy() ? 'Saving...' : 'Save' }}
+          </button>
+        </div>
+      }
     </div>
   `,
 })
 export class ItemNoteComposerComponent {
   private static _id = 0;
   private readonly uid = ItemNoteComposerComponent._id++;
-  protected readonly subjectInputId = `note-subject-${this.uid}`;
   protected readonly bodyInputId = `note-body-${this.uid}`;
   protected readonly maxBody = MAX_BODY;
 
   private locale = inject(LOCALE_ID);
 
   mode = input<'create' | 'edit'>('create');
-  /** The item's distinct prior subjects, most-recent first. Brain does no filtering — we do. */
-  subjects = input<readonly string[]>([]);
   /** Edit seed. Re-seeds on a change of *content* (see `seedKey`), so the reference need not be stable. */
   initial = input<NoteSeed | null>(null);
   /** The header composer is disabled while a row edit is open — only one composer at a time. */
@@ -181,9 +143,7 @@ export class ItemNoteComposerComponent {
   submitted = output<NotePayload>();
   cancelled = output<void>();
 
-  private bodyEl = viewChild<ElementRef<HTMLTextAreaElement>>('bodyInput');
-  /** The subject autocomplete's brain — reached to drop its latched selection on clear (see `clearText`). */
-  private autocomplete = viewChild(BrnAutocomplete);
+  private bodyEl = viewChild<ElementRef<HTMLInputElement>>('bodyInput');
   private dateEl = viewChild<ElementRef<HTMLInputElement>>('dateInput');
 
   // Seeded on a primitive key derived from the seed's *content* (the app-wide `seedKey` convention),
@@ -191,10 +151,9 @@ export class ItemNoteComposerComponent {
   // through a fresh but equal object — never overwrites what the user is typing.
   private seedKey = computed(() => {
     const s = this.initial();
-    return s ? JSON.stringify([s.subject, s.body, s.occurredAt]) : '';
+    return s ? JSON.stringify([s.body, s.occurredAt]) : '';
   });
-  protected subject = seededLinkedSignal(this.seedKey, () => this.initial()?.subject ?? '');
-  protected body = seededLinkedSignal(this.seedKey, () => this.initial()?.body ?? '');
+  protected body = seededLinkedSignal(this.seedKey, () => toSingleLine(this.initial()?.body ?? ''));
   /** null = untouched ("Today"). In edit mode it *displays* the note's date but stays untouched. */
   protected dateIso = seededLinkedSignal(this.seedKey, () => {
     const seed = this.initial();
@@ -208,13 +167,7 @@ export class ItemNoteComposerComponent {
   /** Set when the browser has no `showPicker()`; the native control is then shown in place. */
   protected pickerFallback = signal(false);
 
-  protected readonly identity = (v: string): string => v;
-
-  protected canSubmit = computed(
-    () => (this.subject().trim().length > 0 || this.body().trim().length > 0) && !this.busy() && !this.disabled(),
-  );
-
-  protected filteredSubjects = computed(() => matchSubjects(this.subjects(), this.subject()));
+  protected canSubmit = computed(() => this.body().trim().length > 0 && !this.busy() && !this.disabled());
 
   protected chipLabel = computed(() => {
     const iso = this.dateIso();
@@ -223,10 +176,6 @@ export class ItemNoteComposerComponent {
 
   /** Clear the text but keep the date — the sticky-date rule. Called by the feed after a create. */
   clearText(): void {
-    // Brain latches the last picked value and its model only emits on a *change*, so without this
-    // reset re-picking the same suggestion for the next note would be a silent no-op.
-    this.autocomplete()?.resetValue();
-    this.subject.set('');
     this.body.set('');
     this.focusBody();
   }
@@ -235,20 +184,12 @@ export class ItemNoteComposerComponent {
     this.bodyEl()?.nativeElement.focus();
   }
 
-  protected onSubjectInput(value: string): void {
-    this.subject.set(value.slice(0, MAX_SUBJECT));
-  }
-
-  protected onSubjectPicked(value: unknown): void {
-    if (typeof value === 'string') this.subject.set(value.slice(0, MAX_SUBJECT));
-  }
-
   protected onBodyInput(event: Event): void {
-    this.body.set((event.target as HTMLTextAreaElement).value);
+    this.body.set((event.target as HTMLInputElement).value);
   }
 
   protected onBodyKeydown(event: KeyboardEvent): void {
-    if (event.key === 'Enter' && !event.shiftKey) {
+    if (event.key === 'Enter') {
       event.preventDefault();
       this.submit();
       return;
@@ -291,11 +232,19 @@ export class ItemNoteComposerComponent {
     // genuine no-op server-side rather than silently pinning a full instant to noon.
     const occurredAt = this.mode() === 'edit' ? (picked ?? seed?.occurredAt ?? null) : picked;
     this.submitted.emit({
-      subject: this.subject().trim().slice(0, MAX_SUBJECT) || null,
       body: this.body().trim().slice(0, MAX_BODY),
       occurredAt,
     });
   }
+}
+
+/**
+ * The body is one line. A legacy multi-line note (typed under the old textarea composer) is joined
+ * with spaces on seed, because a text `<input>` silently *strips* line breaks — left alone, the user
+ * would see the lines fused together ("Oil change5W-30") and Save would persist exactly that.
+ */
+function toSingleLine(text: string): string {
+  return text.replace(/\s*\r?\n\s*/g, ' ');
 }
 
 // A date-only pick composes to noon UTC on the *local* calendar date, which for today is a future

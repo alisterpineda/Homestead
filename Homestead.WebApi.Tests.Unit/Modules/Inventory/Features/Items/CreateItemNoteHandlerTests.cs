@@ -60,7 +60,7 @@ public class CreateItemNoteHandlerTests : IDisposable
 
         var response = await _sut.Handle(new CreateItemNoteCommand
         {
-            ItemId = item.Id, OccurredAt = when, Subject = "Oil change", Body = "5W-30",
+            ItemId = item.Id, OccurredAt = when, Body = "5W-30",
         }, Ct);
 
         Assert.Equal(when, response.OccurredAt);
@@ -69,29 +69,17 @@ public class CreateItemNoteHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task Handle_NormalisesText_BlankSubjectBecomesNull_BodyTrimmed()
+    public async Task Handle_TrimsBody()
     {
         var item = await ItemNoteTestData.AddItemAsync(_db);
 
         var response = await _sut.Handle(new CreateItemNoteCommand
         {
-            ItemId = item.Id, Subject = "   ", Body = "  needs a new blade  \n",
+            ItemId = item.Id, Body = "  needs a new blade  \n",
         }, Ct);
 
-        Assert.Null(response.Subject);
         Assert.Equal("needs a new blade", response.Body);
         Assert.Equal(item.Id, response.ItemId);
-    }
-
-    [Fact]
-    public async Task Handle_SubjectOnly_StoresEmptyBody()
-    {
-        var item = await ItemNoteTestData.AddItemAsync(_db);
-
-        var response = await _sut.Handle(new CreateItemNoteCommand { ItemId = item.Id, Subject = " Inspected " }, Ct);
-
-        Assert.Equal("Inspected", response.Subject);
-        Assert.Equal("", response.Body);
     }
 
     [Fact]

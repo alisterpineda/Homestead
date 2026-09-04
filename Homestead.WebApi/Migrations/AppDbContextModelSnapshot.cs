@@ -1419,10 +1419,6 @@ namespace Homestead.WebApi.Migrations
                     b.Property<DateTimeOffset>("OccurredAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("Subject")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -1437,10 +1433,7 @@ namespace Homestead.WebApi.Migrations
 
                     b.HasIndex("ItemId", "OccurredAt");
 
-                    b.ToTable("item_notes", "inventory", t =>
-                        {
-                            t.HasCheckConstraint("CK_item_notes_subject_or_body", "\"Subject\" IS NOT NULL OR \"Body\" <> ''");
-                        });
+                    b.ToTable("item_notes", "inventory");
                 });
 
             modelBuilder.Entity("Homestead.WebApi.Domain.Inventory.ItemTag", b =>

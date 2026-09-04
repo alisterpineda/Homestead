@@ -12,7 +12,6 @@ public static class ItemNoteResponseMapper
         Id = n.Id,
         ItemId = n.ItemId,
         OccurredAt = n.OccurredAt,
-        Subject = n.Subject,
         Body = n.Body,
         CreatedAt = n.CreatedAt,
         UpdatedAt = n.UpdatedAt,

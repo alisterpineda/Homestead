@@ -18,7 +18,6 @@ using Homestead.WebApi.Modules.Inventory.Features.Items.GetItem;
 using Homestead.WebApi.Modules.Inventory.Features.Items.GetItemActivity;
 using Homestead.WebApi.Modules.Inventory.Features.Items.Notes.CreateNote;
 using Homestead.WebApi.Modules.Inventory.Features.Items.Notes.DeleteNote;
-using Homestead.WebApi.Modules.Inventory.Features.Items.Notes.GetNoteSubjects;
 using Homestead.WebApi.Modules.Inventory.Features.Items.Notes.UpdateNote;
 using Homestead.WebApi.Modules.Inventory.Features.Overview.GetInventoryOverview;
 using Homestead.WebApi.Modules.Inventory.Features.Places.GetPlaceContents;
@@ -59,7 +58,6 @@ public static class InventoryModule
         var items = v1.MapGroup("/items");
         GetItemEndpoint.Map(items);
         GetItemActivityEndpoint.Map(items);
-        GetItemNoteSubjectsEndpoint.Map(items);
         CreateItemNoteEndpoint.Map(items);
         UpdateItemNoteEndpoint.Map(items);
         DeleteItemNoteEndpoint.Map(items);

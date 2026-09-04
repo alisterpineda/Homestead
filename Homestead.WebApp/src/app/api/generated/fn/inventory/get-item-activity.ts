@@ -13,8 +13,6 @@ export interface GetItemActivity$Params {
   id: string;
   Page?: number;
   PageSize?: number;
-  notesOnly?: boolean;
-  filter?: string;
 }
 
 export function getItemActivity(http: HttpClient, rootUrl: string, params: GetItemActivity$Params, context?: HttpContext): Observable<StrictHttpResponse<PaginatedResponseOfGetItemActivityResponse>> {
@@ -23,8 +21,6 @@ export function getItemActivity(http: HttpClient, rootUrl: string, params: GetIt
     rb.path('id', params.id, {});
     rb.query('Page', params.Page, {});
     rb.query('PageSize', params.PageSize, {});
-    rb.query('notesOnly', params.notesOnly, {});
-    rb.query('filter', params.filter, {});
   }
 
   return http.request(

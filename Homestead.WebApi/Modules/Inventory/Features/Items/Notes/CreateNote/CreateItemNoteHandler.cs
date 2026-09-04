@@ -30,7 +30,6 @@ public class CreateItemNoteHandler(
             ItemId = request.ItemId,
             // Normalised to UTC: Npgsql refuses a non-zero offset on a timestamptz column.
             OccurredAt = (request.OccurredAt ?? now).ToUniversalTime(),
-            Subject = ItemNoteText.Normalize(request.Subject),
             Body = ItemNoteText.NormalizeBody(request.Body),
             CreatedAt = now,
             UpdatedAt = now,

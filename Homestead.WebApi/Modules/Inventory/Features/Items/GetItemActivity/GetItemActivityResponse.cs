@@ -3,7 +3,7 @@ namespace Homestead.WebApi.Modules.Inventory.Features.Items.GetItemActivity;
 /// <summary>
 /// One row of an item's activity feed. A flat union discriminated by <see cref="Type"/>:
 /// <c>"audit_log"</c> rows carry <see cref="Summary"/>; <c>"note"</c> rows carry the note fields
-/// (<see cref="Subject"/> through <see cref="UpdatedByEmail"/>).
+/// (<see cref="Body"/> through <see cref="UpdatedByEmail"/>).
 /// </summary>
 public record GetItemActivityResponse
 {
@@ -26,7 +26,6 @@ public record GetItemActivityResponse
     public string? Summary { get; init; }
 
     // ----- note only -----
-    public string? Subject { get; init; }
     public string? Body { get; init; }
     public DateTimeOffset? OccurredAt { get; init; }
     public DateTimeOffset? CreatedAt { get; init; }

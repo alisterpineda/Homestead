@@ -8,16 +8,13 @@ public static class GetItemActivityEndpoint
     public static void Map(RouteGroupBuilder group)
     {
         group.MapGet("/{id:guid}/activity", async (Guid id,
-            [AsParameters] PaginatedRequest paging, bool? notesOnly, string? filter,
-            ISender sender, CancellationToken ct) =>
+            [AsParameters] PaginatedRequest paging, ISender sender, CancellationToken ct) =>
         {
             var query = new GetItemActivityQuery
             {
                 Id = id,
                 Page = paging.Page,
                 PageSize = paging.PageSize,
-                NotesOnly = notesOnly ?? false,
-                Filter = filter,
             };
             var response = await sender.Send(query, ct);
             return response is null ? Results.NotFound() : Results.Ok(response);

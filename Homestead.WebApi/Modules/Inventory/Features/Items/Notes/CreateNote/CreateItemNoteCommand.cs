@@ -10,8 +10,6 @@ public record CreateItemNoteCommand : ICommand<ItemNoteResponse>
     /// <summary>When it happened; null means "now" on the server clock. Never in the future.</summary>
     public DateTimeOffset? OccurredAt { get; init; }
 
-    public string? Subject { get; init; }
-
-    /// <summary>Required unless <see cref="Subject"/> is set.</summary>
+    /// <summary>The note text; required, trimmed, at most 4000 characters.</summary>
     public string? Body { get; init; }
 }

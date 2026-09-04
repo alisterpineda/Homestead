@@ -5,9 +5,8 @@ using Homestead.WebApi.Modules.Inventory.Features.Items.GetItemActivity;
 
 namespace Homestead.WebApi.Tests.Unit.Modules.Inventory.Features.Items;
 
-// The Filter branch uses EF.Functions.ILike, which the EF InMemory provider cannot translate, so
-// (like GetTagsHandlerTests) it is not unit-tested here — ItemActivityEndpointTests proves it against
-// a real Postgres. Everything else (merge order, tiebreaks, notesOnly, LEFT joins, paging) is covered.
+// Merge order, tiebreaks, LEFT joins, and paging are covered here; ItemActivityEndpointTests proves
+// the same feed end-to-end against a real Postgres.
 public class GetItemActivityHandlerTests : IDisposable
 {
     private readonly TestAppDbContext _db;
@@ -80,9 +79,9 @@ public class GetItemActivityHandlerTests : IDisposable
         // Typed today, but about something that happened years before the item was entered: the feed
         // sorts on OccurredAt, so it lands at the bottom, below "added this item".
         var backDated = await ItemNoteTestData.AddNoteAsync(_db, item.Id, now.AddYears(-3),
-            subject: "Original purchase", createdAt: now, createdByUserId: alice.Id);
+            body: "Original purchase", createdAt: now, createdByUserId: alice.Id);
         var recent = await ItemNoteTestData.AddNoteAsync(_db, item.Id, now.AddDays(-1),
-            subject: "Oil change", createdAt: now, createdByUserId: alice.Id);
+            body: "Oil change", createdAt: now, createdByUserId: alice.Id);
 
         var result = await _sut.Handle(new GetItemActivityQuery { Id = item.Id }, Ct);
 
@@ -95,7 +94,7 @@ public class GetItemActivityHandlerTests : IDisposable
         Assert.Equal(backDated.Id, result.Items[3].Id);
 
         var note = result.Items[0];
-        Assert.Equal("Oil change", note.Subject);
+        Assert.Equal("Oil change", note.Body);
         Assert.Equal(now.AddDays(-1), note.Timestamp);
         Assert.Equal(now.AddDays(-1), note.OccurredAt);
         Assert.Equal(now, note.CreatedAt);
@@ -144,23 +143,6 @@ public class GetItemActivityHandlerTests : IDisposable
         Assert.Equal(
             first.Items.Select(x => x.Id).OrderByDescending(id => id),
             first.Items.Select(x => x.Id));
-    }
-
-    [Fact]
-    public async Task Handle_NotesOnly_ExcludesAuditRows_AndCountsOnlyNotes()
-    {
-        var item = await ItemNoteTestData.AddItemAsync(_db);
-        await AddAuditAsync(item.Id, AuditAction.Created, Guid.NewGuid(), DateTimeOffset.UtcNow.AddDays(-1));
-        await AddAuditAsync(item.Id, AuditAction.Updated, Guid.NewGuid(), DateTimeOffset.UtcNow.AddHours(-1));
-        await ItemNoteTestData.AddNoteAsync(_db, item.Id, DateTimeOffset.UtcNow, body: "only me");
-
-        var result = await _sut.Handle(new GetItemActivityQuery { Id = item.Id, NotesOnly = true }, Ct);
-
-        Assert.NotNull(result);
-        Assert.Equal(1, result.TotalCount);
-        var row = Assert.Single(result.Items);
-        Assert.Equal("note", row.Type);
-        Assert.Equal("only me", row.Body);
     }
 
     [Fact]

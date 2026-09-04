@@ -137,14 +137,13 @@ class StubDurableApi {
 // The hosted `app-item-activity-feed` reads through InventoryItemApiService.
 class StubItemApi {
   rows: GetItemActivityResponse[] = [];
-  activityCalls: { id: string; Page: number; PageSize: number; notesOnly: boolean; filter?: string }[] = [];
+  activityCalls: { id: string; Page: number; PageSize: number }[] = [];
   activityFails = false;
-  getItemActivity = (p: { id: string; Page: number; PageSize: number; notesOnly: boolean; filter?: string }) => {
+  getItemActivity = (p: { id: string; Page: number; PageSize: number }) => {
     this.activityCalls.push(p);
     if (this.activityFails) return throwError(() => new Error('boom'));
     return of({ items: this.rows, page: p.Page, pageSize: p.PageSize, totalCount: this.rows.length, totalPages: 1 });
   };
-  getItemNoteSubjects = () => of([] as string[]);
   createItemNote = () => of({});
   updateItemNote = () => of({});
   deleteItemNote = () => of(undefined);

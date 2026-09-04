@@ -26,19 +26,22 @@
 
 ## Activity feed (both detail pages)
 
-Shared `app-item-activity-feed`: audit rows interleaved with user notes, an All | Notes toggle, a
-subject filter, and a note composer. On first load with no stored preference it deliberately fires
-**two** requests (`notesOnly=true`, then `notesOnly=false` if the item has no notes) — the
-default-view probe, not a bug. The toggle persists in `localStorage['homestead-inventory-activity-view']`.
+Shared `app-item-activity-feed`: one list of audit rows interleaved with user notes, no toggle and
+no filter (the Documents stream shape). Load fires a single `GET …/activity?Page=1&PageSize=20`. The
+composer is one row: a date chip (default "Today", sticky across submits) + a single-line input
+(placeholder `Add a note...`) with an inline `Add note` send button; Enter submits. ⋮ → Edit swaps
+the row for the same composer with Cancel / Save instead of send (Escape cancels) and disables the
+header composer; ⋮ → Delete confirms in an alert dialog. Nothing is stored in `localStorage`.
 
 ## API
 
 - Areas: `/api/v1/inventory/areas` (`GET`/`POST`), `/areas/{id}` (`PATCH`/`DELETE`). No `PUT`
   (405). The `PATCH` is **JSON Patch** — only `application/json-patch+json`; a plain JSON body gets
   415. Re-parent through the UI dialog instead.
-- Item activity + notes: `/api/v1/inventory/items/{id}/activity` (`GET`; params `Page`, `PageSize`,
-  `notesOnly`, `filter`), `/items/{id}/activity/subjects` (`GET`), `/items/{id}/activity/notes`
-  (`POST`), `/items/{id}/activity/notes/{noteId}` (`PUT`/`DELETE`). `/items/{id}/notes` is not a
+- Item activity + notes: `/api/v1/inventory/items/{id}/activity` (`GET`; params `Page`, `PageSize`
+  only — stray `notesOnly`/`filter` are ignored, not rejected), `/items/{id}/activity/notes` (`POST`),
+  `/items/{id}/activity/notes/{noteId}` (`PUT`/`DELETE`); bodies are `{ occurredAt?, body }` with
+  `body` required. `/items/{id}/activity/subjects` no longer exists (404). `/items/{id}/notes` is not a
   route (405). Writes require Contributor; reads ride the group's ActiveUser policy.
 - Consumable movements are a separate route family: `/api/v1/inventory/consumables/{id}/movements`
   (`GET`, `PageSize=25`), paged independently of the activity feed.

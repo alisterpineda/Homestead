@@ -17,22 +17,20 @@ public class ItemNoteSnapshotTests
             Id = Guid.NewGuid(),
             ItemId = Guid.NewGuid(),
             OccurredAt = Day1,
-            Subject = "Oil change",
             Body = "5W-30, 4.5 L",
         };
 
         var snapshot = ItemNoteSnapshot.From(note);
 
         Assert.Equal(Day1, snapshot.OccurredAt);
-        Assert.Equal("Oil change", snapshot.Subject);
         Assert.Equal("5W-30, 4.5 L", snapshot.Body);
     }
 
     [Fact]
     public void Diff_DetectsOccurredAtChange()
     {
-        var before = new ItemNoteSnapshot { OccurredAt = Day1, Subject = "S", Body = "B" };
-        var after = new ItemNoteSnapshot { OccurredAt = Day2, Subject = "S", Body = "B" };
+        var before = new ItemNoteSnapshot { OccurredAt = Day1, Body = "B" };
+        var after = new ItemNoteSnapshot { OccurredAt = Day2, Body = "B" };
 
         var changes = before.Diff(after);
 
@@ -44,25 +42,10 @@ public class ItemNoteSnapshotTests
     }
 
     [Fact]
-    public void Diff_DetectsSubjectChange()
-    {
-        var before = new ItemNoteSnapshot { OccurredAt = Day1, Subject = null, Body = "B" };
-        var after = new ItemNoteSnapshot { OccurredAt = Day1, Subject = "Oil change", Body = "B" };
-
-        var changes = before.Diff(after);
-
-        var change = Assert.Single(changes);
-        var scalar = Assert.IsType<ScalarFieldChange>(change);
-        Assert.Equal("Subject", scalar.Field);
-        Assert.Null(scalar.OldValue);
-        Assert.Equal("Oil change", scalar.NewValue);
-    }
-
-    [Fact]
     public void Diff_DetectsBodyChange()
     {
-        var before = new ItemNoteSnapshot { OccurredAt = Day1, Subject = "S", Body = "Old" };
-        var after = new ItemNoteSnapshot { OccurredAt = Day1, Subject = "S", Body = "New" };
+        var before = new ItemNoteSnapshot { OccurredAt = Day1, Body = "Old" };
+        var after = new ItemNoteSnapshot { OccurredAt = Day1, Body = "New" };
 
         var changes = before.Diff(after);
 
@@ -76,7 +59,7 @@ public class ItemNoteSnapshotTests
     [Fact]
     public void Diff_ReturnsEmpty_WhenIdentical()
     {
-        var snapshot = new ItemNoteSnapshot { OccurredAt = Day1, Subject = "S", Body = "B" };
+        var snapshot = new ItemNoteSnapshot { OccurredAt = Day1, Body = "B" };
 
         var changes = snapshot.Diff(snapshot);
 
@@ -86,11 +69,11 @@ public class ItemNoteSnapshotTests
     [Fact]
     public void Diff_DetectsMultipleChanges()
     {
-        var before = new ItemNoteSnapshot { OccurredAt = Day1, Subject = null, Body = "Old" };
-        var after = new ItemNoteSnapshot { OccurredAt = Day2, Subject = "S", Body = "New" };
+        var before = new ItemNoteSnapshot { OccurredAt = Day1, Body = "Old" };
+        var after = new ItemNoteSnapshot { OccurredAt = Day2, Body = "New" };
 
         var changes = before.Diff(after);
 
-        Assert.Equal(3, changes.Count);
+        Assert.Equal(2, changes.Count);
     }
 }

@@ -83,15 +83,6 @@ export class UserPreferencesService {
       v === null || v === 'table' || v === 'card',
   });
 
-  // Null = no explicit choice yet, so the activity feed applies its per-item default
-  // (Notes when the item has any note, else All). A user tap on the toggle persists here.
-  readonly inventoryActivityView = persistedSignal<'all' | 'notes' | null>({
-    key: 'homestead-inventory-activity-view',
-    defaultValue: null,
-    validate: (v): v is 'all' | 'notes' | null =>
-      v === null || v === 'all' || v === 'notes',
-  });
-
   readonly documentColumnVisibility = persistedSignal<VisibilityState>({
     key: 'homestead-document-columns',
     defaultValue: {},

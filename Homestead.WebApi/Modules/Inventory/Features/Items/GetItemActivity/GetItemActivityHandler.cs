@@ -1,6 +1,5 @@
 using System.Text.Json;
 using Homestead.WebApi.Common;
-using Homestead.WebApi.Common.Search;
 using Homestead.WebApi.Domain.Auditing;
 using Homestead.WebApi.Persistence;
 using MediatR;
@@ -48,12 +47,8 @@ public class GetItemActivityHandler(AppDbContext db)
         if (!exists)
             return null;
 
-        var filter = request.Filter?.Trim();
-        // A text filter is over note text only, so it implies notes-only (activity.md §Filtering).
-        var notesOnly = request.NotesOnly || !string.IsNullOrEmpty(filter);
-
-        var auditRows = notesOnly ? [] : await LoadAuditRowsAsync(request.Id, ct);
-        var noteRows = await LoadNoteRowsAsync(request.Id, filter, ct);
+        var auditRows = await LoadAuditRowsAsync(request.Id, ct);
+        var noteRows = await LoadNoteRowsAsync(request.Id, ct);
 
         // Merge + order + paginate in memory (the audit summaries parse Changes JSON, so the audit half
         // can't be sorted in SQL anyway). The sort key is explicit: effective date, then the recorded
@@ -131,22 +126,11 @@ public class GetItemActivityHandler(AppDbContext db)
     }
 
     private async Task<List<(SortKey Key, GetItemActivityResponse Row)>> LoadNoteRowsAsync(
-        Guid itemId, string? filter, CancellationToken ct)
+        Guid itemId, CancellationToken ct)
     {
-        var query = db.ItemNotes.AsNoTracking().Where(n => n.ItemId == itemId);
-
-        if (!string.IsNullOrEmpty(filter))
-        {
-            // 3-arg ILike so a user-typed % or _ is matched literally (see LikeEscaper). Postgres-only:
-            // InMemory can't translate it, so this branch is proven by the integration suite.
-            var pattern = $"%{LikeEscaper.Escape(filter)}%";
-            query = query.Where(n =>
-                (n.Subject != null && EF.Functions.ILike(n.Subject, pattern, LikeEscaper.EscapeChar)) ||
-                EF.Functions.ILike(n.Body, pattern, LikeEscaper.EscapeChar));
-        }
-
         // Optional navs → LEFT JOINs; a note whose author was deleted (SetNull FK) still renders.
-        var rows = await query
+        var rows = await db.ItemNotes.AsNoTracking()
+            .Where(n => n.ItemId == itemId)
             .Select(n => new GetItemActivityResponse
             {
                 Type = "note",
@@ -154,7 +138,6 @@ public class GetItemActivityHandler(AppDbContext db)
                 Timestamp = n.OccurredAt,
                 UserDisplayName = n.CreatedByUser != null ? n.CreatedByUser.DisplayName : null,
                 UserEmail = n.CreatedByUser != null ? n.CreatedByUser.Email : null,
-                Subject = n.Subject,
                 Body = n.Body,
                 OccurredAt = n.OccurredAt,
                 CreatedAt = n.CreatedAt,

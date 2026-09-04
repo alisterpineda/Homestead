@@ -7,7 +7,6 @@ export interface GetItemActivityResponse {
   id: string;
   isEdited?: boolean;
   occurredAt?: (string | null);
-  subject?: (string | null);
   summary?: (string | null);
   timestamp: string;
   type: string;

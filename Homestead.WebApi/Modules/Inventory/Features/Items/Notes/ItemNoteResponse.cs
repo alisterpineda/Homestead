@@ -11,7 +11,6 @@ public record ItemNoteResponse
 
     /// <summary>When it happened — the feed's effective date for this row.</summary>
     public required DateTimeOffset OccurredAt { get; init; }
-    public string? Subject { get; init; }
     public required string Body { get; init; }
 
     public required DateTimeOffset CreatedAt { get; init; }

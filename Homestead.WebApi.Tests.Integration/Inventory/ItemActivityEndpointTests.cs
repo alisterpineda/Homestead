@@ -7,30 +7,30 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Homestead.WebApi.Tests.Integration.Inventory;
 
 // Backend integration coverage for the item-level activity feed and its notes
-// (/api/v1/inventory/items/{id}/activity[/notes|/subjects]). This is the only place the ILike
-// filter branch, the item_notes FK/check constraint, and the delete gate are exercised against a
-// real Postgres; the merge/sort logic is unit-tested in GetItemActivityHandlerTests.
+// (/api/v1/inventory/items/{id}/activity[/notes]). This is the only place the item_notes FK and
+// the delete gate are exercised against a real Postgres; the merge/sort logic is unit-tested in
+// GetItemActivityHandlerTests.
 [Collection("Integration")]
 public class ItemActivityEndpointTests : IntegrationTestBase
 {
     public ItemActivityEndpointTests(PostgresFixture fixture) : base(fixture) { }
 
     private record NoteResult(
-        Guid Id, Guid ItemId, DateTimeOffset OccurredAt, string? Subject, string Body,
+        Guid Id, Guid ItemId, DateTimeOffset OccurredAt, string Body,
         DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, bool IsEdited,
         string? CreatedByDisplayName, string? CreatedByEmail,
         string? UpdatedByDisplayName, string? UpdatedByEmail);
 
     private record ActivityRow(
         string Type, Guid Id, DateTimeOffset Timestamp, string? UserDisplayName, string? UserEmail,
-        string? Summary, string? Subject, string? Body, DateTimeOffset? OccurredAt,
+        string? Summary, string? Body, DateTimeOffset? OccurredAt,
         DateTimeOffset? CreatedAt, DateTimeOffset? UpdatedAt, bool IsEdited,
         string? UpdatedByDisplayName, string? UpdatedByEmail);
 
     // ----- Helpers -----
 
-    private static string ActivityUrl(Guid itemId, string query = "") =>
-        $"/api/v1/inventory/items/{itemId}/activity{query}";
+    private static string ActivityUrl(Guid itemId) =>
+        $"/api/v1/inventory/items/{itemId}/activity";
 
     private static string NotesUrl(Guid itemId, Guid? noteId = null) =>
         $"/api/v1/inventory/items/{itemId}/activity/notes" + (noteId is null ? "" : $"/{noteId}");
@@ -50,16 +50,16 @@ public class ItemActivityEndpointTests : IntegrationTestBase
     }
 
     private static async Task<NoteResult> CreateNoteAsync(
-        HttpClient client, Guid itemId, string? body = null, string? subject = null, DateTimeOffset? occurredAt = null)
+        HttpClient client, Guid itemId, string body = "note body", DateTimeOffset? occurredAt = null)
     {
-        var resp = await client.PostAsJsonAsync(NotesUrl(itemId), new { occurredAt, subject, body }, CT);
+        var resp = await client.PostAsJsonAsync(NotesUrl(itemId), new { occurredAt, body }, CT);
         Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
         return (await resp.Content.ReadFromJsonAsync<NoteResult>(CT))!;
     }
 
-    private static async Task<PaginatedResult<ActivityRow>> GetFeedAsync(HttpClient client, Guid itemId, string query = "")
+    private static async Task<PaginatedResult<ActivityRow>> GetFeedAsync(HttpClient client, Guid itemId)
     {
-        var resp = await client.GetAsync(ActivityUrl(itemId, query), CT);
+        var resp = await client.GetAsync(ActivityUrl(itemId), CT);
         Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
         return (await resp.Content.ReadFromJsonAsync<PaginatedResult<ActivityRow>>(CT))!;
     }
@@ -75,7 +75,7 @@ public class ItemActivityEndpointTests : IntegrationTestBase
 
         var resp = await client.PostAsJsonAsync(NotesUrl(itemId), new
         {
-            occurredAt = when, subject = "  Oil change  ", body = "  5W-30, 4 quarts  ",
+            occurredAt = when, body = "  5W-30, 4 quarts  ",
         }, CT);
 
         Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
@@ -83,7 +83,6 @@ public class ItemActivityEndpointTests : IntegrationTestBase
         var note = (await resp.Content.ReadFromJsonAsync<NoteResult>(CT))!;
         Assert.Equal(itemId, note.ItemId);
         Assert.Equal(when, note.OccurredAt);
-        Assert.Equal("Oil change", note.Subject);
         Assert.Equal("5W-30, 4 quarts", note.Body);
         Assert.False(note.IsEdited);
         Assert.Equal(note.CreatedAt, note.UpdatedAt);
@@ -120,7 +119,7 @@ public class ItemActivityEndpointTests : IntegrationTestBase
         var note = await CreateNoteAsync(client, itemId, body: "Bought a second box");
 
         Assert.Equal(itemId, note.ItemId);
-        Assert.Null(note.Subject);
+        Assert.Equal("Bought a second box", note.Body);
     }
 
     [Fact]
@@ -134,12 +133,12 @@ public class ItemActivityEndpointTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task CreateNote_NeitherSubjectNorBody_Returns400()
+    public async Task CreateNote_BlankBody_Returns400()
     {
         var client = await CreateAdminClientAsync();
         var itemId = await CreateDurableAsync(client);
 
-        var resp = await client.PostAsJsonAsync(NotesUrl(itemId), new { subject = "  ", body = "" }, CT);
+        var resp = await client.PostAsJsonAsync(NotesUrl(itemId), new { body = "  " }, CT);
 
         Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
     }
@@ -163,7 +162,7 @@ public class ItemActivityEndpointTests : IntegrationTestBase
     {
         var client = await CreateAdminClientAsync();
         var itemId = await CreateDurableAsync(client);
-        var backDated = await CreateNoteAsync(client, itemId, subject: "Original purchase",
+        var backDated = await CreateNoteAsync(client, itemId, body: "Original purchase",
             occurredAt: DateTimeOffset.UtcNow.AddYears(-2));
         var recent = await CreateNoteAsync(client, itemId, body: "Sharpened the bit");
 
@@ -180,7 +179,7 @@ public class ItemActivityEndpointTests : IntegrationTestBase
 
         // Typed after the item was created, but about something years earlier — sorts by OccurredAt.
         Assert.Equal(backDated.Id, feed.Items[2].Id);
-        Assert.Equal("Original purchase", feed.Items[2].Subject);
+        Assert.Equal("Original purchase", feed.Items[2].Body);
         Assert.Equal(backDated.OccurredAt, feed.Items[2].Timestamp);
     }
 
@@ -207,44 +206,6 @@ public class ItemActivityEndpointTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.NotFound, resp.StatusCode);
     }
 
-    [Fact]
-    public async Task GetActivity_NotesOnly_ExcludesAuditRows()
-    {
-        var client = await CreateAdminClientAsync();
-        var itemId = await CreateDurableAsync(client);
-        await CreateNoteAsync(client, itemId, body: "x");
-
-        var feed = await GetFeedAsync(client, itemId, "?notesOnly=true");
-
-        Assert.Equal(1, feed.TotalCount);
-        Assert.All(feed.Items, r => Assert.Equal("note", r.Type));
-    }
-
-    [Fact]
-    public async Task GetActivity_Filter_IsCaseInsensitive_TreatsWildcardsLiterally_AndImpliesNotesOnly()
-    {
-        var client = await CreateAdminClientAsync();
-        var itemId = await CreateDurableAsync(client);
-        var oil = await CreateNoteAsync(client, itemId, subject: "OIL change", body: "5W-30");
-        var belt = await CreateNoteAsync(client, itemId, body: "Replaced the belt");
-        var percent = await CreateNoteAsync(client, itemId, body: "Battery at 50% after a year");
-
-        // Case-insensitive, over subject and body.
-        var byOil = await GetFeedAsync(client, itemId, "?filter=oil");
-        Assert.Equal(oil.Id, Assert.Single(byOil.Items).Id);
-
-        var byBody = await GetFeedAsync(client, itemId, "?filter=BELT");
-        Assert.Equal(belt.Id, Assert.Single(byBody.Items).Id);
-
-        // A % in the filter is a literal, not a wildcard: only the note that contains "50%" matches.
-        var byPercent = await GetFeedAsync(client, itemId, "?filter=50%25");
-        Assert.Equal(percent.Id, Assert.Single(byPercent.Items).Id);
-
-        // A filter implies notes-only even without the flag — the audit rows never match text.
-        var byAny = await GetFeedAsync(client, itemId, "?filter=a");
-        Assert.All(byAny.Items, r => Assert.Equal("note", r.Type));
-    }
-
     // ----- Update -----
 
     [Fact]
@@ -252,23 +213,23 @@ public class ItemActivityEndpointTests : IntegrationTestBase
     {
         var client = await CreateAdminClientAsync();
         var itemId = await CreateDurableAsync(client);
-        var note = await CreateNoteAsync(client, itemId, subject: "Oil change", body: "5W-30");
+        var note = await CreateNoteAsync(client, itemId, body: "5W-30");
 
         var resp = await client.PutAsJsonAsync(NotesUrl(itemId, note.Id), new
         {
-            occurredAt = note.OccurredAt.AddDays(-1), subject = "Oil + filter", body = "5W-30 and a new filter",
+            occurredAt = note.OccurredAt.AddDays(-1), body = "5W-30 and a new filter",
         }, CT);
 
         Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
         var updated = (await resp.Content.ReadFromJsonAsync<NoteResult>(CT))!;
-        Assert.Equal("Oil + filter", updated.Subject);
+        Assert.Equal("5W-30 and a new filter", updated.Body);
         Assert.True(updated.IsEdited);
         Assert.True(updated.UpdatedAt > updated.CreatedAt);
         Assert.NotNull(updated.UpdatedByDisplayName);
 
-        var feed = await GetFeedAsync(client, itemId, "?notesOnly=true");
-        var row = Assert.Single(feed.Items);
-        Assert.Equal("Oil + filter", row.Subject);
+        var feed = await GetFeedAsync(client, itemId);
+        var row = Assert.Single(feed.Items, r => r.Type == "note");
+        Assert.Equal("5W-30 and a new filter", row.Body);
         Assert.True(row.IsEdited);
         Assert.Equal(note.OccurredAt.AddDays(-1), row.Timestamp);
     }
@@ -307,7 +268,7 @@ public class ItemActivityEndpointTests : IntegrationTestBase
     {
         var client = await CreateAdminClientAsync();
         var itemId = await CreateDurableAsync(client);
-        var note = await CreateNoteAsync(client, itemId, subject: "Oil change");
+        var note = await CreateNoteAsync(client, itemId, body: "Oil change");
 
         var resp = await client.DeleteAsync(NotesUrl(itemId, note.Id), CT);
 
@@ -335,36 +296,6 @@ public class ItemActivityEndpointTests : IntegrationTestBase
         var itemId = await CreateDurableAsync(client);
 
         var resp = await client.DeleteAsync(NotesUrl(itemId, Guid.NewGuid()), CT);
-
-        Assert.Equal(HttpStatusCode.NotFound, resp.StatusCode);
-    }
-
-    // ----- Subjects -----
-
-    [Fact]
-    public async Task GetSubjects_ReturnsDistinct_MostRecentFirst()
-    {
-        var client = await CreateAdminClientAsync();
-        var itemId = await CreateDurableAsync(client);
-        var now = DateTimeOffset.UtcNow;
-        await CreateNoteAsync(client, itemId, subject: "Oil change", occurredAt: now.AddDays(-30));
-        await CreateNoteAsync(client, itemId, subject: "Blade", occurredAt: now.AddDays(-20));
-        await CreateNoteAsync(client, itemId, subject: "Oil change", occurredAt: now.AddDays(-1));
-        await CreateNoteAsync(client, itemId, body: "no subject", occurredAt: now);
-
-        var resp = await client.GetAsync($"/api/v1/inventory/items/{itemId}/activity/subjects", CT);
-
-        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
-        var subjects = await resp.Content.ReadFromJsonAsync<List<string>>(CT);
-        Assert.Equal(["Oil change", "Blade"], subjects);
-    }
-
-    [Fact]
-    public async Task GetSubjects_UnknownItem_Returns404()
-    {
-        var client = await CreateAdminClientAsync();
-
-        var resp = await client.GetAsync($"/api/v1/inventory/items/{Guid.NewGuid()}/activity/subjects", CT);
 
         Assert.Equal(HttpStatusCode.NotFound, resp.StatusCode);
     }
@@ -433,18 +364,16 @@ public class ItemActivityEndpointTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task GetActivityAndSubjects_AsViewer_Return200()
+    public async Task GetActivity_AsViewer_Returns200()
     {
         var admin = await CreateAdminClientAsync();
         var itemId = await CreateDurableAsync(admin);
-        await CreateNoteAsync(admin, itemId, subject: "Oil change");
+        await CreateNoteAsync(admin, itemId, body: "Oil change");
         var viewer = await CreateViewerClientAsync();
 
         var feed = await viewer.GetAsync(ActivityUrl(itemId), CT);
-        var subjects = await viewer.GetAsync($"/api/v1/inventory/items/{itemId}/activity/subjects", CT);
 
         Assert.Equal(HttpStatusCode.OK, feed.StatusCode);
-        Assert.Equal(HttpStatusCode.OK, subjects.StatusCode);
     }
 
     [Fact]

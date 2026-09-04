@@ -75,12 +75,11 @@ class StubConsumableApi {
 // The hosted `app-item-activity-feed` reads through InventoryItemApiService.
 class StubItemApi {
   rows: GetItemActivityResponse[] = [];
-  activityCalls: { id: string; Page: number; PageSize: number; notesOnly: boolean; filter?: string }[] = [];
-  getItemActivity = (p: { id: string; Page: number; PageSize: number; notesOnly: boolean; filter?: string }) => {
+  activityCalls: { id: string; Page: number; PageSize: number }[] = [];
+  getItemActivity = (p: { id: string; Page: number; PageSize: number }) => {
     this.activityCalls.push(p);
     return of({ items: this.rows, page: p.Page, pageSize: p.PageSize, totalCount: this.rows.length, totalPages: 1 });
   };
-  getItemNoteSubjects = () => of([] as string[]);
   createItemNote = () => of({});
   updateItemNote = () => of({});
   deleteItemNote = () => of(undefined);
@@ -355,10 +354,7 @@ describe('ConsumableDetailPageComponent', () => {
 
     expect(component.page()).toBe(2);
     // The feed owns its own page signal; paging Movements must not re-request the activity feed.
-    expect(itemApi.activityCalls).toEqual([
-      { id: 'c1', Page: 1, PageSize: 20, notesOnly: true, filter: undefined },
-      { id: 'c1', Page: 1, PageSize: 20, notesOnly: false, filter: undefined },
-    ]);
+    expect(itemApi.activityCalls).toEqual([{ id: 'c1', Page: 1, PageSize: 20 }]);
   });
 
   it('refreshes the hosted activity feed when a stock op bumps the page refresh tick', async () => {

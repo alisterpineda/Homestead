@@ -45,28 +45,16 @@ public class DeleteItemNoteHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task Handle_Deletes_AndAuditsWithSubjectAsDescription()
-    {
-        var item = await ItemNoteTestData.AddItemAsync(_db);
-        var note = await ItemNoteTestData.AddNoteAsync(_db, item.Id, DateTimeOffset.UtcNow.AddDays(-1),
-            subject: "Oil change", body: "5W-30\nsecond line");
-
-        var result = await _sut.Handle(new DeleteItemNoteCommand(item.Id, note.Id), Ct);
-
-        Assert.True(result);
-        Assert.Empty(_db.ItemNotes);
-        _audit.Received(1).Deleted("InventoryNote", note.Id, "Oil change", item.Id);
-    }
-
-    [Fact]
-    public async Task Handle_NoSubject_DescriptionIsFirstLineOfBody()
+    public async Task Handle_Deletes_AndAuditsWithFirstLineOfBodyAsDescription()
     {
         var item = await ItemNoteTestData.AddItemAsync(_db);
         var note = await ItemNoteTestData.AddNoteAsync(_db, item.Id, DateTimeOffset.UtcNow.AddDays(-1),
             body: "Needs a new blade \r\nOrdered one from the store");
 
-        await _sut.Handle(new DeleteItemNoteCommand(item.Id, note.Id), Ct);
+        var result = await _sut.Handle(new DeleteItemNoteCommand(item.Id, note.Id), Ct);
 
+        Assert.True(result);
+        Assert.Empty(_db.ItemNotes);
         _audit.Received(1).Deleted("InventoryNote", note.Id, "Needs a new blade", item.Id);
     }
 }
