@@ -60,13 +60,13 @@ public class PlacesEndpointTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
     }
 
-    private static async Task LendAsync(HttpClient client, Guid durableId, string lentTo)
+    private static async Task LendAsync(HttpClient client, Guid durableId, string statusNote)
     {
         var resp = await SendJsonPatchAsync(client, $"/api/v1/inventory/durables/{durableId}",
             new object[]
             {
                 new { op = "replace", path = "/status", value = (object)"Lent" },
-                new { op = "replace", path = "/lentTo", value = (object)lentTo },
+                new { op = "replace", path = "/statusNote", value = (object)statusNote },
             });
         Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
     }
@@ -123,7 +123,7 @@ public class PlacesEndpointTests : IntegrationTestBase
             new object[]
             {
                 new { op = "replace", path = "/status", value = (object)"Lent" },
-                new { op = "replace", path = "/lentTo", value = (object)"Dave next door" },
+                new { op = "replace", path = "/statusNote", value = (object)"Dave next door" },
             });
         Assert.Equal(HttpStatusCode.OK, lendResp.StatusCode);
 

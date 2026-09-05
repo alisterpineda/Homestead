@@ -74,7 +74,7 @@ public record LentDurablePreview
 {
     public required Guid Id { get; init; }
     public required string Name { get; init; }
-    public string? LentTo { get; init; }
+    public string? StatusNote { get; init; }
 }
 
 /// <summary>

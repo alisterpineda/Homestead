@@ -42,7 +42,7 @@ internal static class DurableResponseMapper
             // the container flip (see DurableResponse.HasComponents). Non-terminal statuses are spelled
             // inline — IsTerminal()/LiveStatuses won't translate cleanly inside a projected .Any().
             HasComponents = i.Children.Any(c =>
-                c.Status == ItemStatus.Active || c.Status == ItemStatus.Lent || c.Status == ItemStatus.InRepair),
+                c.Status == ItemStatus.Active || c.Status == ItemStatus.Lent),
             Compartment = i.Compartment,
             Value = i.Value,
             ValueCurrencyId = i.ValueCurrencyId,
@@ -57,7 +57,7 @@ internal static class DurableResponseMapper
             AcquisitionCostCurrencyId = i.AcquisitionCostCurrencyId,
             AcquisitionCostCurrencySymbol = i.AcquisitionCostCurrency != null ? i.AcquisitionCostCurrency.Symbol : null,
             AcquiredFrom = i.AcquiredFrom,
-            LentTo = i.LentTo,
+            StatusNote = i.StatusNote,
             Unit = i.Unit,
             RestockThreshold = i.RestockThreshold,
             Tags = i.ItemTags.Select(it => new ItemTagDto

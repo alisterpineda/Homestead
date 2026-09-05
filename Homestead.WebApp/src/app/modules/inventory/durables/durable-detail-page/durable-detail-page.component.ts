@@ -26,9 +26,13 @@ import {
   lucideArchive,
   lucideArchiveRestore,
   lucideTrash2,
+  lucideUserRound,
+  lucideUndo2,
 } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
+import { HlmInput } from '@/shared/components/spartan/input';
+import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog';
@@ -54,6 +58,8 @@ import { UnitPipe } from '../../consumables/unit.pipe';
 import { formatRelativeAge } from '@/shared/utils/relative-age';
 import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
 import { replace } from '@/shared/json-patch';
+import type { JsonPatchDocument } from '@/api/generated/models/json-patch-document';
+import { trimToNull } from '@/shared/utils/trim-to-null';
 import { handleMutationError, handleDetailLoadError } from '@/shared/utils/rxjs-error.utils';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import type { DurableResponse } from '@/api/generated/models/durable-response';
@@ -77,6 +83,8 @@ import { toast } from '@spartan-ng/brain/sonner';
     NgIcon,
     HlmIconImports,
     HlmButton,
+    HlmInput,
+    HlmLabel,
     HlmSpinner,
     HlmEmptyImports,
     HlmAlertDialogImports,
@@ -103,6 +111,8 @@ import { toast } from '@spartan-ng/brain/sonner';
     lucideEllipsisVertical,
     lucideArchive,
     lucideArchiveRestore,
+    lucideUserRound,
+    lucideUndo2,
     lucideTrash2,
   })],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
@@ -127,7 +137,7 @@ import { toast } from '@spartan-ng/brain/sonner';
                 <ng-icon hlm name="lucideCpu" size="sm" class="shrink-0 text-muted-foreground" aria-label="Assembly" />
               }
               <h1 class="text-2xl font-semibold">{{ it.name }}</h1>
-              <app-item-status-badge [status]="it.status" />
+              <app-item-status-badge [status]="it.status" [note]="it.statusNote" />
             </div>
             <!-- Headline answer: where the durable lives. The consumable's parallel is its on-hand
                  metric, but a place name isn't a single scannable number, so this is sized down hard:
@@ -166,6 +176,19 @@ import { toast } from '@spartan-ng/brain/sonner';
             <ng-template #actionsMenu>
               <hlm-dropdown-menu class="w-44">
                 <hlm-dropdown-menu-group>
+                  <!-- Lend / Mark returned mirror the quick panel's status card; Archive keeps its
+                       confirm. Both lending gestures are durable-only, so they live here. -->
+                  @if (it.status === 'Active') {
+                    <button hlmDropdownMenuItem (triggered)="onLendRequest()" [disabled]="archiving()">
+                      <ng-icon hlm name="lucideUserRound" size="sm" />
+                      Lend…
+                    </button>
+                  } @else if (it.status === 'Lent') {
+                    <button hlmDropdownMenuItem (triggered)="onMarkReturned(it)" [disabled]="archiving()">
+                      <ng-icon hlm name="lucideUndo2" size="sm" />
+                      Mark returned
+                    </button>
+                  }
                   <button hlmDropdownMenuItem (triggered)="onArchiveRestore(it)" [disabled]="archiving()">
                     <ng-icon hlm [name]="terminal() ? 'lucideArchiveRestore' : 'lucideArchive'" size="sm" />
                     {{ terminal() ? 'Restore' : 'Archive' }}
@@ -181,8 +204,9 @@ import { toast } from '@spartan-ng/brain/sonner';
           </div>
         </div>
 
-        <!-- Details — hidden entirely when the durable carries no value/serial/acquired/lent/description
-             fields (the common case in current data); location now leads as the headline above. -->
+        <!-- Details — hidden entirely when the durable carries no value/serial/acquired/description
+             fields (the common case in current data); location now leads as the headline above. The
+             status note renders beside the header badge, not here. -->
         @if (hasDetails()) {
           <section class="space-y-2">
             <h2 class="text-sm font-medium text-muted-foreground">Details</h2>
@@ -212,10 +236,6 @@ import { toast } from '@spartan-ng/brain/sonner';
               @if (acquisitionLine(); as acquired) {
                 <dt class="text-muted-foreground">Acquired</dt>
                 <dd class="break-words tabular-nums">{{ acquired }}</dd>
-              }
-              @if (it.status === 'Lent' && it.lentTo) {
-                <dt class="text-muted-foreground">Lent to</dt>
-                <dd class="break-words">{{ it.lentTo }}</dd>
               }
               @if (it.notes) {
                 <dt class="text-muted-foreground">Description</dt>
@@ -419,6 +439,38 @@ import { toast } from '@spartan-ng/brain/sonner';
       (closed)="editState.set('closed')"
     />
 
+    <hlm-alert-dialog [state]="lendState()" (stateChanged)="lendState.set($event)">
+      <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
+        <div hlmAlertDialogHeader>
+          <h2 hlmAlertDialogTitle>Lend {{ durable()?.name ?? 'durable' }}?</h2>
+          <p hlmAlertDialogDescription>
+            The durable stays where it is and keeps counting as live — it is just recorded as being with someone.
+          </p>
+        </div>
+        <div class="grid gap-2">
+          <label hlmLabel for="lend-to">Lent to</label>
+          <input
+            hlmInput
+            id="lend-to"
+            class="w-full"
+            maxlength="256"
+            placeholder="e.g. Dave next door"
+            [value]="lendNote()"
+            (input)="lendNote.set($any($event.target).value)"
+          />
+        </div>
+        @if (lendError()) {
+          <p class="text-sm text-destructive">{{ lendError() }}</p>
+        }
+        <div hlmAlertDialogFooter>
+          <button hlmAlertDialogCancel (click)="ctx.close()">Cancel</button>
+          <button hlmAlertDialogAction (click)="confirmLend(ctx)" [disabled]="archiving() || !lendNote().trim()">
+            {{ archiving() ? 'Saving...' : 'Lend' }}
+          </button>
+        </div>
+      </hlm-alert-dialog-content>
+    </hlm-alert-dialog>
+
     <hlm-alert-dialog [state]="archiveState()" (stateChanged)="archiveState.set($event)">
       <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
         <div hlmAlertDialogHeader>
@@ -426,6 +478,18 @@ import { toast } from '@spartan-ng/brain/sonner';
           <p hlmAlertDialogDescription>
             The durable is kept in records, but it leaves the default list. Containers with live contents cannot be archived. You can restore it later.
           </p>
+        </div>
+        <div class="grid gap-2">
+          <label hlmLabel for="archive-note">Note (optional)</label>
+          <input
+            hlmInput
+            id="archive-note"
+            class="w-full"
+            maxlength="256"
+            placeholder="e.g. Sold to Sam"
+            [value]="archiveNote()"
+            (input)="archiveNote.set($any($event.target).value)"
+          />
         </div>
         @if (archiveError()) {
           <p class="text-sm text-destructive">{{ archiveError() }}</p>
@@ -616,6 +680,12 @@ export class DurableDetailPageComponent {
   archiveState = seededLinkedSignal<string | null, BrnDialogState>(this.durableId, () => 'closed');
   archiving = signal(false);
   archiveError = signal('');
+  /** Optional reason typed into the archive confirm dialog; reset each time it opens. */
+  archiveNote = signal('');
+  // Lend dialog — same shape as archive's, but its note is required.
+  lendState = seededLinkedSignal<string | null, BrnDialogState>(this.durableId, () => 'closed');
+  lendNote = signal('');
+  lendError = signal('');
   storingItems = signal(false);
 
   onChanged(): void {
@@ -662,6 +732,7 @@ export class DurableDetailPageComponent {
       this.setStatus(durable, 'Active');
       return;
     }
+    this.archiveNote.set('');
     this.archiveError.set('');
     this.archiveState.set('open');
   }
@@ -672,24 +743,77 @@ export class DurableDetailPageComponent {
     this.setStatus(it, 'Archived', ctx);
   }
 
+  /** Lending needs a borrower, so it asks first — the same shape as Archive's confirm. */
+  onLendRequest(): void {
+    this.lendNote.set('');
+    this.lendError.set('');
+    this.lendState.set('open');
+  }
+
+  confirmLend(ctx: { close: () => void }): void {
+    const it = this.durable();
+    const note = this.lendNote().trim();
+    if (!it || !note) return;
+    this.patchStatus(
+      it,
+      [replace('/status', 'Lent'), replace('/statusNote', note)],
+      'Marked lent.',
+      'Failed to lend durable.',
+      ctx,
+      this.lendError,
+    );
+  }
+
+  /** Returning is immediate — going back to Active clears the note server-side. */
+  onMarkReturned(durable: DurableResponse): void {
+    this.patchStatus(
+      durable,
+      [replace('/status', 'Active')],
+      'Marked returned.',
+      'Failed to update durable.',
+    );
+  }
+
   private setStatus(durable: DurableResponse, newStatus: 'Active' | 'Archived', ctx?: { close: () => void }): void {
+    // Archiving may carry an optional reason; restoring clears the note server-side.
+    const ops = newStatus === 'Archived'
+      ? [replace('/status', newStatus), replace('/statusNote', trimToNull(this.archiveNote()))]
+      : [replace('/status', newStatus)];
+    this.patchStatus(
+      durable,
+      ops,
+      newStatus === 'Active' ? 'Durable restored.' : 'Durable archived.',
+      'Failed to update durable.',
+      ctx,
+      this.archiveError,
+    );
+  }
+
+  private patchStatus(
+    durable: DurableResponse,
+    ops: JsonPatchDocument,
+    successMessage: string,
+    fallbackMessage: string,
+    ctx?: { close: () => void },
+    errorSignal?: { set: (value: string) => void },
+  ): void {
     this.archiving.set(true);
-    this.archiveError.set('');
-    this.durableApi.patchDurable({ id: durable.id, body: [replace('/status', newStatus)] }).pipe(
+    errorSignal?.set('');
+    this.durableApi.patchDurable({ id: durable.id, body: ops }).pipe(
       takeUntilDestroyed(this.destroyRef),
     ).subscribe({
       next: () => {
         this.archiving.set(false);
         ctx?.close();
-        toast.success(newStatus === 'Active' ? 'Durable restored.' : 'Durable archived.');
+        toast.success(successMessage);
         this.onChanged();
       },
-      // With the confirm dialog open, the rejection reason ("container has live contents") is shown
-      // inline where the user is looking; a restore has no dialog, so it toasts like other mutations.
+      // With a confirm dialog open, the rejection reason ("container has live contents") is shown
+      // inline where the user is looking; the immediate gestures toast like other mutations.
       error: (err: unknown) => {
         this.archiving.set(false);
-        const message = this.errorHandler.getErrorMessage(err, 'Failed to update durable.');
-        if (ctx) this.archiveError.set(message);
+        const message = this.errorHandler.getErrorMessage(err, fallbackMessage);
+        if (ctx && errorSignal) errorSignal.set(message);
         else if (!this.errorHandler.isServerOrNetworkError(err)) toast.error(message);
       },
     });

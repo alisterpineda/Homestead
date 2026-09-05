@@ -47,7 +47,7 @@ What is deliberately **not** on the note, and where it goes instead:
 
 ### Which items can carry notes
 
-**Both kinds.** The feed component is shared, and a consumable note ("switched brand", "this batch is defective") is a real use. Notes can be added to an item in any status, including terminal ones — "sold to Sam" is a good final entry on a sold item. An archived consumable's quick panel is read-only, but its detail page still shows the feed and accepts notes.
+**Both kinds.** The feed component is shared, and a consumable note ("switched brand", "this batch is defective") is a real use. Notes can be added to an item in any status, including archived ones — a service log is a good final entry on something you have just retired. ("Sold to Sam" is *not* the example any more: that particular sentence is now the archive `StatusNote`, written in the archive confirm dialog and printed by the status audit row itself.) An archived consumable's quick panel is read-only, but its detail page still shows the feed and accepts notes.
 
 ### Notes are editable and deletable
 
@@ -74,7 +74,7 @@ The entity-type string is chosen to be **neutral about what is noted** (`Invento
 
 The merged list is ordered by a single **effective date**: `OccurredAt` for notes, `Timestamp` for audit rows — newest first, then `CreatedAt` (notes) / `Timestamp` (audit) as the second key, then `Id` as the final tiebreaker so equal instants across the two ID spaces are stable and never drift across page boundaries. Because notes sort by when they *happened*, a back-filled 2019 oil change on a car added to Inventory in 2026 sits **below** "added this item". That is correct: the feed is the story of the object, not of the database row — the same stance as *status is the state of the thing, not the row*.
 
-One caveat the doc states because a user will notice it: the two halves are on different clocks. A note is dated by the user; an audit row is dated by when the edit was *recorded*. Flip a laptop back to Active a week after the repair note says it came home and the status row sits above the repair. Audit rows therefore read as "recorded" events, and the row copy keeps the existing "{summary} · {age}" form rather than implying an occurrence date.
+One caveat the doc states because a user will notice it: the two halves are on different clocks. A note is dated by the user; an audit row is dated by when the edit was *recorded*. Mark a lent ladder returned a week after the note says it came home and the status row sits above the note. Audit rows therefore read as "recorded" events, and the row copy keeps the existing "{summary} · {age}" form rather than implying an occurrence date.
 
 ### No filtering
 
@@ -118,7 +118,9 @@ Both detail pages are single-column with no tablet/desktop branch, so the rules 
 
 ### Status coupling
 
-Marking a durable `InRepair` → `Active` (or `Active` → `InRepair`) does **not** auto-create a note in v1; the status change already lands in the feed as an audit row. A "log this repair" hand-off from the status form is a natural follow-up once the composer exists, but it must not make the quick panel stack, so it is deferred.
+A status change writes **one** audit row and nothing else — no note is auto-created. That row is not rendered as a bare "updated status" either: the summary reads the transition *and* the `StatusNote` off the same row and prints a sentence — "Alister lent this item to Dave", "Alister marked this item returned", "Alister archived this item (Sold to Sam)", "Alister restored this item". A note-only edit (fixing the borrower's name) falls through to the generic path and reads "Alister updated status note", and rows written before the enum collapsed still render sensibly ("Alister changed status to Sold").
+
+This is why the status note is a *field*, not a note: the feed already tells the story from the audit row, so a second write would duplicate it. Nothing hands off from a status gesture to the composer.
 
 ## Delete gate
 
@@ -149,7 +151,7 @@ Additive on top of `inventory.item_notes`, none requiring a re-migration:
 - **Note → Documents link** — the invoice or manual page, same shape as the transaction–document link (composite key, cross-schema FK cascading from the document, no navigation property). The reverse view ("referenced by") does not exist for Finances either and would be a shared Documents-side seam.
 - **Generic attributes** on items *and* notes — the odometer reading at a service, filter size, tyre pressure. Designed once, attached to both. Until then the note table never grows domain-specific columns.
 - **A `Kind` column** if a behavioural classification ever earns one. Additive with a default. A free-form classification, if wanted instead, reuses the inventory Tag tree on notes rather than a second taxonomy.
-- **Quick-panel "last note" line**, **"last serviced" list column**, **status → note hand-off**, and **note text in universal search**, all described above.
+- **Quick-panel "last note" line**, **"last serviced" list column**, and **note text in universal search**, all described above.
 - **Next-due / reminders**, in the Calendar/Maintenance module, which defines its own task identity; notes are free text and are not the lookup key. Attaching a note to a task there is additive.
 - **Sync.** Note delete is a hard delete with no tombstone; the `InventoryNote` / `Deleted` audit row is the only trace a future sync design would have to work from. The overview's sync note is worded accordingly.
 - **Documents comment editing** adopting the same **interaction pattern and row/composer styling** — explicitly *not* a shared component or entity shape, since comments carry no `OccurredAt` and cascade rather than gate.

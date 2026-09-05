@@ -70,8 +70,9 @@ interface CardView {
                 <span class="block truncate text-xs text-muted-foreground">{{ row.durable?.serial }}</span>
               }
             </div>
-            <!-- Cards are not a dense column of rows, so the resting Active state stays unbadged. -->
-            <app-item-status-badge [status]="row.status" class="shrink-0" />
+            <!-- Cards are not a dense column of rows, so the resting Active state stays unbadged.
+                 The note (borrower / archive reason) rides along with the pill. -->
+            <app-item-status-badge [status]="row.status" [note]="row.statusNote" class="shrink-0 max-w-[50%]" />
             <app-inventory-row-actions
               class="-mr-1 -mt-1 shrink-0"
               [row]="row"
@@ -108,10 +109,6 @@ interface CardView {
                 }
               }
             </div>
-          }
-
-          @if (row.durable?.lentTo) {
-            <span class="text-xs text-muted-foreground">Lent to {{ row.durable?.lentTo }}</span>
           }
 
           <div class="flex items-center gap-2 text-xs text-muted-foreground">

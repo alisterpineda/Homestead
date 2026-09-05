@@ -24,7 +24,6 @@ export interface DurableResponse {
   hasComponents?: boolean;
   id: string;
   isContainer?: (boolean | null);
-  lentTo?: (string | null);
   model?: (string | null);
   name: string;
   notes?: (string | null);
@@ -35,6 +34,7 @@ export interface DurableResponse {
   restockThreshold?: (number | null);
   serial?: (string | null);
   status: ItemStatus;
+  statusNote?: (string | null);
   tags?: Array<ItemTagDto>;
   unit?: (string | null);
   updatedAt: string;

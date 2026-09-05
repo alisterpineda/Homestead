@@ -226,45 +226,59 @@ describe('DurableQuickPanelComponent', () => {
   });
 
   describe('status flow', () => {
-    it('ignores picking the current status', async () => {
+    it('opens the lend form first, then patches /status + /statusNote together', async () => {
       await open();
-      component.onStatusPick('Active');
-      expect(api.patches.length).toBe(0);
+      component.openLend();
+      expect(api.patches.length).toBe(0); // no patch yet — form opened
+      expect(component['inlineForm']()).toBe('lent');
+
+      component.confirmLent();
+      expect(api.patches.length).toBe(0); // a blank borrower is blocked
+
+      component.statusNoteDraft.set('  Dave next door  ');
+      component.confirmLent();
+      expect(api.patches).toEqual([{
+        id: 'item-1',
+        body: [
+          { op: 'replace', path: '/status', value: 'Lent' },
+          { op: 'replace', path: '/statusNote', value: 'Dave next door' },
+        ],
+      }]);
     });
 
-    it('patches /status only for non-Lent statuses (server clears lentTo)', async () => {
-      await open(makeItem({ status: 'Lent', lentTo: 'Dave' }));
-      component.onStatusPick('Active');
+    it('marks a lent durable returned with a status-only patch (server clears the note)', async () => {
+      await open(makeItem({ status: 'Lent', statusNote: 'Dave' }));
+      component.markReturned();
       expect(api.patches).toEqual([{
         id: 'item-1',
         body: [{ op: 'replace', path: '/status', value: 'Active' }],
       }]);
     });
 
-    it('keeps terminal items actionable — a status pick on an Archived item still patches', async () => {
+    it('keeps terminal items actionable — Restore on an Archived item still patches', async () => {
       await open(makeItem({ status: 'Archived' }));
-      component.onStatusPick('Active');
-      expect(api.patches.length).toBe(1);
-    });
-
-    it('collects lentTo inline and patches /status + /lentTo together', async () => {
-      await open();
-      component.onStatusPick('Lent');
-      expect(api.patches.length).toBe(0); // no patch yet — form opened
-      expect(component['inlineForm']()).toBe('lent');
-
-      component.confirmLent();
-      expect(api.patches.length).toBe(0); // blank lentTo blocked
-
-      component.lentToDraft.set('  Dave next door  ');
-      component.confirmLent();
+      component.restore();
       expect(api.patches).toEqual([{
         id: 'item-1',
-        body: [
-          { op: 'replace', path: '/status', value: 'Lent' },
-          { op: 'replace', path: '/lentTo', value: 'Dave next door' },
-        ],
+        body: [{ op: 'replace', path: '/status', value: 'Active' }],
       }]);
+    });
+
+    // The @switch that replaced the status dropdown is template-only, so the method-level tests above
+    // can't tell whether a state actually offers its gesture — pin the rendered control per status.
+    it.each([
+      ['Active', 'Lend…'],
+      ['Lent', 'Mark returned'],
+      ['Archived', 'Restore'],
+    ] as const)('renders exactly one status gesture for a %s durable: "%s"', async (status, gesture) => {
+      await open(makeItem({ id: `d-${status}`, status, statusNote: status === 'Lent' ? 'Dave' : null }));
+
+      const rendered = Array.from(
+        (fixture.nativeElement as HTMLElement).ownerDocument.body.querySelectorAll('button'),
+      )
+        .map(b => b.textContent!.trim())
+        .filter(t => t === 'Lend…' || t === 'Mark returned' || t === 'Restore');
+      expect(rendered).toEqual([gesture]);
     });
 
     it('ignores a late patch response after the panel moved to another item', async () => {
@@ -275,13 +289,14 @@ describe('DurableQuickPanelComponent', () => {
         return pending.asObservable();
       }) as StubDurableApi['patchDurable'];
 
-      component.onStatusPick('Sold'); // PATCH for item-1 in flight
+      component.statusNoteDraft.set('Dave');
+      component.confirmLent(); // PATCH for item-1 in flight
 
       fixture.componentRef.setInput('durable', makeItem({ id: 'item-2', name: 'Other' }));
       fixture.detectChanges();
       await fixture.whenStable();
 
-      pending.next(makeItem({ id: 'item-1', status: 'Sold' })); // late response
+      pending.next(makeItem({ id: 'item-1', status: 'Lent', statusNote: 'Dave' })); // late response
       pending.complete();
 
       expect(component.view()?.id).toBe('item-2'); // not clobbered by item-1's response
@@ -296,20 +311,21 @@ describe('DurableQuickPanelComponent', () => {
         return pending.asObservable();
       }) as StubDurableApi['patchDurable'];
 
-      component.onStatusPick('Sold'); // PATCH in flight, saving = true
-      component.openMove();           // must NOT reseed the saving guard
+      component.statusNoteDraft.set('Dave');
+      component.confirmLent();  // PATCH in flight, saving = true
+      component.openMove();     // must NOT reseed the saving guard
       component.moveDest.set({ kind: 'container', id: 'chest' });
-      component.confirmMove();        // blocked while the first PATCH is in flight
+      component.confirmMove();  // blocked while the first PATCH is in flight
 
       expect(api.patches.length).toBe(1);
-      pending.next(makeItem({ status: 'Sold' }));
+      pending.next(makeItem({ status: 'Lent', statusNote: 'Dave' }));
       pending.complete();
     });
 
     it('toasts the failure and keeps the panel state on a patch error', async () => {
       await open();
       api.failNext = { status: 400 };
-      component.onStatusPick('Sold');
+      component.markReturned();
       expect(errorHandler.handled.length).toBe(1);
       expect(component.view()?.status).toBe('Active'); // unchanged
     });
@@ -319,7 +335,7 @@ describe('DurableQuickPanelComponent', () => {
     it('projects the container icon and status badge beside the name', async () => {
       // Both reach the title row only via the `panelTitleStart` / `panelTitleEnd` projection slots;
       // a misspelled attribute would silently drop them into the body, so pin them through the DOM.
-      await open(makeItem({ isContainer: true, status: 'Lent', lentTo: 'Dave' }));
+      await open(makeItem({ isContainer: true, status: 'Lent', statusNote: 'Dave' }));
       const body = (fixture.nativeElement as HTMLElement).ownerDocument.body;
       const titleRow = body.querySelector('hlm-sheet-content [hlmsheettitle]')!.parentElement!;
       expect(titleRow.querySelector('[aria-label="Container"]')).not.toBeNull();
@@ -344,12 +360,12 @@ describe('DurableQuickPanelComponent', () => {
   });
 
   describe('hasDetails', () => {
-    it('is false when serial/value/acquired/lentTo/notes are all empty', async () => {
+    it('is false when serial/value/acquired/notes are all empty', async () => {
       await open(makeItem());
       expect(component['hasDetails']()).toBe(false);
     });
 
-    it('is true when any of serial/value/acquired/lentTo/notes is present', async () => {
+    it('is true when any of serial/value/acquired/notes is present', async () => {
       // Distinct ids so the seeded `current` signal reseeds from each new input.
       await open(makeItem({ id: 'd-serial', serial: 'SN-1' }));
       expect(component['hasDetails']()).toBe(true);
@@ -360,8 +376,9 @@ describe('DurableQuickPanelComponent', () => {
       await open(makeItem({ id: 'd-acq', acquiredOn: '2026-01-01' }));
       expect(component['hasDetails']()).toBe(true);
 
-      await open(makeItem({ id: 'd-lent', status: 'Lent', lentTo: 'Dave' }));
-      expect(component['hasDetails']()).toBe(true);
+      // A lent durable's borrower is NOT a Details row — it renders beside the status badge.
+      await open(makeItem({ id: 'd-lent', status: 'Lent', statusNote: 'Dave' }));
+      expect(component['hasDetails']()).toBe(false);
 
       await open(makeItem({ id: 'd-notes', notes: 'Keep dry' }));
       expect(component['hasDetails']()).toBe(true);

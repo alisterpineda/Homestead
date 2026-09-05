@@ -202,8 +202,7 @@ public class GetInventoryOverviewHandlerTests : IAsyncLifetime
         var live = await AddDurableAsync("Live drill", T0.AddHours(1));
         // Terminal items, edited more recently — their bumped UpdatedAt must not surface them.
         await AddDurableAsync("Archived box", T0.AddHours(5), ItemStatus.Archived);
-        await AddDurableAsync("Sold bike", T0.AddHours(6), ItemStatus.Sold);
-        await AddDurableAsync("Discarded TV", T0.AddHours(7), ItemStatus.Discarded);
+        await AddDurableAsync("Archived bike", T0.AddHours(6), ItemStatus.Archived);
         await AddConsumableAsync("Archived caulk", T0.AddHours(8), status: ItemStatus.Archived);
 
         var resp = await HandleAsync();
@@ -346,11 +345,9 @@ public class GetInventoryOverviewHandlerTests : IAsyncLifetime
 
     [Theory]
     [InlineData(ItemStatus.Archived)]
-    [InlineData(ItemStatus.Sold)]
-    [InlineData(ItemStatus.Discarded)]
     public async Task ExpiringWarranties_ExcludesTerminalStatuses(ItemStatus status)
     {
-        var item = await AddDurableAsync("Sold dryer", T0, status: status);
+        var item = await AddDurableAsync("Archived dryer", T0, status: status);
         await AddWarrantyAsync(item.Id, Today.AddDays(5));
 
         var resp = await HandleAsync();
@@ -360,7 +357,6 @@ public class GetInventoryOverviewHandlerTests : IAsyncLifetime
 
     [Theory]
     [InlineData(ItemStatus.Lent)]
-    [InlineData(ItemStatus.InRepair)]
     public async Task ExpiringWarranties_IncludesTheOtherLiveStatuses(ItemStatus status)
     {
         var item = await AddDurableAsync("Lent drill", T0, status: status);

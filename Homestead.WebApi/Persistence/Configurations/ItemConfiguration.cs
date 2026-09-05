@@ -17,7 +17,7 @@ public class ItemConfiguration : IEntityTypeConfiguration<Item>
         + "\"AreaId\" IS NULL AND \"ParentItemId\" IS NULL AND \"Compartment\" IS NULL "
         + "AND \"Value\" IS NULL AND \"ValueCurrencyId\" IS NULL AND \"Serial\" IS NULL "
         + "AND \"Model\" IS NULL "
-        + "AND \"AcquiredOn\" IS NULL AND \"LentTo\" IS NULL AND \"IsContainer\" IS NULL "
+        + "AND \"AcquiredOn\" IS NULL AND \"IsContainer\" IS NULL "
         + "AND \"AcquisitionKind\" IS NULL AND \"AcquisitionCost\" IS NULL "
         + "AND \"AcquisitionCostCurrencyId\" IS NULL AND \"AcquiredFrom\" IS NULL)";
 
@@ -36,9 +36,9 @@ public class ItemConfiguration : IEntityTypeConfiguration<Item>
         "(\"AcquisitionCost\" IS NULL AND \"AcquisitionCostCurrencyId\" IS NULL) OR "
         + "(\"AcquisitionCost\" IS NOT NULL AND \"AcquisitionCostCurrencyId\" IS NOT NULL)";
 
-    // LentTo is only meaningful while the item is Lent.
-    private const string LentToRequiresLentSql =
-        "\"LentTo\" IS NULL OR \"Status\" = 'Lent'";
+    // A status note only qualifies a non-Active status. Required-when-Lent is a handler rule.
+    private const string StatusNoteRequiresStatusSql =
+        "\"StatusNote\" IS NULL OR \"Status\" IN ('Lent', 'Archived')";
 
     // Fungible consumables use the reduced Active/Archived lifecycle only.
     private const string FungibleStatusSql =
@@ -53,7 +53,7 @@ public class ItemConfiguration : IEntityTypeConfiguration<Item>
             table.HasCheckConstraint("CK_items_fungible_fields", FungibleFieldsSql);
             table.HasCheckConstraint("CK_items_value_currency_pair", ValueCurrencyPairSql);
             table.HasCheckConstraint("CK_items_acquisition_cost_currency_pair", AcquisitionCostCurrencyPairSql);
-            table.HasCheckConstraint("CK_items_lent_to_requires_lent", LentToRequiresLentSql);
+            table.HasCheckConstraint("CK_items_status_note_requires_status", StatusNoteRequiresStatusSql);
             table.HasCheckConstraint("CK_items_fungible_status", FungibleStatusSql);
         });
 
@@ -76,7 +76,7 @@ public class ItemConfiguration : IEntityTypeConfiguration<Item>
         builder.Property(i => i.Compartment).HasMaxLength(256);
         builder.Property(i => i.Serial).HasMaxLength(128);
         builder.Property(i => i.Model).HasMaxLength(128);
-        builder.Property(i => i.LentTo).HasMaxLength(256);
+        builder.Property(i => i.StatusNote).HasMaxLength(256);
         builder.Property(i => i.AcquiredFrom).HasMaxLength(256);
         builder.Property(i => i.Unit).HasMaxLength(32);
 

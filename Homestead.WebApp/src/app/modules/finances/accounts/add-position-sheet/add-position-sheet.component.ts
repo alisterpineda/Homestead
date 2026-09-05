@@ -22,7 +22,7 @@ import { todayIso, tomorrowDate } from '../../shared/date';
 import { currencyInputPrecision } from '../../shared/format-currency';
 import { MoneyInputDirective } from '../../shared/money-input.directive';
 import { CommodityPickerComponent } from '../../shared/commodity-picker/commodity-picker.component';
-import { trimToNull } from '../../shared/trim-to-null';
+import { trimToNull } from '@/shared/utils/trim-to-null';
 import type { AccountResponse } from '@/api/generated/models/account-response';
 import type { CommodityResponse } from '@/api/generated/models/commodity-response';
 import type { OpeningBalanceResponse } from '@/api/generated/models/opening-balance-response';

@@ -151,8 +151,6 @@ public class GetDurablesHandlerTests : IAsyncLifetime
     public async Task Handle_HidesTerminalItemsByDefault()
     {
         await AddItemAsync("Drill");
-        await AddItemAsync("Old TV", ItemStatus.Discarded);
-        await AddItemAsync("Sold bike", ItemStatus.Sold);
         await AddItemAsync("Archived box", ItemStatus.Archived);
 
         var resp = await _sut.Handle(new GetDurablesQuery { Page = 1, PageSize = 50 }, Ct);
@@ -165,7 +163,7 @@ public class GetDurablesHandlerTests : IAsyncLifetime
     public async Task Handle_IncludeInactive_ShowsTerminalItems()
     {
         await AddItemAsync("Drill");
-        await AddItemAsync("Old TV", ItemStatus.Discarded);
+        await AddItemAsync("Old TV", ItemStatus.Archived);
 
         var resp = await _sut.Handle(new GetDurablesQuery { Page = 1, PageSize = 50, IncludeInactive = true }, Ct);
 

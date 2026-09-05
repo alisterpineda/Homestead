@@ -231,13 +231,6 @@ describe('sortRows', () => {
     expect(ids(sortRows([a, lowC, z], { id: 'name', desc: true }))).toEqual(['z', 'c', 'a']);
   });
 
-  it('sorts by status label', () => {
-    // Labels: Active < Lent < Mid(consumable Active). Active rows tie, Lent sorts after.
-    const result = sortRows([z, a], { id: 'status', desc: false });
-    expect(result[0].status).toBe('Active');
-    expect(result[1].status).toBe('Lent');
-  });
-
   it('sorts durables (null onHand) last regardless of direction', () => {
     expect(ids(sortRows([a, lowC, z], { id: 'onHand', desc: false })).slice(0, 1)).toEqual(['c']);
     // Descending still parks the null-quantity durables after the consumable.

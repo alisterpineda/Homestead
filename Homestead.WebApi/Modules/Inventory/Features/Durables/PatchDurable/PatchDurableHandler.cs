@@ -48,7 +48,7 @@ public class PatchDurableHandler(
             Value = item.Value,
             ValueCurrencyId = item.ValueCurrencyId,
             Status = item.Status,
-            LentTo = item.LentTo,
+            StatusNote = item.StatusNote,
             AreaId = item.AreaId,
             ParentItemId = item.ParentItemId,
             IsContainer = item.IsContainer,
@@ -75,8 +75,8 @@ public class PatchDurableHandler(
             throw new BusinessRuleException("Serial must be 128 characters or fewer.");
         if (model.Model is { Length: > 128 })
             throw new BusinessRuleException("Model must be 128 characters or fewer.");
-        if (model.LentTo is { Length: > 256 })
-            throw new BusinessRuleException("LentTo must be 256 characters or fewer.");
+        if (model.StatusNote is { Length: > 256 })
+            throw new BusinessRuleException("StatusNote must be 256 characters or fewer.");
         if (model.AcquiredFrom is { Length: > 256 })
             throw new BusinessRuleException("AcquiredFrom must be 256 characters or fewer.");
         if (model.Compartment is { Length: > 256 })
@@ -113,18 +113,16 @@ public class PatchDurableHandler(
                 throw new BusinessRuleException("BrandId must reference an existing brand.");
         }
 
-        // Lent requires a recipient; any other status clears the LentTo note.
-        string? lentTo;
-        if (model.Status == ItemStatus.Lent)
+        // The status note qualifies a non-Active status: the borrower when Lent (required), the
+        // reason when Archived (optional). Active carries none.
+        var statusNote = model.Status switch
         {
-            if (string.IsNullOrWhiteSpace(model.LentTo))
-                throw new BusinessRuleException("LentTo is required when the status is Lent.");
-            lentTo = model.LentTo.Trim();
-        }
-        else
-        {
-            lentTo = null;
-        }
+            ItemStatus.Lent when string.IsNullOrWhiteSpace(model.StatusNote) =>
+                throw new BusinessRuleException("StatusNote is required when the status is Lent."),
+            ItemStatus.Lent => model.StatusNote!.Trim(),
+            ItemStatus.Archived => Normalize(model.StatusNote),
+            _ => null,
+        };
 
         // Transition lock: a live→terminal transition keeps the item's existing location (area,
         // parent, compartment) — location ops in the same patch are ignored. An item that is
@@ -212,11 +210,11 @@ public class PatchDurableHandler(
                 throw new BusinessRuleException(
                     "Cannot change whether this is a container while it still holds anything (including inactive records). Empty it first.");
 
-            // Taking a container terminal: only LIVE children block; terminal leftovers don't, so
-            // it stays a container and the parent invariant is preserved. Live stock blocks too.
+            // Archiving a container: only LIVE children block; archived leftovers don't, so it stays
+            // a container and the parent invariant is preserved. Live stock blocks too.
             if (sealingContainer && (childStatuses.Any(s => !s.IsTerminal()) || hasStock))
                 throw new BusinessRuleException(
-                    "Cannot mark a container Sold/Discarded/Archived while it has active contents.");
+                    "Cannot archive a container while it has live contents.");
         }
 
         // Compartment is a sub-position within a container — silently cleared when there is no parent.
@@ -235,7 +233,7 @@ public class PatchDurableHandler(
         item.Value = model.Value;
         item.ValueCurrencyId = model.ValueCurrencyId;
         item.Status = model.Status;
-        item.LentTo = lentTo;
+        item.StatusNote = statusNote;
         item.AreaId = targetAreaId;
         item.ParentItemId = targetParentId;
         item.IsContainer = targetIsContainer;

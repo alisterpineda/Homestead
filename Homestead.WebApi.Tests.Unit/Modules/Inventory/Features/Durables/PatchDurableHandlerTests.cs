@@ -47,7 +47,7 @@ public class PatchDurableHandlerTests : IAsyncLifetime
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
     private async Task<Item> AddItemAsync(
-        ItemStatus status = ItemStatus.Active, Guid? areaId = null, string? lentTo = null,
+        ItemStatus status = ItemStatus.Active, Guid? areaId = null, string? statusNote = null,
         Guid? parentItemId = null, bool isContainer = false, string? compartment = null)
     {
         var item = new Item
@@ -57,7 +57,7 @@ public class PatchDurableHandlerTests : IAsyncLifetime
             Fungibility = Fungibility.NonFungible,
             Status = status,
             AreaId = areaId,
-            LentTo = lentTo,
+            StatusNote = statusNote,
             ParentItemId = parentItemId,
             IsContainer = isContainer,
             Compartment = compartment,
@@ -140,38 +140,100 @@ public class PatchDurableHandlerTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Handle_LentWithoutLentTo_Throws()
+    public async Task Handle_LentWithoutStatusNote_Throws()
+    {
+        var item = await AddItemAsync();
+
+        var ex = await Assert.ThrowsAsync<BusinessRuleException>(() =>
+            PatchAsync(item.Id, p => p.Replace(m => m.Status, ItemStatus.Lent)));
+
+        Assert.Equal("StatusNote is required when the status is Lent.", ex.Message);
+    }
+
+    [Fact]
+    public async Task Handle_LentWithBlankStatusNote_Throws()
     {
         var item = await AddItemAsync();
 
         await Assert.ThrowsAsync<BusinessRuleException>(() =>
-            PatchAsync(item.Id, p => p.Replace(m => m.Status, ItemStatus.Lent)));
+            PatchAsync(item.Id, p =>
+            {
+                p.Replace(m => m.Status, ItemStatus.Lent);
+                p.Replace(m => m.StatusNote, "   ");
+            }));
     }
 
     [Fact]
-    public async Task Handle_LentWithLentTo_SetsBoth()
+    public async Task Handle_LentWithStatusNote_SetsBoth()
     {
         var item = await AddItemAsync();
 
         var resp = await PatchAsync(item.Id, p =>
         {
             p.Replace(m => m.Status, ItemStatus.Lent);
-            p.Replace(m => m.LentTo, "Dave next door");
+            p.Replace(m => m.StatusNote, "  Dave next door  ");
         });
 
         Assert.Equal(ItemStatus.Lent, resp.Status);
-        Assert.Equal("Dave next door", resp.LentTo);
+        Assert.Equal("Dave next door", resp.StatusNote);
     }
 
     [Fact]
-    public async Task Handle_LeavingLent_ClearsLentTo()
+    public async Task Handle_LentToActive_ClearsStatusNote()
     {
-        var item = await AddItemAsync(status: ItemStatus.Lent, lentTo: "Dave");
+        var item = await AddItemAsync(status: ItemStatus.Lent, statusNote: "Dave");
 
         var resp = await PatchAsync(item.Id, p => p.Replace(m => m.Status, ItemStatus.Active));
 
         Assert.Equal(ItemStatus.Active, resp.Status);
-        Assert.Null(resp.LentTo);
+        Assert.Null(resp.StatusNote);
+    }
+
+    [Fact]
+    public async Task Handle_LentToArchived_KeepsASuppliedNote()
+    {
+        // Archiving a lent item can record why, replacing the borrower note in the same patch.
+        var item = await AddItemAsync(status: ItemStatus.Lent, statusNote: "Dave");
+
+        var resp = await PatchAsync(item.Id, p =>
+        {
+            p.Replace(m => m.Status, ItemStatus.Archived);
+            p.Replace(m => m.StatusNote, "  Sold to Sam  ");
+        });
+
+        Assert.Equal(ItemStatus.Archived, resp.Status);
+        Assert.Equal("Sold to Sam", resp.StatusNote);
+    }
+
+    [Fact]
+    public async Task Handle_ArchivedWithBlankNote_StoresNull()
+    {
+        var item = await AddItemAsync();
+
+        var resp = await PatchAsync(item.Id, p =>
+        {
+            p.Replace(m => m.Status, ItemStatus.Archived);
+            p.Replace(m => m.StatusNote, "   ");
+        });
+
+        Assert.Equal(ItemStatus.Archived, resp.Status);
+        Assert.Null(resp.StatusNote);
+        Assert.Null(_db.Items.Single(i => i.Id == item.Id).StatusNote);
+    }
+
+    [Fact]
+    public async Task Handle_StatusNoteTooLong_Throws()
+    {
+        var item = await AddItemAsync();
+
+        var ex = await Assert.ThrowsAsync<BusinessRuleException>(() =>
+            PatchAsync(item.Id, p =>
+            {
+                p.Replace(m => m.Status, ItemStatus.Lent);
+                p.Replace(m => m.StatusNote, new string('x', 257));
+            }));
+
+        Assert.Equal("StatusNote must be 256 characters or fewer.", ex.Message);
     }
 
     [Fact]
@@ -264,14 +326,14 @@ public class PatchDurableHandlerTests : IAsyncLifetime
     {
         var item = await AddItemAsync(areaId: _garage.Id);
 
-        // A "sell and move" in one patch: the move must be ignored for a terminal status.
+        // An "archive and move" in one patch: the move must be ignored for a terminal status.
         var resp = await PatchAsync(item.Id, p =>
         {
-            p.Replace(m => m.Status, ItemStatus.Sold);
+            p.Replace(m => m.Status, ItemStatus.Archived);
             p.Replace(m => m.AreaId, _office.Id);
         });
 
-        Assert.Equal(ItemStatus.Sold, resp.Status);
+        Assert.Equal(ItemStatus.Archived, resp.Status);
         Assert.Equal(_garage.Id, resp.AreaId);
     }
 
@@ -370,16 +432,16 @@ public class PatchDurableHandlerTests : IAsyncLifetime
         var chest = await AddContainerAsync(areaId: _garage.Id);
         var item = await AddItemAsync(areaId: _office.Id);
 
-        // Sell-and-move in one patch: the move/compartment ops are ignored for the transition.
+        // Archive-and-move in one patch: the move/compartment ops are ignored for the transition.
         var resp = await PatchAsync(item.Id, p =>
         {
-            p.Replace(m => m.Status, ItemStatus.Sold);
+            p.Replace(m => m.Status, ItemStatus.Archived);
             p.Replace(m => m.AreaId, null);
             p.Replace(m => m.ParentItemId, chest.Id);
             p.Replace(m => m.Compartment, "Top shelf");
         });
 
-        Assert.Equal(ItemStatus.Sold, resp.Status);
+        Assert.Equal(ItemStatus.Archived, resp.Status);
         Assert.Equal(_office.Id, resp.AreaId);
         Assert.Null(resp.ParentItemId);
         Assert.Null(resp.Compartment);
@@ -496,34 +558,36 @@ public class PatchDurableHandlerTests : IAsyncLifetime
         var chest = await AddContainerAsync(areaId: _garage.Id);
         await AddItemAsync(status: ItemStatus.Active, parentItemId: chest.Id);
 
-        await Assert.ThrowsAsync<BusinessRuleException>(() =>
-            PatchAsync(chest.Id, p => p.Replace(m => m.Status, ItemStatus.Sold)));
+        var ex = await Assert.ThrowsAsync<BusinessRuleException>(() =>
+            PatchAsync(chest.Id, p => p.Replace(m => m.Status, ItemStatus.Archived)));
+
+        Assert.Equal("Cannot archive a container while it has live contents.", ex.Message);
     }
 
     [Fact]
     public async Task Handle_TerminalWithOnlyTerminalChildren_Succeeds_KindStaysContainer()
     {
         var chest = await AddContainerAsync(areaId: _garage.Id);
-        await AddItemAsync(status: ItemStatus.Sold, parentItemId: chest.Id);
+        await AddItemAsync(status: ItemStatus.Archived, parentItemId: chest.Id);
 
-        var resp = await PatchAsync(chest.Id, p => p.Replace(m => m.Status, ItemStatus.Sold));
+        var resp = await PatchAsync(chest.Id, p => p.Replace(m => m.Status, ItemStatus.Archived));
 
-        Assert.Equal(ItemStatus.Sold, resp.Status);
+        Assert.Equal(ItemStatus.Archived, resp.Status);
         // Stays a container so the parent invariant holds for leftovers.
         Assert.Equal(true, resp.IsContainer);
     }
 
     [Fact]
-    public async Task Handle_SellAssemblyWithLiveComponent_Succeeds()
+    public async Task Handle_ArchiveAssemblyWithLiveComponent_Succeeds()
     {
-        // A non-container's components ride along — selling the assembly as a unit is never blocked by
-        // them, unlike a container's live stored-in contents.
+        // A non-container's components ride along — archiving the assembly as a unit is never blocked
+        // by them, unlike a container's live stored-in contents.
         var pc = await AddContainerAsync(areaId: _garage.Id, isContainer: false);
         await AddItemAsync(status: ItemStatus.Active, parentItemId: pc.Id, compartment: "CPU");
 
-        var resp = await PatchAsync(pc.Id, p => p.Replace(m => m.Status, ItemStatus.Sold));
+        var resp = await PatchAsync(pc.Id, p => p.Replace(m => m.Status, ItemStatus.Archived));
 
-        Assert.Equal(ItemStatus.Sold, resp.Status);
+        Assert.Equal(ItemStatus.Archived, resp.Status);
         Assert.Equal(false, resp.IsContainer);
         // Its live component still makes it an assembly (derived from the surviving component child).
         Assert.True(resp.HasComponents);
@@ -537,7 +601,7 @@ public class PatchDurableHandlerTests : IAsyncLifetime
         await AddItemAsync(status: ItemStatus.Active, parentItemId: chest.Id);
 
         await Assert.ThrowsAsync<BusinessRuleException>(() =>
-            PatchAsync(chest.Id, p => p.Replace(m => m.Status, ItemStatus.Sold)));
+            PatchAsync(chest.Id, p => p.Replace(m => m.Status, ItemStatus.Archived)));
     }
 
     [Fact]

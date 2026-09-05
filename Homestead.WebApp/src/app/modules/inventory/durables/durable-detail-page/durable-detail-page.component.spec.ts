@@ -474,7 +474,13 @@ describe('DurableDetailPageComponent', () => {
     component.confirmArchive({ close: () => { closed = true; component.archiveState.set('closed'); } });
     expect(closed).toBe(true);
     expect(durableApi.patchCalls).toEqual([
-      { id: 'item1', body: [{ op: 'replace', path: '/status', value: 'Archived' }] },
+      {
+        id: 'item1',
+        body: [
+          { op: 'replace', path: '/status', value: 'Archived' },
+          { op: 'replace', path: '/statusNote', value: null },
+        ],
+      },
     ]);
 
     component.onArchiveRestore({ ...durable, status: 'Archived' });
@@ -484,10 +490,90 @@ describe('DurableDetailPageComponent', () => {
     );
   });
 
+  it('sends the typed archive note, trimmed, and resets it on the next open', async () => {
+    const { component } = await navigate('/inventory/items/item1');
+
+    component.onArchiveRestore(component.durable()!);
+    component.archiveNote.set('  Sold to Sam  ');
+    component.confirmArchive({ close: () => {} });
+
+    expect(durableApi.patchCalls).toEqual([
+      {
+        id: 'item1',
+        body: [
+          { op: 'replace', path: '/status', value: 'Archived' },
+          { op: 'replace', path: '/statusNote', value: 'Sold to Sam' },
+        ],
+      },
+    ]);
+
+    // Reopening starts from an empty note rather than the previous entry's.
+    component.onArchiveRestore(component.durable()!);
+    expect(component.archiveNote()).toBe('');
+  });
+
+  it('lends only after the dialog collects a borrower, and marks returned immediately', async () => {
+    const { component } = await navigate('/inventory/items/item1');
+    const durable = component.durable()!;
+
+    component.onLendRequest();
+    expect(component.lendState()).toBe('open');
+    expect(durableApi.patchCalls).toEqual([]); // nothing until a borrower is typed
+
+    // A blank borrower is refused — the action button is disabled for the same reason.
+    component.confirmLend({ close: () => {} });
+    expect(durableApi.patchCalls).toEqual([]);
+
+    let closed = false;
+    component.lendNote.set('  Dave next door  ');
+    component.confirmLend({ close: () => { closed = true; } });
+    expect(closed).toBe(true);
+    expect(durableApi.patchCalls).toEqual([
+      {
+        id: 'item1',
+        body: [
+          { op: 'replace', path: '/status', value: 'Lent' },
+          { op: 'replace', path: '/statusNote', value: 'Dave next door' },
+        ],
+      },
+    ]);
+
+    // Returning has no dialog — going back to Active clears the note server-side.
+    component.onMarkReturned({ ...durable, status: 'Lent', statusNote: 'Dave next door' });
+    expect(durableApi.patchCalls[1]).toEqual(
+      { id: 'item1', body: [{ op: 'replace', path: '/status', value: 'Active' }] },
+    );
+  });
+
+  it('keeps the lend dialog open with the rejection reason inline when the lend is refused', async () => {
+    const { component } = await navigate('/inventory/items/item1');
+    durableApi.patchFailure = new HttpErrorResponse({
+      status: 400, error: { detail: 'StatusNote is required when the status is Lent.' },
+    });
+
+    component.onLendRequest();
+    component.lendNote.set('Dave');
+    let closed = false;
+    component.confirmLend({ close: () => { closed = true; } });
+
+    expect(closed).toBe(false);
+    // The lend dialog owns its own error slot — the archive dialog's must stay untouched.
+    expect(component.lendError()).toBe('StatusNote is required when the status is Lent.');
+    expect(component.archiveError()).toBe('');
+    expect(component.archiving()).toBe(false);
+    expect(durableApi.getDurableCalls).toBe(1); // no refresh on failure
+
+    // Re-requesting starts with a clean slate.
+    durableApi.patchFailure = null;
+    component.onLendRequest();
+    expect(component.lendError()).toBe('');
+    expect(component.lendNote()).toBe('');
+  });
+
   it('keeps the archive dialog open with the rejection reason inline when the archive is blocked', async () => {
     const { component } = await navigate('/inventory/items/item1');
     durableApi.patchFailure = new HttpErrorResponse({
-      status: 400, error: { detail: 'Cannot mark a container Sold/Discarded/Archived while it has active contents.' },
+      status: 400, error: { detail: 'Cannot archive a container while it has live contents.' },
     });
 
     component.onArchiveRestore(component.durable()!);
@@ -495,7 +581,7 @@ describe('DurableDetailPageComponent', () => {
     component.confirmArchive({ close: () => { closed = true; } });
 
     expect(closed).toBe(false);
-    expect(component.archiveError()).toBe('Cannot mark a container Sold/Discarded/Archived while it has active contents.');
+    expect(component.archiveError()).toBe('Cannot archive a container while it has live contents.');
     expect(component.archiving()).toBe(false);
     expect(durableApi.getDurableCalls).toBe(1); // no refresh on failure
 

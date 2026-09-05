@@ -65,7 +65,6 @@ describe('EditDurableSheetComponent', () => {
       expect(component.editCurrencyId()).toBe('cad');
       expect(component.editAreaId()).toBe('garage');
       expect(component.editNotes()).toBe('Mine');
-      expect(component.editStatus()).toBe('Active');
     });
 
     it('seeds empty/null fields to empty strings', () => {
@@ -298,29 +297,42 @@ describe('EditDurableSheetComponent', () => {
     });
   });
 
-  describe('LentTo behaviour', () => {
-    it('requires LentTo when status is Lent', () => {
+  describe('status note behaviour', () => {
+    // The sheet renders into an overlay, so read the document body rather than the host element.
+    function sheetHtml(): string {
+      return (fixture.nativeElement as HTMLElement).ownerDocument.body
+        .querySelector('hlm-sheet-content')?.innerHTML ?? '';
+    }
+
+    it('offers no status field and no note field on an Active durable', () => {
       open(makeItem({ status: 'Active' }));
-      component.editStatus.set('Lent');
-      expect(component.validationError()).not.toBeNull();
+      expect(sheetHtml()).not.toContain('durable-status-note');
+      expect(sheetHtml()).not.toContain('>Status<');
+    });
+
+    it('shows the note as "Lent to" and requires it while the durable is lent', () => {
+      open(makeItem({ status: 'Lent', statusNote: 'Dave' }));
+      expect(sheetHtml()).toContain('durable-status-note');
+      expect(sheetHtml()).toContain('Lent to');
+      expect(component.editStatusNote()).toBe('Dave');
+
+      component.editStatusNote.set('   ');
+      expect(component.validationError()).toBe('Lent to is required while the durable is lent.');
       expect(component.canSave()).toBe(false);
     });
 
-    it('sends status and lentTo together when lending', () => {
-      open(makeItem({ status: 'Active' }));
-      component.editStatus.set('Lent');
-      component.editLentTo.set('Dave next door');
+    it('emits only /statusNote — never /status — when the note changes', () => {
+      open(makeItem({ status: 'Lent', statusNote: 'Dave' }));
+      component.editStatusNote.set('  Dave next door  ');
       expect(component.validationError()).toBeNull();
-      expect(ops()).toEqual([
-        { op: 'replace', path: '/status', value: 'Lent' },
-        { op: 'replace', path: '/lentTo', value: 'Dave next door' },
-      ]);
+      expect(ops()).toEqual([{ op: 'replace', path: '/statusNote', value: 'Dave next door' }]);
     });
 
-    it('does not send a lentTo op when leaving Lent (server clears it)', () => {
-      open(makeItem({ status: 'Lent', lentTo: 'Dave' }));
-      component.editStatus.set('Active');
-      expect(ops()).toEqual([{ op: 'replace', path: '/status', value: 'Active' }]);
+    it('lets an archived durable clear its optional note', () => {
+      open(makeItem({ status: 'Archived', statusNote: 'Sold to Sam' }));
+      component.editStatusNote.set('');
+      expect(component.validationError()).toBeNull();
+      expect(ops()).toEqual([{ op: 'replace', path: '/statusNote', value: null }]);
     });
   });
 

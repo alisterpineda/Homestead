@@ -75,7 +75,7 @@ describe('InventoryTableComponent', () => {
 
   it('defines the expected columns', () => {
     const ids = component['_columns']().map(c => c.id);
-    expect(ids).toEqual(['name', 'status', 'location', 'onHand', 'updatedAt', 'actions']);
+    expect(ids).toEqual(['name', 'location', 'onHand', 'updatedAt', 'actions']);
   });
 
   describe('location cell', () => {
@@ -273,24 +273,35 @@ describe('InventoryTableComponent', () => {
     });
   });
 
-  describe('status cell (DOM render)', () => {
-    // The dense list opts into showing the default Active state (quiet secondary tone) so the status
-    // column stays consistent on every row — unlike single-item surfaces, which suppress it.
-    it('renders a quiet Active chip for a default-status row', () => {
+  describe('status badge in the name cell (DOM render)', () => {
+    // There is no Status column: the pill sits beside the name, and Active renders nothing at all,
+    // so an ordinary row carries no status chrome.
+    it('renders no status chrome for a default-status row', () => {
       fixture.componentRef.setInput('rows', [durableToRow(makeItem({ status: 'Active' }))]);
       fixture.detectChanges();
-      const cell = fixture.nativeElement.querySelector('app-inventory-status-cell') as HTMLElement;
-      const span = cell.querySelector('span');
-      expect(span?.textContent?.trim()).toBe('Active');
-      expect(span?.className).toContain('bg-secondary');
+      const cell = fixture.nativeElement.querySelector('app-inventory-name-cell') as HTMLElement;
+      expect(cell.textContent).not.toContain('Active');
     });
 
-    it('renders the colored chip and lent-to text for a Lent row', () => {
-      fixture.componentRef.setInput('rows', [durableToRow(makeItem({ status: 'Lent', lentTo: 'Neighbor' }))]);
+    it('renders the Lent pill and its note beside the name', () => {
+      fixture.componentRef.setInput('rows', [
+        durableToRow(makeItem({ name: 'Ladder', status: 'Lent', statusNote: 'Neighbor' })),
+      ]);
       fixture.detectChanges();
-      const cell = fixture.nativeElement.querySelector('app-inventory-status-cell') as HTMLElement;
+      const cell = fixture.nativeElement.querySelector('app-inventory-name-cell') as HTMLElement;
+      expect(cell.textContent).toContain('Ladder');
       expect(cell.textContent).toContain('Lent');
-      expect(cell.textContent).toContain('Neighbor');
+      expect(cell.textContent).toContain('to Neighbor');
+    });
+
+    it('renders an archive note verbatim beside the name', () => {
+      fixture.componentRef.setInput('rows', [
+        consumableToRow(makeConsumable({ status: 'Archived', statusNote: 'Used up' })),
+      ]);
+      fixture.detectChanges();
+      const cell = fixture.nativeElement.querySelector('app-inventory-name-cell') as HTMLElement;
+      expect(cell.textContent).toContain('Archived');
+      expect(cell.textContent).toContain('Used up');
     });
   });
 
@@ -323,14 +334,14 @@ describe('InventoryTableComponent', () => {
   });
 
   it('marks terminal-status rows as muted/italic and all rows as clickable', () => {
-    const sold = durableToRow(makeItem({ status: 'Sold' }));
+    const archived = durableToRow(makeItem({ status: 'Archived' }));
     const archivedConsumable = consumableToRow(makeConsumable({ status: 'Archived' }));
     const active = durableToRow(makeItem({ status: 'Active' }));
-    expect(component['getRowClass'](sold)).toContain('italic');
+    expect(component['getRowClass'](archived)).toContain('italic');
     expect(component['getRowClass'](archivedConsumable)).toContain('italic');
     expect(component['getRowClass'](active)).not.toContain('italic');
     expect(component['getRowClass'](active)).toContain('cursor-pointer');
-    expect(component['getRowClass'](sold)).toContain('cursor-pointer');
+    expect(component['getRowClass'](archived)).toContain('cursor-pointer');
   });
 
   describe('row click', () => {
@@ -393,16 +404,16 @@ describe('InventoryTableComponent', () => {
         })),
       ]);
       fixture.detectChanges();
-      // Default: name, status, location, onHand, updatedAt, actions.
-      expect(fixture.nativeElement.querySelectorAll('thead th').length).toBe(6);
+      // Default: name, location, onHand, updatedAt, actions.
+      expect(fixture.nativeElement.querySelectorAll('thead th').length).toBe(5);
       expect((fixture.nativeElement as HTMLElement).textContent).toContain('Location');
 
       fixture.componentRef.setInput('columnVisibility', { location: false });
       fixture.detectChanges();
       fixture.detectChanges();
 
-      expect(fixture.nativeElement.querySelectorAll('thead th').length).toBe(5);
-      expect(fixture.nativeElement.querySelector('tbody tr')!.querySelectorAll('td').length).toBe(5);
+      expect(fixture.nativeElement.querySelectorAll('thead th').length).toBe(4);
+      expect(fixture.nativeElement.querySelector('tbody tr')!.querySelectorAll('td').length).toBe(4);
       expect((fixture.nativeElement as HTMLElement).textContent).not.toContain('Location');
     });
   });
@@ -413,9 +424,9 @@ describe('InventoryTableComponent', () => {
     component.sortChange.subscribe(v => (emitted = v));
 
     const onSortingChange = component['table'].options.onSortingChange!;
-    (onSortingChange as (updater: unknown) => void)(() => [{ id: 'status', desc: true }]);
+    (onSortingChange as (updater: unknown) => void)(() => [{ id: 'updatedAt', desc: true }]);
 
-    expect(emitted).toEqual({ id: 'status', desc: true });
+    expect(emitted).toEqual({ id: 'updatedAt', desc: true });
   });
 
   it('emits row-action outputs through the table meta', () => {

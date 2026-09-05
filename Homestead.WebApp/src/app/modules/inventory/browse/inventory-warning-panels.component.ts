@@ -138,8 +138,8 @@ export type WarningPanelsScope =
                     @for (durable of ov.lentDurables; track durable.id) {
                       <li class="flex items-center justify-between gap-2 text-sm">
                         <span class="truncate">{{ durable.name }}</span>
-                        @if (durable.lentTo) {
-                          <span class="shrink-0 truncate text-xs text-muted-foreground">to {{ durable.lentTo }}</span>
+                        @if (durable.statusNote) {
+                          <span class="shrink-0 truncate text-xs text-muted-foreground">to {{ durable.statusNote }}</span>
                         }
                       </li>
                     }

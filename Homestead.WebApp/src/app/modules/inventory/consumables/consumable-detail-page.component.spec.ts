@@ -252,11 +252,39 @@ describe('ConsumableDetailPageComponent', () => {
     harness.detectChanges();
 
     expect(consumableApi.patchCalls).toEqual([
-      { id: 'c1', body: [{ op: 'replace', path: '/status', value: 'Archived' }] },
+      {
+        id: 'c1',
+        body: [
+          { op: 'replace', path: '/status', value: 'Archived' },
+          { op: 'replace', path: '/statusNote', value: null },
+        ],
+      },
     ]);
     expect(consumableApi.getConsumableCalls).toBe(2); // the success handler re-fetched
     expect(component.consumable()?.status).toBe('Archived');
     expect(text(harness)).toContain('Archived'); // status badge reflects the new state
+  });
+
+  it('sends the typed archive note, trimmed, and resets it on the next open', async () => {
+    const { component } = await navigate('/inventory/items/c1');
+
+    component.onArchiveRestore(component.consumable()!);
+    component.archiveNote.set('  Used up  ');
+    component.confirmArchive({ close: () => {} });
+
+    expect(consumableApi.patchCalls).toEqual([
+      {
+        id: 'c1',
+        body: [
+          { op: 'replace', path: '/status', value: 'Archived' },
+          { op: 'replace', path: '/statusNote', value: 'Used up' },
+        ],
+      },
+    ]);
+
+    // Reopening starts from an empty note rather than the previous entry's.
+    component.onArchiveRestore(component.consumable()!);
+    expect(component.archiveNote()).toBe('');
   });
 
   it('restores a terminal consumable: patches status → Active', async () => {

@@ -24,6 +24,44 @@
   ("Moving an area takes its contents with it"). This is the only straightforward way to restructure
   an area tree — see the API note on why not over HTTP.
 
+## Item status (Active / Lent / Archived)
+
+Three statuses only — `Active`, `Lent`, `Archived` — plus a single free-text `statusNote` that
+qualifies the non-Active ones (the borrower when Lent, an optional reason when Archived; always null
+while Active). A consumable is never Lent, so the kinds differ only there.
+
+- **No Status column and no status sort** on `/inventory/items`. The pill renders beside the **name**
+  (name cell in the table, head row on a card), with the note as muted text after it — "Lent · to
+  Dave", "Archived · Sold to Sam". An **Active row shows no pill at all**, so most rows carry no
+  status chrome; archived rows stay italic-muted and only appear behind the refine popover's **Show
+  inactive** toggle. The `?lent=true` deep link and the Browse "Lent out" tile are unchanged.
+- **Lend / Mark returned** live in two places: the durable **quick panel's Status card** (one
+  state-driven button — `Lend…` on an Active item opens the inline "Lent to" form, `Mark returned` on
+  a Lent one patches straight away, `Restore` on an Archived one) and the durable detail page's `⋮`
+  menu (`Lend…` opens a small alert dialog whose action stays disabled until a borrower is typed;
+  `Mark returned` is immediate). There is **no** Lend in the list row's `⋮` — the quick panel is the
+  list's fast surface. The quick panel's old six-way "Change" dropdown is gone.
+- **Archive / Restore** stay in the row `⋮` and the detail `⋮`, both behind a confirm dialog. That
+  dialog now carries an optional single-line **Note (optional)** input (placeholder "e.g. Sold to
+  Sam", 256 chars) — it is sent as `/statusNote` alongside `/status`, and reset every time the dialog
+  opens. Restore is immediate and clears the note server-side.
+- **The edit sheets have no status select** (both kinds). A non-Active item shows one **Status note**
+  field instead — labelled "Lent to" while Lent (required, blocks Save when blank) and "Note" while
+  Archived (optional). Saving never emits `/status`.
+- Archiving a container with live contents is still rejected: `Cannot archive a container while it
+  has live contents.` — shown inline in the confirm dialog, not as a toast.
+- **Selectors for driving it:** the kebab triggers are `button[aria-label="Durable actions"]` /
+  `button[aria-label="Consumable actions"]` on both the list row and the detail page (there is no
+  "Item actions" / "More" label). The quick panel's inline lend form confirms with **`Mark as lent`**
+  (input placeholder `e.g. Dave next door`); the detail page's dialogs confirm with **`Lend`** and
+  **`Archive`** — match those `exact: true`, since "Archive" also hits the menu item. The lend dialog
+  input is `#lend-to` and the durable edit sheet's status-note field is `#durable-status-note`
+  (both `maxlength=256`). The edit sheet's "Lent to is required…" message renders as a form-level
+  error at the bottom of the sheet body, not beside the field.
+- The activity feed prints the transition, not "updated status": "Alister lent this item to Dave",
+  "…marked this item returned", "…archived this item (Sold to Sam)", "…restored this item". A
+  note-only edit reads "updated status note". Nothing writes a second note row for a status change.
+
 ## Warranties (durable detail page only)
 
 `app-item-warranties-section` sits on `/inventory/items/:id` for a **durable**, between

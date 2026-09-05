@@ -27,7 +27,7 @@ import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
 import { openGeneration } from '@/shared/utils/open-generation';
-import { trimToNull } from '@/modules/finances/shared/trim-to-null';
+import { trimToNull } from '@/shared/utils/trim-to-null';
 
 export type StockOpMode = 'receive' | 'consume' | 'transfer' | 'adjust';
 

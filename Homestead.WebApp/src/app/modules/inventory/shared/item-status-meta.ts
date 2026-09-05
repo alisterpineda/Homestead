@@ -27,8 +27,8 @@ export const ITEM_STATUS_META: Record<ItemStatus, ItemStatusMeta> = {
     label: 'Active',
     // The resting default state — suppressed everywhere except the dense list/table, which opts in
     // via `[showDefault]` (see ItemStatusBadgeComponent). Styled as the quiet Spartan `secondary`
-    // tone (not the old loud green): same neutral fill as the muted terminal pills, but readable
-    // secondary-foreground text, so a present "Active" stays distinct from greyed-out Sold/Archived.
+    // tone (not the old loud green): same neutral fill as the muted Archived pill, but readable
+    // secondary-foreground text, so a present "Active" stays distinct from a greyed-out Archived.
     badgeClass: `${BADGE_BASE} bg-secondary text-secondary-foreground`,
     terminal: false,
     isDefault: true,
@@ -38,21 +38,6 @@ export const ITEM_STATUS_META: Record<ItemStatus, ItemStatusMeta> = {
     badgeClass: `${BADGE_BASE} bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300`,
     terminal: false,
   },
-  InRepair: {
-    label: 'In repair',
-    badgeClass: `${BADGE_BASE} bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300`,
-    terminal: false,
-  },
-  Sold: {
-    label: 'Sold',
-    badgeClass: `${BADGE_BASE} bg-muted text-muted-foreground`,
-    terminal: true,
-  },
-  Discarded: {
-    label: 'Discarded',
-    badgeClass: `${BADGE_BASE} bg-destructive/10 text-destructive dark:bg-destructive/20`,
-    terminal: true,
-  },
   Archived: {
     label: 'Archived',
     badgeClass: `${BADGE_BASE} bg-muted text-muted-foreground`,
@@ -60,15 +45,18 @@ export const ITEM_STATUS_META: Record<ItemStatus, ItemStatusMeta> = {
   },
 };
 
-/** All statuses, in lifecycle order — for status select dropdowns. */
-export const ALL_ITEM_STATUSES: readonly ItemStatus[] = [
-  'Active', 'Lent', 'InRepair', 'Sold', 'Discarded', 'Archived',
-];
-
-export function itemStatusLabel(status: ItemStatus): string {
-  return ITEM_STATUS_META[status]?.label ?? status;
-}
-
 export function isTerminalStatus(status: ItemStatus): boolean {
   return ITEM_STATUS_META[status]?.terminal ?? false;
+}
+
+/**
+ * Muted text rendered after the pill: "to Dave" for Lent, the note verbatim for Archived, null
+ * otherwise (Active never carries one, and a blank note renders nothing).
+ */
+export function statusNoteText(status: ItemStatus, note: string | null | undefined): string | null {
+  const trimmed = note?.trim();
+  if (!trimmed) return null;
+  if (status === 'Lent') return `to ${trimmed}`;
+  if (status === 'Archived') return trimmed;
+  return null;
 }

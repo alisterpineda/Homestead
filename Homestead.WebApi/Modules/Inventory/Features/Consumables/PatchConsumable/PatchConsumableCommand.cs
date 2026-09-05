@@ -7,7 +7,8 @@ namespace Homestead.WebApi.Modules.Inventory.Features.Consumables.PatchConsumabl
 /// <summary>
 /// Patchable metadata of a consumable. Quantity is never edited here — it changes only through the
 /// stock operations (receive/consume/transfer/adjust). <see cref="Status"/> accepts only the reduced
-/// fungible lifecycle (<c>Active</c> / <c>Archived</c>), enforced server-side.
+/// fungible lifecycle (<c>Active</c> / <c>Archived</c>), enforced server-side;
+/// <see cref="StatusNote"/> optionally records why it was archived.
 /// </summary>
 public class PatchConsumableModel
 {
@@ -17,6 +18,7 @@ public class PatchConsumableModel
     public Guid? BrandId { get; set; }
     public string? Notes { get; set; }
     public ItemStatus Status { get; set; }
+    public string? StatusNote { get; set; }
 
     /// <summary>
     /// Whole desired classification tag set as slash-delimited paths. Seeded from the item's current

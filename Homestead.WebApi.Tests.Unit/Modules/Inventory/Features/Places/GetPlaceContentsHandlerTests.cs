@@ -311,7 +311,7 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
     public async Task Handle_TerminalChildrenAndArchivedConsumables_Excluded()
     {
         var chest = await AddItemAsync("Chest", areaId: _garage.Id, isContainer: true);
-        await AddItemAsync("Sold drill", status: ItemStatus.Sold, areaId: _garage.Id);
+        await AddItemAsync("Archived drill", status: ItemStatus.Archived, areaId: _garage.Id);
         await AddItemAsync("Archived nested", status: ItemStatus.Archived, parentItemId: chest.Id);
         var archived = await AddConsumableAsync("Old glue", status: ItemStatus.Archived);
         await AddStockAsync(archived.Id, 3m, areaId: _garage.Id);

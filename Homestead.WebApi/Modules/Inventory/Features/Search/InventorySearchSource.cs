@@ -25,7 +25,7 @@ public class InventorySearchSource(AppDbContext db) : ISearchSource
     {
         var pattern = $"%{LikeEscaper.Escape(query)}%";
 
-        // Live items only (excludes Sold/Discarded/Archived); both durables and consumables.
+        // Live items only (excludes Archived); both durables and consumables.
         var filtered = db.Items.AsNoTracking()
             .Where(i => ItemStatusExtensions.LiveStatuses.Contains(i.Status))
             .Where(i =>
@@ -88,7 +88,6 @@ public class InventorySearchSource(AppDbContext db) : ISearchSource
     private static string? DurableBadge(ItemStatus status) => status switch
     {
         ItemStatus.Active => null,
-        ItemStatus.InRepair => "In repair",
         _ => status.ToString(),
     };
 

@@ -138,7 +138,7 @@ One narrow exception: a rare **uniqueness-collision** race — an inflow landing
 - A consume or transfer may not exceed the quantity on-hand at the source location — over-consume/over-transfer is rejected (with the `>= 0` constraint as the last-resort backstop).
 - Movement `Quantity` is a positive magnitude; direction comes from the location fields, never from a signed quantity.
 - `UnitCost` and `UnitCostCurrencyId` are set together or not at all; the currency references the seeded, read-only currency set (see [overview.md](overview.md#every-amount-carries-its-currency)).
-- A receive/transfer/convert-in **destination** must be a **live** container — stock moves out of a `Sold`/`Discarded`/`Archived` container but never into one (the complement of the sealing gate; see [locations.md](locations.md#holder-emptiness-and-terminal-status)). Sources stay existence-only. An *adjust* that **lowers** the count is a source too — stranded stock can still be reconciled **out** of a terminal container — but an *adjust* that **raises** it is an inflow and is rejected into a terminal container like any other destination.
+- A receive/transfer/convert-in **destination** must be a **live** container — stock moves out of an `Archived` container but never into one (the complement of the sealing gate; see [locations.md](locations.md#holder-emptiness-and-terminal-status)). Sources stay existence-only. An *adjust* that **lowers** the count is a source too — stranded stock can still be reconciled **out** of an archived container — but an *adjust* that **raises** it is an inflow and is rejected into an archived container like any other destination.
 
 ## Transfers
 
@@ -146,7 +146,7 @@ Moving stock between two locations is a single operation that decrements the sou
 
 ## Fungible status
 
-Fungible items use a reduced lifecycle — only **`Active`** and **`Archived`**. `Lent`, `InRepair`, `Sold`, and `Discarded` are meaningless for a count of a consumable (you do not lend "screws" as an identity). Archiving a consumable removes it from the default unified items list behind the same "Show inactive" reveal used elsewhere; per the delete-vs-archive rule in [locations.md](locations.md#delete-vs-archive), a fungible item with any movement history can only be archived, not hard-deleted. The consumable detail page exposes **Archive** (and **Restore** once archived), plus **Delete** when there is no ledger history and no notes (see [activity.md](activity.md#delete-gate)), through its `⋮` overflow menu — the same lifecycle actions the unified list's row actions offer.
+Fungible items use a reduced lifecycle — only **`Active`** and **`Archived`**, so the kinds differ by exactly one value: `Lent` is meaningless for a count of a consumable (you do not lend "screws" as an identity). Archiving a consumable *may* carry the same optional `StatusNote` a durable does ("Used up"), since the column lives on the shared row. Archiving a consumable removes it from the default unified items list behind the same "Show inactive" reveal used elsewhere; per the delete-vs-archive rule in [locations.md](locations.md#delete-vs-archive), a fungible item with any movement history can only be archived, not hard-deleted. The consumable detail page exposes **Archive** (and **Restore** once archived), plus **Delete** when there is no ledger history and no notes (see [activity.md](activity.md#delete-gate)), through its `⋮` overflow menu — the same lifecycle actions the unified list's row actions offer.
 
 ## Track this one individually
 
@@ -166,7 +166,7 @@ The reverse — folding several individually-tracked instances back into a fungi
 2. **Append N `Conversion` inflow movements of quantity 1** — one per collapsed instance, each carrying its own `RelatedItemId`. Traceability therefore runs both ways here too, mirroring *track-this-one-individually*: every collapsed instance leaves its own ledger row pointing back at the item it came from, rather than a single anonymous inflow of N.
 3. **Archive** the collapsed non-fungible instances (do **not** hard-delete them), keeping their location.
 
-Only **`Active`** instances are eligible: `Lent` / `InRepair` ones are physically elsewhere, so folding them back would inflate on-hand and silently drop their `LentTo`. A container can be collapsed only once it is empty (no live children, no stock inside) — the same sealing gate that guards taking a container terminal — and it cannot be its own collapse target.
+Only **`Active`** instances are eligible: `Lent` ones are physically elsewhere, so folding them back would inflate on-hand and silently drop their `StatusNote`. A container can be collapsed only once it is empty (no live children, no stock inside) — the same sealing gate that guards taking a container terminal — and it cannot be its own collapse target.
 
 This is mechanically simple but **lossy**: per-instance serials, values, compartments, and individual history have nowhere to live on a bulk count. So the operation **warns** before proceeding, and it **archives** the source instances rather than deleting them, so their records and any attachments survive for later reference. The asymmetry with *track-this-one-individually* (which is lossless) is intrinsic: splitting adds identity, collapsing discards it.
 

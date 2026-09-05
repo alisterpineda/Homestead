@@ -37,7 +37,7 @@ public record GetDurablesQuery : PaginatedRequest, IRequest<PaginatedResponse<Du
     /// </summary>
     public bool? Unplaced { get; init; }
 
-    /// <summary>Include terminal (Sold/Discarded/Archived) items. Default false.</summary>
+    /// <summary>Include archived items. Default false.</summary>
     public bool? IncludeInactive { get; init; }
 
     /// <summary>Case-insensitive name search.</summary>

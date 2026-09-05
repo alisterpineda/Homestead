@@ -25,7 +25,7 @@ public class PatchDurableModel
     public decimal? Value { get; set; }
     public Guid? ValueCurrencyId { get; set; }
     public ItemStatus Status { get; set; }
-    public string? LentTo { get; set; }
+    public string? StatusNote { get; set; }
     public Guid? AreaId { get; set; }
     public Guid? ParentItemId { get; set; }
     public bool? IsContainer { get; set; }

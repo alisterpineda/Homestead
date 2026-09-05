@@ -3,6 +3,6 @@
 
 export interface LentDurablePreview {
   id: string;
-  lentTo?: (string | null);
   name: string;
+  statusNote?: (string | null);
 }

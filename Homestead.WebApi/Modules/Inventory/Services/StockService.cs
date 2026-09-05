@@ -116,7 +116,7 @@ public class StockService(
             // Adjusting UP inside a terminal container is an inflow — blocked like a receive/transfer-in.
             // Adjusting DOWN stays allowed (the reconcile-stranded-stock-out escape hatch).
             if (delta > 0m && locationIsTerminalContainer)
-                throw new BusinessRuleException("Cannot add stock into a Sold/Discarded/Archived container.");
+                throw new BusinessRuleException("Cannot add stock into an archived container.");
 
             if (entry is null)
             {
@@ -388,13 +388,13 @@ public class StockService(
         // Loose stock can only sit in a container — a non-container holds components, not a place that takes stock.
         if (container.Fungibility != Fungibility.NonFungible || container.IsContainer != true)
             throw new BusinessRuleException("ContainerItemId must reference a container item.");
-        // A destination must be live: stock moves OUT of a terminal (Sold/Discarded/Archived) container
+        // A destination must be live: stock moves OUT of an archived container
         // but never INTO one — the complement of the durable sealing gate.
         if (isDestination && container.Status.IsTerminal())
-            throw new BusinessRuleException("Cannot place stock into a Sold/Discarded/Archived container.");
+            throw new BusinessRuleException("Cannot place stock into an archived container.");
     }
 
-    // True only for a container location whose holder is terminal (Sold/Discarded/Archived); area
+    // True only for a container location whose holder is archived; area
     // locations have no status. Used by AdjustAsync to block an adjust-UP inflow into a terminal
     // container while still allowing an adjust-DOWN reconcile-out. Assumes the location was already
     // validated (existence + container-kind) by ValidateLocationAsync.

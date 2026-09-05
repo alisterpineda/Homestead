@@ -17,7 +17,6 @@ public class GetItemActivityHandler(AppDbContext db)
     private static readonly Dictionary<string, string> FieldDisplayNames = new()
     {
         ["Name"] = "name",
-        ["Status"] = "status",
         ["Value"] = "value",
         ["ValueCurrencyId"] = "value",
         ["AreaId"] = "location",
@@ -25,7 +24,10 @@ public class GetItemActivityHandler(AppDbContext db)
         ["Compartment"] = "compartment",
         ["Serial"] = "serial",
         ["AcquiredOn"] = "acquired date",
-        ["LentTo"] = "lent to",
+        // The column is "StatusNote" now; historical rows recorded the same free text as "LentTo".
+        // Both map to "status note" so a note-only edit reads consistently across the schema's history.
+        ["StatusNote"] = "status note",
+        ["LentTo"] = "status note",
         // Current rows record the container flag under "IsContainer"; historical rows recorded the
         // interim "DurableKind" trichotomy (and, before that, an older "IsContainer" boolean). All map
         // to "type" so activity reads consistently across the schema's history.
@@ -37,6 +39,10 @@ public class GetItemActivityHandler(AppDbContext db)
         ["Unit"] = "unit",
         ["RestockThreshold"] = "restock threshold",
     };
+
+    // Folded into the status sentence, so they never repeat in its "and updated …" tail. "LentTo" is
+    // the historical name of "StatusNote".
+    private static readonly string[] StatusFieldNames = ["Status", "StatusNote", "LentTo"];
 
     /// <summary>
     /// The ItemWarranty field → label map, kept separate from the item's because the two disagree on
@@ -187,17 +193,53 @@ public class GetItemActivityHandler(AppDbContext db)
 
     private static string GenerateUpdatedSummary(string? changesJson, string userName)
     {
-        var fieldNames = ParseChangedFieldNames(changesJson);
+        var changes = ParseChanges(changesJson);
+        var fieldNames = changes.Select(c => c.Field).Where(f => !string.IsNullOrEmpty(f)).ToList();
         if (fieldNames.Count == 0)
             return $"{userName} updated this item";
 
-        var displayNames = fieldNames
+        // A status transition tells the story in words ("lent this item to Dave"), with the note that
+        // qualifies it read off the same audit row — nothing writes a second entry for it.
+        var statusChange = changes.OfType<ScalarFieldChange>().FirstOrDefault(c => c.Field == "Status");
+        if (statusChange is not null)
+        {
+            var note = changes.OfType<ScalarFieldChange>()
+                .FirstOrDefault(c => c.Field is "StatusNote" or "LentTo")
+                ?.NewValue;
+
+            var sentence = StatusSentence(statusChange, note, userName);
+            var others = ToDisplayNames(fieldNames.Where(f => !StatusFieldNames.Contains(f)));
+            return others.Count == 0
+                ? sentence
+                : $"{sentence} and updated {string.Join(", ", others)}";
+        }
+
+        // A note-only change falls through here and reads "updated status note".
+        return $"{userName} updated {string.Join(", ", ToDisplayNames(fieldNames))}";
+    }
+
+    /// <summary>
+    /// The status half of an item update, phrased as the transition rather than "updated status".
+    /// Historical values (Sold / Discarded / InRepair, before the enum collapsed) fall through to the
+    /// generic arm so old feeds still read sensibly.
+    /// </summary>
+    private static string StatusSentence(ScalarFieldChange status, string? note, string userName) =>
+        status.NewValue switch
+        {
+            "Lent" when !string.IsNullOrWhiteSpace(note) => $"{userName} lent this item to {note}",
+            "Lent" => $"{userName} marked this item lent",
+            "Active" when status.OldValue == "Lent" => $"{userName} marked this item returned",
+            "Active" => $"{userName} restored this item",
+            "Archived" when !string.IsNullOrWhiteSpace(note) => $"{userName} archived this item ({note})",
+            "Archived" => $"{userName} archived this item",
+            var other => $"{userName} changed status to {other}",
+        };
+
+    private static List<string> ToDisplayNames(IEnumerable<string> fieldNames) =>
+        fieldNames
             .Select(f => FieldDisplayNames.TryGetValue(f, out var display) ? display : f.ToLowerInvariant())
             .Distinct()
             .ToList();
-
-        return $"{userName} updated {string.Join(", ", displayNames)}";
-    }
 
     /// <summary>
     /// A warranty has no feed row of its own, so these three summaries are the whole trace of it. The

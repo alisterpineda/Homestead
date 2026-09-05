@@ -14,6 +14,13 @@ public record ConsumableResponse
     public required Guid Id { get; init; }
     public required string Name { get; init; }
     public required ItemStatus Status { get; init; }
+
+    /// <summary>
+    /// Optional reason recorded when the consumable was archived; null while Active. (A consumable is
+    /// never Lent.)
+    /// </summary>
+    public string? StatusNote { get; init; }
+
     public string? Notes { get; init; }
 
     /// <summary>Unit of measure ("screws", "rolls", "gal"). Null when the consumable has no unit;

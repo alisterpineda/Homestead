@@ -82,6 +82,67 @@ public class PatchConsumableHandlerTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Handle_ArchiveWithNote_PersistsBoth()
+    {
+        var item = await AddConsumableAsync();
+
+        var resp = await PatchAsync(item.Id, p =>
+        {
+            p.Replace(m => m.Status, ItemStatus.Archived);
+            p.Replace(m => m.StatusNote, "  Used up  ");
+        });
+
+        Assert.Equal(ItemStatus.Archived, resp.Status);
+        Assert.Equal("Used up", resp.StatusNote);
+        Assert.Equal("Used up", _db.Items.Single(i => i.Id == item.Id).StatusNote);
+    }
+
+    [Fact]
+    public async Task Handle_ArchiveWithBlankNote_StoresNull()
+    {
+        var item = await AddConsumableAsync();
+
+        var resp = await PatchAsync(item.Id, p =>
+        {
+            p.Replace(m => m.Status, ItemStatus.Archived);
+            p.Replace(m => m.StatusNote, "   ");
+        });
+
+        Assert.Equal(ItemStatus.Archived, resp.Status);
+        Assert.Null(resp.StatusNote);
+    }
+
+    [Fact]
+    public async Task Handle_Restore_ClearsStatusNote()
+    {
+        var item = await AddConsumableAsync();
+        item.Status = ItemStatus.Archived;
+        item.StatusNote = "Used up";
+        await _db.SaveChangesAsync(Ct);
+
+        var resp = await PatchAsync(item.Id, p => p.Replace(m => m.Status, ItemStatus.Active));
+
+        Assert.Equal(ItemStatus.Active, resp.Status);
+        Assert.Null(resp.StatusNote);
+        Assert.Null(_db.Items.Single(i => i.Id == item.Id).StatusNote);
+    }
+
+    [Fact]
+    public async Task Handle_StatusNoteTooLong_Throws()
+    {
+        var item = await AddConsumableAsync();
+
+        var ex = await Assert.ThrowsAsync<BusinessRuleException>(() =>
+            PatchAsync(item.Id, p =>
+            {
+                p.Replace(m => m.Status, ItemStatus.Archived);
+                p.Replace(m => m.StatusNote, new string('x', 257));
+            }));
+
+        Assert.Equal("StatusNote must be 256 characters or fewer.", ex.Message);
+    }
+
+    [Fact]
     public async Task Handle_ReplaceTags_SwapsEntireSet()
     {
         var ct = Ct;

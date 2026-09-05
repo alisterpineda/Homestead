@@ -41,6 +41,7 @@ public class PatchConsumableHandler(
             BrandId = item.BrandId,
             Notes = item.Notes,
             Status = item.Status,
+            StatusNote = item.StatusNote,
             Tags = item.ItemTags.Select(it => it.Tag.Path).ToList(),
         };
 
@@ -54,6 +55,8 @@ public class PatchConsumableHandler(
             throw new BusinessRuleException("Unit must be 32 characters or fewer.");
         if (model.RestockThreshold is < 0m)
             throw new BusinessRuleException("Restock threshold must be zero or positive.");
+        if (model.StatusNote is { Length: > 256 })
+            throw new BusinessRuleException("StatusNote must be 256 characters or fewer.");
         // Also the B2 guard for consumables: JsonPatch can bind an out-of-range integer to the
         // enum-typed Status (allowIntegerValues defaults true), but this Active/Archived allowlist
         // already rejects any undefined value before it can persist and re-serialize as a JSON number
@@ -74,6 +77,8 @@ public class PatchConsumableHandler(
         item.BrandId = model.BrandId;
         item.Notes = Normalize(model.Notes);
         item.Status = model.Status;
+        // A consumable is never Lent, so the note only ever qualifies Archived; Active carries none.
+        item.StatusNote = model.Status == ItemStatus.Archived ? Normalize(model.StatusNote) : null;
         item.UpdatedAt = DateTimeOffset.UtcNow;
         item.UpdatedByUserId = currentUser.UserId;
 

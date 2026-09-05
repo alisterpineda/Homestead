@@ -58,7 +58,7 @@ import type { ConsumableResponse } from '@/api/generated/models/consumable-respo
                 >
                   <span class="flex min-w-0 items-center gap-2">
                     <span class="truncate font-medium">{{ d.name }}</span>
-                    <app-item-status-badge [status]="d.status" />
+                    <app-item-status-badge [status]="d.status" [note]="d.statusNote" />
                   </span>
                   <span class="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground tabular-nums">
                     <span class="hidden sm:inline">{{ formatPath(d) }}</span>

@@ -393,7 +393,7 @@ public class ConversionsEndpointTests : IntegrationTestBase
         await SendJsonPatchAsync(client, $"/api/v1/inventory/durables/{item.Id}", new object[]
         {
             new { op = "replace", path = "/status", value = (object)"Lent" },
-            new { op = "replace", path = "/lentTo", value = (object)"A neighbour" },
+            new { op = "replace", path = "/statusNote", value = (object)"A neighbour" },
         });
 
         var resp = await CollapseAsync(client, consumable.Id, new { itemIds = new[] { item.Id }, areaId });
@@ -503,7 +503,7 @@ public class ConversionsEndpointTests : IntegrationTestBase
         await SendJsonPatchAsync(client, $"/api/v1/inventory/durables/{lent.Id}", new object[]
         {
             new { op = "replace", path = "/status", value = (object)"Lent" },
-            new { op = "replace", path = "/lentTo", value = (object)"A neighbour" },
+            new { op = "replace", path = "/statusNote", value = (object)"A neighbour" },
         });
 
         var before = await GetConsumableAsync(client, consumable.Id);

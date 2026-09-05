@@ -83,7 +83,7 @@ describe('LocationPickerComponent', () => {
       container('c', 'C', { status: 'Archived', parentItemId: 'b' }),
       container('d', 'D', { parentItemId: 'c' }),
       container('e', 'E'),
-      container('f', 'F', { status: 'Sold' }),
+      container('f', 'F', { status: 'Archived' }),
     ];
     await openAndLoad([], containers);
 

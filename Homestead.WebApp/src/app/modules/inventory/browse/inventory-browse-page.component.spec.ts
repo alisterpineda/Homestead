@@ -30,7 +30,7 @@ const OVERVIEW: GetInventoryOverviewResponse = {
   // Lent is folded into the needs-attention panel, so a household-wide lent item opens it at root
   // even with nothing low.
   lentCount: 1,
-  lentDurables: [{ id: 'ladder', name: 'Ladder', lentTo: 'Dave next door' }],
+  lentDurables: [{ id: 'ladder', name: 'Ladder', statusNote: 'Dave next door' }],
   unplacedCount: 2,
   areas: [
     { id: 'garage', name: 'Garage', itemCount: 12, lowStockCount: 3 },

@@ -42,7 +42,7 @@ function makeConsumable(over: Partial<ConsumableResponse>): ConsumableResponse {
 }
 
 const WRENCH = makeItem({ id: 'wrench', name: 'Wrench' });
-const LADDER = makeItem({ id: 'ladder', name: 'Ladder', status: 'Lent' as ItemStatus, lentTo: 'Dave' });
+const LADDER = makeItem({ id: 'ladder', name: 'Ladder', status: 'Lent' as ItemStatus, statusNote: 'Dave' });
 const ARCHIVED = makeItem({ id: 'archived', name: 'Old rag', status: 'Archived' as ItemStatus });
 const SCREWS = makeConsumable({ id: 'screws', name: 'Wood screws', totalOnHand: 10, isLow: true });
 const TAPE = makeConsumable({ id: 'tape', name: 'Tape', totalOnHand: 5 });
@@ -220,17 +220,48 @@ describe('InventoryItemsViewComponent', () => {
     expect(durableApi.patchDurable).not.toHaveBeenCalled();
     expect(changed).toBe(0);
 
+    // A blank note still sends the op, clearing any note the row carried.
     let closed = false;
     component.confirmArchive({ close: () => { closed = true; } });
-    expect(durableApi.patchDurable).toHaveBeenCalledWith({ id: 'wrench', body: [{ op: 'replace', path: '/status', value: 'Archived' }] });
+    expect(durableApi.patchDurable).toHaveBeenCalledWith({
+      id: 'wrench',
+      body: [
+        { op: 'replace', path: '/status', value: 'Archived' },
+        { op: 'replace', path: '/statusNote', value: null },
+      ],
+    });
     expect(closed).toBe(true);
     expect(component.pendingArchive()).toBeNull();
     expect(changed).toBe(1);
 
     component.onArchiveRestore(consumableToRow(TAPE));
     component.confirmArchive({ close: () => {} });
-    expect(consumableApi.patchConsumable).toHaveBeenCalledWith({ id: 'tape', body: [{ op: 'replace', path: '/status', value: 'Archived' }] });
+    expect(consumableApi.patchConsumable).toHaveBeenCalledWith({
+      id: 'tape',
+      body: [
+        { op: 'replace', path: '/status', value: 'Archived' },
+        { op: 'replace', path: '/statusNote', value: null },
+      ],
+    });
     expect(changed).toBe(2);
+  });
+
+  it('sends the typed archive note, trimmed, and resets it on the next open', () => {
+    component.onArchiveRestore(durableToRow(WRENCH));
+    component.archiveNote.set('  Sold to Sam  ');
+    component.confirmArchive({ close: () => {} });
+
+    expect(durableApi.patchDurable).toHaveBeenCalledWith({
+      id: 'wrench',
+      body: [
+        { op: 'replace', path: '/status', value: 'Archived' },
+        { op: 'replace', path: '/statusNote', value: 'Sold to Sam' },
+      ],
+    });
+
+    // Reopening starts from an empty note rather than the previous entry's.
+    component.onArchiveRestore(durableToRow(WRENCH));
+    expect(component.archiveNote()).toBe('');
   });
 
   it('shows the rejection reason inline and keeps the dialog open when an archive is blocked', () => {

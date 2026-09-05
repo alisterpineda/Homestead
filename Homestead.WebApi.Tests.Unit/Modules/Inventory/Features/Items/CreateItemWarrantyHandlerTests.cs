@@ -125,7 +125,6 @@ public class CreateItemWarrantyHandlerTests : IDisposable
 
     [Theory]
     [InlineData(ItemStatus.Lent)]
-    [InlineData(ItemStatus.Sold)]
     [InlineData(ItemStatus.Archived)]
     public async Task Handle_WorksOnAnyDurableStatus(ItemStatus status)
     {

@@ -76,7 +76,11 @@ public record DurableResponse
     /// <summary>Free-text source — a store or a person.</summary>
     public string? AcquiredFrom { get; init; }
 
-    public string? LentTo { get; init; }
+    /// <summary>
+    /// Qualifier for a non-Active status — the borrower when Lent, the reason when Archived; null
+    /// when Active.
+    /// </summary>
+    public string? StatusNote { get; init; }
 
     public string? Unit { get; init; }
     public decimal? RestockThreshold { get; init; }

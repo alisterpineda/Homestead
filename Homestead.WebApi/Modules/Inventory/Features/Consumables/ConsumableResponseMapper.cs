@@ -15,6 +15,7 @@ internal static class ConsumableResponseMapper
         Id = i.Id,
         Name = i.Name,
         Status = i.Status,
+        StatusNote = i.StatusNote,
         Notes = i.Notes,
         Unit = i.Unit,
         RestockThreshold = i.RestockThreshold,

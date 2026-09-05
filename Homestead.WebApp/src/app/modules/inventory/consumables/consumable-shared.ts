@@ -1,8 +1,4 @@
-import type { ItemStatus } from '@/api/generated/models/item-status';
 import type { StockMovementResponse } from '@/api/generated/models/stock-movement-response';
-
-/** Consumables use the reduced fungible lifecycle — only these two statuses are valid. */
-export const CONSUMABLE_STATUSES: readonly ItemStatus[] = ['Active', 'Archived'];
 
 /** Formats a quantity for display, trimming insignificant trailing zeros (e.g. 2.50 → "2.5"). */
 export function formatQty(value: number): string {

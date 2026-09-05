@@ -57,7 +57,7 @@ pick an icon and route, so one source can render heterogeneous result kinds.
 Matches an item's **own text** — Name + Serial + Unit + Compartment + Notes (single table, no joins) —
 via case-insensitive **substring** match, plus a **fuzzy fallback on Name only** (pg_trgm
 `word_similarity`, threshold 0.3) so typos and plural mismatches still surface (`battry` → battery,
-`boxs` → box). Terminal items (Sold / Discarded / Archived) are excluded. A durable's subtitle is its
+`boxs` → box). Archived items are excluded. A durable's subtitle is its
 direct location (area, else containing item, else "Unplaced"); a consumable's subtitle is its on-hand
 total with unit; a status/low-stock badge shows when relevant.
 

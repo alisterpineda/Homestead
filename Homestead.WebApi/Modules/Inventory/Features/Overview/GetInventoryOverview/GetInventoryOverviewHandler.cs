@@ -63,7 +63,7 @@ public class GetInventoryOverviewHandler(
             .OrderBy(i => i.Name)
             .ThenBy(i => i.Id)
             .Take(PreviewCount)
-            .Select(i => new LentDurablePreview { Id = i.Id, Name = i.Name, LentTo = i.LentTo })
+            .Select(i => new LentDurablePreview { Id = i.Id, Name = i.Name, StatusNote = i.StatusNote })
             .ToListAsync(ct);
 
         // Warranty expiring — the item-level Expiring rule of WarrantyStatusRules, in SQL. The
@@ -148,7 +148,7 @@ public class GetInventoryOverviewHandler(
     private async Task<IReadOnlyList<RecentlyUpdatedItem>> BuildRecentlyUpdatedAsync(
         DateOnly today, CancellationToken ct)
     {
-        // Consumables are only ever Active among the live statuses; durables span Active/Lent/InRepair.
+        // Consumables are only ever Active among the live statuses; durables span Active/Lent.
         var recency = await db.Items.AsNoTracking()
             .Where(i => ItemStatusExtensions.LiveStatuses.Contains(i.Status))
             .Select(i => new

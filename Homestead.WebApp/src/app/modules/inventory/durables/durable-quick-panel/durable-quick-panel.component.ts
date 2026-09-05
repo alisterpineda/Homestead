@@ -19,7 +19,6 @@ import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmItemImports } from '@/shared/components/spartan/item';
-import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-menu';
 import { InventoryDurableApiService } from '@/api/services/inventory-durable-api.service';
 import {
   LocationPickerComponent,
@@ -27,7 +26,6 @@ import {
 } from '../../shared/location-picker/location-picker.component';
 import { ItemStatusBadgeComponent } from '../../shared/item-status-badge.component';
 import { TagBadgeComponent } from '@/shared/components/tag-badge/tag-badge.component';
-import { ALL_ITEM_STATUSES, itemStatusLabel } from '../../shared/item-status-meta';
 import { QuickPanelComponent } from '../../shared/quick-panel/quick-panel.component';
 import { durableLocationPath, type LocationPathView } from '../../shared/location-path';
 import { LocationPathComponent } from '../../shared/location-path.component';
@@ -40,7 +38,6 @@ import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
 import type { JsonPatchDocument } from '@/api/generated/models/json-patch-document';
 import type { DurableResponse } from '@/api/generated/models/durable-response';
-import type { ItemStatus } from '@/api/generated/models/item-status';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { toast } from '@spartan-ng/brain/sonner';
 
@@ -64,7 +61,6 @@ type InlineForm = 'move' | 'lent' | null;
     HlmLabel,
     HlmInput,
     HlmItemImports,
-    HlmDropdownMenuImports,
     LocationPickerComponent,
     LocationPathComponent,
     ItemStatusBadgeComponent,
@@ -79,7 +75,7 @@ type InlineForm = 'move' | 'lent' | null;
         <ng-icon hlm panelTitleStart name="lucideCpu" size="sm" class="shrink-0 text-muted-foreground" aria-label="Assembly" />
       }
       @if (view()?.status; as status) {
-        <app-item-status-badge panelTitleEnd [status]="status" />
+        <app-item-status-badge panelTitleEnd [status]="status" [note]="view()?.statusNote" />
       }
 
         @if (view(); as it) {
@@ -134,20 +130,35 @@ type InlineForm = 'move' | 'lent' | null;
               }
             </div>
 
-            <!-- Status — mirrors the Location card: live value on the left, its control on the right,
-                 with the inline "Lent to" form expanding in place (like Move under Location). -->
+            <!-- Status — mirrors the Location card: live value on the left, its one state-driven
+                 gesture on the right, with the inline "Lent to" form expanding in place (like Move
+                 under Location). -->
             <div hlmItem variant="outline">
               <div hlmItemContent class="min-w-0">
                 <span class="text-sm text-muted-foreground">Status</span>
                 <!-- This badge IS the field value (not a header adornment), so show Active too —
                      otherwise the most common state renders a blank value under the label. -->
-                <app-item-status-badge [status]="it.status" [showDefault]="true" />
+                <app-item-status-badge [status]="it.status" [note]="it.statusNote" [showDefault]="true" />
               </div>
               @if (inlineForm() !== 'lent') {
                 <div hlmItemActions>
-                  <button hlmBtn variant="ghost" size="sm" class="max-md:h-11" [hlmDropdownMenuTrigger]="statusMenu">
-                    Change
-                  </button>
+                  <!-- One gesture per state: lend an Active item, take a Lent one back, restore an
+                       Archived one. Archiving lives in the row / detail menus, behind a confirm. -->
+                  @switch (it.status) {
+                    @case ('Active') {
+                      <button hlmBtn variant="ghost" size="sm" class="max-md:h-11" (click)="openLend()">Lend…</button>
+                    }
+                    @case ('Lent') {
+                      <button hlmBtn variant="ghost" size="sm" class="max-md:h-11" [disabled]="saving()" (click)="markReturned()">
+                        Mark returned
+                      </button>
+                    }
+                    @case ('Archived') {
+                      <button hlmBtn variant="ghost" size="sm" class="max-md:h-11" [disabled]="saving()" (click)="restore()">
+                        Restore
+                      </button>
+                    }
+                  }
                 </div>
               }
 
@@ -161,38 +172,22 @@ type InlineForm = 'move' | 'lent' | null;
                       class="w-full"
                       maxlength="256"
                       placeholder="e.g. Dave next door"
-                      [value]="lentToDraft()"
-                      (input)="lentToDraft.set(asValue($event))"
+                      [value]="statusNoteDraft()"
+                      (input)="statusNoteDraft.set(asValue($event))"
                     />
                   </div>
                   <div class="flex justify-end gap-2">
                     <button hlmBtn variant="ghost" size="sm" (click)="closeForm()">Cancel</button>
-                    <button hlmBtn size="sm" (click)="confirmLent()" [disabled]="!lentToDraft().trim() || saving()">
+                    <button hlmBtn size="sm" (click)="confirmLent()" [disabled]="!statusNoteDraft().trim() || saving()">
                       {{ saving() ? 'Saving...' : 'Mark as lent' }}
                     </button>
                   </div>
                 </div>
               }
             </div>
-            <ng-template #statusMenu>
-              <hlm-dropdown-menu class="w-44">
-                <hlm-dropdown-menu-group>
-                  @for (s of statuses; track s) {
-                    <button
-                      hlmDropdownMenuRadio
-                      [checked]="it.status === s"
-                      (triggered)="onStatusPick(s)"
-                    >
-                      <hlm-dropdown-menu-radio-indicator />
-                      {{ statusLabel(s) }}
-                    </button>
-                  }
-                </hlm-dropdown-menu-group>
-              </hlm-dropdown-menu>
-            </ng-template>
-
-            <!-- Details — hidden when serial/value/acquired/lent/description are all empty (status now lives
-                 in the header and Updated in the footer, so nothing keeps this card permanently filled). -->
+            <!-- Details — hidden when serial/value/acquired/description are all empty (status and its
+                 note live beside the badge and Updated in the footer, so nothing keeps this card
+                 permanently filled). -->
             @if (hasDetails()) {
               <div hlmItem variant="outline">
                 <div hlmItemContent class="min-w-0">
@@ -222,10 +217,6 @@ type InlineForm = 'move' | 'lent' | null;
                     @if (acquisitionLine(); as acquired) {
                       <dt class="text-muted-foreground">Acquired</dt>
                       <dd class="break-words tabular-nums">{{ acquired }}</dd>
-                    }
-                    @if (it.status === 'Lent' && it.lentTo) {
-                      <dt class="text-muted-foreground">Lent to</dt>
-                      <dd class="truncate">{{ it.lentTo }}</dd>
                     }
                     @if (it.notes) {
                       <!-- Multi-line free text: wrap, don't truncate like the single-line rows above. -->
@@ -282,9 +273,6 @@ export class DurableQuickPanelComponent {
   private errorHandler = inject(ErrorHandlerService);
   private destroyRef = inject(DestroyRef);
 
-
-  protected readonly statuses = ALL_ITEM_STATUSES;
-  protected readonly statusLabel = itemStatusLabel;
 
   private seedKey = computed(() => `${this.durable()?.id ?? ''}|${this.state() === 'open'}`);
 
@@ -372,7 +360,7 @@ export class DurableQuickPanelComponent {
     if (it?.areaId) return { kind: 'area', id: it.areaId };
     return { kind: 'unplaced' };
   });
-  lentToDraft = seededLinkedSignal(this.formSeedKey, () => this.view()?.lentTo ?? '');
+  statusNoteDraft = seededLinkedSignal(this.formSeedKey, () => this.view()?.statusNote ?? '');
   // Panel-scoped (NOT formSeedKey): switching forms must not reset the in-flight guard, or a
   // second concurrent PATCH could be issued from stale state.
   saving = seededLinkedSignal(this.seedKey, () => false);
@@ -434,23 +422,25 @@ export class DurableQuickPanelComponent {
     this.patch(ops, 'Durable moved.');
   }
 
-  onStatusPick(status: ItemStatus): void {
-    const it = this.view();
-    if (!it || status === it.status) return;
-    if (status === 'Lent') {
-      // Lent requires a non-empty /lentTo in the same patch — collect it inline first.
-      this.formOpenCount.update(n => n + 1);
-      this.inlineForm.set('lent');
-      return;
-    }
-    // Any other status auto-clears lentTo server-side; send /status only.
-    this.patch([replace('/status', status)], 'Status updated.');
+  /** Lent requires a non-blank note in the same patch — collect the borrower inline first. */
+  openLend(): void {
+    this.formOpenCount.update(n => n + 1);
+    this.inlineForm.set('lent');
   }
 
   confirmLent(): void {
-    const lentTo = this.lentToDraft().trim();
-    if (!lentTo) return;
-    this.patch([replace('/status', 'Lent'), replace('/lentTo', lentTo)], 'Status updated.');
+    const statusNote = this.statusNoteDraft().trim();
+    if (!statusNote) return;
+    this.patch([replace('/status', 'Lent'), replace('/statusNote', statusNote)], 'Marked lent.');
+  }
+
+  /** Both gestures go back to Active, which clears the status note server-side. */
+  markReturned(): void {
+    this.patch([replace('/status', 'Active')], 'Marked returned.');
+  }
+
+  restore(): void {
+    this.patch([replace('/status', 'Active')], 'Durable restored.');
   }
 
   onViewContents(): void {

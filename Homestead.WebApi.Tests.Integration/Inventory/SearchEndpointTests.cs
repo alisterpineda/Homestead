@@ -252,7 +252,7 @@ public class SearchEndpointTests : IntegrationTestBase
             new object[]
             {
                 new { op = "replace", path = "/status", value = (object)"Lent" },
-                new { op = "replace", path = "/lentTo", value = (object)"Dave next door" },
+                new { op = "replace", path = "/statusNote", value = (object)"Dave next door" },
             });
 
         var group = Inventory(await SearchAsync(client, "ladder"));

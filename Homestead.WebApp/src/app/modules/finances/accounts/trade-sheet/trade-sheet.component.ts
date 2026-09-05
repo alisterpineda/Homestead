@@ -17,7 +17,7 @@ import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
 import { toast } from '@spartan-ng/brain/sonner';
 import { todayIso } from '../../shared/date';
-import { trimToNull } from '../../shared/trim-to-null';
+import { trimToNull } from '@/shared/utils/trim-to-null';
 import { formatCurrency } from '../../shared/format-currency';
 import { MoneyInputDirective } from '../../shared/money-input.directive';
 import { composeOccurredAt, decomposeOccurredAt } from '@/shared/utils/occurred-at';

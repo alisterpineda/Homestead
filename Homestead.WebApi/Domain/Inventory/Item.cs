@@ -16,6 +16,14 @@ public class Item
     public required string Name { get; set; }
     public Fungibility Fungibility { get; set; }
     public ItemStatus Status { get; set; }
+
+    /// <summary>
+    /// Qualifier for a non-Active status — the borrower when <see cref="ItemStatus.Lent"/> (required),
+    /// the reason when <see cref="ItemStatus.Archived"/> (optional); null when
+    /// <see cref="ItemStatus.Active"/>. Both kinds.
+    /// </summary>
+    public string? StatusNote { get; set; }
+
     public string? Notes { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; }
@@ -87,11 +95,8 @@ public class Item
     public Guid? AcquisitionCostCurrencyId { get; set; }
     public Commodity? AcquisitionCostCurrency { get; set; }
 
-    /// <summary>Free-text source — a store or a person ("Home Depot", "Mom"); <see cref="LentTo"/> precedent, no vendor entity.</summary>
+    /// <summary>Free-text source — a store or a person ("Home Depot", "Mom"); <see cref="StatusNote"/> precedent, no vendor entity.</summary>
     public string? AcquiredFrom { get; set; }
-
-    /// <summary>Free-text "lent to whom"; set only when <see cref="Status"/> is <see cref="ItemStatus.Lent"/>.</summary>
-    public string? LentTo { get; set; }
 
     // Fungible
     /// <summary>Unit of measure for a consumable ("screws", "rolls", "gal").</summary>

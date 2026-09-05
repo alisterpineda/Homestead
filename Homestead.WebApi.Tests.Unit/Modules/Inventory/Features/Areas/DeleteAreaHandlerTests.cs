@@ -73,7 +73,7 @@ public class DeleteAreaHandlerTests : IDisposable
     [Fact]
     public async Task Handle_WithOnlyTerminalItem_Deletes()
     {
-        var area = await AddAreaWithItemAsync(ItemStatus.Sold);
+        var area = await AddAreaWithItemAsync(ItemStatus.Archived);
 
         var result = await _sut.Handle(new DeleteAreaCommand(area.Id), Ct);
 
@@ -89,9 +89,9 @@ public class DeleteAreaHandlerTests : IDisposable
         var bin = new Item
         {
             Id = Guid.NewGuid(),
-            Name = "Sold bin",
+            Name = "Archived bin",
             Fungibility = Fungibility.NonFungible,
-            Status = ItemStatus.Sold,
+            Status = ItemStatus.Archived,
             AreaId = area.Id,
             IsContainer = true,
         };

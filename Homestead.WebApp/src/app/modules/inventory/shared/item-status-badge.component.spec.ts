@@ -10,10 +10,13 @@ describe('ItemStatusBadgeComponent', () => {
     });
   });
 
-  function create(status: ItemStatus, showDefault = false): ComponentFixture<ItemStatusBadgeComponent> {
+  function create(
+    status: ItemStatus, showDefault = false, note: string | null = null,
+  ): ComponentFixture<ItemStatusBadgeComponent> {
     const fixture = TestBed.createComponent(ItemStatusBadgeComponent);
     fixture.componentRef.setInput('status', status);
     fixture.componentRef.setInput('showDefault', showDefault);
+    fixture.componentRef.setInput('note', note);
     fixture.detectChanges();
     return fixture;
   }
@@ -53,11 +56,44 @@ describe('ItemStatusBadgeComponent', () => {
   });
 
   it('renders the chip for a terminal non-default status', () => {
-    const fixture = create('Sold');
+    const fixture = create('Archived');
 
     const span = host(fixture).querySelector('span');
     expect(span).not.toBeNull();
-    expect(span!.textContent?.trim()).toBe('Sold');
+    expect(span!.textContent?.trim()).toBe('Archived');
     expect(host(fixture).classList.contains('hidden')).toBe(false);
+  });
+
+  it('renders a Lent note as "to <borrower>" beside the pill', () => {
+    const fixture = create('Lent', false, 'Dave');
+
+    const spans = host(fixture).querySelectorAll('span');
+    expect(spans.length).toBe(2);
+    expect(spans[0].textContent?.trim()).toBe('Lent');
+    expect(spans[1].textContent?.trim()).toBe('to Dave');
+  });
+
+  it('renders an Archived note verbatim beside the pill', () => {
+    const fixture = create('Archived', false, 'Sold to Sam');
+
+    const spans = host(fixture).querySelectorAll('span');
+    expect(spans.length).toBe(2);
+    expect(spans[1].textContent?.trim()).toBe('Sold to Sam');
+  });
+
+  it('renders no note for Active, even when one is somehow supplied', () => {
+    const fixture = create('Active', true, 'ignored');
+
+    const spans = host(fixture).querySelectorAll('span');
+    expect(spans.length).toBe(1);
+    expect(spans[0].textContent?.trim()).toBe('Active');
+  });
+
+  it('renders no note text when the note is blank', () => {
+    const fixture = create('Lent', false, '   ');
+
+    const spans = host(fixture).querySelectorAll('span');
+    expect(spans.length).toBe(1);
+    expect(spans[0].textContent?.trim()).toBe('Lent');
   });
 });

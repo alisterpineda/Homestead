@@ -85,10 +85,15 @@ interface InventoryTableMeta {
 @Component({
   selector: 'app-inventory-name-cell',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TagBadgeComponent],
+  imports: [TagBadgeComponent, ItemStatusBadgeComponent],
   template: `
     <div class="min-w-0">
-      <span class="block truncate text-sm font-medium">{{ row.name }}</span>
+      <div class="flex items-center gap-2 min-w-0">
+        <span class="truncate text-sm font-medium">{{ row.name }}</span>
+        <!-- There is no Status column: the pill (and its note) sits beside the name, and Active
+             renders nothing at all, so only Lent/Archived rows carry any status chrome. -->
+        <app-item-status-badge [status]="row.status" [note]="row.statusNote" />
+      </div>
       @if (row.durable?.serial) {
         <span class="block truncate text-xs text-muted-foreground">{{ row.durable?.serial }}</span>
       }
@@ -103,27 +108,6 @@ interface InventoryTableMeta {
   `,
 })
 export class InventoryNameCell {
-  private readonly ctx = injectFlexRenderContext<CellContext<InventoryRow, unknown>>();
-  protected get row(): InventoryRow { return this.ctx.row.original; }
-}
-
-@Component({
-  selector: 'app-inventory-status-cell',
-  changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ItemStatusBadgeComponent],
-  template: `
-    <div class="flex min-w-0 items-center gap-2">
-      <!-- Dense list: keep a status chip on every row, including Active (quiet secondary tone). -->
-      <app-item-status-badge [status]="row.status" [showDefault]="true" />
-      @if (row.durable?.lentTo) {
-        <!-- Explicit cap: in the auto-layout table the cell grows to fit nowrap content, so
-             truncate only engages against a fixed max-width. -->
-        <span class="max-w-48 truncate text-xs text-muted-foreground">{{ row.durable?.lentTo }}</span>
-      }
-    </div>
-  `,
-})
-export class InventoryStatusCell {
   private readonly ctx = injectFlexRenderContext<CellContext<InventoryRow, unknown>>();
   protected get row(): InventoryRow { return this.ctx.row.original; }
 }
@@ -282,12 +266,6 @@ export class InventoryTableComponent {
       id: 'name',
       header: () => flexRenderComponent(SortHeaderButton, { inputs: { header: 'Name' } }),
       cell: () => flexRenderComponent(InventoryNameCell),
-    },
-    {
-      id: 'status',
-      accessorFn: (row) => row.status,
-      header: () => flexRenderComponent(SortHeaderButton, { inputs: { header: 'Status' } }),
-      cell: () => flexRenderComponent(InventoryStatusCell),
     },
     {
       id: 'location',

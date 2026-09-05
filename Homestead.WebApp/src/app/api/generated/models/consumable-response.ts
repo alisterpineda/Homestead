@@ -14,6 +14,7 @@ export interface ConsumableResponse {
   notes?: (string | null);
   restockThreshold?: (number | null);
   status: ItemStatus;
+  statusNote?: (string | null);
   stockLocations?: Array<StockEntryResponse>;
   tags?: Array<ItemTagDto>;
   totalOnHand: number;

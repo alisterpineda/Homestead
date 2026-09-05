@@ -13,7 +13,7 @@ export interface WarrantyStatusMeta {
 /**
  * The four derived warranty states, as the UI draws them. Only the two that want the eye get a pill:
  * **Expiring** borrows the amber low-stock tone (the module's one "act soon" colour, so the two
- * cannot read as different urgencies), **Expired** is the quiet muted tone shared with Sold/Archived.
+ * cannot read as different urgencies), **Expired** is the quiet muted tone shared with Archived.
  * *Active* and *None* are resting states — a covered item and an uncovered one are both unremarkable,
  * and a pill on every row would drown the two that matter.
  *

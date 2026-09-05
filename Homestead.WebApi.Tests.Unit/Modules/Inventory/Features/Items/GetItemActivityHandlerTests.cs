@@ -166,7 +166,7 @@ public class GetItemActivityHandlerTests : IDisposable
             Assert.Null(i.UserDisplayName);
             Assert.Null(i.UserEmail);
         });
-        Assert.Equal("Someone updated status", result.Items[1].Summary);
+        Assert.Equal("Someone archived this item", result.Items[1].Summary);
         Assert.Equal("orphaned", result.Items[0].Body);
     }
 
@@ -327,6 +327,90 @@ public class GetItemActivityHandlerTests : IDisposable
 
         Assert.NotNull(result);
         Assert.Equal("Alice updated value, location", Assert.Single(result.Items).Summary);
+    }
+
+    [Theory]
+    // Lent with a borrower, and the blank-note fallback a historical row could carry.
+    [InlineData("Active", "Lent", "Dave next door", "Alice lent this item to Dave next door")]
+    [InlineData("Active", "Lent", null, "Alice marked this item lent")]
+    // Coming back from Lent is a return; coming back from Archived is a restore.
+    [InlineData("Lent", "Active", null, "Alice marked this item returned")]
+    [InlineData("Archived", "Active", null, "Alice restored this item")]
+    [InlineData("Active", "Archived", "Sold to Sam", "Alice archived this item (Sold to Sam)")]
+    [InlineData("Active", "Archived", null, "Alice archived this item")]
+    // Rows written before the enum collapsed still read sensibly.
+    [InlineData("Active", "Sold", null, "Alice changed status to Sold")]
+    public async Task Handle_RendersStatusTransitionAsASentence(
+        string oldStatus, string newStatus, string? note, string expected)
+    {
+        var item = await ItemNoteTestData.AddItemAsync(_db);
+        var alice = await ItemNoteTestData.AddUserAsync(_db, "Alice", "alice@test.com");
+        List<FieldChange> changes = [new ScalarFieldChange("Status", oldStatus, newStatus)];
+        if (note is not null)
+            changes.Add(new ScalarFieldChange("StatusNote", null, note));
+        await AddAuditAsync(item.Id, AuditAction.Updated, alice.Id, DateTimeOffset.UtcNow, changes);
+
+        var result = await _sut.Handle(new GetItemActivityQuery { Id = item.Id }, Ct);
+
+        Assert.NotNull(result);
+        Assert.Equal(expected, Assert.Single(result.Items).Summary);
+    }
+
+    [Fact]
+    public async Task Handle_ReadsTheHistoricalLentToFieldAsTheStatusNote()
+    {
+        var item = await ItemNoteTestData.AddItemAsync(_db);
+        var alice = await ItemNoteTestData.AddUserAsync(_db, "Alice", "alice@test.com");
+        // Rows written before the rename recorded the same free text under "LentTo".
+        await AddAuditAsync(item.Id, AuditAction.Updated, alice.Id, DateTimeOffset.UtcNow,
+            changes:
+            [
+                new ScalarFieldChange("Status", "Active", "Lent"),
+                new ScalarFieldChange("LentTo", null, "Dave"),
+            ]);
+
+        var result = await _sut.Handle(new GetItemActivityQuery { Id = item.Id }, Ct);
+
+        Assert.NotNull(result);
+        Assert.Equal("Alice lent this item to Dave", Assert.Single(result.Items).Summary);
+    }
+
+    [Fact]
+    public async Task Handle_AppendsOtherFieldsAfterTheStatusSentence()
+    {
+        var item = await ItemNoteTestData.AddItemAsync(_db);
+        var alice = await ItemNoteTestData.AddUserAsync(_db, "Alice", "alice@test.com");
+        // Status and its note are folded into the sentence; everything else lands in the tail.
+        await AddAuditAsync(item.Id, AuditAction.Updated, alice.Id, DateTimeOffset.UtcNow,
+            changes:
+            [
+                new ScalarFieldChange("Status", "Active", "Archived"),
+                new ScalarFieldChange("StatusNote", null, "Sold to Sam"),
+                new ScalarFieldChange("Name", "Drill", "Old drill"),
+                new ScalarFieldChange("Notes", null, "x"),
+            ]);
+
+        var result = await _sut.Handle(new GetItemActivityQuery { Id = item.Id }, Ct);
+
+        Assert.NotNull(result);
+        Assert.Equal(
+            "Alice archived this item (Sold to Sam) and updated name, description",
+            Assert.Single(result.Items).Summary);
+    }
+
+    [Fact]
+    public async Task Handle_NoteOnlyChange_ReadsAsAPlainFieldUpdate()
+    {
+        var item = await ItemNoteTestData.AddItemAsync(_db);
+        var alice = await ItemNoteTestData.AddUserAsync(_db, "Alice", "alice@test.com");
+        // No Status change in the row, so it falls through to the generic field-list path.
+        await AddAuditAsync(item.Id, AuditAction.Updated, alice.Id, DateTimeOffset.UtcNow,
+            changes: [new ScalarFieldChange("StatusNote", "Dave", "Dave next door")]);
+
+        var result = await _sut.Handle(new GetItemActivityQuery { Id = item.Id }, Ct);
+
+        Assert.NotNull(result);
+        Assert.Equal("Alice updated status note", Assert.Single(result.Items).Summary);
     }
 
     [Fact]

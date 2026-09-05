@@ -31,6 +31,7 @@ import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog';
 import { HlmCheckboxImports } from '@/shared/components/spartan/checkbox';
 import { HlmLabel } from '@/shared/components/spartan/label';
+import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmPopoverImports } from '@/shared/components/spartan/popover';
 import { HlmSeparatorImports } from '@/shared/components/spartan/separator';
 import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-menu';
@@ -46,6 +47,7 @@ import { injectIsNarrowViewport } from '@/shared/utils/viewport';
 import { UserPreferencesService } from '@/shared/services/user-preferences.service';
 import { sortRows, type InventoryRow, type InventorySortId, type InventorySortState } from './inventory-row';
 import { replace } from '@/shared/json-patch';
+import { trimToNull } from '@/shared/utils/trim-to-null';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import type { VisibilityState } from '@tanstack/angular-table';
 import type { DurableResponse } from '@/api/generated/models/durable-response';
@@ -100,6 +102,7 @@ export const kindFilterFromParam = (v: string | null): KindFilter => (isKindFilt
     HlmAlertDialogImports,
     HlmCheckboxImports,
     HlmLabel,
+    HlmInput,
     HlmPopoverImports,
     HlmSeparatorImports,
     HlmDropdownMenuImports,
@@ -365,6 +368,18 @@ export const kindFilterFromParam = (v: string | null): KindFilter => (isKindFilt
             }
           </p>
         </div>
+        <div class="grid gap-2">
+          <label hlmLabel for="archive-note">Note (optional)</label>
+          <input
+            hlmInput
+            id="archive-note"
+            class="w-full"
+            maxlength="256"
+            placeholder="e.g. Sold to Sam"
+            [value]="archiveNote()"
+            (input)="archiveNote.set($any($event.target).value)"
+          />
+        </div>
         @if (archiveError()) {
           <p class="text-sm text-destructive">{{ archiveError() }}</p>
         }
@@ -417,7 +432,6 @@ export class InventoryItemsViewComponent implements OnInit {
 
   private readonly allSortFields: readonly InventorySortFieldOption[] = [
     { id: 'name', label: 'Name', defaultDesc: false },
-    { id: 'status', label: 'Status', defaultDesc: false },
     { id: 'location', label: 'Location', defaultDesc: false },
     { id: 'onHand', label: 'On hand', defaultDesc: true },
     { id: 'updatedAt', label: 'Updated', defaultDesc: true },
@@ -482,6 +496,8 @@ export class InventoryItemsViewComponent implements OnInit {
   archiveState = signal<BrnDialogState>('closed');
   archiving = signal(false);
   archiveError = signal('');
+  /** Optional reason typed into the archive confirm dialog; reset each time it opens. */
+  archiveNote = signal('');
 
   // Seed the filter signals from the initial* inputs once. ngOnInit (not the constructor) because
   // signal inputs aren't bound until the first change detection; running here is synchronous and
@@ -647,6 +663,7 @@ export class InventoryItemsViewComponent implements OnInit {
       return;
     }
     this.pendingArchive.set(row);
+    this.archiveNote.set('');
     this.archiveError.set('');
     this.archiveState.set('open');
   }
@@ -662,9 +679,14 @@ export class InventoryItemsViewComponent implements OnInit {
     const noun = isConsumable ? 'Consumable' : 'Durable';
     this.archiving.set(true);
     this.archiveError.set('');
+    // Archiving may carry an optional reason; restoring clears the note server-side, so it sends
+    // only the status op.
+    const body = newStatus === 'Archived'
+      ? [replace('/status', newStatus), replace('/statusNote', trimToNull(this.archiveNote()))]
+      : [replace('/status', newStatus)];
     const request$: Observable<unknown> = isConsumable
-      ? this.consumableApi.patchConsumable({ id: row.id, body: [replace('/status', newStatus)] })
-      : this.durableApi.patchDurable({ id: row.id, body: [replace('/status', newStatus)] });
+      ? this.consumableApi.patchConsumable({ id: row.id, body })
+      : this.durableApi.patchDurable({ id: row.id, body });
     request$.subscribe({
       next: () => {
         this.archiving.set(false);

@@ -108,12 +108,15 @@ describe('InventoryCardGridComponent', () => {
     });
   });
 
-  it('renders the lent-to line only when the durable records a borrower', () => {
-    const lent = setup([durableToRow(makeItem({ status: 'Lent', lentTo: 'Dave' }))]);
-    expect(lent.textContent).toContain('Lent to Dave');
+  it('renders the status note beside the badge, not as a separate line', () => {
+    const lent = setup([durableToRow(makeItem({ status: 'Lent', statusNote: 'Dave' }))]);
+    const badge = lent.querySelector('app-item-status-badge')!;
+    expect(badge.textContent).toContain('Lent');
+    expect(badge.textContent).toContain('to Dave');
+    expect(lent.textContent).not.toContain('Lent to Dave');
 
     const plain = setup([durableToRow(makeItem({ status: 'Active' }))]);
-    expect(plain.textContent).not.toContain('Lent to');
+    expect(plain.textContent).not.toContain('Dave');
   });
 
   describe('footer', () => {
@@ -218,12 +221,12 @@ describe('InventoryCardGridComponent', () => {
 
   it('mutes terminal-status cards and leaves live ones alone', () => {
     const host = setup([
-      durableToRow(makeItem({ id: 'sold', name: 'Sold thing', status: 'Sold' })),
+      durableToRow(makeItem({ id: 'archived', name: 'Archived thing', status: 'Archived' })),
       durableToRow(makeItem({ id: 'live', name: 'Live thing', status: 'Active' })),
     ]);
-    const [sold, live] = cards(host);
-    expect(sold.classList).toContain('italic');
-    expect(sold.classList).toContain('text-muted-foreground');
+    const [archived, live] = cards(host);
+    expect(archived.classList).toContain('italic');
+    expect(archived.classList).toContain('text-muted-foreground');
     expect(live.classList).not.toContain('italic');
     expect(live.classList).toContain('cursor-pointer');
     // hlmCard applies its own padding/gap through the `classes()` helper; the card's own layout

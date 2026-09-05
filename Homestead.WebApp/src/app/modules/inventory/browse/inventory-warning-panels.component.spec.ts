@@ -27,7 +27,7 @@ const BUSY: GetInventoryOverviewResponse = {
   // Lent is now folded into needs-attention as an alert tile; unplaced is still a location bucket
   // (a place card), never an alert — the warning panels must ignore it.
   lentCount: 1,
-  lentDurables: [{ id: 'ladder', name: 'Ladder', lentTo: 'Dave next door' }],
+  lentDurables: [{ id: 'ladder', name: 'Ladder', statusNote: 'Dave next door' }],
   unplacedCount: 2,
   areas: [],
   recentlyUpdated: [],
@@ -169,7 +169,7 @@ describe('InventoryWarningPanelsComponent', () => {
   it('renders at the root with just the lent tile when only lent is nonzero', async () => {
     const fixture = await create({
       kind: 'root',
-      overview: { ...ALL_QUIET, lentCount: 3, lentDurables: [{ id: 'ladder', name: 'Ladder', lentTo: 'Dave next door' }] },
+      overview: { ...ALL_QUIET, lentCount: 3, lentDurables: [{ id: 'ladder', name: 'Ladder', statusNote: 'Dave next door' }] },
     });
 
     const content = text(fixture);

@@ -6,7 +6,6 @@ import type { ItemStatus } from '@/api/generated/models/item-status';
 import type { ItemTagDto } from '@/api/generated/models/item-tag-dto';
 import type { WarrantyStatus } from '@/api/generated/models/warranty-status';
 import { formatQty } from '../consumables/consumable-shared';
-import { itemStatusLabel } from '../shared/item-status-meta';
 import {
   durableLocationPath,
   locationPathText,
@@ -17,7 +16,7 @@ import {
 export type InventoryKind = 'durable' | 'consumable';
 
 /** The sortable columns of the unified inventory list — the single source of truth for the set. */
-export const INVENTORY_SORT_IDS = ['name', 'status', 'location', 'onHand', 'updatedAt'] as const;
+export const INVENTORY_SORT_IDS = ['name', 'location', 'onHand', 'updatedAt'] as const;
 /** A sortable column id, derived from {@link INVENTORY_SORT_IDS} so the two never drift. */
 export type InventorySortId = (typeof INVENTORY_SORT_IDS)[number];
 /** A column + direction pair. */
@@ -51,6 +50,12 @@ export interface InventoryRow {
   readonly id: string;
   readonly name: string;
   readonly status: ItemStatus;
+  /**
+   * The status qualifier rendered beside the pill — the borrower when Lent, the reason when Archived.
+   * Flattened onto the row (rather than read off `durable`) so the name cell and the cards render the
+   * pair identically for both kinds.
+   */
+  readonly statusNote: string | null;
   readonly updatedAt: string;
   /** Display/sort text for the Location column. Consumable: '—' (no stock) | label | 'N locations'. */
   readonly locationText: string;
@@ -92,6 +97,7 @@ export function durableToRow(durable: DurableResponse): InventoryRow {
     id: durable.id,
     name: durable.name,
     status: durable.status,
+    statusNote: durable.statusNote ?? null,
     updatedAt: durable.updatedAt,
     locationText: formatPath(durable),
     resolvedAreaIds: [durable.resolvedAreaId ?? null],
@@ -130,6 +136,7 @@ export function consumableToRow(consumable: ConsumableResponse): InventoryRow {
     id: consumable.id,
     name: consumable.name,
     status: consumable.status,
+    statusNote: consumable.statusNote ?? null,
     updatedAt: consumable.updatedAt,
     locationText: consumableLocationText(locations),
     resolvedAreaIds: locations.map(entryResolvedAreaId),
@@ -219,8 +226,6 @@ export function sortRows(rows: readonly InventoryRow[], sortState: InventorySort
     switch (id) {
       case 'name':
         return a.name.localeCompare(b.name) * dir;
-      case 'status':
-        return itemStatusLabel(a.status).localeCompare(itemStatusLabel(b.status)) * dir;
       case 'location':
         return a.locationText.localeCompare(b.locationText) * dir;
       case 'onHand':

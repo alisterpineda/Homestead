@@ -74,7 +74,7 @@ const BIN = makeItem({
 const SCREW = makeItem({ id: 'screw', name: 'Screw', parentItemId: 'bin', resolvedAreaId: GARAGE });
 const ARCHIVED = makeItem({ id: 'archived', name: 'Old rag', status: 'Archived' as ItemStatus, parentItemId: 'chest', resolvedAreaId: GARAGE });
 const FLOATING = makeItem({ id: 'floating', name: 'Floating thing' });
-const LADDER = makeItem({ id: 'ladder', name: 'Ladder', status: 'Lent' as ItemStatus, areaId: GARAGE, resolvedAreaId: GARAGE, lentTo: 'Dave' });
+const LADDER = makeItem({ id: 'ladder', name: 'Ladder', status: 'Lent' as ItemStatus, areaId: GARAGE, resolvedAreaId: GARAGE, statusNote: 'Dave' });
 
 // tape: stocked in the garage area ; screws: split chest(4) + garage(6), low ;
 // glue: zero stock ; loose: stocked in an unplaced container (no area root)

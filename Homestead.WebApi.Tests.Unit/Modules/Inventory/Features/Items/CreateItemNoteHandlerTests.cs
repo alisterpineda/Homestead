@@ -111,12 +111,12 @@ public class CreateItemNoteHandlerTests : IDisposable
 
     [Theory]
     [InlineData(Fungibility.Fungible, ItemStatus.Active)]
-    [InlineData(Fungibility.NonFungible, ItemStatus.Sold)]
+    [InlineData(Fungibility.NonFungible, ItemStatus.Lent)]
     [InlineData(Fungibility.NonFungible, ItemStatus.Archived)]
     public async Task Handle_WorksOnAnyKindAndStatus(Fungibility fungibility, ItemStatus status)
     {
-        // Notes complete an item's story, so a consumable, a sold durable, and an archived item all take
-        // them (activity.md §Which items can carry notes).
+        // Notes complete an item's story, so a consumable, a lent durable, and an archived item all
+        // take them (activity.md §Which items can carry notes).
         var item = await ItemNoteTestData.AddItemAsync(_db, fungibility, status);
 
         var response = await _sut.Handle(new CreateItemNoteCommand { ItemId = item.Id, Body = "x" }, Ct);

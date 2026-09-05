@@ -24,13 +24,11 @@ import { commodityResource } from '@/modules/finances/shared/commodity-resource'
 import { LocationPickerComponent, type ItemLocationValue } from '../../shared/location-picker/location-picker.component';
 import { BrandPickerComponent } from '../../shared/brand-picker/brand-picker.component';
 import { TagInputComponent } from '../../tags/tag-input/tag-input.component';
-import { ALL_ITEM_STATUSES, itemStatusLabel, isTerminalStatus } from '../../shared/item-status-meta';
 import { tomorrowDate } from '../../shared/date';
 import { replace } from '@/shared/json-patch';
 import type { JsonPatchDocument } from '@/api/generated/models/json-patch-document';
 import type { DurableResponse } from '@/api/generated/models/durable-response';
 import type { BrandPickerValue } from '../../shared/brand-picker/brand-picker.component';
-import type { ItemStatus } from '@/api/generated/models/item-status';
 import type { CommodityResponse } from '@/api/generated/models/commodity-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { toast } from '@spartan-ng/brain/sonner';
@@ -38,7 +36,7 @@ import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
 import { openGeneration } from '@/shared/utils/open-generation';
-import { trimToNull } from '@/modules/finances/shared/trim-to-null';
+import { trimToNull } from '@/shared/utils/trim-to-null';
 
 /** An amount + currency normalised both-or-neither: '' clears the pair; unparseable input → NaN. */
 function parseMoneyPair(raw: string, currencyId: string | null): { amount: number | null; currencyId: string | null } {
@@ -84,7 +82,7 @@ function moneyPairError(
       <hlm-sheet-content *hlmSheetPortal>
         <hlm-sheet-header>
           <h3 hlmSheetTitle>Edit durable</h3>
-          <p hlmSheetDescription>Update details, value, location, and status.</p>
+          <p hlmSheetDescription>Update details, value, location, and description.</p>
         </hlm-sheet-header>
 
         @if (durable(); as it) {
@@ -154,11 +152,6 @@ function moneyPairError(
                 [excludeItemId]="it.id"
                 ariaLabel="Location"
               />
-              @if (terminalLocationHint()) {
-                <p class="text-xs text-muted-foreground">
-                  Location changes are ignored when marking a durable Sold/Discarded/Archived.
-                </p>
-              }
             </div>
 
             @if (editParentItemId() !== null) {
@@ -194,35 +187,24 @@ function moneyPairError(
               </p>
             </div>
 
-            <div class="space-y-2">
-              <label hlmLabel>Status</label>
-              <hlm-select [ngModel]="editStatus()" (ngModelChange)="editStatus.set($event)" [itemToString]="statusToString">
-                <hlm-select-trigger class="w-full">
-                  <hlm-select-value />
-                </hlm-select-trigger>
-                <hlm-select-content *hlmSelectPortal>
-                  <hlm-select-group>
-                    @for (s of statuses; track s) {
-                      <hlm-select-item [value]="s">{{ statusToString(s) }}</hlm-select-item>
-                    }
-                  </hlm-select-group>
-                </hlm-select-content>
-              </hlm-select>
-            </div>
-
-            @if (editStatus() === 'Lent') {
-              <div class="space-y-2">
-                <label hlmLabel for="durable-lent-to">Lent to</label>
-                <input
-                  hlmInput
-                  id="durable-lent-to"
-                  class="w-full"
-                  maxlength="256"
-                  placeholder="e.g. Dave next door"
-                  [value]="editLentTo()"
-                  (input)="editLentTo.set(asValue($event))"
-                />
-              </div>
+            <!-- No status select: status changes are gestures (Lend / Mark returned, Archive /
+                 Restore) on the list row, quick panel and detail page. Only the note that qualifies
+                 a non-Active status is editable here. -->
+            @if (durable(); as d) {
+              @if (d.status !== 'Active') {
+                <div class="space-y-2">
+                  <label hlmLabel for="durable-status-note">{{ statusNoteLabel() }}</label>
+                  <input
+                    hlmInput
+                    id="durable-status-note"
+                    class="w-full"
+                    maxlength="256"
+                    [placeholder]="statusNotePlaceholder()"
+                    [value]="editStatusNote()"
+                    (input)="editStatusNote.set(asValue($event))"
+                  />
+                </div>
+              }
             }
 
             <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Acquisition</p>
@@ -365,7 +347,6 @@ export class EditDurableSheetComponent {
   saved = output<DurableResponse>();
   closed = output<void>();
 
-  protected readonly statuses = ALL_ITEM_STATUSES;
   // '' is the "Not recorded" sentinel — hlm-select items can't carry null.
   protected readonly acquisitionKinds = ['', 'Purchased', 'Gift', 'Inherited', 'Other'];
   protected readonly maxAcquiredDate = tomorrowDate();
@@ -416,9 +397,7 @@ export class EditDurableSheetComponent {
   editCompartment = seededLinkedSignal(this.seedKey, () => this.openDurable()?.compartment ?? '');
   editIsContainer = seededLinkedSignal<string, boolean>(
     this.seedKey, () => this.openDurable()?.isContainer ?? false);
-  editStatus = seededLinkedSignal<string, ItemStatus>(
-    this.seedKey, () => this.openDurable()?.status ?? 'Active');
-  editLentTo = seededLinkedSignal(this.seedKey, () => this.openDurable()?.lentTo ?? '');
+  editStatusNote = seededLinkedSignal(this.seedKey, () => this.openDurable()?.statusNote ?? '');
   editNotes = seededLinkedSignal(this.seedKey, () => this.openDurable()?.notes ?? '');
   pickedCurrency = seededLinkedSignal<string, CommodityResponse | null>(this.seedKey, () => null);
   pickedAcquisitionCurrency = seededLinkedSignal<string, CommodityResponse | null>(this.seedKey, () => null);
@@ -472,18 +451,10 @@ export class EditDurableSheetComponent {
     return null;
   });
 
-  // A non-blocking warning: the server keeps the location on a live→terminal transition, so any
-  // pending move/compartment edit in the same save is silently dropped.
-  protected terminalLocationHint = computed<boolean>(() => {
-    const it = this.durable();
-    if (!it || isTerminalStatus(it.status) || !isTerminalStatus(this.editStatus())) return false;
-    const areaMoved = this.editAreaId() !== (it.areaId ?? null);
-    const parentMoved = this.editParentItemId() !== (it.parentItemId ?? null);
-    const compartmentChanged =
-      this.editParentItemId() !== null &&
-      (this.editCompartment().trim() || null) !== (it.compartment ?? null);
-    return areaMoved || parentMoved || compartmentChanged;
-  });
+  /** The note means different things per status, so the field is labelled for the one in force. */
+  protected statusNoteLabel = computed(() => (this.durable()?.status === 'Lent' ? 'Lent to' : 'Note'));
+  protected statusNotePlaceholder = computed(() =>
+    this.durable()?.status === 'Lent' ? 'e.g. Dave next door' : 'e.g. Sold to Sam');
 
   /** Apply a picked location to the area/parent pair atomically (they are mutually exclusive). */
   protected onLocationChange(value: ItemLocationValue): void {
@@ -516,15 +487,14 @@ export class EditDurableSheetComponent {
     if (valueError) return valueError;
     const costError = moneyPairError(this.normalizedAcquisitionCost(), 'Purchase price', 'purchase price');
     if (costError) return costError;
-    if (this.editStatus() === 'Lent' && !this.editLentTo().trim()) return 'Lent to is required when the status is Lent.';
+    if (this.durable()?.status === 'Lent' && !this.editStatusNote().trim())
+      return 'Lent to is required while the durable is lent.';
     return null;
   });
 
   hasChanges = computed(() => this.buildOps().length > 0);
 
   canSave = computed(() => this.validationError() === null && this.hasChanges());
-
-  statusToString = (status: ItemStatus): string => itemStatusLabel(status);
 
   acquisitionKindToString = (kind: string): string => (kind === '' ? 'Not recorded' : kind);
 
@@ -595,14 +565,10 @@ export class EditDurableSheetComponent {
       ops.push(replace('/valueCurrencyId', currencyId));
     }
 
-    const status = this.editStatus();
-    if (status !== it.status) ops.push(replace('/status', status));
-
-    // LentTo only travels with a Lent status; the server clears it otherwise.
-    if (status === 'Lent') {
-      const lentTo = this.editLentTo().trim();
-      if (lentTo !== (it.lentTo ?? '')) ops.push(replace('/lentTo', lentTo));
-    }
+    // Never emits /status — the sheet edits the note that qualifies the current status, and the
+    // transitions themselves are gestures elsewhere.
+    const statusNote = trimToNull(this.editStatusNote());
+    if (statusNote !== (it.statusNote ?? null)) ops.push(replace('/statusNote', statusNote));
 
     // Area + parent are a mutually-exclusive pair; a cross-kind move naturally emits both ops, so
     // the server's at-most-one rule never trips.

@@ -111,7 +111,7 @@ public class DurablesEndpointTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task PatchItem_LentRoundTrip_SetsThenAutoClearsLentTo()
+    public async Task PatchItem_LentRoundTrip_SetsThenAutoClearsStatusNote()
     {
         var client = await CreateAdminClientAsync();
         var item = await CreateDurableAsync(client, new { name = "Ladder" });
@@ -121,25 +121,52 @@ public class DurablesEndpointTests : IntegrationTestBase
             new object[]
             {
                 new { op = "replace", path = "/status", value = (object)"Lent" },
-                new { op = "replace", path = "/lentTo", value = (object)"Dave next door" },
+                new { op = "replace", path = "/statusNote", value = (object)"Dave next door" },
             });
         Assert.Equal(HttpStatusCode.OK, lendResp.StatusCode);
         var lent = await lendResp.Content.ReadFromJsonAsync<DurableItem>(CT);
         Assert.Equal("Lent", lent!.Status);
-        Assert.Equal("Dave next door", lent.LentTo);
+        Assert.Equal("Dave next door", lent.StatusNote);
 
-        // Leaving Lent auto-clears the LentTo note.
+        // Returning to Active auto-clears the note.
         var returnResp = await SendJsonPatchAsync(client,
             $"/api/v1/inventory/durables/{item.Id}",
             new[] { new { op = "replace", path = "/status", value = (object)"Active" } });
         Assert.Equal(HttpStatusCode.OK, returnResp.StatusCode);
         var returned = await returnResp.Content.ReadFromJsonAsync<DurableItem>(CT);
         Assert.Equal("Active", returned!.Status);
-        Assert.Null(returned.LentTo);
+        Assert.Null(returned.StatusNote);
     }
 
     [Fact]
-    public async Task PatchItem_LentWithoutLentTo_Returns400()
+    public async Task PatchItem_ArchiveWithNote_KeepsTheNote()
+    {
+        var client = await CreateAdminClientAsync();
+        var item = await CreateDurableAsync(client, new { name = "Ladder" });
+        await SendJsonPatchAsync(client,
+            $"/api/v1/inventory/durables/{item.Id}",
+            new object[]
+            {
+                new { op = "replace", path = "/status", value = (object)"Lent" },
+                new { op = "replace", path = "/statusNote", value = (object)"Dave next door" },
+            });
+
+        // Archiving replaces the borrower note with the reason, and the note survives the transition.
+        var resp = await SendJsonPatchAsync(client,
+            $"/api/v1/inventory/durables/{item.Id}",
+            new object[]
+            {
+                new { op = "replace", path = "/status", value = (object)"Archived" },
+                new { op = "replace", path = "/statusNote", value = (object)"Sold to Sam" },
+            });
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var archived = (await resp.Content.ReadFromJsonAsync<DurableItem>(CT))!;
+        Assert.Equal("Archived", archived.Status);
+        Assert.Equal("Sold to Sam", archived.StatusNote);
+    }
+
+    [Fact]
+    public async Task PatchItem_LentWithoutStatusNote_Returns400()
     {
         var client = await CreateAdminClientAsync();
         var item = await CreateDurableAsync(client, new { name = "Ladder" });
@@ -559,7 +586,7 @@ public class DurablesEndpointTests : IntegrationTestBase
 
         var resp = await SendJsonPatchAsync(client,
             $"/api/v1/inventory/durables/{chest.Id}",
-            new[] { new { op = "replace", path = "/status", value = (object)"Sold" } });
+            new[] { new { op = "replace", path = "/status", value = (object)"Archived" } });
 
         Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
     }
@@ -576,13 +603,13 @@ public class DurablesEndpointTests : IntegrationTestBase
             $"/api/v1/inventory/durables/{wrench.Id}",
             new[] { new { op = "replace", path = "/status", value = (object)"Archived" } });
 
-        var sellResp = await SendJsonPatchAsync(client,
+        var archiveResp = await SendJsonPatchAsync(client,
             $"/api/v1/inventory/durables/{chest.Id}",
-            new[] { new { op = "replace", path = "/status", value = (object)"Sold" } });
-        Assert.Equal(HttpStatusCode.OK, sellResp.StatusCode);
-        var sold = (await sellResp.Content.ReadFromJsonAsync<DurableItem>(CT))!;
-        Assert.Equal("Sold", sold.Status);
-        Assert.True(sold.IsContainer); // stays a container, preserving the invariant for leftovers.
+            new[] { new { op = "replace", path = "/status", value = (object)"Archived" } });
+        Assert.Equal(HttpStatusCode.OK, archiveResp.StatusCode);
+        var archived = (await archiveResp.Content.ReadFromJsonAsync<DurableItem>(CT))!;
+        Assert.Equal("Archived", archived.Status);
+        Assert.True(archived.IsContainer); // stays a container, preserving the invariant for leftovers.
     }
 
     // ----- Containment: escape hatch -----
@@ -595,20 +622,20 @@ public class DurablesEndpointTests : IntegrationTestBase
         var chest = await CreateContainerAsync(client, "Tool chest", areaId: garageId);
         var drill = await CreateDurableAsync(client, new { name = "Drill", areaId = garageId });
 
-        // Sell-and-move in one patch: the move ops are ignored for the live→terminal transition.
+        // Archive-and-move in one patch: the move ops are ignored for the live→terminal transition.
         var resp = await SendJsonPatchAsync(client,
             $"/api/v1/inventory/durables/{drill.Id}",
             new object[]
             {
-                new { op = "replace", path = "/status", value = (object)"Sold" },
+                new { op = "replace", path = "/status", value = (object)"Archived" },
                 new { op = "replace", path = "/areaId", value = (object?)null },
                 new { op = "replace", path = "/parentItemId", value = (object)chest.Id },
             });
         Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
-        var sold = (await resp.Content.ReadFromJsonAsync<DurableItem>(CT))!;
-        Assert.Equal("Sold", sold.Status);
-        Assert.Equal(garageId, sold.AreaId);
-        Assert.Null(sold.ParentItemId);
+        var archived = (await resp.Content.ReadFromJsonAsync<DurableItem>(CT))!;
+        Assert.Equal("Archived", archived.Status);
+        Assert.Equal(garageId, archived.AreaId);
+        Assert.Null(archived.ParentItemId);
     }
 
     [Fact]

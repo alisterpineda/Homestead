@@ -12,7 +12,9 @@ internal record ConsumableItem(
     decimal TotalOnHand, bool IsLow, string? Notes, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt,
     IReadOnlyList<StockEntryItem>? StockLocations,
     // Trailing + defaulted: absent `tags` binds to null, so existing tag-agnostic tests are unaffected.
-    IReadOnlyList<ItemTagRef>? Tags = null);
+    IReadOnlyList<ItemTagRef>? Tags = null,
+    // Optional archive reason; trailing + defaulted for the same reason.
+    string? StatusNote = null);
 
 internal record StockEntryItem(
     Guid Id, decimal Quantity, Guid? AreaId, Guid? ContainerItemId,
@@ -283,6 +285,34 @@ public class ConsumablesEndpointTests : IntegrationTestBase
             new[] { new { op = "replace", path = "/status", value = (object)"Lent" } });
 
         Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task PatchConsumable_ArchiveWithNoteRoundTrip_KeepsThenClearsTheNote()
+    {
+        var client = await CreateAdminClientAsync();
+        var consumable = await CreateConsumableAsync(client);
+
+        var archiveResp = await SendJsonPatchAsync(client,
+            $"/api/v1/inventory/consumables/{consumable.Id}",
+            new object[]
+            {
+                new { op = "replace", path = "/status", value = (object)"Archived" },
+                new { op = "replace", path = "/statusNote", value = (object)"Used up" },
+            });
+        Assert.Equal(HttpStatusCode.OK, archiveResp.StatusCode);
+        var archived = (await archiveResp.Content.ReadFromJsonAsync<ConsumableItem>(CT))!;
+        Assert.Equal("Archived", archived.Status);
+        Assert.Equal("Used up", archived.StatusNote);
+
+        // Restoring to Active clears the note.
+        var restoreResp = await SendJsonPatchAsync(client,
+            $"/api/v1/inventory/consumables/{consumable.Id}",
+            new[] { new { op = "replace", path = "/status", value = (object)"Active" } });
+        Assert.Equal(HttpStatusCode.OK, restoreResp.StatusCode);
+        var restored = (await restoreResp.Content.ReadFromJsonAsync<ConsumableItem>(CT))!;
+        Assert.Equal("Active", restored.Status);
+        Assert.Null(restored.StatusNote);
     }
 
     [Fact]

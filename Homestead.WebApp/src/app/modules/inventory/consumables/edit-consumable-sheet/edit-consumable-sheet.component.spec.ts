@@ -69,4 +69,36 @@ describe('EditConsumableSheetComponent', () => {
     component.editBrand.set(null);
     expect(ops()).toEqual([{ op: 'replace', path: '/brandId', value: null }]);
   });
+
+  describe('status note behaviour', () => {
+    // The sheet renders into an overlay, so read the document body rather than the host element.
+    function sheetHtml(): string {
+      return (fixture.nativeElement as HTMLElement).ownerDocument.body
+        .querySelector('hlm-sheet-content')?.innerHTML ?? '';
+    }
+
+    it('offers no status select and no note field on an active consumable', () => {
+      open(makeConsumable());
+      expect(sheetHtml()).not.toContain('consumable-status-note');
+      expect(sheetHtml()).not.toContain('>Status<');
+    });
+
+    it('shows the note field only when the consumable is archived', () => {
+      open(makeConsumable({ id: 'c-2', status: 'Archived', statusNote: 'Used up' }));
+      expect(sheetHtml()).toContain('consumable-status-note');
+      expect(component.editStatusNote()).toBe('Used up');
+    });
+
+    it('emits only /statusNote — never /status — when the note changes', () => {
+      open(makeConsumable({ status: 'Archived', statusNote: 'Used up' }));
+      component.editStatusNote.set('  Gave it away  ');
+      expect(ops()).toEqual([{ op: 'replace', path: '/statusNote', value: 'Gave it away' }]);
+    });
+
+    it('clears the note by emitting /statusNote:null', () => {
+      open(makeConsumable({ status: 'Archived', statusNote: 'Used up' }));
+      component.editStatusNote.set('');
+      expect(ops()).toEqual([{ op: 'replace', path: '/statusNote', value: null }]);
+    });
+  });
 });

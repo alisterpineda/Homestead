@@ -34,7 +34,7 @@ public class GetAreasHandlerTests : IAsyncLifetime
         _db.Items.AddRange(
             Item(garage.Id, ItemStatus.Active),
             Item(garage.Id, ItemStatus.Lent),
-            Item(garage.Id, ItemStatus.Sold),
+            Item(garage.Id, ItemStatus.Archived),
             Item(null, ItemStatus.Active));
         await _db.SaveChangesAsync(Ct);
 

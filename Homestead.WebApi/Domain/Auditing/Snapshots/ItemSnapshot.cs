@@ -23,7 +23,7 @@ public record ItemSnapshot : IAuditSnapshot<ItemSnapshot, Item>
     public decimal? AcquisitionCost { get; init; }
     public Guid? AcquisitionCostCurrencyId { get; init; }
     public string? AcquiredFrom { get; init; }
-    public string? LentTo { get; init; }
+    public string? StatusNote { get; init; }
     public string? Unit { get; init; }
     public decimal? RestockThreshold { get; init; }
 
@@ -46,7 +46,7 @@ public record ItemSnapshot : IAuditSnapshot<ItemSnapshot, Item>
         AcquisitionCost = source.AcquisitionCost,
         AcquisitionCostCurrencyId = source.AcquisitionCostCurrencyId,
         AcquiredFrom = source.AcquiredFrom,
-        LentTo = source.LentTo,
+        StatusNote = source.StatusNote,
         Unit = source.Unit,
         RestockThreshold = source.RestockThreshold,
     };
@@ -89,8 +89,8 @@ public record ItemSnapshot : IAuditSnapshot<ItemSnapshot, Item>
             changes.Add(new ScalarFieldChange("AcquisitionCostCurrencyId", AcquisitionCostCurrencyId?.ToString(), other.AcquisitionCostCurrencyId?.ToString()));
         if (AcquiredFrom != other.AcquiredFrom)
             changes.Add(new ScalarFieldChange("AcquiredFrom", AcquiredFrom, other.AcquiredFrom));
-        if (LentTo != other.LentTo)
-            changes.Add(new ScalarFieldChange("LentTo", LentTo, other.LentTo));
+        if (StatusNote != other.StatusNote)
+            changes.Add(new ScalarFieldChange("StatusNote", StatusNote, other.StatusNote));
         if (Unit != other.Unit)
             changes.Add(new ScalarFieldChange("Unit", Unit, other.Unit));
         if (RestockThreshold != other.RestockThreshold)

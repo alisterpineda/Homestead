@@ -12,7 +12,7 @@ internal record OverviewResult(
 internal record LowStockPreviewItem(
     Guid Id, string Name, decimal TotalOnHand, string? Unit, decimal RestockThreshold);
 
-internal record LentPreviewItem(Guid Id, string Name, string? LentTo);
+internal record LentPreviewItem(Guid Id, string Name, string? StatusNote);
 
 internal record AreaSummaryItem(Guid Id, string Name, int ItemCount, int LowStockCount);
 
@@ -70,11 +70,11 @@ public class OverviewEndpointTests : IntegrationTestBase
     }
 
     private static async Task PatchStatusAsync(
-        HttpClient client, Guid itemId, string status, string? lentTo = null)
+        HttpClient client, Guid itemId, string status, string? statusNote = null)
     {
         var ops = new List<object> { new { op = "replace", path = "/status", value = (object)status } };
-        if (lentTo is not null)
-            ops.Add(new { op = "replace", path = "/lentTo", value = (object)lentTo });
+        if (statusNote is not null)
+            ops.Add(new { op = "replace", path = "/statusNote", value = (object)statusNote });
         var resp = await SendJsonPatchAsync(client, $"/api/v1/inventory/durables/{itemId}", ops.ToArray());
         Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
     }
@@ -144,21 +144,19 @@ public class OverviewEndpointTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task Overview_Lent_CountsLentWithLentToAndDropsOnReturn()
+    public async Task Overview_Lent_CountsLentWithStatusNoteAndDropsOnReturn()
     {
         var client = await CreateAdminClientAsync();
 
         var ladder = await CreateDurableAsync(client, new { name = "Ladder" });
-        await PatchStatusAsync(client, ladder.Id, "Lent", lentTo: "Dave next door");
+        await PatchStatusAsync(client, ladder.Id, "Lent", statusNote: "Dave next door");
 
         var drill = await CreateDurableAsync(client, new { name = "Drill" });
-        await PatchStatusAsync(client, drill.Id, "Lent", lentTo: "Sam");
+        await PatchStatusAsync(client, drill.Id, "Lent", statusNote: "Sam");
         await PatchStatusAsync(client, drill.Id, "Active"); // returned
 
-        var sold = await CreateDurableAsync(client, new { name = "Sold bike" });
-        await PatchStatusAsync(client, sold.Id, "Sold");
-        var discarded = await CreateDurableAsync(client, new { name = "Discarded chair" });
-        await PatchStatusAsync(client, discarded.Id, "Discarded");
+        var archivedBike = await CreateDurableAsync(client, new { name = "Archived bike" });
+        await PatchStatusAsync(client, archivedBike.Id, "Archived", statusNote: "Sold to Sam");
         var archived = await CreateDurableAsync(client, new { name = "Archived lamp" });
         await PatchStatusAsync(client, archived.Id, "Archived");
 
@@ -168,7 +166,7 @@ public class OverviewEndpointTests : IntegrationTestBase
         var preview = Assert.Single(overview.LentDurables);
         Assert.Equal(ladder.Id, preview.Id);
         Assert.Equal("Ladder", preview.Name);
-        Assert.Equal("Dave next door", preview.LentTo);
+        Assert.Equal("Dave next door", preview.StatusNote);
     }
 
     [Fact]
@@ -208,11 +206,11 @@ public class OverviewEndpointTests : IntegrationTestBase
         var bin = await CreateContainerAsync(client, "Garage bin", areaId: garageId);
         await CreateDurableAsync(client, new { name = "Nested pliers", parentItemId = bin.Id });
 
-        // Lent is live and counts; Sold is terminal and doesn't.
+        // Lent is live and counts; Archived is terminal and doesn't.
         var lent = await CreateDurableAsync(client, new { name = "Lent ladder", areaId = garageId });
-        await PatchStatusAsync(client, lent.Id, "Lent", lentTo: "Dave");
-        var sold = await CreateDurableAsync(client, new { name = "Sold bike", areaId = garageId });
-        await PatchStatusAsync(client, sold.Id, "Sold");
+        await PatchStatusAsync(client, lent.Id, "Lent", statusNote: "Dave");
+        var archivedBike = await CreateDurableAsync(client, new { name = "Archived bike", areaId = garageId });
+        await PatchStatusAsync(client, archivedBike.Id, "Archived");
 
         // An item in an unplaced container counts toward no area but is still unplaced.
         var floatingBin = await CreateContainerAsync(client, "Floating bin");
@@ -309,7 +307,7 @@ public class OverviewEndpointTests : IntegrationTestBase
         for (var i = 1; i <= 7; i++)
         {
             var item = await CreateDurableAsync(client, new { name = $"Lent thing {i}" });
-            await PatchStatusAsync(client, item.Id, "Lent", lentTo: $"Friend {i}");
+            await PatchStatusAsync(client, item.Id, "Lent", statusNote: $"Friend {i}");
         }
 
         var overview = await GetOverviewAsync(client);

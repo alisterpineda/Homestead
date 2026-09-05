@@ -21,7 +21,7 @@ import { toast } from '@spartan-ng/brain/sonner';
 import { todayIso, tomorrowDate } from '../../shared/date';
 import { currencyInputPrecision } from '../../shared/format-currency';
 import { MoneyInputDirective } from '../../shared/money-input.directive';
-import { trimToNull } from '../../shared/trim-to-null';
+import { trimToNull } from '@/shared/utils/trim-to-null';
 import { commodityResource } from '../../shared/commodity-resource';
 import { CommodityPickerComponent } from '../../shared/commodity-picker/commodity-picker.component';
 import type { AccountResponse } from '@/api/generated/models/account-response';

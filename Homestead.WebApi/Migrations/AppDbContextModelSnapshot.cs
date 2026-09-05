@@ -1311,10 +1311,6 @@ namespace Homestead.WebApi.Migrations
                     b.Property<bool?>("IsContainer")
                         .HasColumnType("boolean");
 
-                    b.Property<string>("LentTo")
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
-
                     b.Property<string>("Model")
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
@@ -1341,6 +1337,10 @@ namespace Homestead.WebApi.Migrations
                         .IsRequired()
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)");
+
+                    b.Property<string>("StatusNote")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
 
                     b.Property<string>("Unit")
                         .HasMaxLength(32)
@@ -1386,11 +1386,11 @@ namespace Homestead.WebApi.Migrations
 
                             t.HasCheckConstraint("CK_items_fungible_status", "\"Fungibility\" = 'NonFungible' OR \"Status\" IN ('Active', 'Archived')");
 
-                            t.HasCheckConstraint("CK_items_lent_to_requires_lent", "\"LentTo\" IS NULL OR \"Status\" = 'Lent'");
-
                             t.HasCheckConstraint("CK_items_location_not_both", "NOT (\"AreaId\" IS NOT NULL AND \"ParentItemId\" IS NOT NULL)");
 
-                            t.HasCheckConstraint("CK_items_nonfungible_fields", "\"Fungibility\" = 'NonFungible' OR (\"AreaId\" IS NULL AND \"ParentItemId\" IS NULL AND \"Compartment\" IS NULL AND \"Value\" IS NULL AND \"ValueCurrencyId\" IS NULL AND \"Serial\" IS NULL AND \"Model\" IS NULL AND \"AcquiredOn\" IS NULL AND \"LentTo\" IS NULL AND \"IsContainer\" IS NULL AND \"AcquisitionKind\" IS NULL AND \"AcquisitionCost\" IS NULL AND \"AcquisitionCostCurrencyId\" IS NULL AND \"AcquiredFrom\" IS NULL)");
+                            t.HasCheckConstraint("CK_items_nonfungible_fields", "\"Fungibility\" = 'NonFungible' OR (\"AreaId\" IS NULL AND \"ParentItemId\" IS NULL AND \"Compartment\" IS NULL AND \"Value\" IS NULL AND \"ValueCurrencyId\" IS NULL AND \"Serial\" IS NULL AND \"Model\" IS NULL AND \"AcquiredOn\" IS NULL AND \"IsContainer\" IS NULL AND \"AcquisitionKind\" IS NULL AND \"AcquisitionCost\" IS NULL AND \"AcquisitionCostCurrencyId\" IS NULL AND \"AcquiredFrom\" IS NULL)");
+
+                            t.HasCheckConstraint("CK_items_status_note_requires_status", "\"StatusNote\" IS NULL OR \"Status\" IN ('Lent', 'Archived')");
 
                             t.HasCheckConstraint("CK_items_value_currency_pair", "(\"Value\" IS NULL AND \"ValueCurrencyId\" IS NULL) OR (\"Value\" IS NOT NULL AND \"ValueCurrencyId\" IS NOT NULL)");
                         });

@@ -31,6 +31,8 @@ import {
 } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
+import { HlmInput } from '@/shared/components/spartan/input';
+import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { HlmTableImports } from '@/shared/components/spartan/table';
@@ -56,6 +58,7 @@ import { UnitPipe } from './unit.pipe';
 import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
 import { formatRelativeAge } from '@/shared/utils/relative-age';
 import { replace } from '@/shared/json-patch';
+import { trimToNull } from '@/shared/utils/trim-to-null';
 import { handleDetailLoadError } from '@/shared/utils/rxjs-error.utils';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { toast } from '@spartan-ng/brain/sonner';
@@ -73,6 +76,8 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
     NgIcon,
     HlmIconImports,
     HlmButton,
+    HlmInput,
+    HlmLabel,
     HlmSpinner,
     HlmEmptyImports,
     HlmTableImports,
@@ -118,7 +123,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
           <div class="space-y-1">
             <div class="flex items-center gap-3">
               <h1 class="text-2xl font-semibold">{{ s.name }}</h1>
-              <app-item-status-badge [status]="s.status" />
+              <app-item-status-badge [status]="s.status" [note]="s.statusNote" />
               @if (s.isLow) {
                 <span [class]="lowStockBadgeClass">
                   <ng-icon hlm name="lucideTriangleAlert" size="xs" />
@@ -394,6 +399,18 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
             The consumable and its stock history are kept, but it leaves the default list. You can restore it later.
           </p>
         </div>
+        <div class="grid gap-2">
+          <label hlmLabel for="archive-note">Note (optional)</label>
+          <input
+            hlmInput
+            id="archive-note"
+            class="w-full"
+            maxlength="256"
+            placeholder="e.g. Used up"
+            [value]="archiveNote()"
+            (input)="archiveNote.set($any($event.target).value)"
+          />
+        </div>
         @if (archiveError()) {
           <p class="text-sm text-destructive">{{ archiveError() }}</p>
         }
@@ -551,6 +568,8 @@ export class ConsumableDetailPageComponent {
   archiveState = signal<BrnDialogState>('closed');
   archiving = signal(false);
   archiveError = signal('');
+  /** Optional reason typed into the archive confirm dialog; reset each time it opens. */
+  archiveNote = signal('');
 
   private toOpLocation(entry: StockEntryResponse): StockOpLocation {
     return {
@@ -631,6 +650,7 @@ export class ConsumableDetailPageComponent {
       this.setStatus(consumable, 'Active');
       return;
     }
+    this.archiveNote.set('');
     this.archiveError.set('');
     this.archiveState.set('open');
   }
@@ -644,7 +664,11 @@ export class ConsumableDetailPageComponent {
   private setStatus(consumable: ConsumableResponse, newStatus: 'Active' | 'Archived', ctx?: { close: () => void }): void {
     this.archiving.set(true);
     this.archiveError.set('');
-    this.consumableApi.patchConsumable({ id: consumable.id, body: [replace('/status', newStatus)] }).pipe(
+    // Archiving may carry an optional reason; restoring clears the note server-side.
+    const body = newStatus === 'Archived'
+      ? [replace('/status', newStatus), replace('/statusNote', trimToNull(this.archiveNote()))]
+      : [replace('/status', newStatus)];
+    this.consumableApi.patchConsumable({ id: consumable.id, body }).pipe(
       takeUntilDestroyed(this.destroyRef),
     ).subscribe({
       next: () => {

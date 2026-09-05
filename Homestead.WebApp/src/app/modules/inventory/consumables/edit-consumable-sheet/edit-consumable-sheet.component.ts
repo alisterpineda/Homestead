@@ -13,17 +13,14 @@ import { HlmSheetImports } from '@/shared/components/spartan/sheet';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmInput } from '@/shared/components/spartan/input';
-import { HlmSelectImports } from '@/shared/components/spartan/select';
 import { InventoryConsumableApiService } from '@/api/services/inventory-consumable-api.service';
 import { BrandPickerComponent } from '../../shared/brand-picker/brand-picker.component';
 import { TagInputComponent } from '../../tags/tag-input/tag-input.component';
-import { itemStatusLabel } from '../../shared/item-status-meta';
-import { CONSUMABLE_STATUSES } from '../consumable-shared';
 import { replace } from '@/shared/json-patch';
+import { trimToNull } from '@/shared/utils/trim-to-null';
 import type { JsonPatchDocument } from '@/api/generated/models/json-patch-document';
 import type { ConsumableResponse } from '@/api/generated/models/consumable-response';
 import type { BrandPickerValue } from '../../shared/brand-picker/brand-picker.component';
-import type { ItemStatus } from '@/api/generated/models/item-status';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { toast } from '@spartan-ng/brain/sonner';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
@@ -34,13 +31,13 @@ import { openGeneration } from '@/shared/utils/open-generation';
 @Component({
   selector: 'app-edit-consumable-sheet',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, HlmSheetImports, HlmButton, HlmLabel, HlmInput, HlmSelectImports, BrandPickerComponent, TagInputComponent],
+  imports: [FormsModule, HlmSheetImports, HlmButton, HlmLabel, HlmInput, BrandPickerComponent, TagInputComponent],
   template: `
     <hlm-sheet side="right" [state]="state()" (stateChanged)="onStateChanged($event)">
       <hlm-sheet-content *hlmSheetPortal>
         <hlm-sheet-header>
           <h3 hlmSheetTitle>Edit consumable</h3>
-          <p hlmSheetDescription>Update name, unit, restock threshold, and status.</p>
+          <p hlmSheetDescription>Update name, unit, restock threshold, and description.</p>
         </hlm-sheet-header>
 
         @if (consumable(); as s) {
@@ -104,21 +101,22 @@ import { openGeneration } from '@/shared/utils/open-generation';
               />
             </div>
 
-            <div class="space-y-2">
-              <label hlmLabel>Status</label>
-              <hlm-select [ngModel]="editStatus()" (ngModelChange)="editStatus.set($event)" [itemToString]="statusToString">
-                <hlm-select-trigger class="w-full">
-                  <hlm-select-value />
-                </hlm-select-trigger>
-                <hlm-select-content *hlmSelectPortal>
-                  <hlm-select-group>
-                    @for (st of statuses; track st) {
-                      <hlm-select-item [value]="st">{{ statusToString(st) }}</hlm-select-item>
-                    }
-                  </hlm-select-group>
-                </hlm-select-content>
-              </hlm-select>
-            </div>
+            <!-- No status select: archiving and restoring are gestures on the list row and the
+                 detail page. Only the optional archive reason is editable here. -->
+            @if (consumable()?.status === 'Archived') {
+              <div class="space-y-2">
+                <label hlmLabel for="consumable-status-note">Note</label>
+                <input
+                  hlmInput
+                  id="consumable-status-note"
+                  class="w-full"
+                  maxlength="256"
+                  placeholder="e.g. Used up"
+                  [value]="editStatusNote()"
+                  (input)="editStatusNote.set(asValue($event))"
+                />
+              </div>
+            }
 
             <div class="space-y-2">
               <label hlmLabel for="consumable-notes">Description</label>
@@ -154,8 +152,6 @@ export class EditConsumableSheetComponent {
   saved = output<ConsumableResponse>();
   closed = output<void>();
 
-  protected readonly statuses = CONSUMABLE_STATUSES;
-
   private openGen = openGeneration(this.state);
   private seedKey = computed(() => `${this.consumable()?.id ?? ''}|${this.state() === 'open'}|${this.openGen()}`);
 
@@ -165,7 +161,7 @@ export class EditConsumableSheetComponent {
     const t = this.openConsumable()?.restockThreshold;
     return t != null ? String(t) : '';
   });
-  editStatus = seededLinkedSignal<string, ItemStatus>(this.seedKey, () => this.openConsumable()?.status ?? 'Active');
+  editStatusNote = seededLinkedSignal(this.seedKey, () => this.openConsumable()?.statusNote ?? '');
   editBrand = seededLinkedSignal<string, BrandPickerValue | null>(this.seedKey, () => {
     const c = this.openConsumable();
     return c?.brandId ? { id: c.brandId, name: c.brandName ?? '' } : null;
@@ -210,8 +206,6 @@ export class EditConsumableSheetComponent {
   hasChanges = computed(() => this.buildOps().length > 0);
   canSave = computed(() => this.validationError() === null && this.hasChanges());
 
-  statusToString = (status: ItemStatus): string => itemStatusLabel(status);
-
   asValue(event: Event): string {
     return (event.target as HTMLInputElement | HTMLTextAreaElement).value;
   }
@@ -234,8 +228,9 @@ export class EditConsumableSheetComponent {
       ops.push(replace('/restockThreshold', threshold));
     }
 
-    const status = this.editStatus();
-    if (status !== s.status) ops.push(replace('/status', status));
+    // Never emits /status — the sheet edits the note that qualifies the current status.
+    const statusNote = trimToNull(this.editStatusNote());
+    if (statusNote !== (s.statusNote ?? null)) ops.push(replace('/statusNote', statusNote));
 
     const brandId = this.editBrand()?.id ?? null;
     if (brandId !== (s.brandId ?? null)) ops.push(replace('/brandId', brandId));

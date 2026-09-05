@@ -2,25 +2,20 @@ namespace Homestead.WebApi.Domain.Inventory;
 
 /// <summary>
 /// The real-world state of the physical thing an <see cref="Item"/> represents — domain lifecycle,
-/// not soft-delete. Fungible consumables use only <see cref="Active"/> / <see cref="Archived"/>.
+/// not soft-delete. Fungible consumables use only <see cref="Active"/> / <see cref="Archived"/>,
+/// so the kinds differ only by <see cref="Lent"/>.
 /// </summary>
 public enum ItemStatus
 {
-    /// <summary>Owned and in use or storage. The default.</summary>
+    /// <summary>Owned and in use or storage. The default. Carries no <c>StatusNote</c>.</summary>
     Active,
 
-    /// <summary>Lent out, with a free-text <c>LentTo</c> note.</summary>
+    /// <summary>Lent out; <c>StatusNote</c> carries to whom (required). Non-fungible only.</summary>
     Lent,
 
-    /// <summary>Temporarily out for service.</summary>
-    InRepair,
-
-    /// <summary>Sold off. Terminal.</summary>
-    Sold,
-
-    /// <summary>Thrown out. Terminal.</summary>
-    Discarded,
-
-    /// <summary>Kept in records but not part of the active picture. Terminal.</summary>
+    /// <summary>
+    /// The single terminal state — kept in records but out of the active picture (sold, thrown out,
+    /// or simply retired). <c>StatusNote</c> optionally carries why ("Sold to Sam").
+    /// </summary>
     Archived,
 }

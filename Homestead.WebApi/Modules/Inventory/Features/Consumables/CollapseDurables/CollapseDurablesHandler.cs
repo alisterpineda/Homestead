@@ -37,8 +37,8 @@ public class CollapseDurablesHandler(
         if (items.Any(i => i.Fungibility != Fungibility.NonFungible))
             throw new BusinessRuleException("Only individually-tracked items can be collapsed.");
 
-        // Lent / InRepair items are physically elsewhere; collapsing them would inflate on-hand and
-        // silently drop their LentTo note.
+        // Lent items are physically elsewhere; collapsing them would inflate on-hand and silently
+        // drop their status note.
         if (items.Any(i => i.Status != ItemStatus.Active))
             throw new BusinessRuleException("Only Active items can be collapsed back into stock.");
 
@@ -85,7 +85,7 @@ public class CollapseDurablesHandler(
             // (area / parent / compartment) for the moving-leftovers escape hatch.
             audit.Track<ItemSnapshot, Item>(item, "Item", item.Id);
             item.Status = ItemStatus.Archived;
-            item.LentTo = null;
+            item.StatusNote = null;
             item.UpdatedAt = now;
             item.UpdatedByUserId = currentUser.UserId;
         }

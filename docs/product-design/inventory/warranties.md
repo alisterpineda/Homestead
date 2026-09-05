@@ -52,7 +52,7 @@ Consequently an **all-null row is valid and meaningful**: a lifetime manufacture
 
 **Durables only.** A warranty attaches to *a thing*, and a fungible consumable is a count of a type, not a thing — "the AA batteries are under warranty" has no referent. Attempting to add one to a consumable is a business-rule error, enforced in the handler rather than by a check constraint (the rule spans two tables, exactly like the parent-item rule in [locations.md](locations.md)).
 
-Warranties can be added to a durable in **any status**, terminal ones included: recording the coverage on something already sold or archived is normal record-keeping, and a lapsed warranty on a discarded appliance is history worth keeping.
+Warranties can be added to a durable in **any status**, archived ones included: recording the coverage on something already retired is normal record-keeping, and a lapsed warranty on an appliance you threw out is history worth keeping.
 
 **Components own their own warranties, and nothing rolls up.** The PSU inside a gaming PC carries its own coverage; the assembly's status reflects only the assembly's own rows. Rolling a component's warranty up into its parent would make the parent's status a claim about something the parent is not, and the component is a first-class item with its own detail page where its coverage already reads correctly.
 
@@ -105,7 +105,7 @@ The facet is **deep-linkable** as `?warranty=` with values `any` · `active` · 
 
 ## Overview tile
 
-Browse's needs-attention region gains a **"Warranty expiring"** tile at its **root scope only**, beside low stock, lent out, and unplaced: an exact count plus a most-urgent-first preview of up to five items with their expiry dates, and a "View all" landing on the Items list at `?warranty=expiring`. It counts **live durables only** (terminal statuses are out of the active picture by definition) whose status is `Expiring` — so an item with an open-ended row is never in it, matching the status rules exactly.
+Browse's needs-attention region gains a **"Warranty expiring"** tile at its **root scope only**, beside low stock, lent out, and unplaced: an exact count plus a most-urgent-first preview of up to five items with their expiry dates, and a "View all" landing on the Items list at `?warranty=expiring`. It counts **live durables only** — `Active` and `Lent`; an archived item is out of the active picture by definition — whose status is `Expiring` — so an item with an open-ended row is never in it, matching the status rules exactly.
 
 It is deliberately **not** added to the drilled place scope. The place-scoped panels answer "what needs attention *here*", and coverage lapsing is a property of a thing and its paperwork, not of the room it is stored in; adding a fourth panel to every drilled area would cost vertical space on the surface the module most wants to keep fast.
 

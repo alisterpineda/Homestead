@@ -237,7 +237,7 @@ public class InventoryPlacementServiceTests : IAsyncLifetime
     public async Task Compute_TerminalItems_ExcludedFromContainerStats()
     {
         var chest = await AddItemAsync("Chest", areaId: _garage.Id, isContainer: true);
-        await AddItemAsync("Sold drill", status: ItemStatus.Sold, parentItemId: chest.Id);
+        await AddItemAsync("Archived drill", status: ItemStatus.Archived, parentItemId: chest.Id);
         await AddItemAsync("Archived lamp", status: ItemStatus.Archived, parentItemId: chest.Id);
 
         var placement = await _sut.ComputeAsync(Ct);
@@ -367,10 +367,9 @@ public class InventoryPlacementServiceTests : IAsyncLifetime
     [Fact]
     public async Task Compute_Lent_OnlyLentStatusCounts()
     {
-        // Only Lent counts toward the lent tally — neither other live statuses nor terminal ones do.
+        // Only Lent counts toward the lent tally — neither Active nor Archived does.
         await AddItemAsync("Owned drill", areaId: _garage.Id);
-        await AddItemAsync("In-repair saw", status: ItemStatus.InRepair, areaId: _garage.Id);
-        await AddItemAsync("Sold lamp", status: ItemStatus.Sold, areaId: _garage.Id);
+        await AddItemAsync("Archived lamp", status: ItemStatus.Archived, areaId: _garage.Id);
 
         var placement = await _sut.ComputeAsync(Ct);
 

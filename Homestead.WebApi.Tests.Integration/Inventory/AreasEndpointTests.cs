@@ -14,7 +14,7 @@ internal record PlaceContentsLite(
     IReadOnlyList<LocationSegmentItem> Path, IReadOnlyList<ChildAreaItem> ChildAreas);
 internal record DurableItem(
     Guid Id, string Name, string Fungibility, string Status,
-    Guid? AreaId, string? AreaName, string? LentTo, string? Serial, bool? IsContainer,
+    Guid? AreaId, string? AreaName, string? StatusNote, string? Serial, bool? IsContainer,
     Guid? ParentItemId, bool? ParentIsContainer, string? Compartment, Guid? ResolvedAreaId,
     IReadOnlyList<LocationSegmentItem>? Path,
     // Whole classification-tag set on the item, each badge carrying its resolved effective colour.

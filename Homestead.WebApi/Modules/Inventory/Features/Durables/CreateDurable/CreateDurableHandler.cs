@@ -37,7 +37,7 @@ public class CreateDurableHandler(
                 throw new BusinessRuleException("ParentItemId must reference an existing item.");
             if (parent.Fungibility != Fungibility.NonFungible)
                 throw new BusinessRuleException("ParentItemId must reference a non-fungible item.");
-            // Things move OUT of a terminal (Sold/Discarded/Archived) parent but never INTO one — the
+            // Things move OUT of an archived parent but never INTO one — the
             // complement of the sealing gate. A new item must be parented into a live item.
             if (parent.Status.IsTerminal())
                 throw new BusinessRuleException("ParentItemId must reference a live item.");
