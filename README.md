@@ -379,6 +379,6 @@ export Ocr__Engines__tesseract__TessDataPath="$HOME/.local/share/tessdata"
    ```bash
    aspire run   # auto-detects the AppHost
    ```
-   Backend hot reload is on by default via the committed `aspire.config.json` (`features.defaultWatchEnabled=true`) — most C# edits are hot-reloaded into the running WebApi in place, and edits watch can't patch restart just the WebApi; either way, no manual stop/re-run. The Angular dev server already live-reloads on its own. `cd Homestead.AppHost && dotnet run` starts the stack without watch.
+   Backend hot reload is on by default via the committed `aspire.config.json` (`features.defaultWatchEnabled=true`) — most C# edits are hot-reloaded into the running WebApi in place, and edits watch can't patch restart just the WebApi; either way, no manual stop/re-run. The Angular dev server already live-reloads on its own. The AppHost runs in CLI-bundle mode (`AspireUseCliBundle=true`): DCP and the dashboard come from the installed Aspire CLI's bundle (`~/.aspire/bundle`) rather than NuGet packages, so the CLI must be installed — the devcontainer's Aspire feature already does that. In bundle mode a plain `dotnet run` delegates to `aspire run --no-build`, which the CLI rejects while `defaultWatchEnabled` is on, so to start the stack **without** watch use `cd Homestead.AppHost && ASPIRE_SUPPRESS_CLI_RUN_HOOK=1 dotnet run` (the same bypass the CLI sets on its own launches); that runs the AppHost in-process with the bundle's DCP and dashboard.
 
 See [CLAUDE.md](CLAUDE.md) for project structure and test commands.
