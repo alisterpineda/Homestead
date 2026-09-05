@@ -185,6 +185,17 @@ describe('locationCellView', () => {
   });
 });
 
+describe('warranty status mapping', () => {
+  it("carries a durable's derived status through, defaulting undefined to null", () => {
+    expect(durableToRow(makeItem({ warrantyStatus: 'Expiring' })).warrantyStatus).toBe('Expiring');
+    expect(durableToRow(makeItem({})).warrantyStatus).toBeNull();
+  });
+
+  it('leaves a consumable null — warranties are a durables-only concept, not "None"', () => {
+    expect(consumableToRow(makeConsumable({})).warrantyStatus).toBeNull();
+  });
+});
+
 describe('tag mapping', () => {
   const tag = {
     id: 'g1', name: 'Cordless', path: 'Tools/Cordless', color: null, effectiveColor: '#3b82f6',

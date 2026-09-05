@@ -6,6 +6,7 @@ import { Fungibility } from '../models/fungibility';
 import { ItemStatus } from '../models/item-status';
 import { ItemTagDto } from '../models/item-tag-dto';
 import { LocationSegmentResponse } from '../models/location-segment-response';
+import { WarrantyStatus } from '../models/warranty-status';
 export interface DurableResponse {
   acquiredFrom?: (string | null);
   acquiredOn?: (string | null);
@@ -40,4 +41,5 @@ export interface DurableResponse {
   value?: (number | null);
   valueCurrencyId?: (string | null);
   valueCurrencySymbol?: (string | null);
+  warrantyStatus?: WarrantyStatus;
 }

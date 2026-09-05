@@ -25,7 +25,10 @@ internal record DurableItem(
     // Acquisition cluster — trailing + defaulted for the same reason.
     string? AcquisitionKind = null, decimal? AcquisitionCost = null,
     Guid? AcquisitionCostCurrencyId = null, string? AcquisitionCostCurrencySymbol = null,
-    string? AcquiredFrom = null);
+    string? AcquiredFrom = null,
+    // Derived warranty cover ("None" | "Active" | "Expiring" | "Expired"); trailing + defaulted for
+    // the same reason — warranty-agnostic tests bind unchanged.
+    string WarrantyStatus = "None");
 // Enum serializes as a string server-side, so Kind is "Area" | "Container".
 internal record LocationSegmentItem(Guid Id, string Name, string Kind);
 // Read-only tag badge shared by the durable/consumable item projections.

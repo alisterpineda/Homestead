@@ -4,6 +4,7 @@ import type { PlaceConsumableResponse } from '@/api/generated/models/place-consu
 import type { StockEntryResponse } from '@/api/generated/models/stock-entry-response';
 import type { ItemStatus } from '@/api/generated/models/item-status';
 import type { ItemTagDto } from '@/api/generated/models/item-tag-dto';
+import type { WarrantyStatus } from '@/api/generated/models/warranty-status';
 import { formatQty } from '../consumables/consumable-shared';
 import { itemStatusLabel } from '../shared/item-status-meta';
 import {
@@ -66,6 +67,12 @@ export interface InventoryRow {
   readonly onHandHint?: string;
   /** Classification tags on this item (both kinds), each carrying its resolved effective colour. */
   readonly tags: readonly ItemTagDto[];
+  /**
+   * The item's derived warranty state, computed server-side. Null on a consumable — warranties are
+   * a durables-only concept, so a consumable row matches no warranty facet rather than reading
+   * "None" (which is a real answer about a durable that has no warranty recorded).
+   */
+  readonly warrantyStatus: WarrantyStatus | null;
   readonly durable?: DurableResponse;
   readonly consumable?: ConsumableResponse;
 }
@@ -92,6 +99,7 @@ export function durableToRow(durable: DurableResponse): InventoryRow {
     unit: null,
     isLow: false,
     tags: durable.tags ?? [],
+    warrantyStatus: durable.warrantyStatus ?? null,
     durable,
   };
 }
@@ -129,6 +137,7 @@ export function consumableToRow(consumable: ConsumableResponse): InventoryRow {
     unit: consumable.unit ?? null,
     isLow: consumable.isLow,
     tags: consumable.tags ?? [],
+    warrantyStatus: null,
     consumable,
   };
 }

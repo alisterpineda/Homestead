@@ -65,6 +65,8 @@ function makeContents(over: Partial<PlaceContentsResponse>): PlaceContentsRespon
 }
 
 const OVERVIEW: GetInventoryOverviewResponse = {
+  expiringWarrantyCount: 0,
+  expiringWarranties: [],
   lowStockCount: 0,
   lowStockConsumables: [],
   lentCount: 0,

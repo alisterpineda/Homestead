@@ -480,6 +480,17 @@ describe('InventoryListPageComponent', () => {
       expect(TestBed.inject(Router).routerState.snapshot.root.queryParams['lent']).toBeUndefined();
     });
 
+    it('?warranty=expiring seeds the items-view warranty facet and strips the param', async () => {
+      const f = await createWithParams({ warranty: 'expiring' });
+      expect(itemsView(f).warrantyFilter()).toBe('expiring');
+      expect(TestBed.inject(Router).routerState.snapshot.root.queryParams['warranty']).toBeUndefined();
+    });
+
+    it('an unknown ?warranty value falls back to the unfiltered facet', async () => {
+      const f = await createWithParams({ warranty: 'bogus' });
+      expect(itemsView(f).warrantyFilter()).toBe('any');
+    });
+
     it('?area and ?kind seed the page area scope and the items-view kind together', async () => {
       const f = await createWithParams({ area: 'unplaced', kind: 'durables' });
       expect(f.componentInstance.areaFilter()).toBe('unplaced');

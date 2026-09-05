@@ -19,6 +19,10 @@ using Homestead.WebApi.Modules.Inventory.Features.Items.GetItemActivity;
 using Homestead.WebApi.Modules.Inventory.Features.Items.Notes.CreateNote;
 using Homestead.WebApi.Modules.Inventory.Features.Items.Notes.DeleteNote;
 using Homestead.WebApi.Modules.Inventory.Features.Items.Notes.UpdateNote;
+using Homestead.WebApi.Modules.Inventory.Features.Items.Warranties.CreateWarranty;
+using Homestead.WebApi.Modules.Inventory.Features.Items.Warranties.DeleteWarranty;
+using Homestead.WebApi.Modules.Inventory.Features.Items.Warranties.GetWarranties;
+using Homestead.WebApi.Modules.Inventory.Features.Items.Warranties.UpdateWarranty;
 using Homestead.WebApi.Modules.Inventory.Features.Overview.GetInventoryOverview;
 using Homestead.WebApi.Modules.Inventory.Features.Places.GetPlaceContents;
 using Homestead.WebApi.Modules.Inventory.Features.Consumables.AdjustStock;
@@ -61,6 +65,10 @@ public static class InventoryModule
         CreateItemNoteEndpoint.Map(items);
         UpdateItemNoteEndpoint.Map(items);
         DeleteItemNoteEndpoint.Map(items);
+        GetItemWarrantiesEndpoint.Map(items);
+        CreateItemWarrantyEndpoint.Map(items);
+        UpdateItemWarrantyEndpoint.Map(items);
+        DeleteItemWarrantyEndpoint.Map(items);
 
         var places = v1.MapGroup("/places");
         GetPlaceContentsEndpoint.Map(places);

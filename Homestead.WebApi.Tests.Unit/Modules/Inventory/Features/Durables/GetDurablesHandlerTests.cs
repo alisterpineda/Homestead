@@ -1,4 +1,5 @@
 using Homestead.WebApi.Domain.Inventory;
+using Microsoft.EntityFrameworkCore;
 using Homestead.WebApi.Modules.Inventory.Features.Durables.GetDurables;
 using Homestead.WebApi.Modules.Inventory.Services;
 
@@ -288,6 +289,89 @@ public class GetDurablesHandlerTests : IAsyncLifetime
         Assert.Contains(resp.Items, i => i.Name == "Bin");
         Assert.Contains(resp.Items, i => i.Name == "Wrench");
         Assert.DoesNotContain(resp.Items, i => i.Name == "Screw driver");
+    }
+
+    // ----- Derived warranty status (the item-level rule lives in DurableResponseMapper's SQL) -----
+
+    private async Task AddWarrantyAsync(Guid itemId, DateOnly? expiresOn)
+    {
+        _db.ItemWarranties.Add(new ItemWarranty
+        {
+            Id = Guid.NewGuid(),
+            ItemId = itemId,
+            ExpiresOn = expiresOn,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow,
+        });
+        await _db.SaveChangesAsync(Ct);
+    }
+
+    [Fact]
+    public async Task Handle_NoWarranties_IsNone()
+    {
+        await AddItemAsync("Hammer");
+
+        var resp = await _sut.Handle(new GetDurablesQuery { Page = 1, PageSize = 50 }, Ct);
+
+        Assert.Equal(WarrantyStatus.None, Assert.Single(resp.Items).WarrantyStatus);
+    }
+
+    [Theory]
+    [InlineData(-1, WarrantyStatus.Expired)]
+    [InlineData(0, WarrantyStatus.Expiring)]
+    [InlineData(WarrantyStatusRules.ExpiringWindowDays, WarrantyStatus.Expiring)]
+    [InlineData(WarrantyStatusRules.ExpiringWindowDays + 1, WarrantyStatus.Active)]
+    public async Task Projection_DerivesStatusFromTheLatestExpiry(int offsetDays, WarrantyStatus expected)
+    {
+        // Pinned through For(today) rather than the handler's wall-clock Projection: the edge cases
+        // (0 and +30) would otherwise flip if the run straddled UTC midnight between seed and query.
+        var today = new DateOnly(2026, 3, 1);
+        var item = await AddItemAsync("Dryer");
+        // An older, already-lapsed tier must not drag the verdict down: the latest expiry decides.
+        await AddWarrantyAsync(item.Id, today.AddDays(-400));
+        await AddWarrantyAsync(item.Id, today.AddDays(offsetDays));
+
+        var projected = await _db.Items
+            .Where(i => i.Id == item.Id)
+            .Select(Homestead.WebApi.Modules.Inventory.Features.Durables.DurableResponseMapper.For(today))
+            .SingleAsync(Ct);
+
+        Assert.Equal(expected, projected.WarrantyStatus);
+    }
+
+    [Fact]
+    public async Task Handle_OpenEndedRow_WinsOverAnExpiredOne()
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var item = await AddItemAsync("Cast iron pan");
+        await AddWarrantyAsync(item.Id, today.AddDays(-400));
+        await AddWarrantyAsync(item.Id, null);
+
+        var resp = await _sut.Handle(new GetDurablesQuery { Page = 1, PageSize = 50 }, Ct);
+
+        Assert.Equal(WarrantyStatus.Active, Assert.Single(resp.Items).WarrantyStatus);
+    }
+
+    [Fact]
+    public async Task Projection_FungibleItem_IsNone()
+    {
+        // Warranties are durables-only, so a consumable can never have rows — the list excludes it,
+        // but GetItem projects every kind through this same expression, so pin the value here.
+        var consumable = new Item
+        {
+            Id = Guid.NewGuid(), Name = "Screws", Fungibility = Fungibility.Fungible,
+            Status = ItemStatus.Active,
+        };
+        _db.Items.Add(consumable);
+        await _db.SaveChangesAsync(Ct);
+
+        var projected = await _db.Items
+            .Where(i => i.Id == consumable.Id)
+            .Select(Homestead.WebApi.Modules.Inventory.Features.Durables.DurableResponseMapper
+                .For(DateOnly.FromDateTime(DateTime.UtcNow)))
+            .SingleAsync(Ct);
+
+        Assert.Equal(WarrantyStatus.None, projected.WarrantyStatus);
     }
 
     [Fact]

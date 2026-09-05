@@ -41,6 +41,7 @@ import { CreateEntryDialogComponent } from './create-entry-dialog/create-entry-d
 import { DurableQuickPanelComponent } from '../durables/durable-quick-panel/durable-quick-panel.component';
 import { ConsumableQuickPanelComponent } from '../consumables/consumable-quick-panel/consumable-quick-panel.component';
 import { InventoryItemsViewComponent, kindFilterFromParam, type KindFilter } from './inventory-items-view.component';
+import { warrantyFacetFromParam, type WarrantyFacet } from '../shared/warranties/warranty-status-meta';
 import { durableToRow, consumableToRow, sortStateFromParams, type InventoryRow, type InventorySortState } from './inventory-row';
 import { orderAreaTree, type AreaTreeNode } from '../shared/area-tree';
 import { handleQueryError } from '@/shared/utils/rxjs-error.utils';
@@ -160,6 +161,7 @@ interface ListData {
             [initialKind]="initialKind"
             [initialLowStockOnly]="initialLowStockOnly"
             [initialLentOnly]="initialLentOnly"
+            [initialWarranty]="initialWarranty"
             [initialSort]="initialSort"
             [extraFiltersActive]="extraFiltersActive()"
             [scopeLabel]="scopeLabel()"
@@ -313,12 +315,14 @@ export class InventoryListPageComponent {
   // construction seed can't catch — so it is owned instead by the reactive handler in the constructor
   // (seeded from the snapshot below, like `searchInput`). Keeping it out of both lists also avoids two
   // strip-navigations racing on a combined `?brand=&area=` deep link.
-  private deepLink = seedDeepLinkParams(this.route, this.router, ['lowStock', 'lent', 'kind', 'area', 'sort', 'dir']);
+  private deepLink = seedDeepLinkParams(this.route, this.router, ['lowStock', 'lent', 'warranty', 'kind', 'area', 'sort', 'dir']);
 
   // The non-place refinements live in the items-view; pass the deep-link values as its one-shot seeds.
   protected readonly initialKind: KindFilter = kindFilterFromParam(this.deepLink['kind']);
   protected readonly initialLowStockOnly = this.deepLink['lowStock'] === 'true';
   protected readonly initialLentOnly = this.deepLink['lent'] === 'true';
+  // The Browse "Warranty expiring" tile lands here as ?warranty=expiring; unknown values → 'any'.
+  protected readonly initialWarranty: WarrantyFacet = warrantyFacetFromParam(this.deepLink['warranty']);
   // The "View all →" recency bridge lands here sorted by Updated-descending; absent/invalid → name-asc.
   protected readonly initialSort: InventorySortState =
     sortStateFromParams(this.deepLink['sort'], this.deepLink['dir']);

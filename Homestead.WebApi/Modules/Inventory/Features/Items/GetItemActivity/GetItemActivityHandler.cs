@@ -38,6 +38,17 @@ public class GetItemActivityHandler(AppDbContext db)
         ["RestockThreshold"] = "restock threshold",
     };
 
+    /// <summary>
+    /// The ItemWarranty field → label map, kept separate from the item's because the two disagree on
+    /// "Notes": on the item that column is the Description field, on a warranty it really is a note.
+    /// </summary>
+    private static readonly Dictionary<string, string> WarrantyFieldDisplayNames = new()
+    {
+        ["Provider"] = "provider",
+        ["ExpiresOn"] = "expiry",
+        ["Notes"] = "notes",
+    };
+
     public async Task<PaginatedResponse<GetItemActivityResponse>?> Handle(
         GetItemActivityQuery request, CancellationToken ct)
     {
@@ -80,15 +91,19 @@ public class GetItemActivityHandler(AppDbContext db)
 
     private async Task<List<(SortKey Key, GetItemActivityResponse Row)>> LoadAuditRowsAsync(Guid itemId, CancellationToken ct)
     {
-        // Only the item's own rows. Deliberately no ParentEntityId branch: the InventoryNote audit rows
-        // (created/updated/deleted notes, parented to this item) are NOT projected into the feed — the
-        // notes themselves are the feed rows, and a deleted note simply disappears (activity.md §Auditing notes).
+        // The item's own rows plus exactly one ParentEntityId branch: ItemWarranty (the DocumentVersion
+        // shape). A warranty has no feed row of its own, so its lifecycle is the only trace of it —
+        // unlike InventoryNote rows (created/updated/deleted notes, also parented to this item), which
+        // stay deliberately unprojected because the notes themselves are the feed rows and a deleted
+        // note simply disappears (activity.md §Auditing notes, warranties.md §Audit).
         //
         // LEFT join Users (GroupJoin + SelectMany + DefaultIfEmpty), NOT an inner Join: an audit row
         // whose actor is null (a system action) or a since-deleted user must still surface. An inner
         // join silently drops those rows — the bug called out in the Documents audit doc §3.1.
         var rows = await db.AuditLogs.AsNoTracking()
-            .Where(a => a.EntityType == "Item" && a.EntityId == itemId)
+            .Where(a =>
+                (a.EntityType == "Item" && a.EntityId == itemId) ||
+                (a.EntityType == "ItemWarranty" && a.ParentEntityId == itemId))
             .GroupJoin(
                 db.Users.AsNoTracking(),
                 a => a.UserId,
@@ -99,6 +114,7 @@ public class GetItemActivityHandler(AppDbContext db)
                 (x, u) => new
                 {
                     x.Audit.Id,
+                    x.Audit.EntityType,
                     x.Audit.Action,
                     x.Audit.Changes,
                     x.Audit.Timestamp,
@@ -118,7 +134,7 @@ public class GetItemActivityHandler(AppDbContext db)
                     Timestamp = x.Timestamp,
                     UserDisplayName = x.DisplayName,
                     UserEmail = x.Email,
-                    Summary = GenerateSummary(x.Action, x.Changes, userName),
+                    Summary = GenerateSummary(x.EntityType, x.Action, x.Changes, userName),
                 };
                 return (new SortKey(x.Timestamp, x.Timestamp, x.Id), row);
             })
@@ -153,8 +169,12 @@ public class GetItemActivityHandler(AppDbContext db)
             .ToList();
     }
 
-    private static string GenerateSummary(AuditAction action, string? changes, string userName) =>
-        action switch
+    private static string GenerateSummary(string entityType, AuditAction action, string? changes, string userName)
+    {
+        if (entityType == "ItemWarranty")
+            return GenerateWarrantySummary(action, changes, userName);
+
+        return action switch
         {
             AuditAction.Created => $"{userName} added this item",
             AuditAction.Deleted => $"{userName} deleted this item",
@@ -163,6 +183,7 @@ public class GetItemActivityHandler(AppDbContext db)
             AuditAction.Restored => $"{userName} restored this item",
             _ => $"{userName} modified this item",
         };
+    }
 
     private static string GenerateUpdatedSummary(string? changesJson, string userName)
     {
@@ -178,15 +199,59 @@ public class GetItemActivityHandler(AppDbContext db)
         return $"{userName} updated {string.Join(", ", displayNames)}";
     }
 
-    private static List<string> ParseChangedFieldNames(string? changesJson)
+    /// <summary>
+    /// A warranty has no feed row of its own, so these three summaries are the whole trace of it. The
+    /// delete carries the one-line description the delete handler recorded ("Bosch · until 2028-03-12"),
+    /// which is the only place a removed warranty's details survive.
+    /// </summary>
+    private static string GenerateWarrantySummary(AuditAction action, string? changesJson, string userName) =>
+        action switch
+        {
+            AuditAction.Created => $"{userName} added a warranty",
+            AuditAction.Updated => GenerateWarrantyUpdatedSummary(changesJson, userName),
+            AuditAction.Deleted => $"{userName} removed a warranty{DescriptionSuffix(changesJson)}",
+            _ => $"{userName} modified a warranty",
+        };
+
+    private static string GenerateWarrantyUpdatedSummary(string? changesJson, string userName)
+    {
+        var fieldNames = ParseChangedFieldNames(changesJson);
+        if (fieldNames.Count == 0)
+            return $"{userName} updated a warranty";
+
+        var displayNames = fieldNames
+            .Select(f => WarrantyFieldDisplayNames.TryGetValue(f, out var display) ? display : f.ToLowerInvariant())
+            .Distinct()
+            .ToList();
+
+        return $"{userName} updated a warranty ({string.Join(", ", displayNames)})";
+    }
+
+    /// <summary>
+    /// The audit logger records a deletion's description as a "Description" field change; surface it in
+    /// parentheses when present, and say nothing when it isn't.
+    /// </summary>
+    private static string? DescriptionSuffix(string? changesJson)
+    {
+        var description = ParseChanges(changesJson)
+            .OfType<ScalarFieldChange>()
+            .FirstOrDefault(c => c.Field == "Description")
+            ?.OldValue;
+
+        return string.IsNullOrWhiteSpace(description) ? null : $" ({description})";
+    }
+
+    private static List<string> ParseChangedFieldNames(string? changesJson) =>
+        ParseChanges(changesJson).Select(c => c.Field).Where(f => !string.IsNullOrEmpty(f)).ToList();
+
+    private static List<FieldChange> ParseChanges(string? changesJson)
     {
         if (string.IsNullOrEmpty(changesJson))
             return [];
 
         try
         {
-            var changes = JsonSerializer.Deserialize<List<FieldChange>>(changesJson, FieldChange.JsonOptions);
-            return changes?.Select(c => c.Field).Where(f => !string.IsNullOrEmpty(f)).ToList() ?? [];
+            return JsonSerializer.Deserialize<List<FieldChange>>(changesJson, FieldChange.JsonOptions) ?? [];
         }
         catch
         {

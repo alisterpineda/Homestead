@@ -327,6 +327,14 @@ export type { UpdateItemNote$Params as UpdateItemNote$Params } from './fn/invent
 export { updateItemNote as updateItemNote } from './fn/inventory/update-item-note';
 export type { DeleteItemNote$Params as DeleteItemNote$Params } from './fn/inventory/delete-item-note';
 export { deleteItemNote as deleteItemNote } from './fn/inventory/delete-item-note';
+export type { GetItemWarranties$Params as GetItemWarranties$Params } from './fn/inventory/get-item-warranties';
+export { getItemWarranties as getItemWarranties } from './fn/inventory/get-item-warranties';
+export type { CreateItemWarranty$Params as CreateItemWarranty$Params } from './fn/inventory/create-item-warranty';
+export { createItemWarranty as createItemWarranty } from './fn/inventory/create-item-warranty';
+export type { UpdateItemWarranty$Params as UpdateItemWarranty$Params } from './fn/inventory/update-item-warranty';
+export { updateItemWarranty as updateItemWarranty } from './fn/inventory/update-item-warranty';
+export type { DeleteItemWarranty$Params as DeleteItemWarranty$Params } from './fn/inventory/delete-item-warranty';
+export { deleteItemWarranty as deleteItemWarranty } from './fn/inventory/delete-item-warranty';
 export type { GetPlaceContents$Params as GetPlaceContents$Params } from './fn/inventory/get-place-contents';
 export { getPlaceContents as getPlaceContents } from './fn/inventory/get-place-contents';
 export type { GetAreas$Params as GetAreas$Params } from './fn/inventory/get-areas';

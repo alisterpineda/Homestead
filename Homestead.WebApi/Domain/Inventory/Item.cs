@@ -111,4 +111,11 @@ public class Item
     /// column on the items table (identity lives on <see cref="Tag.Path"/>).
     /// </summary>
     public ICollection<ItemTag> ItemTags { get; set; } = [];
+
+    /// <summary>
+    /// Warranty rows on this durable (empty for a consumable). Unlike <see cref="ItemNote"/> — which
+    /// deliberately has no inverse — this one exists because <c>DurableResponse.WarrantyStatus</c> is
+    /// projected from it in SQL.
+    /// </summary>
+    public ICollection<ItemWarranty> Warranties { get; set; } = [];
 }

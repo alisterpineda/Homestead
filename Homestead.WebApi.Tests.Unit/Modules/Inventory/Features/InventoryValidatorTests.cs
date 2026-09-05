@@ -6,6 +6,8 @@ using Homestead.WebApi.Modules.Inventory.Features.Consumables.CreateConsumable;
 using Homestead.WebApi.Modules.Inventory.Features.Consumables.TrackDurable;
 using Homestead.WebApi.Modules.Inventory.Features.Items.Notes.CreateNote;
 using Homestead.WebApi.Modules.Inventory.Features.Items.Notes.UpdateNote;
+using Homestead.WebApi.Modules.Inventory.Features.Items.Warranties.CreateWarranty;
+using Homestead.WebApi.Modules.Inventory.Features.Items.Warranties.UpdateWarranty;
 
 namespace Homestead.WebApi.Tests.Unit.Modules.Inventory.Features;
 
@@ -553,5 +555,94 @@ public class UpdateItemNoteCommandValidatorTests
     public async Task OccurredAtThirtySecondsAhead_IsValid()
     {
         Assert.True((await _sut.ValidateAsync(Command(body: "x", at: DateTimeOffset.UtcNow.AddSeconds(30)), Ct)).IsValid);
+    }
+}
+
+public class CreateItemWarrantyCommandValidatorTests
+{
+    private readonly CreateItemWarrantyCommandValidator _sut = new();
+
+    private static CancellationToken Ct => TestContext.Current.CancellationToken;
+
+    [Fact]
+    public async Task EmptyCommand_IsValid()
+    {
+        // An all-null row is a lifetime manufacturer warranty — the validator must not require anything.
+        Assert.True((await _sut.ValidateAsync(new CreateItemWarrantyCommand(), Ct)).IsValid);
+    }
+
+    [Fact]
+    public async Task ProviderOver200_IsInvalid()
+    {
+        var result = await _sut.ValidateAsync(
+            new CreateItemWarrantyCommand { Provider = new string('a', 201) }, Ct);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == "Provider");
+    }
+
+    [Fact]
+    public async Task ProviderAt200_IsValid()
+    {
+        Assert.True((await _sut.ValidateAsync(
+            new CreateItemWarrantyCommand { Provider = new string('a', 200) }, Ct)).IsValid);
+    }
+
+    [Fact]
+    public async Task NotesOver500_IsInvalid()
+    {
+        var result = await _sut.ValidateAsync(
+            new CreateItemWarrantyCommand { Notes = new string('a', 501) }, Ct);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == "Notes");
+    }
+
+    [Fact]
+    public async Task NotesAt500_IsValid()
+    {
+        Assert.True((await _sut.ValidateAsync(
+            new CreateItemWarrantyCommand { Notes = new string('a', 500) }, Ct)).IsValid);
+    }
+
+    [Fact]
+    public async Task PastExpiry_IsValid()
+    {
+        // Back-filling a warranty that has already lapsed is legitimate — there is no date rule.
+        var result = await _sut.ValidateAsync(new CreateItemWarrantyCommand
+        {
+            ExpiresOn = DateOnly.FromDateTime(DateTime.UtcNow).AddYears(-5),
+        }, Ct);
+        Assert.True(result.IsValid);
+    }
+}
+
+public class UpdateItemWarrantyCommandValidatorTests
+{
+    private readonly UpdateItemWarrantyCommandValidator _sut = new();
+
+    private static CancellationToken Ct => TestContext.Current.CancellationToken;
+
+    [Fact]
+    public async Task EmptyCommand_IsValid()
+    {
+        // PUT semantics: clearing every field back to null is a legal edit.
+        Assert.True((await _sut.ValidateAsync(new UpdateItemWarrantyCommand(), Ct)).IsValid);
+    }
+
+    [Fact]
+    public async Task ProviderOver200_IsInvalid()
+    {
+        var result = await _sut.ValidateAsync(
+            new UpdateItemWarrantyCommand { Provider = new string('a', 201) }, Ct);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == "Provider");
+    }
+
+    [Fact]
+    public async Task NotesOver500_IsInvalid()
+    {
+        var result = await _sut.ValidateAsync(
+            new UpdateItemWarrantyCommand { Notes = new string('a', 501) }, Ct);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == "Notes");
     }
 }

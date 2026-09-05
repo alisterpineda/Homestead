@@ -9,7 +9,8 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Modules.Inventory.Features.Overview.GetInventoryOverview;
 
 public class GetInventoryOverviewHandler(
-    AppDbContext db, IInventoryPlacementService placementService, IItemLocationResolver locationResolver)
+    AppDbContext db, IInventoryPlacementService placementService, IItemLocationResolver locationResolver,
+    TimeProvider timeProvider)
     : IRequestHandler<GetInventoryOverviewQuery, GetInventoryOverviewResponse>
 {
     private const int PreviewCount = 5;
@@ -65,6 +66,33 @@ public class GetInventoryOverviewHandler(
             .Select(i => new LentDurablePreview { Id = i.Id, Name = i.Name, LentTo = i.LentTo })
             .ToListAsync(ct);
 
+        // Warranty expiring — the item-level Expiring rule of WarrantyStatusRules, in SQL. The
+        // "no open-ended row" guard is what keeps a lifetime warranty from ever counting as expiring,
+        // matching DurableResponseMapper's projection; the latest expiry is what decides, so a lapsed
+        // narrow tier alongside live cover doesn't raise the tile.
+        var today = WarrantyStatusRules.TodayUtc(timeProvider);
+        var cutoff = WarrantyStatusRules.Cutoff(today);
+        var expiringWarranties = db.Items.AsNoTracking()
+            .Where(i => i.Fungibility == Fungibility.NonFungible
+                && ItemStatusExtensions.LiveStatuses.Contains(i.Status)
+                && i.Warranties.Any()
+                && !i.Warranties.Any(w => w.ExpiresOn == null))
+            .Select(i => new
+            {
+                i.Id,
+                i.Name,
+                Latest = i.Warranties.Max(w => w.ExpiresOn),
+            })
+            .Where(x => x.Latest >= today && x.Latest <= cutoff);
+
+        var expiringWarrantyCount = await expiringWarranties.CountAsync(ct);
+        var expiringWarrantyPreviews = await expiringWarranties
+            .OrderBy(x => x.Latest)
+            .ThenBy(x => x.Name)
+            .Take(PreviewCount)
+            .Select(x => new ExpiringWarrantyPreview(x.Id, x.Name, x.Latest!.Value))
+            .ToListAsync(ct);
+
         var placement = await placementService.ComputeAsync(ct);
 
         // SQL ordering for collation parity with GetAreasHandler. Zero-item areas are included —
@@ -85,7 +113,7 @@ public class GetInventoryOverviewHandler(
             })
             .ToList();
 
-        var recentlyUpdated = await BuildRecentlyUpdatedAsync(ct);
+        var recentlyUpdated = await BuildRecentlyUpdatedAsync(today, ct);
 
         return new GetInventoryOverviewResponse
         {
@@ -94,6 +122,8 @@ public class GetInventoryOverviewHandler(
             LentCount = lentCount,
             LentDurables = lentItems,
             UnplacedCount = placement.UnplacedItems.Count,
+            ExpiringWarrantyCount = expiringWarrantyCount,
+            ExpiringWarranties = expiringWarrantyPreviews,
             Areas = areaSummaries,
             RecentlyUpdated = recentlyUpdated,
         };
@@ -115,7 +145,8 @@ public class GetInventoryOverviewHandler(
     /// re-fetch (the consumable quick panel still re-fetches its full breakdown on open — the row only
     /// needs display text).
     /// </remarks>
-    private async Task<IReadOnlyList<RecentlyUpdatedItem>> BuildRecentlyUpdatedAsync(CancellationToken ct)
+    private async Task<IReadOnlyList<RecentlyUpdatedItem>> BuildRecentlyUpdatedAsync(
+        DateOnly today, CancellationToken ct)
     {
         // Consumables are only ever Active among the live statuses; durables span Active/Lent/InRepair.
         var recency = await db.Items.AsNoTracking()
@@ -162,7 +193,8 @@ public class GetInventoryOverviewHandler(
         {
             var projected = await db.Items.AsNoTracking()
                 .Where(i => durableIds.Contains(i.Id) && ItemStatusExtensions.LiveStatuses.Contains(i.Status))
-                .Select(DurableResponseMapper.Projection)
+                // Same "today" as the expiring tile above, so one response never carries two clocks.
+                .Select(DurableResponseMapper.For(today))
                 .ToListAsync(ct);
             durables = await locationResolver.EnrichAsync(projected, ct);
         }

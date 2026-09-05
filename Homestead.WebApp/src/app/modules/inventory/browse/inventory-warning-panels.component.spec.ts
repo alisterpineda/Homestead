@@ -5,6 +5,8 @@ import { InventoryWarningPanelsComponent, type WarningPanelsScope } from './inve
 import type { GetInventoryOverviewResponse } from '@/api/generated/models/get-inventory-overview-response';
 
 const ALL_QUIET: GetInventoryOverviewResponse = {
+  expiringWarrantyCount: 0,
+  expiringWarranties: [],
   lowStockCount: 0,
   lowStockConsumables: [],
   lentCount: 0,
@@ -15,6 +17,8 @@ const ALL_QUIET: GetInventoryOverviewResponse = {
 };
 
 const BUSY: GetInventoryOverviewResponse = {
+  expiringWarrantyCount: 0,
+  expiringWarranties: [],
   lowStockCount: 7,
   lowStockConsumables: [
     { id: 'glue', name: 'Glue', totalOnHand: 0, unit: 'tubes', restockThreshold: 5 },
@@ -108,6 +112,51 @@ describe('InventoryWarningPanelsComponent', () => {
     const badge = row(fixture, 'Glue')?.querySelector('[aria-label="Out of stock"]');
     expect(badge?.textContent?.trim()).toBe('Out');
     expect(row(fixture, 'Tape')?.querySelector('[aria-label="Out of stock"]')).toBeNull();
+  });
+
+  it('renders the warranty-expiring tile with a soonest-first preview and a ?warranty=expiring link', async () => {
+    const fixture = await create({
+      kind: 'root',
+      overview: {
+        ...BUSY,
+        expiringWarrantyCount: 4,
+        expiringWarranties: [
+          { id: 'drill', name: 'Cordless Drill', expiresOn: '2026-09-20' },
+          { id: 'fridge', name: 'Fridge', expiresOn: '2026-10-01' },
+        ],
+      },
+    });
+
+    const content = text(fixture);
+    expect(content).toContain('Warranty expiring');
+    expect(content).toContain('Cordless Drill');
+    expect(content).toContain('until Sep 20, 2026');
+    // 4 expiring with 2 previewed → "+2 more".
+    expect(content).toContain('+2 more');
+    expect(links(fixture)).toContain('/inventory/items?warranty=expiring');
+  });
+
+  it('opens the panel on an expiring warranty alone, and counts it in the collapsed summary', async () => {
+    const fixture = await create({
+      kind: 'root',
+      overview: {
+        ...ALL_QUIET,
+        expiringWarrantyCount: 2,
+        expiringWarranties: [{ id: 'drill', name: 'Cordless Drill', expiresOn: '2026-09-20' }],
+      },
+    });
+
+    const content = text(fixture);
+    expect(content).toContain('Warranty expiring');
+    expect(content).not.toContain('Low stock');
+    expect(content).not.toContain('Lent out');
+    expect(content).toContain('2 expiring');
+    expect(links(fixture)).toEqual(['/inventory/items?warranty=expiring']);
+  });
+
+  it('never shows a warranty tile in a drilled place (root-scope alert only)', async () => {
+    const fixture = await create({ kind: 'place', viewAllParams: { area: 'garage' }, lowStockCount: 3, lentCount: 0 });
+    expect(text(fixture)).not.toContain('Warranty expiring');
   });
 
   it('renders nothing at the root when nothing is running low', async () => {

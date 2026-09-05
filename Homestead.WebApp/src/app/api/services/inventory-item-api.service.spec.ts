@@ -82,4 +82,51 @@ describe('InventoryItemApiService', () => {
     expect(req.request.method).toBe('DELETE');
     req.flush(null);
   });
+
+  it('getItemWarranties sends GET and unwraps the list body', () => {
+    const mockBody = [{ id: 'w1', itemId: 'abc', provider: 'Bosch', status: 'Active' }];
+    service.getItemWarranties({ id: 'abc' }).subscribe(result => {
+      expect(result).toEqual(mockBody);
+    });
+    const req = httpTesting.expectOne('/api/v1/inventory/items/abc/warranties');
+    expect(req.request.method).toBe('GET');
+    req.flush(mockBody);
+  });
+
+  it('createItemWarranty sends POST with the warranty body', () => {
+    const mockBody = { id: 'w1', itemId: 'abc', provider: null, expiresOn: null, notes: null, status: 'Active' };
+    service
+      .createItemWarranty({ id: 'abc', body: { provider: null, expiresOn: null, notes: null } })
+      .subscribe(result => {
+        expect(result).toEqual(mockBody);
+      });
+    const req = httpTesting.expectOne('/api/v1/inventory/items/abc/warranties');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ provider: null, expiresOn: null, notes: null });
+    req.flush(mockBody);
+  });
+
+  it('updateItemWarranty sends PUT with the warrantyId path param and body', () => {
+    const mockBody = { id: 'w1', itemId: 'abc', provider: 'Bosch', expiresOn: '2028-03-12', notes: null, status: 'Active' };
+    service
+      .updateItemWarranty({
+        id: 'abc',
+        warrantyId: 'w1',
+        body: { provider: 'Bosch', expiresOn: '2028-03-12', notes: null },
+      })
+      .subscribe(result => {
+        expect(result).toEqual(mockBody);
+      });
+    const req = httpTesting.expectOne('/api/v1/inventory/items/abc/warranties/w1');
+    expect(req.request.method).toBe('PUT');
+    expect(req.request.body).toEqual({ provider: 'Bosch', expiresOn: '2028-03-12', notes: null });
+    req.flush(mockBody);
+  });
+
+  it('deleteItemWarranty sends DELETE with the warrantyId path param', () => {
+    service.deleteItemWarranty({ id: 'abc', warrantyId: 'w1' }).subscribe();
+    const req = httpTesting.expectOne('/api/v1/inventory/items/abc/warranties/w1');
+    expect(req.request.method).toBe('DELETE');
+    req.flush(null);
+  });
 });

@@ -10,6 +10,17 @@ public record GetInventoryOverviewResponse
     public required int LentCount { get; init; }
     public required IReadOnlyList<LentDurablePreview> LentDurables { get; init; }
     public required int UnplacedCount { get; init; }
+
+    /// <summary>
+    /// Live durables whose warranty cover lapses within
+    /// <see cref="Homestead.WebApi.Domain.Inventory.WarrantyStatusRules.ExpiringWindowDays"/> days —
+    /// i.e. whose derived status is <c>Expiring</c>.
+    /// </summary>
+    public required int ExpiringWarrantyCount { get; init; }
+
+    /// <summary>Most-urgent-first preview of <see cref="ExpiringWarrantyCount"/>, capped at five.</summary>
+    public required IReadOnlyList<ExpiringWarrantyPreview> ExpiringWarranties { get; init; }
+
     public required IReadOnlyList<AreaSummary> Areas { get; init; }
 
     /// <summary>
@@ -65,3 +76,9 @@ public record LentDurablePreview
     public required string Name { get; init; }
     public string? LentTo { get; init; }
 }
+
+/// <summary>
+/// One row of the "Warranty expiring" tile. <see cref="ExpiresOn"/> is the item's <b>latest</b>
+/// expiry — the date its cover actually runs out (warranties.md §Derived status).
+/// </summary>
+public record ExpiringWarrantyPreview(Guid Id, string Name, DateOnly ExpiresOn);

@@ -214,6 +214,82 @@ public class GetItemActivityHandlerTests : IDisposable
     }
 
     [Fact]
+    public async Task Handle_ProjectsItemWarrantyAuditRows_WithWarrantySummaries()
+    {
+        // Unlike InventoryNote, an ItemWarranty row has no feed entry of its own, so its lifecycle
+        // audit rows ARE projected — the DocumentVersion precedent (warranties.md §Audit).
+        var item = await ItemNoteTestData.AddItemAsync(_db);
+        var alice = await ItemNoteTestData.AddUserAsync(_db, "Alice", "alice@test.com");
+        var warrantyId = Guid.NewGuid();
+        await AddAuditAsync(item.Id, AuditAction.Created, alice.Id, DateTimeOffset.UtcNow.AddMinutes(-3),
+            entityType: "ItemWarranty", entityId: warrantyId, parentEntityId: item.Id);
+        await AddAuditAsync(item.Id, AuditAction.Updated, alice.Id, DateTimeOffset.UtcNow.AddMinutes(-2),
+            changes: [new ScalarFieldChange("ExpiresOn", "2027-01-01", "2028-03-12")],
+            entityType: "ItemWarranty", entityId: warrantyId, parentEntityId: item.Id);
+        await AddAuditAsync(item.Id, AuditAction.Deleted, alice.Id, DateTimeOffset.UtcNow.AddMinutes(-1),
+            changes: [new ScalarFieldChange("Description", "Bosch · until 2028-03-12", null)],
+            entityType: "ItemWarranty", entityId: warrantyId, parentEntityId: item.Id);
+
+        var result = await _sut.Handle(new GetItemActivityQuery { Id = item.Id }, Ct);
+
+        Assert.NotNull(result);
+        Assert.Equal(3, result.TotalCount);
+        Assert.All(result.Items, r => Assert.Equal("audit_log", r.Type));
+        Assert.Equal(
+            [
+                "Alice removed a warranty (Bosch · until 2028-03-12)",
+                "Alice updated a warranty (expiry)",
+                "Alice added a warranty",
+            ],
+            result.Items.Select(r => r.Summary));
+    }
+
+    [Fact]
+    public async Task Handle_WarrantyNotesField_ReadsAsNotes_NotDescription()
+    {
+        // The item's own "Notes" column is the Description field; a warranty's really is a note.
+        var item = await ItemNoteTestData.AddItemAsync(_db);
+        var alice = await ItemNoteTestData.AddUserAsync(_db, "Alice", "alice@test.com");
+        await AddAuditAsync(item.Id, AuditAction.Updated, alice.Id, DateTimeOffset.UtcNow,
+            changes: [new ScalarFieldChange("Provider", null, "Bosch"), new ScalarFieldChange("Notes", null, "motor only")],
+            entityType: "ItemWarranty", entityId: Guid.NewGuid(), parentEntityId: item.Id);
+
+        var result = await _sut.Handle(new GetItemActivityQuery { Id = item.Id }, Ct);
+
+        Assert.NotNull(result);
+        Assert.Equal("Alice updated a warranty (provider, notes)", Assert.Single(result.Items).Summary);
+    }
+
+    [Fact]
+    public async Task Handle_WarrantyDeleteWithoutDescription_OmitsTheParenthetical()
+    {
+        var item = await ItemNoteTestData.AddItemAsync(_db);
+        var alice = await ItemNoteTestData.AddUserAsync(_db, "Alice", "alice@test.com");
+        await AddAuditAsync(item.Id, AuditAction.Deleted, alice.Id, DateTimeOffset.UtcNow,
+            entityType: "ItemWarranty", entityId: Guid.NewGuid(), parentEntityId: item.Id);
+
+        var result = await _sut.Handle(new GetItemActivityQuery { Id = item.Id }, Ct);
+
+        Assert.NotNull(result);
+        Assert.Equal("Alice removed a warranty", Assert.Single(result.Items).Summary);
+    }
+
+    [Fact]
+    public async Task Handle_IgnoresWarrantyRowsParentedToAnotherItem()
+    {
+        var item = await ItemNoteTestData.AddItemAsync(_db);
+        var other = await ItemNoteTestData.AddItemAsync(_db, name: "Other");
+        var alice = await ItemNoteTestData.AddUserAsync(_db, "Alice", "alice@test.com");
+        await AddAuditAsync(other.Id, AuditAction.Created, alice.Id, DateTimeOffset.UtcNow,
+            entityType: "ItemWarranty", entityId: Guid.NewGuid(), parentEntityId: other.Id);
+
+        var result = await _sut.Handle(new GetItemActivityQuery { Id = item.Id }, Ct);
+
+        Assert.NotNull(result);
+        Assert.Empty(result.Items);
+    }
+
+    [Fact]
     public async Task Handle_PaginatesInMemory_AcrossBothSources()
     {
         var item = await ItemNoteTestData.AddItemAsync(_db);

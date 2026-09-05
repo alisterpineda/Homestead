@@ -23,6 +23,8 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
 }
 
 const OVERVIEW: GetInventoryOverviewResponse = {
+  expiringWarrantyCount: 0,
+  expiringWarranties: [],
   lowStockCount: 0,
   lowStockConsumables: [],
   // Lent is folded into the needs-attention panel, so a household-wide lent item opens it at root

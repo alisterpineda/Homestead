@@ -65,6 +65,8 @@ A single `Item` table holds both kinds, discriminated by `Fungibility`. Shared f
 
 `Value` references the seeded, read-only currency set (the same commodities Finances uses for currencies); v1 shows it in the entered currency and does not convert or roll it up — see [overview.md](overview.md#every-amount-carries-its-currency). Fungible-only fields and their behaviour are detailed in [stock.md](stock.md); this document owns the non-fungible side.
 
+Two child tables hang off the item rather than living in these columns: user-authored **notes** (see [activity.md](activity.md)) on both kinds, and **warranties** on non-fungible items only — zero or more coverage records per durable, from which a per-item warranty status is derived at read time (see [warranties.md](warranties.md)). Both cascade with the item; only notes gate its delete.
+
 ## The location rule
 
 A non-fungible item's location is held as a **pair of optional foreign keys** — one to an area, one to a parent item — with **at most one set**:

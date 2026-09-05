@@ -57,6 +57,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<Domain.Inventory.Tag> InventoryTags { get; set; }
     public DbSet<Domain.Inventory.ItemTag> ItemTags { get; set; }
     public DbSet<ItemNote> ItemNotes { get; set; }
+    public DbSet<ItemWarranty> ItemWarranties { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

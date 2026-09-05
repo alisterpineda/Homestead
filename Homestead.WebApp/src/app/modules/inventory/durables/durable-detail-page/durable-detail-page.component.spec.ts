@@ -13,6 +13,7 @@ import { InventoryDurableApiService } from '@/api/services/inventory-durable-api
 import { InventoryPlaceApiService } from '@/api/services/inventory-place-api.service';
 import { InventoryItemApiService } from '@/api/services/inventory-item-api.service';
 import type { GetItemActivityResponse } from '@/api/generated/models/get-item-activity-response';
+import type { ItemWarrantyResponse } from '@/api/generated/models/item-warranty-response';
 import type { DurableResponse } from '@/api/generated/models/durable-response';
 import type { PlaceContentsResponse } from '@/api/generated/models/place-contents-response';
 
@@ -147,6 +148,16 @@ class StubItemApi {
   createItemNote = () => of({});
   updateItemNote = () => of({});
   deleteItemNote = () => of(undefined);
+  // The hosted `app-item-warranties-section` reads through the same service.
+  warranties: ItemWarrantyResponse[] = [];
+  warrantyCalls: { id: string }[] = [];
+  getItemWarranties = (p: { id: string }) => {
+    this.warrantyCalls.push(p);
+    return of(this.warranties);
+  };
+  createItemWarranty = () => of({});
+  updateItemWarranty = () => of({});
+  deleteItemWarranty = () => of(undefined);
 }
 
 class StubPlaceApi {
@@ -525,6 +536,27 @@ describe('DurableDetailPageComponent', () => {
     expect(content).toContain('Alice updated value, location');
     // A null/deleted actor still renders (summary says "Someone"), never vanishes.
     expect(content).toContain('Someone added this item');
+  });
+
+  it('hosts the Warranties section between Components/Contents and Activity', async () => {
+    durableApi.item = CONTAINER_ITEM;
+    placeApi.contents = CHEST_CONTENTS;
+    itemApi.warranties = [{
+      id: 'w1', itemId: 'box1', provider: 'Home Depot', expiresOn: '2028-03-12', notes: null,
+      status: 'Active', createdAt: '2026-06-01T00:00:00Z', updatedAt: '2026-06-01T00:00:00Z',
+    }];
+    const { harness } = await navigate('/inventory/items/box1');
+
+    expect(itemApi.warrantyCalls).toEqual([{ id: 'box1' }]);
+    const content = text(harness);
+    expect(content).toContain('Warranties');
+    expect(content).toContain('Home Depot');
+    // Section order: Details → Contents → Warranties → Activity.
+    const headings = Array.from(
+      (harness.routeNativeElement as HTMLElement).querySelectorAll('h2'),
+    ).map(h => h.textContent?.trim());
+    expect(headings.indexOf('Contents')).toBeLessThan(headings.indexOf('Warranties'));
+    expect(headings.indexOf('Warranties')).toBeLessThan(headings.indexOf('Activity'));
   });
 
   it('resets the activity page and open overlays when navigating to another item (component reused)', async () => {

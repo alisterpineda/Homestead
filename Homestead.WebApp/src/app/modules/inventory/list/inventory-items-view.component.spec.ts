@@ -314,6 +314,7 @@ describe('InventoryItemsViewComponent', () => {
     component.showInactive.set(true);
     component.lowStockOnly.set(true);
     component.lentOnly.set(true);
+    component.warrantyFilter.set('expiring');
     let reset = 0;
     component.reset.subscribe(() => reset++);
 
@@ -321,7 +322,85 @@ describe('InventoryItemsViewComponent', () => {
     expect(component.showInactive()).toBe(false);
     expect(component.lowStockOnly()).toBe(false);
     expect(component.lentOnly()).toBe(false);
+    expect(component.warrantyFilter()).toBe('any');
     expect(reset).toBe(1);
+  });
+
+  describe('warranty facet', () => {
+    // A dedicated row set: the shared ROWS carry no warranty status, and the facet is durables-only.
+    const COVERED = makeItem({ id: 'covered', name: 'Covered', warrantyStatus: 'Active' });
+    const SOON = makeItem({ id: 'soon', name: 'Soon', warrantyStatus: 'Expiring' });
+    const LAPSED = makeItem({ id: 'lapsed', name: 'Lapsed', warrantyStatus: 'Expired' });
+    const BARE = makeItem({ id: 'bare', name: 'Bare', warrantyStatus: 'None' });
+    // An archived durable that would match a facet — the counts must hide it while the list does.
+    const SHELVED = makeItem({
+      id: 'shelved', name: 'Shelved', status: 'Archived' as ItemStatus, warrantyStatus: 'Expiring',
+    });
+    const WARRANTY_ROWS: InventoryRow[] = [
+      durableToRow(COVERED), durableToRow(SOON), durableToRow(LAPSED), durableToRow(BARE),
+      durableToRow(SHELVED), consumableToRow(TAPE),
+    ];
+
+    beforeEach(() => {
+      fixture.componentRef.setInput('rows', WARRANTY_ROWS);
+      fixture.detectChanges();
+    });
+
+    it('is off by default and keeps every row', () => {
+      expect(component.warrantyFilter()).toBe('any');
+      // 'shelved' is archived, so the default (Show inactive off) list omits it.
+      expect(ids(component.visibleRows())).toEqual(['bare', 'covered', 'lapsed', 'soon', 'tape']);
+    });
+
+    it('keeps only the rows matching the chosen state, dropping consumables entirely', () => {
+      component.warrantyFilter.set('expiring');
+      expect(ids(component.visibleRows())).toEqual(['soon']);
+
+      component.warrantyFilter.set('expired');
+      expect(ids(component.visibleRows())).toEqual(['lapsed']);
+
+      component.warrantyFilter.set('none');
+      expect(ids(component.visibleRows())).toEqual(['bare']);
+
+      component.warrantyFilter.set('active');
+      expect(ids(component.visibleRows())).toEqual(['covered']);
+    });
+
+    it('counts each state over the durable rows, with Any counting everything countable', () => {
+      expect(component.warrantyCounts()).toEqual({
+        any: 5, active: 1, expiring: 1, expired: 1, none: 1,
+      });
+    });
+
+    // The bug this guards: counts taken over the un-narrowed rows promised more than the list could
+    // show ("None (44)" beside a list yielding 35). Every badge must equal what picking it yields.
+    it('excludes inactive rows from the counts until Show inactive reveals them', () => {
+      expect(component.warrantyCounts().expiring).toBe(1);
+      expect(ids(component.visibleRows())).not.toContain('shelved');
+
+      component.showInactive.set(true);
+      expect(component.warrantyCounts().expiring).toBe(2);
+      expect(component.warrantyCounts().any).toBe(6);
+    });
+
+    it('every facet badge equals the number of rows selecting it actually shows', () => {
+      for (const inactive of [false, true]) {
+        component.showInactive.set(inactive);
+        for (const facet of ['any', 'active', 'expiring', 'expired', 'none'] as const) {
+          component.warrantyFilter.set(facet);
+          expect(component.visibleRows().length).toBe(component.warrantyCounts()[facet]);
+        }
+      }
+      component.showInactive.set(false);
+      component.warrantyFilter.set('any');
+    });
+
+    it('names the active facet in the popover trigger label', () => {
+      component.warrantyFilter.set('expiring');
+      expect(component.filterLabel()).toBe('Filter: Warranty expiring');
+      component.warrantyFilter.set('none');
+      expect(component.filterLabel()).toBe('Filter: Warranty none');
+    });
   });
 
   it('renders "Nothing matches" (not a spinner) when nothing is visible and not loading', async () => {
@@ -359,6 +438,11 @@ describe('InventoryItemsViewComponent', () => {
       const c = await createSeeded({ initialLentOnly: true });
       expect(c.lentOnly()).toBe(true);
       expect(ids(c.visibleRows())).toEqual(['ladder']);
+    });
+
+    it('seeds the warranty facet from the Browse tile deep link', async () => {
+      const c = await createSeeded({ initialWarranty: 'expiring' });
+      expect(c.warrantyFilter()).toBe('expiring');
     });
 
     it('seeds the kind toggle and the sort state', async () => {

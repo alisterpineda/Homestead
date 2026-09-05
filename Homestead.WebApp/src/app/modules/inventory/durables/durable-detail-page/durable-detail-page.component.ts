@@ -42,6 +42,7 @@ import { EditDurableSheetComponent } from '../edit-durable-sheet/edit-durable-sh
 import { DurableQuickPanelComponent } from '../durable-quick-panel/durable-quick-panel.component';
 import { CreateEntryDialogComponent } from '../../list/create-entry-dialog/create-entry-dialog.component';
 import { ItemActivityFeedComponent } from '../../shared/activity/item-activity-feed.component';
+import { ItemWarrantiesSectionComponent } from '../../shared/warranties/item-warranties-section.component';
 import type { ItemLocationValue } from '../../shared/location-picker/location-picker.component';
 import { formatPath } from '../../list/inventory-row';
 import { durableLocationPath, type LocationPathView } from '../../shared/location-path';
@@ -87,6 +88,7 @@ import { toast } from '@spartan-ng/brain/sonner';
     DurableQuickPanelComponent,
     CreateEntryDialogComponent,
     ItemActivityFeedComponent,
+    ItemWarrantiesSectionComponent,
     UnitPipe,
   ],
   providers: [provideIcons({
@@ -365,6 +367,16 @@ import { toast } from '@spartan-ng/brain/sonner';
             }
           </section>
         }
+
+        <!-- Warranties — durables only, so this section is owned by the durable page rather than
+             the shared detail dispatcher. Sits ahead of Activity, which projects its audit rows. -->
+        <app-item-warranties-section
+          [itemId]="it.id"
+          [brandName]="it.brandName ?? null"
+          [acquiredOn]="it.acquiredOn ?? null"
+          [refreshTick]="refreshTrigger()"
+          (changed)="onChanged()"
+        />
 
         <!-- Activity — the shared feed: this item's audit projection interleaved with its notes. -->
         <app-item-activity-feed [itemId]="it.id" [refreshTick]="refreshTrigger()" />

@@ -1,6 +1,7 @@
 using Homestead.WebApi.Domain.Inventory;
 using Homestead.WebApi.Modules.Inventory.Features.Overview.GetInventoryOverview;
 using Homestead.WebApi.Modules.Inventory.Services;
+using Microsoft.Extensions.Time.Testing;
 
 namespace Homestead.WebApi.Tests.Unit.Modules.Inventory.Features.Overview;
 
@@ -21,7 +22,8 @@ public class GetInventoryOverviewHandlerTests : IAsyncLifetime
         _db.Areas.Add(_garage);
         await _db.SaveChangesAsync();
         _sut = new GetInventoryOverviewHandler(
-            _db, new InventoryPlacementService(_db), new ItemLocationResolver(_db));
+            _db, new InventoryPlacementService(_db), new ItemLocationResolver(_db),
+            new FakeTimeProvider(T0));
     }
 
     public ValueTask DisposeAsync()
@@ -248,5 +250,140 @@ public class GetInventoryOverviewHandlerTests : IAsyncLifetime
     {
         var resp = await HandleAsync();
         Assert.Empty(resp.RecentlyUpdated);
+    }
+
+    // ----- Warranty expiring tile -----
+
+    // "Today" is T0 = 2026-01-01 (the FakeTimeProvider above), so the inclusive window edge is
+    // 2026-01-31 and 2026-02-01 is one day too far out.
+    private static readonly DateOnly Today = new(2026, 1, 1);
+
+    private async Task AddWarrantyAsync(Guid itemId, DateOnly? expiresOn)
+    {
+        _db.ItemWarranties.Add(new ItemWarranty
+        {
+            Id = Guid.NewGuid(),
+            ItemId = itemId,
+            ExpiresOn = expiresOn,
+            CreatedAt = T0,
+            UpdatedAt = T0,
+        });
+        await _db.SaveChangesAsync(Ct);
+    }
+
+    [Fact]
+    public async Task ExpiringWarranties_CountsAndPreviewsMostUrgentFirst()
+    {
+        var soon = await AddDurableAsync("Dryer", T0);
+        await AddWarrantyAsync(soon.Id, Today.AddDays(3));
+        var later = await AddDurableAsync("Washer", T0);
+        await AddWarrantyAsync(later.Id, Today.AddDays(20));
+
+        var resp = await HandleAsync();
+
+        Assert.Equal(2, resp.ExpiringWarrantyCount);
+        Assert.Equal([soon.Id, later.Id], resp.ExpiringWarranties.Select(w => w.Id));
+        Assert.Equal(["Dryer", "Washer"], resp.ExpiringWarranties.Select(w => w.Name));
+        Assert.Equal(Today.AddDays(3), resp.ExpiringWarranties[0].ExpiresOn);
+    }
+
+    [Fact]
+    public async Task ExpiringWarranties_LatestExpiryDecides_AndIsWhatThePreviewShows()
+    {
+        // A lapsed narrow tier alongside cover that runs out next week: the item is expiring on the
+        // later date, and that later date is the one the tile shows.
+        var item = await AddDurableAsync("Dishwasher", T0);
+        await AddWarrantyAsync(item.Id, Today.AddDays(-100));
+        await AddWarrantyAsync(item.Id, Today.AddDays(7));
+
+        var resp = await HandleAsync();
+
+        Assert.Equal(1, resp.ExpiringWarrantyCount);
+        Assert.Equal(Today.AddDays(7), Assert.Single(resp.ExpiringWarranties).ExpiresOn);
+    }
+
+    [Fact]
+    public async Task ExpiringWarranties_OpenEndedRowKeepsAnItemOut()
+    {
+        // A lifetime warranty means the item is covered for good, whatever the other rows say —
+        // the same guard DurableResponseMapper applies.
+        var item = await AddDurableAsync("Cast iron pan", T0);
+        await AddWarrantyAsync(item.Id, Today.AddDays(5));
+        await AddWarrantyAsync(item.Id, null);
+
+        var resp = await HandleAsync();
+
+        Assert.Equal(0, resp.ExpiringWarrantyCount);
+        Assert.Empty(resp.ExpiringWarranties);
+    }
+
+    [Fact]
+    public async Task ExpiringWarranties_ExcludesExpiredAndFarFutureAndNoWarranty()
+    {
+        var expired = await AddDurableAsync("Old kettle", T0);
+        await AddWarrantyAsync(expired.Id, Today.AddDays(-1));
+        var far = await AddDurableAsync("New fridge", T0);
+        await AddWarrantyAsync(far.Id, Today.AddDays(31));
+        await AddDurableAsync("Hammer", T0);
+
+        var resp = await HandleAsync();
+
+        Assert.Equal(0, resp.ExpiringWarrantyCount);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(30)]
+    public async Task ExpiringWarranties_IncludesBothWindowEdges(int days)
+    {
+        var item = await AddDurableAsync("Edge case", T0);
+        await AddWarrantyAsync(item.Id, Today.AddDays(days));
+
+        var resp = await HandleAsync();
+
+        Assert.Equal(1, resp.ExpiringWarrantyCount);
+    }
+
+    [Theory]
+    [InlineData(ItemStatus.Archived)]
+    [InlineData(ItemStatus.Sold)]
+    [InlineData(ItemStatus.Discarded)]
+    public async Task ExpiringWarranties_ExcludesTerminalStatuses(ItemStatus status)
+    {
+        var item = await AddDurableAsync("Sold dryer", T0, status: status);
+        await AddWarrantyAsync(item.Id, Today.AddDays(5));
+
+        var resp = await HandleAsync();
+
+        Assert.Equal(0, resp.ExpiringWarrantyCount);
+    }
+
+    [Theory]
+    [InlineData(ItemStatus.Lent)]
+    [InlineData(ItemStatus.InRepair)]
+    public async Task ExpiringWarranties_IncludesTheOtherLiveStatuses(ItemStatus status)
+    {
+        var item = await AddDurableAsync("Lent drill", T0, status: status);
+        await AddWarrantyAsync(item.Id, Today.AddDays(5));
+
+        var resp = await HandleAsync();
+
+        Assert.Equal(1, resp.ExpiringWarrantyCount);
+    }
+
+    [Fact]
+    public async Task ExpiringWarranties_PreviewCapsAtFive()
+    {
+        for (var i = 1; i <= 7; i++)
+        {
+            var item = await AddDurableAsync($"Item {i:00}", T0);
+            await AddWarrantyAsync(item.Id, Today.AddDays(i));
+        }
+
+        var resp = await HandleAsync();
+
+        Assert.Equal(7, resp.ExpiringWarrantyCount);
+        Assert.Equal(5, resp.ExpiringWarranties.Count);
+        Assert.Equal("Item 01", resp.ExpiringWarranties[0].Name);
     }
 }

@@ -1453,6 +1453,49 @@ namespace Homestead.WebApi.Migrations
                     b.ToTable("item_tags", "inventory");
                 });
 
+            modelBuilder.Entity("Homestead.WebApi.Domain.Inventory.ItemWarranty", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateOnly?>("ExpiresOn")
+                        .HasColumnType("date");
+
+                    b.Property<Guid>("ItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Provider")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("UpdatedByUserId");
+
+                    b.HasIndex("ItemId", "ExpiresOn");
+
+                    b.ToTable("item_warranties", "inventory");
+                });
+
             modelBuilder.Entity("Homestead.WebApi.Domain.Inventory.StockEntry", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2509,6 +2552,31 @@ namespace Homestead.WebApi.Migrations
                     b.Navigation("Tag");
                 });
 
+            modelBuilder.Entity("Homestead.WebApi.Domain.Inventory.ItemWarranty", b =>
+                {
+                    b.HasOne("Homestead.WebApi.Domain.Identity.AppUser", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Homestead.WebApi.Domain.Inventory.Item", "Item")
+                        .WithMany("Warranties")
+                        .HasForeignKey("ItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Homestead.WebApi.Domain.Identity.AppUser", "UpdatedByUser")
+                        .WithMany()
+                        .HasForeignKey("UpdatedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("CreatedByUser");
+
+                    b.Navigation("Item");
+
+                    b.Navigation("UpdatedByUser");
+                });
+
             modelBuilder.Entity("Homestead.WebApi.Domain.Inventory.StockEntry", b =>
                 {
                     b.HasOne("Homestead.WebApi.Domain.Inventory.Area", "Area")
@@ -2744,6 +2812,8 @@ namespace Homestead.WebApi.Migrations
                     b.Navigation("ItemTags");
 
                     b.Navigation("StockEntries");
+
+                    b.Navigation("Warranties");
                 });
 
             modelBuilder.Entity("Homestead.WebApi.Domain.Inventory.Tag", b =>

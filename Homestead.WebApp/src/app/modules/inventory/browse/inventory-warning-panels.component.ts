@@ -1,8 +1,10 @@
 import { Component, ChangeDetectionStrategy, computed, input } from '@angular/core';
+import { DatePipe } from '@angular/common';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
   lucideTriangleAlert,
   lucideChevronRight,
+  lucideShieldAlert,
   lucideUserRound,
 } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
@@ -17,29 +19,33 @@ import type { GetInventoryOverviewResponse } from '@/api/generated/models/get-in
 /**
  * The Browse "needs attention" alert region: a conditional, collapsible block surfacing the things
  * that want the user's eye — **low stock** (a violation of a restock threshold the user set, with a
- * clear resolution) and **lent out** (durables currently out on loan). Lent is folded in here as an
- * alert tile rather than left as a standalone neutral status row, so the panel now renders whenever
- * something is lent even if nothing is low. (Unplaced is deliberately **not** a tile here — it stays
+ * clear resolution), **lent out** (durables currently out on loan), and **warranty expiring** (live
+ * durables whose latest cover runs out within 30 days). Lent is folded in here as an alert tile
+ * rather than left as a standalone neutral status row, so the panel now renders whenever something
+ * is lent even if nothing is low. (Unplaced is deliberately **not** a tile here — it stays
  * a location bucket surfaced as a place card; that diverges from the product-design doc, which lists
  * unplaced as a third needs-attention tile.) The
- * generic frame stays so future alert types (expiring soon, overdue loans, warranty) can slot in. The
+ * generic frame stays so future alert types (overdue loans, service due) can slot in. The
  * single light card holds stacked, flat alert sections (`InventoryWarningSectionComponent`) laid out
  * in a content-aware `auto-fit` grid — one section fills the row (matching the page's full-width
  * rhythm), two-plus flow into equal side-by-side columns, mobile collapses to one. Two modes:
  *
- * - **root** — the global household-wide low-stock section with a most-urgent-first preview plus a
- *   lent-out section listing who has what, reusing the overview data the Browse root already fetches;
- *   each section deep-links into the unified items list pre-filtered to that slice (`?lowStock=true` /
- *   `?lent=true`). A zero-on-hand consumable is flagged "Out" to distinguish it from merely-low.
+ * - **root** — the global household-wide low-stock section with a most-urgent-first preview, a
+ *   lent-out section listing who has what, and a warranty-expiring section (soonest first), reusing
+ *   the overview data the Browse root already fetches; each section deep-links into the unified items
+ *   list pre-filtered to that slice (`?lowStock=true` / `?lent=true` / `?warranty=expiring`). A
+ *   zero-on-hand consumable is flagged "Out" to distinguish it from merely-low.
  * - **place** — count-only sections scoped to the drilled place ("low consumables stored here" /
  *   "items lent from here"). An **area** drill carries a `{ area: id }` filter, so its low-stock
  *   "View all" links into the pre-filtered items list; lent is always count-only (Browse already
  *   scopes spatially, and the lent items show in the contents table). A **container** drill carries
  *   `null` for low stock too (the list no longer scopes to a container — Browse owns containment), so
- *   that section renders count-only with no link.
+ *   that section renders count-only with no link. Warranties are root-scope only: the overview
+ *   payload carries no per-place warranty count, and a spatial slice of "expiring soon" is not a
+ *   question anyone asks.
  *
- * Renders nothing when the scope has no alerts, so a household with nothing running low and nothing
- * lent sees a clean Browse. Defaults collapsed in every scope — seeded on scope kind, so drilling
+ * Renders nothing when the scope has no alerts, so a household with nothing running low, nothing
+ * lent, and no cover about to lapse sees a clean Browse. Defaults collapsed in every scope — seeded on scope kind, so drilling
  * area→area keeps the user's toggle while root↔place re-seeds the collapsed default.
  */
 export type WarningPanelsScope =
@@ -55,10 +61,12 @@ export type WarningPanelsScope =
     HlmCollapsibleImports,
     InventoryWarningSectionComponent,
     UnitPipe,
+    DatePipe,
   ],
   providers: [provideIcons({
     lucideTriangleAlert,
     lucideChevronRight,
+    lucideShieldAlert,
     lucideUserRound,
   })],
   template: `
@@ -137,6 +145,22 @@ export type WarningPanelsScope =
                     }
                   </app-inventory-warning-section>
                 }
+                @if (ov.expiringWarrantyCount > 0) {
+                  <app-inventory-warning-section
+                    icon="lucideShieldAlert"
+                    label="Warranty expiring"
+                    [count]="ov.expiringWarrantyCount"
+                    [previewCount]="ov.expiringWarranties.length"
+                    [viewAllParams]="{ warranty: 'expiring' }"
+                  >
+                    @for (item of ov.expiringWarranties; track item.id) {
+                      <li class="flex items-center justify-between gap-2 text-sm">
+                        <span class="truncate">{{ item.name }}</span>
+                        <span class="shrink-0 text-xs text-muted-foreground">until {{ item.expiresOn | date: 'mediumDate' }}</span>
+                      </li>
+                    }
+                  </app-inventory-warning-section>
+                }
               } @else {
                 @for (panel of placePanels(); track panel.label) {
                   <app-inventory-warning-section
@@ -196,22 +220,24 @@ export class InventoryWarningPanelsComponent {
   private counts = computed(() => {
     const s = this.scope();
     return s.kind === 'root'
-      ? { low: s.overview.lowStockCount, lent: s.overview.lentCount }
-      : { low: s.lowStockCount, lent: s.lentCount };
+      ? { low: s.overview.lowStockCount, lent: s.overview.lentCount, warranty: s.overview.expiringWarrantyCount }
+      // Warranties are a root-scope alert only — a drilled place carries no warranty count.
+      : { low: s.lowStockCount, lent: s.lentCount, warranty: 0 };
   });
 
-  /** Hidden entirely when nothing needs attention — i.e. no low stock and nothing lent. */
+  /** Hidden entirely when nothing needs attention — no low stock, nothing lent, no expiring warranty. */
   protected hasWarnings = computed(() => {
-    const { low, lent } = this.counts();
-    return low > 0 || lent > 0;
+    const { low, lent, warranty } = this.counts();
+    return low > 0 || lent > 0 || warranty > 0;
   });
 
   /** One chip per nonzero alert for the collapsed summary line (e.g. "3 low · 1 lent"). */
   protected summaryParts = computed<{ icon: string; label: string; count: number }[]>(() => {
-    const { low, lent } = this.counts();
+    const { low, lent, warranty } = this.counts();
     const parts: { icon: string; label: string; count: number }[] = [];
     if (low > 0) parts.push({ icon: 'lucideTriangleAlert', label: 'low', count: low });
     if (lent > 0) parts.push({ icon: 'lucideUserRound', label: 'lent', count: lent });
+    if (warranty > 0) parts.push({ icon: 'lucideShieldAlert', label: 'expiring', count: warranty });
     return parts;
   });
 

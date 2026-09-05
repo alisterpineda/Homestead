@@ -86,4 +86,11 @@ public record DurableResponse
 
     public required DateTimeOffset CreatedAt { get; init; }
     public required DateTimeOffset UpdatedAt { get; init; }
+
+    /// <summary>
+    /// Derived warranty cover as of the server's UTC date (never stored). <c>None</c> for an item with
+    /// no warranty rows — which includes every consumable, since warranties are durables-only. See
+    /// <see cref="WarrantyStatusRules"/>.
+    /// </summary>
+    public WarrantyStatus WarrantyStatus { get; init; }
 }

@@ -64,6 +64,8 @@ Two consequences are surfaced rather than hidden:
 
 Every note create / update / delete is written to the audit log via `IAuditLogger` under **its own entity type, `InventoryNote`**, with `ParentEntityId = ItemId`. The precedent is `DocumentComment`, which Documents audits under its own type with the document as parent and does *not* project into the document feed (Documents *does* project `DocumentVersion` rows through `ParentEntityId` — that is the deliberate counter-example, because a version change is a change to the document). Note audit rows are **not** projected into the item's feed: "Alister edited a note" beside the note itself is noise, and a "deleted a note" ghost would contradict delete-is-destructive. The feed shows the note in its current state, or not at all.
 
+Inventory's own counter-example is **`ItemWarranty`** (see [warranties.md](warranties.md#audit)), audited under its own type with the item as parent exactly as notes are — and *projected* into this feed ("added a warranty", "updated a warranty (expiry)", "removed a warranty (Bosch · until 2028-03-12)"). The two sibling rules sit here together because the split is the same one Documents draws: a warranty is the `DocumentVersion` case — structured data about the item, living in a different section of the page, whose delete row is the only trace left behind — while a note is the `DocumentComment` case, visible in the feed itself or nowhere.
+
 The entity-type string is chosen to be **neutral about what is noted** (`InventoryNote`, not `ItemNote`) because audit rows are never re-migrated: if notes later attach to a second kind of thing (see *Future-compatibility*, areas), the history written today must still read correctly.
 
 ## The feed

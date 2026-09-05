@@ -20,6 +20,7 @@ import {
   lucideLayoutGrid,
   lucideTable,
   lucideEllipsisVertical,
+  lucideCheck,
 } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
@@ -40,6 +41,7 @@ import { InventoryCardGridComponent } from './inventory-card-grid.component';
 import { EditDurableSheetComponent } from '../durables/edit-durable-sheet/edit-durable-sheet.component';
 import { EditConsumableSheetComponent } from '../consumables/edit-consumable-sheet/edit-consumable-sheet.component';
 import { isTerminalStatus } from '../shared/item-status-meta';
+import { WARRANTY_FACETS, type WarrantyFacet } from '../shared/warranties/warranty-status-meta';
 import { injectIsNarrowViewport } from '@/shared/utils/viewport';
 import { UserPreferencesService } from '@/shared/services/user-preferences.service';
 import { sortRows, type InventoryRow, type InventorySortId, type InventorySortState } from './inventory-row';
@@ -114,6 +116,7 @@ export const kindFilterFromParam = (v: string | null): KindFilter => (isKindFilt
     lucideLayoutGrid,
     lucideTable,
     lucideEllipsisVertical,
+    lucideCheck,
   })],
   host: { class: 'flex min-h-0 flex-1 flex-col gap-4' },
   template: `
@@ -141,7 +144,7 @@ export const kindFilterFromParam = (v: string | null): KindFilter => (isKindFilt
           <div hlmPopoverContent *hlmPopoverPortal class="max-h-[min(70vh,32rem)] w-[260px] overflow-y-auto p-0" align="start">
             <div class="flex items-center justify-between px-3 py-2">
               <span class="text-sm font-medium">Filters</span>
-              @if (showInactive() || lowStockOnly() || lentOnly() || extraFiltersActive()) {
+              @if (showInactive() || lowStockOnly() || lentOnly() || warrantyFilter() !== 'any' || extraFiltersActive()) {
                 <button
                   hlmBtn
                   variant="ghost"
@@ -178,6 +181,22 @@ export const kindFilterFromParam = (v: string | null): KindFilter => (isKindFilt
                 />
                 <span>Lent only ({{ lentCount() }})</span>
               </label>
+            </div>
+            <!-- Warranty is single-choice (the states are mutually exclusive), so it reads as a
+                 radio-style group of rows rather than four more checkboxes. -->
+            <span hlmSeparator></span>
+            <div class="p-1">
+              <span class="block px-2 py-1 text-xs font-medium text-muted-foreground">Warranty</span>
+              @for (facet of warrantyFacets; track facet.value) {
+                <button
+                  type="button"
+                  class="flex w-full items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+                  (click)="warrantyFilter.set(facet.value)"
+                >
+                  <span>{{ facet.label }} ({{ warrantyCounts()[facet.value] }})</span>
+                  @if (warrantyFilter() === facet.value) { <ng-icon hlm name="lucideCheck" size="sm" /> }
+                </button>
+              }
             </div>
             <ng-content select="[refineExtra]" />
           </div>
@@ -416,6 +435,7 @@ export class InventoryItemsViewComponent implements OnInit {
   initialShowInactive = input(false);
   initialLowStockOnly = input(false);
   initialLentOnly = input(false);
+  initialWarranty = input<WarrantyFacet>('any');
   initialSort = input<InventorySortState>({ id: 'name', desc: false });
   /** Browse passes false: place contents carry only live statuses, so the toggle would be dead. */
   showInactiveFilter = input(true);
@@ -443,6 +463,9 @@ export class InventoryItemsViewComponent implements OnInit {
   lowStockOnly = signal(false);
   /** Lent-only lens: rows whose status is Lent. */
   lentOnly = signal(false);
+  /** Single-choice warranty lens over the durable rows' server-derived status; 'any' = off. */
+  warrantyFilter = signal<WarrantyFacet>('any');
+  protected readonly warrantyFacets = WARRANTY_FACETS;
   sort = signal<InventorySortState>({ id: 'name', desc: false });
 
   selectedDurable = signal<DurableResponse | null>(null);
@@ -469,6 +492,7 @@ export class InventoryItemsViewComponent implements OnInit {
     this.showInactive.set(this.initialShowInactive());
     this.lowStockOnly.set(this.initialLowStockOnly());
     this.lentOnly.set(this.initialLentOnly());
+    this.warrantyFilter.set(this.initialWarranty());
     this.sort.set(this.initialSort());
   }
 
@@ -480,12 +504,36 @@ export class InventoryItemsViewComponent implements OnInit {
   });
 
   inactiveCount = computed(() => this.kindRows().filter(r => isTerminalStatus(r.status)).length);
+  /**
+   * The base every in-popover count is taken over: the kind-filtered rows minus the ones the
+   * inactive toggle is currently hiding. A count that ignored that narrowing would promise rows the
+   * list cannot show — "None (44)" beside a list that yields 35 — so every filter's badge is
+   * measured against the same visible-if-you-pick-this set.
+   */
+  private countableRows = computed(() => {
+    const rows = this.kindRows();
+    return this.showInactive() ? rows : rows.filter(r => !isTerminalStatus(r.status));
+  });
+
   // Counts what the low-stock filter would actually show: archived low consumables count only while
   // "Show inactive" reveals them.
-  lowCount = computed(() => this.kindRows()
-    .filter(r => r.isLow && (this.showInactive() || !isTerminalStatus(r.status))).length);
-  // Lent is a live status, so the inactive toggle can't hide these rows.
-  lentCount = computed(() => this.kindRows().filter(r => r.status === 'Lent').length);
+  lowCount = computed(() => this.countableRows().filter(r => r.isLow).length);
+  // Lent is a live status, so the inactive narrowing above can never remove one of these rows.
+  lentCount = computed(() => this.countableRows().filter(r => r.status === 'Lent').length);
+  /**
+   * How many rows each warranty facet would show. Durables only — a consumable carries no warranty
+   * status, so it can never satisfy any facet but "Any" (which counts the whole countable set, so
+   * the badge beside it matches the list you get by clearing the facet).
+   */
+  warrantyCounts = computed<Record<WarrantyFacet, number>>(() => {
+    const rows = this.countableRows();
+    const counts = { any: rows.length, active: 0, expiring: 0, expired: 0, none: 0 } as Record<WarrantyFacet, number>;
+    for (const facet of WARRANTY_FACETS) {
+      if (!facet.status) continue;
+      counts[facet.value] = rows.filter(r => r.warrantyStatus === facet.status).length;
+    }
+    return counts;
+  });
 
   visibleRows = computed(() => {
     let rows = this.kindRows();
@@ -493,6 +541,9 @@ export class InventoryItemsViewComponent implements OnInit {
     // Only consumables carry a low flag, so this doubles as the reorder view.
     if (this.lowStockOnly()) rows = rows.filter(r => r.isLow);
     if (this.lentOnly()) rows = rows.filter(r => r.status === 'Lent');
+    // Warranties are durables-only, so any facet but 'any' drops every consumable by construction.
+    const warranty = WARRANTY_FACETS.find(f => f.value === this.warrantyFilter())?.status ?? null;
+    if (warranty) rows = rows.filter(r => r.warrantyStatus === warranty);
     return rows;
   });
 
@@ -518,6 +569,9 @@ export class InventoryItemsViewComponent implements OnInit {
     if (scope) return scope;
     if (this.lowStockOnly()) return 'Filter: Low stock';
     if (this.lentOnly()) return 'Filter: Lent';
+    // The facet *value* ('expiring') reads better in the trigger than its menu label ('Expiring soon').
+    const warranty = this.warrantyFilter();
+    if (warranty !== 'any') return `Filter: Warranty ${warranty}`;
     return this.showInactive() ? 'Filter: Inactive' : 'Filter';
   });
 
@@ -540,6 +594,7 @@ export class InventoryItemsViewComponent implements OnInit {
     this.showInactive.set(false);
     this.lowStockOnly.set(false);
     this.lentOnly.set(false);
+    this.warrantyFilter.set('any');
     this.reset.emit();
   }
 
