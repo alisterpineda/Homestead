@@ -26,6 +26,21 @@
       "@/shared/components/spartan/button": [
         "./src/app/shared/components/spartan/button/src/index.ts"
       ],
+      "@/shared/components/spartan/autocomplete": [
+        "./src/app/shared/components/spartan/autocomplete/src/index.ts"
+      ],
+      "@/shared/components/spartan/popover": [
+        "./src/app/shared/components/spartan/popover/src/index.ts"
+      ],
+      "@/shared/components/spartan/input-group": [
+        "./src/app/shared/components/spartan/input-group/src/index.ts"
+      ],
+      "@/shared/components/spartan/input": [
+        "./src/app/shared/components/spartan/input/src/index.ts"
+      ],
+      "@/shared/components/spartan/textarea": [
+        "./src/app/shared/components/spartan/textarea/src/index.ts"
+      ],
       "@/shared/components/spartan/badge": [
         "./src/app/shared/components/spartan/badge/src/index.ts"
       ],
@@ -53,15 +68,6 @@
       "@/shared/components/spartan/combobox": [
         "./src/app/shared/components/spartan/combobox/src/index.ts"
       ],
-      "@/shared/components/spartan/input-group": [
-        "./src/app/shared/components/spartan/input-group/src/index.ts"
-      ],
-      "@/shared/components/spartan/input": [
-        "./src/app/shared/components/spartan/input/src/index.ts"
-      ],
-      "@/shared/components/spartan/textarea": [
-        "./src/app/shared/components/spartan/textarea/src/index.ts"
-      ],
       "@/shared/components/spartan/command": [
         "./src/app/shared/components/spartan/command/src/index.ts"
       ],
@@ -71,8 +77,8 @@
       "@/shared/components/spartan/date-picker": [
         "./src/app/shared/components/spartan/date-picker/src/index.ts"
       ],
-      "@/shared/components/spartan/popover": [
-        "./src/app/shared/components/spartan/popover/src/index.ts"
+      "@/shared/components/spartan/drawer": [
+        "./src/app/shared/components/spartan/drawer/src/index.ts"
       ],
       "@/shared/components/spartan/dropdown-menu": [
         "./src/app/shared/components/spartan/dropdown-menu/src/index.ts"
@@ -139,12 +145,6 @@
       ],
       "@/shared/components/spartan/icon": [
         "./src/app/shared/components/spartan/icon/src/index.ts"
-      ],
-      "@/shared/components/spartan/drawer": [
-        "./src/app/shared/components/spartan/drawer/src/index.ts"
-      ],
-      "@/shared/components/spartan/autocomplete": [
-        "./src/app/shared/components/spartan/autocomplete/src/index.ts"
       ]
     }
   },

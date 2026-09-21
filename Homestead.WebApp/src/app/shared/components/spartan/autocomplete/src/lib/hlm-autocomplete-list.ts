@@ -4,7 +4,7 @@ import { classes } from '@/shared/components/spartan/utils';
 
 @Directive({
 	selector: '[hlmAutocompleteList]',
-	hostDirectives: [{ directive: BrnAutocompleteList, inputs: ['id'] }],
+	hostDirectives: [{ directive: BrnAutocompleteList, inputs: ['id', 'aria-label', 'aria-labelledby'] }],
 	host: { 'data-slot': 'autocomplete-list' },
 })
 export class HlmAutocompleteList {
