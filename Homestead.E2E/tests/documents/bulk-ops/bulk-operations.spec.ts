@@ -106,7 +106,7 @@ test.describe('Bulk operations', () => {
     const deleteResponse = page.waitForResponse(
       (resp) => resp.url().includes('/api/v1/documents/bulk-delete') && resp.request().method() === 'POST',
     );
-    await page.getByRole('button', { name: /^Delete$/ }).last().click();
+    await page.getByRole('alertdialog').getByRole('button', { name: /^Delete$/ }).click();
     await deleteResponse;
   });
 

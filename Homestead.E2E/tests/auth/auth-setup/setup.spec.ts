@@ -76,7 +76,15 @@ setup(
     // 5. Persist the admin's authenticated browser state for workflow tests
     await page.context().storageState({ path: AUTH_STATE.adminPath });
 
-    // 6. Log out so the login tests start from an unauthenticated state
-    await page.goto(`${baseUrl}/api/auth/logout`, { waitUntil: 'networkidle' });
+    // 6. Log out so the login tests start from an unauthenticated state.
+    //    This is the real OIDC sign-out endpoint (cookie sign-out + Keycloak
+    //    end-session). Keycloak asks for confirmation because the app sends
+    //    client_id rather than id_token_hint; confirming lands on /login.
+    await page.goto(
+      `${baseUrl}/api/auth/oidc/logout?returnUrl=${encodeURIComponent(`${baseUrl}/login`)}`,
+    );
+    await page.waitForURL(KEYCLOAK_URL_PATTERN);
+    await page.getByRole('button', { name: 'Logout' }).click();
+    await page.waitForURL(/\/login(\?|$)/);
   },
 );

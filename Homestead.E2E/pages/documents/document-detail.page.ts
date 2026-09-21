@@ -51,6 +51,6 @@ export class DocumentDetailPage {
     await this.openMoreMenu();
     await this.page.getByText('Delete').click();
     // Confirm in alert dialog
-    await this.page.getByRole('button', { name: 'Delete' }).last().click();
+    await this.page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click();
   }
 }

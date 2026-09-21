@@ -78,7 +78,7 @@ export class TagListPage {
     const deleteResponse = this.page.waitForResponse(
       (resp) => resp.url().includes('/api/v1/documents/tags/bulk-delete') && resp.request().method() === 'POST',
     );
-    await this.page.getByRole('button', { name: 'Delete' }).last().click();
+    await this.page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click();
     await deleteResponse;
   }
 }
