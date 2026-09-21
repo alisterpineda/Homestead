@@ -147,7 +147,7 @@ import { getModuleByPath } from '@/modules/registry';
         <!-- Inset Header -->
         <header class="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4 select-none">
           <button hlmSidebarTrigger></button>
-          <hlm-separator orientation="vertical" class="mr-2 !h-4" />
+          <hlm-separator orientation="vertical" class="mr-2 h-4 data-vertical:self-center" />
           @if (headerTitle()) {
             <div class="min-w-0">
               <ng-container *ngTemplateOutlet="headerTitle()!" />
