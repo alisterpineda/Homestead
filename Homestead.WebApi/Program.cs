@@ -387,6 +387,15 @@ if (app.Environment.IsDevelopment())
     app.MapScalarApiReference();
 }
 
+// A miss under /api is a client error, not a client-side route. Without this the fallback
+// below would answer with index.html and the caller would fail parsing JSON. A catch-all
+// segment has the lowest route precedence, so real endpoints still win. RequireAuthorization
+// keeps the 401 for anonymous callers so an unauthenticated probe learns nothing about which
+// paths exist; signed-in users get the 404.
+app.Map("/api/{**rest}", () => Results.NotFound())
+    .RequireAuthorization()
+    .ExcludeFromDescription();
+
 // SPA fallback for client-side routing — must also send no-cache since this always serves index.html
 app.MapFallbackToFile("index.html", new StaticFileOptions
 {
