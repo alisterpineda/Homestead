@@ -24,7 +24,6 @@ public class CreateGroupHandler(
 
         var group = new Group
         {
-            Id = Guid.NewGuid(),
             Name = request.Name.Trim(),
             Description = request.Description?.Trim(),
             CreatedAt = DateTimeOffset.UtcNow,

@@ -35,7 +35,6 @@ public class BalanceEntryService(
 
         var entry = new BalanceEntryTransaction
         {
-            Id = Guid.NewGuid(),
             OccurredAt = occurredAt,
             Memo = NormalizeMemo(request.Memo),
             Type = TransactionType.BalanceEntry,
@@ -46,14 +45,12 @@ public class BalanceEntryService(
             [
                 new AccountTransactionSplit
                 {
-                    Id = Guid.NewGuid(),
                     AccountId = account.Id,
                     CommodityId = commodity.Id,
                     Quantity = delta,
                 },
                 new AccountTransactionSplit
                 {
-                    Id = Guid.NewGuid(),
                     AccountId = adjustments.Id,
                     CommodityId = commodity.Id,
                     Quantity = -delta,

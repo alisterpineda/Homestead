@@ -30,7 +30,6 @@ public class CreateBrandHandler(AppDbContext db, IAuditContext audit, IUnitOfWor
 
         var brand = new Brand
         {
-            Id = Guid.NewGuid(),
             Name = name,
             CreatedAt = DateTimeOffset.UtcNow,
             UpdatedAt = DateTimeOffset.UtcNow,

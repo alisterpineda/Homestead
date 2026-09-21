@@ -29,7 +29,6 @@ public class CreateAccountHandler(
 
         var account = new Account
         {
-            Id = Guid.NewGuid(),
             Name = request.Name.Trim(),
             AccountType = request.Kind.ToAccountType(),
             Kind = request.Kind,

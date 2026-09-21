@@ -28,7 +28,6 @@ public class DividendService(
 
         var transaction = new NormalTransaction
         {
-            Id = Guid.NewGuid(),
             OccurredAt = request.OccurredAt,
             Memo = NormalizeDescription(request.Description),
             Type = TransactionType.Normal,
@@ -37,14 +36,12 @@ public class DividendService(
             [
                 new AccountTransactionSplit
                 {
-                    Id = Guid.NewGuid(),
                     AccountId = account.Id,
                     CommodityId = payment.Id,
                     Quantity = request.Amount,
                 },
                 new AccountTransactionSplit
                 {
-                    Id = Guid.NewGuid(),
                     AccountId = income.Id,
                     CommodityId = payment.Id,
                     Quantity = -request.Amount,

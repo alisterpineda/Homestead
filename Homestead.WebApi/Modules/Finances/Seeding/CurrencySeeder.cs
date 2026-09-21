@@ -215,7 +215,6 @@ public static class CurrencySeeder
             if (existingSymbols.Contains(code)) continue;
             toAdd.Add(new Commodity
             {
-                Id = Guid.NewGuid(),
                 Symbol = code,
                 Exchange = null,
                 Name = name,

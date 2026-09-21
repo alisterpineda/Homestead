@@ -201,7 +201,6 @@ public class BackupToTargetJobHandler(
         {
             var child = new ProcessingJob
             {
-                Id = Guid.NewGuid(),
                 Type = ProcessingJobType.BackupBatch,
                 Status = ProcessingJobStatus.Pending,
                 EntityType = ProcessingEntityType.BackupSource,

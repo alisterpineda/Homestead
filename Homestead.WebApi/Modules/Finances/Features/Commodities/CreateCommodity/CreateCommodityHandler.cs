@@ -29,7 +29,6 @@ public class CreateCommodityHandler(
 
         var commodity = new Commodity
         {
-            Id = Guid.NewGuid(),
             Symbol = symbol,
             Exchange = exchange,
             Name = name,

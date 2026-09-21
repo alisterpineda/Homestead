@@ -275,7 +275,6 @@ public class DripService(
         DateTimeOffset occurredAt, string memo) =>
         new()
         {
-            Id = Guid.NewGuid(),
             OccurredAt = occurredAt,
             Memo = memo,
             Type = TransactionType.Normal,
@@ -284,14 +283,12 @@ public class DripService(
             [
                 new AccountTransactionSplit
                 {
-                    Id = Guid.NewGuid(),
                     AccountId = accountId,
                     CommodityId = paymentId,
                     Quantity = total,
                 },
                 new AccountTransactionSplit
                 {
-                    Id = Guid.NewGuid(),
                     AccountId = incomeId,
                     CommodityId = paymentId,
                     Quantity = -total,
@@ -304,7 +301,6 @@ public class DripService(
         DateTimeOffset occurredAt, string memo) =>
         new()
         {
-            Id = Guid.NewGuid(),
             OccurredAt = occurredAt,
             Memo = memo,
             Type = TransactionType.Normal,
@@ -315,7 +311,6 @@ public class DripService(
                 // half's inflow to leave the account's cash unchanged.
                 new AccountTransactionSplit
                 {
-                    Id = Guid.NewGuid(),
                     AccountId = accountId,
                     CommodityId = paymentId,
                     Quantity = -total,
@@ -324,7 +319,6 @@ public class DripService(
                 // leg in the pair, so it emits the single linked CommodityPrice row.
                 new AccountTransactionSplit
                 {
-                    Id = Guid.NewGuid(),
                     AccountId = accountId,
                     CommodityId = securityId,
                     Quantity = units,

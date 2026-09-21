@@ -43,7 +43,6 @@ public class BulkReprocessDocumentsJobHandler(
 
             db.ProcessingJobs.Add(new ProcessingJob
             {
-                Id = Guid.NewGuid(),
                 Type = ProcessingJobType.ReprocessDocumentVersion,
                 Status = ProcessingJobStatus.Pending,
                 EntityType = ProcessingEntityType.Document,

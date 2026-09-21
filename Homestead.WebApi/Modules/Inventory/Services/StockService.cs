@@ -300,7 +300,6 @@ public class StockService(
 
         db.StockMovements.Add(new StockMovement
         {
-            Id = Guid.NewGuid(),
             ItemId = item.Id,
             Kind = kind,
             FromAreaId = from?.AreaId,
@@ -328,7 +327,6 @@ public class StockService(
     private static StockEntry NewEntry(Guid itemId, StockLocation location, decimal quantity, DateTimeOffset now) =>
         new()
         {
-            Id = Guid.NewGuid(),
             ItemId = itemId,
             AreaId = location.AreaId,
             ContainerItemId = location.ContainerItemId,

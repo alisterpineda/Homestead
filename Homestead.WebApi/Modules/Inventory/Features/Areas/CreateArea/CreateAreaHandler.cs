@@ -27,7 +27,6 @@ public class CreateAreaHandler(AppDbContext db, IAuditContext audit, IUnitOfWork
 
         var area = new Area
         {
-            Id = Guid.NewGuid(),
             Name = request.Name.Trim(),
             ParentAreaId = request.ParentAreaId,
             CreatedAt = DateTimeOffset.UtcNow,

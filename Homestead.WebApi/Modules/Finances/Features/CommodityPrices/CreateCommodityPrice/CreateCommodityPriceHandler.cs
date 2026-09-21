@@ -51,7 +51,6 @@ public class CreateCommodityPriceHandler(
 
         var price = new CommodityPrice
         {
-            Id = Guid.NewGuid(),
             CommodityId = request.CommodityId,
             QuoteCurrencyId = request.QuoteCurrencyId,
             PriceAt = priceAt,

@@ -35,7 +35,6 @@ public class BulkClassifyDocumentsJobHandler(
 
             db.ProcessingJobs.Add(new ProcessingJob
             {
-                Id = Guid.NewGuid(),
                 Type = ProcessingJobType.ClassifyDocument,
                 Status = ProcessingJobStatus.Pending,
                 EntityType = ProcessingEntityType.Document,

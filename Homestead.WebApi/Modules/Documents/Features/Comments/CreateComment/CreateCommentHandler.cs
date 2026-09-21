@@ -25,7 +25,6 @@ public class CreateCommentHandler(
 
         var comment = new DocumentComment
         {
-            Id = Guid.NewGuid(),
             Body = request.Body.Trim(),
             DocumentId = request.DocumentId,
             CreatedByUserId = userId,

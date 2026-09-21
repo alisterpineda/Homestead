@@ -18,7 +18,6 @@ public class CreateUserHandler(AppDbContext db, IAuditContext audit)
 
         var user = new AppUser
         {
-            Id = Guid.NewGuid(),
             Email = email,
             DisplayName = request.DisplayName.Trim(),
             Role = request.Role,

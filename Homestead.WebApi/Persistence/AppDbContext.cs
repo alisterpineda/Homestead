@@ -63,5 +63,31 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     {
         modelBuilder.HasPostgresExtension("pg_trgm");
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
+        UseUuidV7PrimaryKeys(modelBuilder);
+    }
+
+    /// <summary>
+    /// Every single-column Guid primary key that the app mints itself gets <see cref="UuidV7ValueGenerator"/>.
+    /// Runs after the per-entity configurations so a new entity picks it up without any per-config line.
+    /// Skipped: derived TPH types (the root owns the key), and keys that are also foreign keys (shared
+    /// primary keys copy the principal's value, they are never generated).
+    /// </summary>
+    private static void UseUuidV7PrimaryKeys(ModelBuilder modelBuilder)
+    {
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            if (entityType.BaseType is not null) continue;
+
+            var key = entityType.FindPrimaryKey();
+            if (key is null || key.Properties.Count != 1) continue;
+
+            var property = key.Properties[0];
+            if (property.ClrType != typeof(Guid) || property.IsForeignKey()) continue;
+
+            modelBuilder.Entity(entityType.ClrType)
+                .Property(property.Name)
+                .ValueGeneratedOnAdd()
+                .HasValueGenerator<UuidV7ValueGenerator>();
+        }
     }
 }

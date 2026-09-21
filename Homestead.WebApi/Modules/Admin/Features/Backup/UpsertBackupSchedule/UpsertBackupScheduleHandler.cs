@@ -79,7 +79,6 @@ public class UpsertBackupScheduleHandler(
         {
             schedule = new ProcessingSchedule
             {
-                Id = Guid.NewGuid(),
                 Name = name,
                 Description = "Managed via /admin/backup",
                 JobType = descriptor.JobType,

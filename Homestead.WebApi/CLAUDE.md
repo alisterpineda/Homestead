@@ -53,6 +53,7 @@ The WebApi uses vertical slice architecture organized by module, with MediatR fo
 - **Modules** (e.g., `Modules/Documents/DocumentsModule.cs`) register versioned route groups on `IVersionedEndpointRouteBuilder`
 - **API versioning** is URL-based: `/api/v{version:apiVersion}/documents`
 - **Persistence**: EF Core with PostgreSQL. Migrations auto-run on startup in `Program.cs`
+- **Primary keys**: UUIDv7, minted in one place — `UuidV7ValueGenerator` is registered for every Guid key in `AppDbContext.OnModelCreating`. Never set `Id = Guid.NewGuid()` on an entity; leave `Id` unset and read it after `db.Set.Add(entity)` (EF assigns it at `Add`, not `SaveChanges`). Link children via navigation properties rather than copying a parent id you minted yourself. `UuidV7PrimaryKeyTests` fails the build on any new `Guid.NewGuid()` in the WebApi outside its allowlist of non-key uses
 
 ### Project Structure
 

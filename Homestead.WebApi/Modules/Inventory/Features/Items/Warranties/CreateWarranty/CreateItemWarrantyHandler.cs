@@ -33,7 +33,6 @@ public class CreateItemWarrantyHandler(
         var now = DateTimeOffset.UtcNow;
         var warranty = new ItemWarranty
         {
-            Id = Guid.NewGuid(),
             ItemId = item.Id,
             Provider = ItemWarrantyText.NormalizeText(request.Provider),
             ExpiresOn = request.ExpiresOn,

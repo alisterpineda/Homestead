@@ -78,7 +78,6 @@ public class ApplyCommodityPriceObservationsHandler(AppDbContext db, IAuditConte
                 {
                     var price = new CommodityPrice
                     {
-                        Id = Guid.NewGuid(),
                         CommodityId = observation.CommodityId,
                         QuoteCurrencyId = observation.QuoteCurrencyId,
                         PriceAt = observation.PriceAt,

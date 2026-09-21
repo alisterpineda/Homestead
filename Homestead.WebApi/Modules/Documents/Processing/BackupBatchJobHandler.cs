@@ -496,7 +496,6 @@ public class BackupBatchJobHandler(
 
         var session = new BackupUploadSession
         {
-            Id = Guid.NewGuid(),
             BackupSourceId = backupSourceId,
             DocumentVersionId = action.VersionId,
             SessionUri = suspended.SessionUri,
@@ -684,7 +683,6 @@ public class BackupBatchJobHandler(
     {
         var continuation = new ProcessingJob
         {
-            Id = Guid.NewGuid(),
             Type = ProcessingJobType.BackupBatch,
             Status = ProcessingJobStatus.Pending,
             EntityType = job.EntityType,
@@ -719,7 +717,6 @@ public class BackupBatchJobHandler(
 
         var state = new DocumentBackupState
         {
-            Id = Guid.NewGuid(),
             BackupSourceId = backupSourceId,
             DocumentVersionId = action.VersionId,
             DocumentId = action.DocumentId,

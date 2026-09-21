@@ -34,7 +34,6 @@ public class FlowService(
 
         var transaction = new NormalTransaction
         {
-            Id = Guid.NewGuid(),
             OccurredAt = request.Date.ToStartOfDayUtc(),
             Memo = NormalizeMemo(request.Description),
             Type = TransactionType.Normal,
@@ -46,14 +45,12 @@ public class FlowService(
             [
                 new AccountTransactionSplit
                 {
-                    Id = Guid.NewGuid(),
                     AccountId = account.Id,
                     CommodityId = currency.Id,
                     Quantity = accountQuantity,
                 },
                 new AccountTransactionSplit
                 {
-                    Id = Guid.NewGuid(),
                     AccountId = counter.Id,
                     CommodityId = currency.Id,
                     Quantity = -accountQuantity,

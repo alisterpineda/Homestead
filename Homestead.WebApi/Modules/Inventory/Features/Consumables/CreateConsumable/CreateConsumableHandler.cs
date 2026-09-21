@@ -29,7 +29,6 @@ public class CreateConsumableHandler(
 
         var item = new Item
         {
-            Id = Guid.NewGuid(),
             Name = request.Name.Trim(),
             Fungibility = Fungibility.Fungible,
             Status = ItemStatus.Active,

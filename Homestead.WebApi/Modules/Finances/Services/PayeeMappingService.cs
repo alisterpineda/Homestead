@@ -17,7 +17,8 @@ public class PayeeMappingService(AppDbContext db, ICurrentUserAccessor currentUs
         var key = Truncate(normalizedKey);
         var sample = Truncate(sampleRawDescription);
         var userId = currentUser.UserId;
-        var id = Guid.NewGuid();
+        // Raw SQL never goes through the change tracker, so UuidV7ValueGenerator can't run here.
+        var id = Guid.CreateVersion7();
         short version = PayeeDescriptionNormalizer.Version;
 
         // First ON CONFLICT upsert in the app. The CommandWriteCommandInterceptor auto-enrolls this raw

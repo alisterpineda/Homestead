@@ -22,7 +22,6 @@ public class CreatePartyHandler(AppDbContext db, ICurrentUserAccessor currentUse
 
         var party = new Party
         {
-            Id = Guid.NewGuid(),
             Name = name,
             Description = request.Description?.Trim(),
             CreatedAt = DateTimeOffset.UtcNow,

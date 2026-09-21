@@ -39,7 +39,6 @@ public class LinkedPriceManager(AppDbContext db, IAuditContext audit) : ILinkedP
 
                 var created = new CommodityPrice
                 {
-                    Id = Guid.NewGuid(),
                     CommodityId = split.CommodityId,
                     QuoteCurrencyId = quoteId,
                     PriceAt = transaction.OccurredAt,

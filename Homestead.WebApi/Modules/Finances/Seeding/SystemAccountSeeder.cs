@@ -74,7 +74,6 @@ public static class SystemAccountSeeder
         {
             toAdd.Add(new Account
             {
-                Id = Guid.NewGuid(),
                 Name = def.Name,
                 AccountType = def.Type,
                 Kind = null,

@@ -45,7 +45,6 @@ public class InventoryTagPathResolver(AppDbContext db) : IInventoryTagPathResolv
                 var color = isLeaf ? leafColor : null;
                 tag = new Tag
                 {
-                    Id = Guid.NewGuid(),
                     Name = segments[i],
                     Path = currentPath,
                     ParentId = parent?.Id,
@@ -102,7 +101,6 @@ public class InventoryTagPathResolver(AppDbContext db) : IInventoryTagPathResolv
                 {
                     tag = new Tag
                     {
-                        Id = Guid.NewGuid(),
                         Name = segments[i],
                         Path = currentPath,
                         ParentId = parent?.Id,

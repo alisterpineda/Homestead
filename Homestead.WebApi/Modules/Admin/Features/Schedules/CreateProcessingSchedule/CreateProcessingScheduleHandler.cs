@@ -18,7 +18,6 @@ public class CreateProcessingScheduleHandler(
 
         var schedule = new ProcessingSchedule
         {
-            Id = Guid.NewGuid(),
             Name = request.Name.Trim(),
             Description = request.Description?.Trim(),
             JobType = request.JobType,

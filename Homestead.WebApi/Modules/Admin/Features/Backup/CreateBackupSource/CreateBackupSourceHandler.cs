@@ -51,7 +51,6 @@ public class CreateBackupSourceHandler(
 
         var source = new BackupSource
         {
-            Id = Guid.NewGuid(),
             SourceKind = descriptor.Key,
             // The RESOLVER's casing, not the caller's: the row and config must agree on how the target is
             // spelled, or every subsequent display reads back whatever the first admin happened to type.

@@ -26,7 +26,6 @@ public class CreateItemNoteHandler(
         var now = DateTimeOffset.UtcNow;
         var note = new ItemNote
         {
-            Id = Guid.NewGuid(),
             ItemId = request.ItemId,
             // Normalised to UTC: Npgsql refuses a non-zero offset on a timestamptz column.
             OccurredAt = (request.OccurredAt ?? now).ToUniversalTime(),

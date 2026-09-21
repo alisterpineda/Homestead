@@ -31,7 +31,6 @@ public class CreateCategoryHandler(
 
         var category = new Account
         {
-            Id = Guid.NewGuid(),
             Name = name,
             AccountType = request.Type,
             Kind = null,

@@ -70,7 +70,6 @@ public class CreateDurableHandler(
 
         var item = new Item
         {
-            Id = Guid.NewGuid(),
             Name = request.Name.Trim(),
             Fungibility = Fungibility.NonFungible,
             Status = ItemStatus.Active,

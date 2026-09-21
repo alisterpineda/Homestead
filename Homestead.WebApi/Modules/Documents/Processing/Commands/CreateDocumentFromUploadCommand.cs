@@ -42,10 +42,8 @@ public class CreateDocumentFromUploadHandler(
 {
     public async Task<CreateDocumentFromUploadResult> Handle(CreateDocumentFromUploadCommand request, CancellationToken ct)
     {
-        var documentId = Guid.NewGuid();
         var document = new Document
         {
-            Id = documentId,
             Name = request.Name,
             CreatedAt = DateTimeOffset.UtcNow,
             CreatedByUserId = request.ActorUserId,
@@ -55,7 +53,6 @@ public class CreateDocumentFromUploadHandler(
 
         var version = new DocumentVersion
         {
-            Id = Guid.NewGuid(),
             VersionNumber = 1,
             Label = request.Label,
             ContentType = request.ContentType,
@@ -64,7 +61,7 @@ public class CreateDocumentFromUploadHandler(
             FileHash = request.FileHash,
             FileExtension = request.FileExtension,
             CreatedAt = DateTimeOffset.UtcNow,
-            DocumentId = documentId,
+            Document = document,
             ExtractedText = request.ExtractedText,
             TextExtractionMetadata = request.TextExtractionMetadata
         };
@@ -80,10 +77,10 @@ public class CreateDocumentFromUploadHandler(
                 ClassificationScope.All, request.ActorUserId, stampSummaryMetadata: false, ct);
         }
 
-        audit.Created("Document", documentId);
+        audit.Created("Document", document.Id);
 
         // The UnitOfWorkBehavior commits once after this handler returns — a single Created row.
         // SearchVector is maintained by DB triggers as document + version are inserted.
-        return new CreateDocumentFromUploadResult(documentId, document.Name);
+        return new CreateDocumentFromUploadResult(document.Id, document.Name);
     }
 }

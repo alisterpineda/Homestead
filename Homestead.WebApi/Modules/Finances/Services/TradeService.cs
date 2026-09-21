@@ -25,7 +25,6 @@ public class TradeService(
 
         var transaction = new NormalTransaction
         {
-            Id = Guid.NewGuid(),
             OccurredAt = request.OccurredAt,
             Memo = NormalizeMemo(request.Memo),
             Type = TransactionType.Normal,
@@ -179,7 +178,6 @@ public class TradeService(
 
         var cash = new AccountTransactionSplit
         {
-            Id = Guid.NewGuid(),
             AccountId = accountId,
             CommodityId = fundingId,
             Quantity = sign * total,
@@ -187,7 +185,6 @@ public class TradeService(
 
         var security = new AccountTransactionSplit
         {
-            Id = Guid.NewGuid(),
             AccountId = accountId,
             CommodityId = securityId,
             Quantity = -sign * quantity,

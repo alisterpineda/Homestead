@@ -30,7 +30,6 @@ public class OidcUserProvisioner(
 
             user = new AppUser
             {
-                Id = Guid.NewGuid(),
                 Email = email,
                 DisplayName = displayName,
                 IsActive = isFirstUser,

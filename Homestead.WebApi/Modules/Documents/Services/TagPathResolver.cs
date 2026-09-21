@@ -44,7 +44,6 @@ public class TagPathResolver(AppDbContext db) : ITagPathResolver
                 var color = isLeaf ? leafColor : null;
                 tag = new Tag
                 {
-                    Id = Guid.NewGuid(),
                     Name = segments[i],
                     Path = currentPath,
                     ParentId = parent?.Id,
@@ -101,7 +100,6 @@ public class TagPathResolver(AppDbContext db) : ITagPathResolver
                 {
                     tag = new Tag
                     {
-                        Id = Guid.NewGuid(),
                         Name = segments[i],
                         Path = currentPath,
                         ParentId = parent?.Id,

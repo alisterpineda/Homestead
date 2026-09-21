@@ -22,7 +22,6 @@ public class UpsertPriceSourceScheduleHandler(
 
         var now = DateTimeOffset.UtcNow;
         var nextRunAt = CronSchedule.NextOccurrence(request.CronExpression, now);
-        var newId = Guid.NewGuid();
 
         // RemoveBySource only marks the existing schedule for deletion; the Add below stages the new one.
         // Both are a single atomic SaveChanges committed by the command pipeline's transaction — no need
@@ -31,7 +30,6 @@ public class UpsertPriceSourceScheduleHandler(
 
         var schedule = new ProcessingSchedule
         {
-            Id = newId,
             Name = $"{request.Source.DisplayName()} price import",
             Description = "Managed via /finances/settings/price-sources",
             JobType = ProcessingJobType.ImportCommodityPrices,
@@ -47,6 +45,6 @@ public class UpsertPriceSourceScheduleHandler(
 
         db.ProcessingSchedules.Add(schedule);
 
-        return new UpsertPriceSourceScheduleResponse(newId, nextRunAt);
+        return new UpsertPriceSourceScheduleResponse(schedule.Id, nextRunAt);
     }
 }

@@ -961,7 +961,6 @@ public sealed class GoogleDriveBackupTarget : IBackupTarget, IBackupTargetCache,
 
         db.BackupTargetFolders.Add(new BackupTargetFolder
         {
-            Id = Guid.NewGuid(),
             TargetKey = Key,
             Path = path,
             RemoteFolderId = folderId,

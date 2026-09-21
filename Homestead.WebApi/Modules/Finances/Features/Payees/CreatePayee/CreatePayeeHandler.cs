@@ -27,7 +27,6 @@ public class CreatePayeeHandler(
 
         var payee = new Payee
         {
-            Id = Guid.NewGuid(),
             Name = name,
             DefaultCategoryId = request.DefaultCategoryId,
             Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim(),

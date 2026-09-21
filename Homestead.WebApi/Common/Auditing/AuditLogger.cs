@@ -28,7 +28,6 @@ public class AuditLogger : IAuditLogger
     {
         _db.AuditLogs.Add(new AuditLog
         {
-            Id = Guid.NewGuid(),
             EntityType = entityType,
             EntityId = entityId,
             ParentEntityId = parentEntityId,
@@ -46,7 +45,6 @@ public class AuditLogger : IAuditLogger
 
         _db.AuditLogs.Add(new AuditLog
         {
-            Id = Guid.NewGuid(),
             EntityType = entityType,
             EntityId = entityId,
             ParentEntityId = parentEntityId,
@@ -90,7 +88,6 @@ public class AuditLogger : IAuditLogger
 
         _db.AuditLogs.Add(new AuditLog
         {
-            Id = Guid.NewGuid(),
             EntityType = entityType,
             EntityId = entityId,
             ParentEntityId = parentEntityId,

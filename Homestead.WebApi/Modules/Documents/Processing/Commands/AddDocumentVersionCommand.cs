@@ -47,7 +47,6 @@ public class AddDocumentVersionHandler(AppDbContext db, IAuditContext audit)
 
         var version = new DocumentVersion
         {
-            Id = Guid.NewGuid(),
             VersionNumber = maxVersionNumber + 1,
             Label = request.Label,
             ContentType = request.ContentType,

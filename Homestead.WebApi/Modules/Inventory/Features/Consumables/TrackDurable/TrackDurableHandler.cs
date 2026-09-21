@@ -41,7 +41,6 @@ public class TrackDurableHandler(
         // becomes the item's location.
         var item = new Item
         {
-            Id = Guid.NewGuid(),
             Name = body.Name.Trim(),
             Fungibility = Fungibility.NonFungible,
             Status = ItemStatus.Active,

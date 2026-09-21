@@ -15,7 +15,6 @@ public class JobQueue(AppDbContext db, IJobSignal signal, IUnitOfWork unitOfWork
 
         var job = new ProcessingJob
         {
-            Id = Guid.NewGuid(),
             Type = type,
             Status = ProcessingJobStatus.Pending,
             EntityType = options.EntityType,

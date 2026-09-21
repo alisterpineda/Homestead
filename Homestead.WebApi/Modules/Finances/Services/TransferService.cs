@@ -31,7 +31,6 @@ public class TransferService(
 
         var transaction = new NormalTransaction
         {
-            Id = Guid.NewGuid(),
             OccurredAt = occurredAt,
             Memo = NormalizeMemo(request.Memo),
             Type = TransactionType.Normal,
@@ -207,7 +206,6 @@ public class TransferService(
         // sign flip per AccountType is needed for a transfer.
         var sourceSplit = new AccountTransactionSplit
         {
-            Id = Guid.NewGuid(),
             AccountId = sourceAccountId,
             CommodityId = sourceCurrency.Id,
             Quantity = -sourceAmount,
@@ -215,7 +213,6 @@ public class TransferService(
 
         var destSplit = new AccountTransactionSplit
         {
-            Id = Guid.NewGuid(),
             AccountId = destinationAccountId,
             CommodityId = destinationCurrency.Id,
             Quantity = destinationAmount ?? sourceAmount,

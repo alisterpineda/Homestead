@@ -27,21 +27,18 @@ public class OpeningBalanceService(
         await EnsureNoExistingOpeningBalanceAsync(request.AccountId, request.CommodityId, ct);
 
         var occurredAt = ResolveOccurredAt(account, request.AsOfDate);
-        var transactionId = Guid.NewGuid();
 
         var signedQuantity = account.AccountType.ApplySign(request.Quantity);
         var openingBalances = await systemAccounts.GetOpeningBalancesAsync(ct);
 
         var accountSplit = new AccountTransactionSplit
         {
-            Id = Guid.NewGuid(),
             AccountId = request.AccountId,
             CommodityId = request.CommodityId,
             Quantity = signedQuantity,
         };
         var equitySplit = new AccountTransactionSplit
         {
-            Id = Guid.NewGuid(),
             AccountId = openingBalances.Id,
         };
 
@@ -49,7 +46,6 @@ public class OpeningBalanceService(
 
         var transaction = new OpeningBalanceTransaction
         {
-            Id = transactionId,
             OccurredAt = occurredAt,
             Memo = NormalizeMemo(request.Memo),
             Type = TransactionType.OpeningBalance,
