@@ -9,7 +9,18 @@
   <link rel="icon" type="image/x-icon" href="favicon.ico">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="manifest" href="manifest.webmanifest">
-  <meta name="theme-color" content="#1E6070">
+  <!-- Matches --background so iOS 26+ (Liquid Glass) paints the status bar the same colour as the
+       app header instead of a tinted band + blur gradient over it. Both values are kept in sync with
+       the resolved theme by ThemeService (a manual light/dark override ignores the media query).
+       apple-mobile-web-app-status-bar-style is pinned to "default" so the web view is inset below an
+       opaque status bar; never use "black-translucent", which puts page pixels under the status bar
+       and gets them smeared by iOS 26+/27's Liquid Glass blur. Note the blur can still appear with
+       "default": the fix that is actually verified on iOS 27 is the sticky opaque app-shell header
+       (see app-shell.component.ts). iOS freezes this meta at install time: remove and re-add the
+       home-screen app to pick up a change. -->
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)">
 </head>
 <body>
   <app-root></app-root>

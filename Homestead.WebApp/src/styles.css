@@ -103,6 +103,12 @@
   * {
     @apply border-border outline-ring/50;
   }
+  /* Explicit root background: Safari 26+ samples the root element's colour when tinting the
+     status-bar zone at scroll position 0, and a transparent root falls back to white (wrong in
+     dark mode). */
+  html {
+    background-color: var(--background);
+  }
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-sans);

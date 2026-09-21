@@ -144,8 +144,13 @@ import { getModuleByPath } from '@/modules/registry';
       </hlm-sidebar>
 
       <main hlmSidebarInset class="min-h-0 min-w-0">
-        <!-- Inset Header -->
-        <header class="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4 select-none">
+        <!-- Inset Header. sticky + opaque bg on purpose: iOS 26+/27 composites a Liquid Glass blur
+             over the top ~35pt of an installed web app unless WebKit's top-edge sampler finds a
+             sizeable fixed/sticky, opaque container touching the top edge (a hairline strip is
+             ignored; the sheet/dialog backdrops qualify, which is why the blur vanishes while one
+             is open). The main column never scrolls, so sticky changes no layout; md:rounded-t-xl
+             keeps the inset variant's rounded top corners on desktop now the header paints a bg. -->
+        <header class="sticky top-0 z-20 flex h-12 shrink-0 items-center gap-2 border-b border-border bg-background px-4 select-none md:rounded-t-xl supports-backdrop-filter:backdrop-blur-xs">
           <button hlmSidebarTrigger></button>
           <hlm-separator orientation="vertical" class="mr-2 h-4 data-vertical:self-center" />
           @if (headerTitle()) {
