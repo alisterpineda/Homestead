@@ -50,7 +50,10 @@ public class GetProcessingJobsHandler(AppDbContext db, ICurrentUserAccessor curr
                 ParentJobId = j.ParentJobId,
                 TotalChildCount = j.TotalChildCount,
                 CompletedChildCount = j.CompletedChildCount,
-                FailedChildCount = j.FailedChildCount
+                FailedChildCount = j.FailedChildCount,
+                Attempts = j.Attempts,
+                MaxAttempts = j.MaxAttempts,
+                RunAfter = j.RunAfter
             })
             .ToPaginatedAsync(request, ct);
     }

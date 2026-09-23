@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 
 namespace Homestead.WebApi.Processing;
 
@@ -7,7 +8,10 @@ public static class ProcessingServiceExtensions
 {
     public static IServiceCollection AddProcessing(this IServiceCollection services, IConfiguration configuration)
     {
-        services.Configure<JobProcessingOptions>(configuration.GetSection(JobProcessingOptions.SectionName));
+        services.AddOptions<JobProcessingOptions>()
+            .Bind(configuration.GetSection(JobProcessingOptions.SectionName))
+            .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<JobProcessingOptions>, JobProcessingOptionsValidator>();
         services.Configure<JobSchedulingOptions>(configuration.GetSection(JobSchedulingOptions.SectionName));
 
         // The scheduler resolves "now" through TimeProvider rather than DateTimeOffset.UtcNow so the
@@ -29,6 +33,7 @@ public static class ProcessingServiceExtensions
         }
 
         services.AddScoped<IJobQueue, JobQueue>();
+        services.AddSingleton<JobRunner>();
         services.AddSingleton<JobProcessorService>();
         services.AddHostedService(sp => sp.GetRequiredService<JobProcessorService>());
         services.AddSingleton<IJobProcessorControl>(sp => sp.GetRequiredService<JobProcessorService>());

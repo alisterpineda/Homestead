@@ -14,42 +14,37 @@ public class ProcessingPipelineTests : IntegrationTestBase
 {
     public ProcessingPipelineTests(PostgresFixture fixture) : base(fixture) { }
 
+    /// <summary>
+    /// What a crash leaves behind — a childless job InProgress under a lease nobody renews — is picked up by
+    /// the running processor's ordinary claim once the lease has expired. No restart, no sweep.
+    /// </summary>
     [Fact]
-    public async Task OrphanedInProgressJob_IsRecoveredAndProcessed()
+    public async Task OrphanedInProgressJob_WithAnExpiredLease_IsReclaimedAndProcessed()
     {
-        // Pause the processor so we can seed an orphaned job without it being picked up
+        Guid orphanId;
+
         var control = Factory.Services.GetRequiredService<IJobProcessorControl>();
         await using (await control.PauseAsync(CT))
         {
             using var scope = CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-            // Simulate an orphaned InProgress job (as if the process crashed mid-processing)
             var orphan = new ProcessingJob
             {
-                Id = Guid.NewGuid(),
-                Type = ProcessingJobType.UploadDocument,
+                Type = ProcessingJobType.NoOp,
                 Status = ProcessingJobStatus.InProgress,
                 StartedAt = DateTimeOffset.UtcNow.AddMinutes(-10),
+                LockedUntil = DateTimeOffset.UtcNow.AddMinutes(-8),
                 CreatedAt = DateTimeOffset.UtcNow.AddMinutes(-10),
-                CreatedByUserId = Guid.NewGuid()
             };
             db.ProcessingJobs.Add(orphan);
             await db.SaveChangesAsync(CT);
-
-            // Reset the orphan to Pending (simulating what recovery does at startup)
-            await db.ProcessingJobs
-                .Where(j => j.Id == orphan.Id && j.Status == ProcessingJobStatus.InProgress)
-                .ExecuteUpdateAsync(s => s
-                    .SetProperty(j => j.Status, ProcessingJobStatus.Pending)
-                    .SetProperty(j => j.StartedAt, (DateTimeOffset?)null), CT);
-
-            var recovered = await db.ProcessingJobs.AsNoTracking()
-                .FirstAsync(j => j.Id == orphan.Id, CT);
-
-            Assert.Equal(ProcessingJobStatus.Pending, recovered.Status);
-            Assert.Null(recovered.StartedAt);
+            orphanId = orphan.Id;
         }
+
+        Factory.Services.GetRequiredService<IJobSignal>().Signal();
+
+        await WaitForJobCompletionAsync(orphanId);
     }
 
     [Fact]

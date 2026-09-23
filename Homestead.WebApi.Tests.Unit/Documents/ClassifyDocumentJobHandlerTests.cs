@@ -1,3 +1,5 @@
+using System.Net;
+using System.Text.Json;
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Modules.Documents.Processing;
@@ -43,6 +45,33 @@ public class ClassifyDocumentJobHandlerTests : IDisposable
     {
         _db.Dispose();
         GC.SuppressFinalize(this);
+    }
+
+    [Fact]
+    public void OptsIntoRetries_ForTransientFailuresAndMalformedModelOutput()
+    {
+        IJobHandler handler = _sut;
+
+        Assert.Equal(3, handler.MaxAttempts);
+        Assert.True(handler.ShouldRetry(new JsonException("Unexpected end of JSON")));
+        Assert.True(handler.ShouldRetry(new HttpRequestException("Bad gateway", null, HttpStatusCode.BadGateway)));
+
+        // A document that isn't there fails the same way every time.
+        Assert.False(handler.ShouldRetry(new InvalidOperationException("Document not found")));
+    }
+
+    [Fact]
+    public async Task APayloadThatWontParse_FailsWithoutARetry()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        IJobHandler handler = _sut;
+        var job = CreateJob();
+        job.Payload = "{ not json";
+
+        var thrown = await Assert.ThrowsAnyAsync<Exception>(() => _sut.HandleAsync(job, ct));
+
+        // Must not surface as the JsonException that ShouldRetry reads as malformed model output.
+        Assert.False(handler.ShouldRetry(thrown));
     }
 
     [Fact]

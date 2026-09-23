@@ -12,7 +12,11 @@ import { HlmTableImports } from '@/shared/components/spartan/table';
 import { HlmBadge } from '@/shared/components/spartan/badge';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmSelectImports } from '@/shared/components/spartan/select';
-import { statusBadgeVariant as _statusBadgeVariant, statusLabel as _statusLabel } from '@/shared/utils/processing-status.utils';
+import {
+  attemptSummary as _attemptSummary,
+  statusBadgeVariant as _statusBadgeVariant,
+  statusLabel as _statusLabel,
+} from '@/shared/utils/processing-status.utils';
 import { processingJobTypeLabel } from '@/shared/utils/processing-job-type.utils';
 import { PaginationComponent } from '@/shared/components/pagination/pagination.component';
 import { AdminApiService } from '@/api/services/admin-api.service';
@@ -147,7 +151,10 @@ import { handleQueryError } from '@/shared/utils/rxjs-error.utils';
                             @if (isParentJob(job)) {
                               {{ childProgress(job) }}
                             } @else {
-                              —
+                              {{ attemptSummary(job) ?? '—' }}
+                              @if (job.status === 'Pending' && job.runAfter) {
+                                at {{ job.runAfter | date:'shortTime' }}
+                              }
                             }
                           </td>
                           <td hlmTd class="text-muted-foreground text-sm">{{ job.createdAt | date:'medium' }}</td>
@@ -179,7 +186,12 @@ import { handleQueryError } from '@/shared/utils/rxjs-error.utils';
                                   {{ statusLabel(child.status) }}
                                 </span>
                               </td>
-                              <td hlmTd>—</td>
+                              <td hlmTd class="text-muted-foreground text-sm">
+                                {{ attemptSummary(child) ?? '—' }}
+                                @if (child.status === 'Pending' && child.runAfter) {
+                                  at {{ child.runAfter | date:'shortTime' }}
+                                }
+                              </td>
                               <td hlmTd class="text-muted-foreground text-sm">{{ child.createdAt | date:'medium' }}</td>
                               <td hlmTd class="hidden md:table-cell text-muted-foreground text-sm">
                                 {{ child.startedAt ? (child.startedAt | date:'medium') : '—' }}
@@ -359,4 +371,5 @@ export class JobListComponent {
 
   statusBadgeVariant = _statusBadgeVariant;
   statusLabel = _statusLabel;
+  attemptSummary = _attemptSummary;
 }

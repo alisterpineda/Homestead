@@ -5,6 +5,7 @@ using Homestead.WebApi.Modules.Documents.Services;
 using Homestead.WebApi.Modules.Finances.PriceProviders;
 using Homestead.WebApi.Modules.Finances.PriceProviders.BankOfCanada;
 using Homestead.WebApi.Modules.Finances.Services;
+using Homestead.WebApi.Processing;
 using MediatR;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -112,6 +113,16 @@ public class HomesteadApiFactory : WebApplicationFactory<Program>
         // by resolving JobSchedulerService and calling TryFireOneDueScheduleAsync.
         builder.UseSetting("Processing:Scheduling:Enabled", "false");
 
+        // Lease and retry timing sized for tests. The lease is generous so a stalled CI box never expires
+        // one by accident — tests that need an expired lease write it into the row. The heartbeat is fast
+        // so a test can watch it move. The first backoff is short so a retry the background loop has to
+        // wake for comes due in well under the 30s poll; the second is deliberately far off and distinct,
+        // so a test can tell which entry a retry used. Tests that go past one retry write the due time in.
+        builder.UseSetting("Processing:LeaseDuration", "00:00:30");
+        builder.UseSetting("Processing:HeartbeatInterval", "00:00:00.5");
+        builder.UseSetting("Processing:RetryBackoff:0", "00:00:00.2");
+        builder.UseSetting("Processing:RetryBackoff:1", "01:00:00");
+
         // Pin the AI default to the fake registered below. Without this the fake would only resolve via
         // the resolver's sole-provider arm — which silently breaks the moment ANY real Ai:Providers config
         // leaks in (e.g. Ai__Providers__* env vars exported in a dev/CI shell reach the in-process host via
@@ -153,6 +164,23 @@ public class HomesteadApiFactory : WebApplicationFactory<Program>
             services.AddTransient<
                 IRequestHandler<TransactionRollbackProbes.DirectSaveChangesNoEnsureRollbackProbeCommand, Unit>,
                 TransactionRollbackProbes.DirectSaveChangesNoEnsureRollbackProbeHandler>();
+
+            // The NoOp job type runs the test handler instead: same no-op by default, but driveable into
+            // failing, retrying, and blocking, so the processor's retry and lease paths have a real job
+            // type to exercise that no domain handler's failure modes are coupled to.
+            var noOp = services.Single(d =>
+                d.ServiceType == typeof(IJobHandler) && d.ImplementationType == typeof(NoOpJobHandler));
+            services.Remove(noOp);
+            services.AddScoped<IJobHandler, TestNoOpJobHandler>();
+            services.AddSingleton<TestJobGate>();
+            services.AddSingleton<JobHookProbe>();
+
+            // Every notification still goes out through the real ProcessingNotifier; the decorator only
+            // records it, so the retry tests can assert that a retried attempt announces nothing.
+            services.RemoveAll<IProcessingNotifier>();
+            services.AddScoped<Homestead.WebApi.Processing.Hubs.ProcessingNotifier>();
+            services.AddSingleton<NotificationProbe>();
+            services.AddScoped<IProcessingNotifier, RecordingProcessingNotifier>();
 
             // Swap the system clock for a controllable one so scheduler tests can pin "now". This
             // replaces TimeProvider for EVERY DI consumer (the scheduler today, but also anything else

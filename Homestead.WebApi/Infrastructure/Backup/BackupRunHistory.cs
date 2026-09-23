@@ -75,7 +75,7 @@ public class BackupRunHistory(AppDbContext db, IBackupSourceCatalog catalog) : I
             .ToListAsync(ct);
 
         // A parent whose CHILDREN failed carries no Error of its own: the generic
-        // JobProcessorService.UpdateParentProgressAsync sets the parent's status from the child tally but
+        // JobRunner.UpdateParentProgressAsync sets the parent's status from the child tally but
         // never writes an error string, and only a throw from the parent's own handler populates one. So
         // without this the admin page shows a red "Failed" badge with no explanation anywhere, and the
         // only record of WHICH files failed sits on the child rows in /admin/jobs.

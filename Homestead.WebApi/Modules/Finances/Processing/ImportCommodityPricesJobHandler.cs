@@ -14,7 +14,6 @@ public class ImportCommodityPricesJobHandler(
     AppDbContext db,
     IPriceSourceRegistry sources,
     ISender sender,
-    IServiceScopeFactory scopeFactory,
     ILogger<ImportCommodityPricesJobHandler> logger) : IJobHandler
 {
     private const int MaxErrorLength = 4096;
@@ -31,15 +30,41 @@ public class ImportCommodityPricesJobHandler(
                 "source_system_managed",
                 $"Price source '{payload.Source}' is system-managed and cannot be imported.");
 
+        await RunImportAsync(job, payload, ct);
+    }
+
+    /// <summary>
+    /// Provider calls are HTTP against third parties, so an outage measured in minutes — longer than the
+    /// HttpClient resilience handler rides out — is worth waiting through. Safe to re-run: observations are
+    /// upserted by (commodity, quote, instant) and a rate that did not change writes no audit.
+    /// Import blockers (<see cref="PriceImportException"/>) are structured and so never retried.
+    /// </summary>
+    public int MaxAttempts => 3;
+
+    /// <summary>
+    /// Stamps the failure onto the source's settings row, once, after the last attempt — not on every
+    /// attempt, which would show the source as Failed while a retry was still queued.
+    /// </summary>
+    /// <remarks>
+    /// Runs in a fresh scope, so the injected <c>db</c> is not the one the failed run left behind. A
+    /// system-managed source never reaches the import and has nothing to stamp.
+    /// </remarks>
+    public async Task OnFinallyFailedAsync(ProcessingJob job, Exception exception, CancellationToken ct)
+    {
+        ImportCommodityPricesPayload? payload;
         try
         {
-            await RunImportAsync(job, payload, ct);
+            payload = job.GetPayload<ImportCommodityPricesPayload>();
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (JsonException)
         {
-            await RecordFailureAsync(payload.Source, ex, ct);
-            throw;
+            return;
         }
+
+        if (payload is null || payload.Source.Kind() != CommodityPriceSourceKind.External)
+            return;
+
+        await RecordFailureAsync(payload.Source, exception, ct);
     }
 
     private async Task RunImportAsync(
@@ -186,16 +211,14 @@ public class ImportCommodityPricesJobHandler(
     {
         try
         {
-            await using var scope = scopeFactory.CreateAsyncScope();
-            var freshDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var settings = await freshDb.CommodityPriceSourceSettings
+            var settings = await db.CommodityPriceSourceSettings
                 .FirstOrDefaultAsync(s => s.Source == source, ct);
             if (settings is null) return;
 
             settings.LastImportStatus = ImportStatus.Failed;
             settings.LastImportMessage = Truncate(ex.Message);
             settings.UpdatedAt = DateTimeOffset.UtcNow;
-            await freshDb.SaveChangesAsync(ct);
+            await db.SaveChangesAsync(ct);
         }
         catch (Exception inner)
         {

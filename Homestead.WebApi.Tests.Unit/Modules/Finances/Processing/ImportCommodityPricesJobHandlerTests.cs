@@ -3,9 +3,11 @@ using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Modules.Finances.PriceProviders;
 using Homestead.WebApi.Modules.Finances.Processing;
 using Homestead.WebApi.Modules.Finances.Processing.Commands;
+using System.Net;
 using Homestead.WebApi.Persistence;
+using Homestead.WebApi.Processing;
 using MediatR;
-using Microsoft.Extensions.DependencyInjection;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 
@@ -17,7 +19,6 @@ public class ImportCommodityPricesJobHandlerTests : IDisposable
     private readonly IPriceProvider _provider;
     private readonly StubPriceSourceRegistry _sources;
     private readonly ISender _sender;
-    private readonly IServiceScopeFactory _scopeFactory;
     private readonly ImportCommodityPricesJobHandler _sut;
 
     private readonly Commodity _cad;
@@ -36,15 +37,8 @@ public class ImportCommodityPricesJobHandlerTests : IDisposable
 
         _sender = Substitute.For<ISender>();
 
-        _scopeFactory = Substitute.For<IServiceScopeFactory>();
-        var scope = Substitute.For<IServiceScope>();
-        var scopedSc = new ServiceCollection();
-        scopedSc.AddSingleton<AppDbContext>(_db);
-        scope.ServiceProvider.Returns(scopedSc.BuildServiceProvider());
-        _scopeFactory.CreateScope().Returns(scope);
-
         _sut = new ImportCommodityPricesJobHandler(
-            _db, _sources, _sender, _scopeFactory, NullLogger<ImportCommodityPricesJobHandler>.Instance);
+            _db, _sources, _sender, NullLogger<ImportCommodityPricesJobHandler>.Instance);
 
         _cad = new Commodity { Id = Guid.NewGuid(), Symbol = "CAD", Name = "Canadian Dollar", Kind = CommodityKind.Currency };
         _usd = new Commodity { Id = Guid.NewGuid(), Symbol = "USD", Name = "US Dollar", Kind = CommodityKind.Currency };
@@ -76,6 +70,84 @@ public class ImportCommodityPricesJobHandlerTests : IDisposable
         var ex = await Assert.ThrowsAsync<PriceImportException>(
             () => _sut.HandleAsync(job, TestContext.Current.CancellationToken));
         Assert.Equal("source_system_managed", ex.ErrorCode);
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Retry policy and the final-failure hook
+    // ---------------------------------------------------------------------------------------------
+
+    [Fact]
+    public void OptsIntoRetries()
+    {
+        IJobHandler handler = _sut;
+        Assert.Equal(3, handler.MaxAttempts);
+    }
+
+    [Fact]
+    public void ImportBlockers_AreNotRetried()
+    {
+        IJobHandler handler = _sut;
+        Assert.False(handler.ShouldRetry(new PriceImportException("source_disabled", "Disabled.")));
+        Assert.True(handler.ShouldRetry(new HttpRequestException("Unavailable", null, HttpStatusCode.ServiceUnavailable)));
+    }
+
+    /// <summary>
+    /// A failed attempt no longer stamps the settings row itself: with retries that would read Failed while
+    /// the next attempt was still queued. The hook does it, once, after the last attempt.
+    /// </summary>
+    [Fact]
+    public async Task FailedAttempt_DoesNotStampTheSettingsRow()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        SeedSettings(CommodityPriceSource.BankOfCanada);
+        _provider.ImportAsync(Arg.Any<PriceImportRequest>(), Arg.Any<CancellationToken>())
+            .Returns<Task<PriceImportResult>>(_ => throw new HttpRequestException("Valet is down"));
+
+        var job = MakeJob(new ImportCommodityPricesPayload(CommodityPriceSource.BankOfCanada));
+        await Assert.ThrowsAsync<HttpRequestException>(() => _sut.HandleAsync(job, ct));
+
+        var settings = await _db.CommodityPriceSourceSettings.SingleAsync(ct);
+        Assert.Null(settings.LastImportStatus);
+    }
+
+    [Fact]
+    public async Task FinalFailureHook_StampsTheSettingsRowFailed_WithATruncatedMessage()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        SeedSettings(CommodityPriceSource.BankOfCanada);
+        var job = MakeJob(new ImportCommodityPricesPayload(CommodityPriceSource.BankOfCanada));
+
+        IJobHandler handler = _sut;
+        await handler.OnFinallyFailedAsync(job, new InvalidOperationException(new string('x', 5000)), ct);
+
+        var settings = await _db.CommodityPriceSourceSettings.SingleAsync(ct);
+        Assert.Equal(ImportStatus.Failed, settings.LastImportStatus);
+        Assert.Equal(4096, settings.LastImportMessage!.Length);
+    }
+
+    [Fact]
+    public async Task FinalFailureHook_IgnoresSystemManagedSources()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        SeedSettings(CommodityPriceSource.Manual);
+        var job = MakeJob(new ImportCommodityPricesPayload(CommodityPriceSource.Manual));
+
+        IJobHandler handler = _sut;
+        await handler.OnFinallyFailedAsync(job, new InvalidOperationException("boom"), ct);
+
+        var settings = await _db.CommodityPriceSourceSettings.SingleAsync(ct);
+        Assert.Null(settings.LastImportStatus);
+    }
+
+    private void SeedSettings(CommodityPriceSource source)
+    {
+        _db.CommodityPriceSourceSettings.Add(new CommodityPriceSourceSettings
+        {
+            Source = source,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow,
+        });
+        _db.SaveChanges();
     }
 
     [Fact]

@@ -5,6 +5,7 @@ import { ProcessingEntityType } from '../models/processing-entity-type';
 import { ProcessingJobStatus } from '../models/processing-job-status';
 import { ProcessingJobType } from '../models/processing-job-type';
 export interface GetProcessingJobsResponse {
+  attempts?: number;
   completedAt?: (string | null);
   completedChildCount?: number;
   createdAt: string;
@@ -14,8 +15,10 @@ export interface GetProcessingJobsResponse {
   error?: (string | null);
   failedChildCount?: number;
   id: string;
+  maxAttempts?: number;
   parentJobId?: (string | null);
   priority?: number;
+  runAfter?: (string | null);
   startedAt?: (string | null);
   status: ProcessingJobStatus;
   totalChildCount?: number;

@@ -15,7 +15,9 @@ public class JobProcessorServiceTests
         var services = new ServiceCollection();
         var sp = services.BuildServiceProvider();
         var options = Options.Create(new JobProcessingOptions { MaxConcurrency = maxConcurrency });
-        return new JobProcessorService(sp.GetRequiredService<IServiceScopeFactory>(), options, _logger);
+        var runner = new JobRunner(
+            sp.GetRequiredService<IServiceScopeFactory>(), options, Substitute.For<ILogger<JobRunner>>());
+        return new JobProcessorService(runner, options, _logger);
     }
 
     [Fact]

@@ -50,6 +50,18 @@ public class ProcessingJobConfiguration : IEntityTypeConfiguration<ProcessingJob
             .IsRequired()
             .HasDefaultValue(0);
 
+        builder.Property(j => j.Attempts)
+            .IsRequired()
+            .HasDefaultValue(0);
+
+        builder.Property(j => j.MaxAttempts)
+            .IsRequired()
+            .HasDefaultValue(1);
+
+        // RunAfter and LockedUntil need no configuration: nullable timestamptz. No index for them either —
+        // the claim filters on Status first, and (Status, Priority) already narrows it to the live rows, a
+        // tiny fraction of a table made almost entirely of terminal history.
+
         builder.HasOne<ProcessingJob>()
             .WithMany()
             .HasForeignKey(j => j.ParentJobId)

@@ -65,8 +65,9 @@ public class DeleteBackupSourceHandler(
             var now = DateTimeOffset.UtcNow;
 
             // Pending children first, and this is race-safe by construction: the processor's claim query
-            // picks only Pending rows, so a child that slips past this update was already claimed and is
-            // caught by the InProgress check below.
+            // never takes a Cancelled row (only Pending ones, or InProgress ones whose lease expired), so a
+            // child that slips past this update was already claimed and is caught by the InProgress check
+            // below.
             await db.ProcessingJobs
                 .Where(j => j.ParentJobId == liveRun.Id && j.Status == ProcessingJobStatus.Pending)
                 .ExecuteUpdateAsync(s => s

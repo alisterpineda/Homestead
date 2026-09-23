@@ -316,10 +316,12 @@ public class BackupBatchJobHandler(
     /// <remarks>
     /// Anchored on <c>StartedAt</c> — the claim instant — rather than on handler entry, so the budget is
     /// conservative: any delay between the claim and this handler running comes out of our margin rather
-    /// than being handed back to us. Note the two clocks: <c>StartedAt</c> is stamped by the processor
-    /// with <c>DateTimeOffset.UtcNow</c> while the budget is read from the injected provider. They are
-    /// the same clock in production; a test that pins the provider only ever inflates the budget (the
-    /// pin is taken from the current instant and then falls behind), which is the safe direction.
+    /// than being handed back to us. <c>StartedAt</c> is re-stamped by every claim, so a batch reclaimed
+    /// after a crash gets a fresh budget rather than inheriting a spent one. Note the two clocks:
+    /// <c>StartedAt</c> is stamped by the database's <c>now()</c> while the budget is read from the injected
+    /// provider. They agree in production to within the host/DB clock skew; a test that pins the provider
+    /// only ever inflates the budget (the pin is taken from the current instant and then falls behind),
+    /// which is the safe direction.
     /// </remarks>
     private DateTimeOffset ResolveDeadline(ProcessingJob job) =>
         (job.StartedAt ?? timeProvider.GetUtcNow())

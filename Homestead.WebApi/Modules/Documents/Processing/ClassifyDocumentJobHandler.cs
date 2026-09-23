@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Modules.Documents.Processing.Commands;
 using Homestead.WebApi.Modules.Documents.Services;
@@ -16,10 +17,36 @@ public class ClassifyDocumentJobHandler(
 {
     public ProcessingJobType Type => ProcessingJobType.ClassifyDocument;
 
+    /// <summary>
+    /// The model call is the one part of classification that fails for reasons that pass: a provider
+    /// restarting, a model still loading, a rate limit the SDK's own retries gave up on. Safe to re-run:
+    /// <see cref="ApplyClassificationCommand"/> reverts any earlier AI suggestions before applying new ones.
+    /// </summary>
+    public int MaxAttempts => 3;
+
+    /// <summary>
+    /// The transient-infrastructure default, plus malformed model output — the same prompt usually parses
+    /// on the next sample. A missing document or payload stays final.
+    /// </summary>
+    public bool ShouldRetry(Exception exception) =>
+        exception is JsonException || JobFailureClassifier.IsTransient(exception);
+
     public async Task HandleAsync(ProcessingJob job, CancellationToken ct)
     {
-        var payload = job.GetPayload<ClassifyDocumentPayload>()
-            ?? throw new InvalidOperationException("Job payload is missing or invalid.");
+        // A payload that won't parse fails the same way every time, so it must not surface as the
+        // JsonException that ShouldRetry reads as malformed model output.
+        ClassifyDocumentPayload? payload;
+        try
+        {
+            payload = job.GetPayload<ClassifyDocumentPayload>();
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidOperationException("Job payload is missing or invalid.", ex);
+        }
+
+        if (payload is null)
+            throw new InvalidOperationException("Job payload is missing or invalid.");
 
         job.EntityId = payload.DocumentId;
 

@@ -18,21 +18,23 @@ The module is a **job-execution engine** plus a **cron-style schedule emitter** 
 ## In scope for v1
 
 - A single durable, FIFO-with-priority queue stored in PostgreSQL (`processing.jobs` table).
-- One in-process worker (the WebApi itself) that claims pending jobs, runs them with bounded concurrency, and writes their terminal status back to the database.
+- One in-process worker (the WebApi itself) that claims pending jobs under a renewable **lease**, runs them with bounded concurrency, and writes their outcome back to the database.
 - A small, closed set of job **types** known to the worker, each backed by a handler class (see *Job catalog*).
 - A two-level **parent/child** hierarchy for fan-out work, with the parent's status derived from the aggregate of its children.
 - A separate **schedule emitter** (`processing.schedules` table + `JobSchedulerService` background tick loop) that turns cron expressions into Pending jobs in the same `processing.jobs` table. Schedules carry a nullable `CreatedByUserId` — both current creation endpoints stamp the creating admin; a creator-less (system-attributed) schedule is schema-supported but not yet produced by any endpoint. Admins can create and delete schedules via `POST` / `DELETE /api/v1/admin/schedules`; the create endpoint is generic over `JobType` but accepts only `NoOp` — `ImportCommodityPrices` is deliberately rejected with a pointer to its per-module surface (`PUT`/`DELETE /api/v1/finances/settings/price-sources/{source}/schedule`), and no other type is schedulable yet.
 - Per-user, per-job real-time notifications over a SignalR hub. Schedule-spawned jobs inherit the schedule's creator and notify them like any other job; only a job with no creator (system-attributed — schema-supported, not yet produced by any endpoint) would emit no SignalR, its failures surfacing only in the admin job list.
 - A read-only HTTP endpoint that lists jobs, scoped to the caller's identity (admins see all jobs; non-admins see only their own).
 - Admin-only HTTP endpoints to list, create, and delete schedules.
-- A best-effort orphaned-job recovery sweep at process startup.
+- **Crash recovery by lease expiry.** A childless job left `InProgress` by a process that died is reclaimed by the ordinary claim once its lease runs out — no startup sweep, no restart needed. See *Crash recovery*.
+- **Opt-in retries with backoff, per job type.** A handler that declares `MaxAttempts > 1` has its transient failures re-queued behind a fixed backoff; only the last attempt fails the job. Every other type keeps the original "a failure is terminal" contract. See *Retries*.
+- **A final-failure hook.** `IJobHandler.OnFinallyFailedAsync` is called once, after a job's last attempt has been recorded as `Failed`, so a handler can mark the entity it was working on failed too.
 - Programmatic pause for tests and migrations: `IJobProcessorControl.PauseAsync()` returns an `IAsyncDisposable` that drains all worker permits. **Pause does not stop the scheduler** — schedules can still fire during a pause; jobs accumulate as Pending and drain when pause is released. Tests that need the scheduler quiet set `JobSchedulingOptions.Enabled = false` via config.
 
 ## Out of scope for v1
 
-- **Retries.** A failure is terminal. The user (or an admin) re-issues the work if they want it retried. A schedule that fires a job that fails will fire its next scheduled run at the normal cadence — there is no per-failure backoff.
+- **Queue-wide retries.** Retries are opt-in per job type (see *Retries*); a type that has not opted in fails terminally on its first failure, and the user (or an admin) re-issues the work. A schedule whose job fails for good fires its next run at the normal cadence — there is no per-schedule backoff.
 - **External brokers.** No Redis, RabbitMQ, Hangfire, or background-process worker. The queue lives in the same database the rest of the app uses, and the worker is a `BackgroundService` in the WebApi.
-- **Multi-process workers.** Concurrency is bounded by `JobProcessingOptions.MaxConcurrency` within a single process. Running multiple WebApi instances is not supported (the claim is atomic, but no other coordination exists).
+- **Multi-process workers.** Concurrency is bounded by `JobProcessingOptions.MaxConcurrency` within a single process. Running multiple WebApi instances is not supported: the claim and the lease are safe across processes, but SignalR has no backplane and nothing else coordinates.
 - **Cancellation from the API surface.** A running job cannot be cancelled by the user. A 5-minute per-job timeout exists as a backstop, but there is no "cancel job" endpoint.
 - **Per-job dead-lettering or quarantine.** Failed jobs stay in the table with their error string; there is no separate dead-letter table or replay tooling.
 - **User-issued retries through the queue.** Reprocessing a single document version *is* available as a job type, but it is conceptually a fresh action initiated by the user, not a retry of a previous job.
@@ -51,15 +53,17 @@ One row per job. The columns the rest of the system depends on:
 
 - **Identity:** `Id` (Guid PK).
 - **What:** `Type` (enum, stored as string), `Payload` (jsonb — handler-defined shape), `EntityType` + `EntityId` (optional pointer to a domain entity the job concerns; used by the UI to link from a job back to its document/download). The job catalog below describes which handler reads which payload shape.
-- **Status:** `Status` (enum), `Error` (free-form string from the failure exception's message), `Priority` (int, higher first).
-- **Timing:** `CreatedAt`, `StartedAt`, `CompletedAt`.
+- **Status:** `Status` (enum), `Error` (free-form string from the latest failure's message — on a `Pending` row with attempts, the failure it is retrying after; cleared on success), `Priority` (int, higher first).
+- **Timing:** `CreatedAt`, `StartedAt` (re-stamped by every claim), `CompletedAt`.
+- **Retries:** `Attempts` (runs that ended in an exception — a lease reclaim is not one), `MaxAttempts` (the handler's allowance as of its last run; written by the processor, never at enqueue, because parent handlers insert children directly), `RunAfter` (nullable; the earliest a scheduled retry may be claimed, null = now — nullable so every insert path stays correct without knowing about it).
+- **Lease:** `LockedUntil` (nullable; when the current runner's hold expires, null when nothing holds the job — including a parent waiting on its children).
 - **Attribution:** `CreatedByUserId`. Audit logs written by the handler are attributed to this user, not the worker. Null for system-initiated jobs (those produced by a schedule with no creator).
 - **Hierarchy:** `ParentJobId`, `TotalChildCount`, `CompletedChildCount`, `FailedChildCount`. See *Parent/child jobs*.
 - **Origin:** `ScheduleId` (nullable FK → `processing.schedules`, ON DELETE SET NULL). Set when the job was created by the scheduler; null for ad-hoc enqueues. Lets the admin trace a job back to the schedule that produced it.
 
 Indexes worth knowing:
 
-- `(Status, Priority)` — supports the claim query.
+- `(Status, Priority)` — supports the claim query. No index covers `RunAfter` or `LockedUntil`: the claim filters on `Status` first, and live rows are a tiny fraction of a table that is almost entirely terminal history.
 - `EntityId`, `CreatedByUserId`, `ParentJobId`, `(ParentJobId, Status)` — support the list endpoint and parent-progress aggregation.
 - `Type` — admin filtering.
 - `ScheduleId` — admin "all jobs from schedule X" lookups.
@@ -85,66 +89,96 @@ The `ParentJobId` foreign key cascades on delete so deleting a parent removes it
 ## Status lifecycle
 
 ```
-Pending ──┬─► InProgress ──► Completed
-          │                  Failed
-          │                  PartiallyCompleted   (parent jobs only)
+Pending ──┬─► InProgress ──┬─► Completed
+          │                ├─► Failed
+          │                └─► PartiallyCompleted   (parent jobs only)
           │
-          ├─► Cancelled                           (torn down out-of-band, or cancelled by a
-          │                                        higher-priority sibling's failure)
-          │
-          └─► (recovered to Pending at startup if InProgress with no children)
+          └─► Cancelled                             (torn down out-of-band, or cancelled by a
+                                                     higher-priority sibling's final failure)
+
+InProgress ──► Pending       a failed attempt waiting out its backoff (opted-in types only),
+                             or a job handed back by a graceful shutdown
+InProgress ──► InProgress    reclaimed after its lease expired — a crashed process's job
+                             (childless jobs only)
 ```
 
-- **Pending** — enqueued, not yet claimed.
-- **InProgress** — atomically claimed by a worker (handler is running), or for parent jobs, the handler has returned and we are waiting on children.
+- **Pending** — enqueued and not yet claimed, or waiting out a retry's backoff (`Attempts > 0`, `RunAfter` set), or handed back by a graceful shutdown.
+- **InProgress** — atomically claimed by a worker holding its lease (handler is running), or for parent jobs, the handler has returned and we are waiting on children (no lease).
 - **Completed** — terminal success. For non-parent jobs, the handler returned without throwing. For parent jobs, every child completed successfully.
-- **Failed** — terminal failure. For non-parent jobs, the handler threw. For parent jobs, every child failed.
+- **Failed** — terminal failure. For non-parent jobs, the handler threw on its last allowed attempt, or threw something its type does not retry. For parent jobs, every child failed.
 - **PartiallyCompleted** — terminal. **Parent jobs only.** Some children completed, some failed.
-- **Cancelled** — terminal. Two producers. The first is **out of band**: a caller tearing down the thing a run belongs to, today only deleting a backup source (see [documents/backup.md](../documents/backup.md#deleting-a-backup)), which flips the parent and its still-`Pending` children in one transaction. The second is the **processor itself**: when a child fails, it cancels that parent's still-`Pending` children at *strictly lower* priority — the siblings whose happens-before edge said they depended on it (see *Sibling ordering* below). Both write in one transaction, and neither ever cancels a job that is already `InProgress`.
+- **Cancelled** — terminal. Two producers. The first is **out of band**: a caller tearing down the thing a run belongs to, today only deleting a backup source (see [documents/backup.md](../documents/backup.md#deleting-a-backup)), which flips the parent and its still-`Pending` children in one transaction. The second is the **processor itself**: when a child fails *for good* (its last attempt — a child waiting to retry is still `Pending` and keeps blocking), it cancels that parent's still-`Pending` children at *strictly lower* priority — the siblings whose happens-before edge said they depended on it (see *Sibling ordering* below). Both write in one transaction, and neither ever cancels a job that is already `InProgress`.
 
 A non-parent job will never enter `PartiallyCompleted`. A parent job that successfully spawned zero children would terminate as `Completed` immediately on the next progress update, since `0 finished ≥ 0 total` and `failed == 0`.
 
-**Cancellation stops what has not started, not what is running.** The claim query picks only `Pending` rows, so a cancelled job is never picked up — but a job already inside its handler is untouched, which is why the delete flow refuses (409) rather than cancelling while a batch is mid-flight. `UpdateParentProgressAsync` tallies only `Completed` and `Failed`, and both of its writes are guarded on the parent still being `InProgress`, so a straggler child completing under a cancelled parent is a natural no-op: it leaves the parent `Cancelled`, its counters untouched, and sends no notification.
+**Cancellation stops what has not started, not what is running.** The claim takes only `Pending` rows and lease-expired `InProgress` ones, so a cancelled job is never picked up — but a job already inside its handler is untouched, which is why the delete flow refuses (409) rather than cancelling while a batch is mid-flight. `UpdateParentProgressAsync` tallies only `Completed` and `Failed`, and both of its writes are guarded on the parent still being `InProgress`, so a straggler child completing under a cancelled parent is a natural no-op: it leaves the parent `Cancelled`, its counters untouched, and sends no notification.
 
 **A cancelled child lowers the expectation rather than raising the tally.** When the processor cancels dependent siblings it decrements the parent's `TotalChildCount` by exactly the number cancelled, in the same transaction. `TotalChildCount` means *"children still expected to terminate"*, not *"children created"* — which is the same reading `BackupBatch` already relies on when a continuation batch **increments** it. So the parent still finalizes on `finished ≥ total` with one code path and no knowledge of cancellation.
 
-`CompletedAt` is set on every terminal transition (success or failure). `StartedAt` is set when the job is claimed, regardless of outcome. Recovered jobs (see *Crash recovery*) have their `StartedAt` cleared when transitioned back to `Pending`.
+`CompletedAt` is set on every terminal transition (success or failure). `StartedAt` is set by every claim — so on a retried or reclaimed job it is the *latest* attempt's start — and cleared when a job goes back to `Pending` for a retry or a shutdown release. The processor stamps both from the database's `now()`, the same clock the lease and `RunAfter` are compared against.
 
 ## The processor loop
 
-The worker is a single `BackgroundService` (`JobProcessorService`) that also implements `IJobSignal` (a wake-up channel) and `IJobProcessorControl` (pause). Its loop:
+The worker is a single `BackgroundService` (`JobProcessorService`) that also implements `IJobSignal` (a wake-up channel) and `IJobProcessorControl` (pause). It only decides *when*; everything that happens to a job — claim, lease, heartbeat, retry, outcome — lives in `JobRunner`, which tests drive directly through `RunOnceAsync` while the loop is paused. The loop:
 
-1. **At startup**, sweep orphaned jobs (see *Crash recovery*).
-2. **Wait** for either a wake-up signal or a 30-second poll timeout.
-3. **Drain pending jobs**: while there is at least one available worker permit and at least one *claimable* Pending job, atomically claim the highest-priority oldest one and dispatch the handler on a background `Task`. When nothing is claimable but work is still in flight — the normal state at a backup stage boundary, where every remaining sibling is blocked behind one still running — the loop waits for the **first** dispatched task to finish and re-tries the claim, rather than exiting and having to await them all. That is what keeps an upload arriving mid-run preempting at the next freed permit instead of waiting out the longest batch.
-4. **Loop.**
+1. **Drain claimable jobs**: while there is at least one available worker permit and at least one *claimable* job, atomically claim the highest-priority oldest one and dispatch the handler on a background `Task`. When nothing is claimable but work is still in flight — the normal state at a backup stage boundary, where every remaining sibling is blocked behind one still running — the loop waits for the **first** dispatched task to finish — or for the next retry to come due, whichever is sooner — and re-tries the claim, rather than exiting and having to await them all. That is what keeps an upload arriving mid-run preempting at the next freed permit instead of waiting out the longest batch.
+2. **Wait** for a wake-up signal, or until the next retry's `RunAfter` or the next orphaned lease's expiry, capped at the poll interval (`JobProcessingOptions.PollInterval`, 30 seconds).
+3. **Loop.** Draining comes first, so work left over from before a restart starts immediately rather than a poll interval late.
 
 A few details that matter:
 
-- **Atomic claim.** The claim is a `WHERE Status = Pending` `ExecuteUpdateAsync` that flips the row to `InProgress` and stamps `StartedAt`. If another path stole it, the update affects 0 rows and the loop tries the next candidate. This is what makes concurrent dispatch safe.
+- **Atomic claim.** A job is *claimable* when it is `Pending` and due (`RunAfter` null or past), or when it is a childless `InProgress` job whose lease has expired (see *Crash recovery*). The claim is an `ExecuteUpdateAsync` that re-asserts that predicate, flips the row to `InProgress`, stamps `StartedAt`, and starts the lease (`LockedUntil = now() + LeaseDuration`). If another path took it first, Postgres's re-check of the `WHERE` under READ COMMITTED makes the update affect 0 rows and the loop tries the next candidate. This is what makes concurrent dispatch safe — across processes, too.
+- **The lease and its heartbeat.** While a handler runs, a heartbeat on its own DI scope pushes `LockedUntil` forward every `HeartbeatInterval` (30 s against a 2-minute `LeaseDuration`; startup validation rejects a heartbeat that is not faster than the lease). Every heartbeat and every outcome write is **fenced** on `StartedAt` equalling the value this claim wrote, so a runner whose job was reclaimed out from under it neither renews the new holder's lease nor overwrites its outcome — it finds zero rows and stands down. If the heartbeat finds its fence gone, or cannot reach the database for longer than the lease it last renewed, it cancels the handler: from then on another runner may legitimately hold the job, and carrying on would run it twice. A run that ends that way records nothing.
+- **Shutdown releases, it does not fail.** A handler interrupted by host shutdown is handed straight back — `Pending`, lease and `StartedAt` cleared, `Attempts` unchanged — so a deploy neither burns an attempt nor parks the job until its lease expires. (A parent that had already saved its children keeps `InProgress` and only gives up its lease.)
 - **Ordering.** Highest `Priority` first (descending), with `CreatedAt` as a stable FIFO tiebreaker. The default priority is `0` — anything higher jumps the queue.
 - **Sibling ordering is a happens-before edge, not a hint.** Among the children of **one** parent, a strictly higher `Priority` means **runs before**: a child is not claimable while any sibling above it is still `Pending` or `InProgress`, and if one of them *fails*, its lower-priority siblings are cancelled outright rather than run against a precondition that never held. Equal priority imposes no edge at all, so an ordinary flat fan-out — every child at the default `0` — is completely unaffected and stays fully concurrent. Two guards make this narrow: the predicate applies only within a parent (root jobs never block each other, whatever their priorities), and only *strictly* higher priorities block. **A new fan-out handler that gives its children differing priorities is opting into serialization between those levels**, so it has to mean it; today only the backup mirror does, where the priority encodes the pipeline stage.
 - **Bounded concurrency.** A `SemaphoreSlim` of size `JobProcessingOptions.MaxConcurrency` gates dispatch. The shipped `appsettings.json` value is **4**. The code default when the key is absent is 1, but nothing runs on that default — reason about the queue as concurrent, because it is. (The gap between the two is where a real ordering bug lived: the backup planner's Delete → Move → Put sequence was expressed as claim order alone and silently corrupted the mirror once adjacent batches overlapped. The happens-before rule above is the fix, and it holds at any concurrency.)
-- **Wake-up channel.** `JobQueue.EnqueueAsync` calls `IJobSignal.Signal()` after committing the row, which releases a permit on a `SemaphoreSlim(0)` the worker awaits. This makes the queue *latency-free for the common case* without polling. The 30-second poll exists as a safety net.
-- **Per-job timeout.** Each handler runs against a linked `CancellationTokenSource` that cancels after 5 minutes. A timed-out job throws `TimeoutException` and lands in `Failed`. The application shutdown token also propagates — but a graceful shutdown awaits dispatched tasks before returning.
+- **Wake-up channel.** `JobQueue.EnqueueAsync` calls `IJobSignal.Signal()` after committing the row, which releases a permit on a `SemaphoreSlim(0)` the worker awaits. This makes the queue *latency-free for the common case* without polling. The 30-second poll exists as a safety net; a retry or an orphaned lease coming due shortens the sleep to match, so a 10-second backoff is not stretched to 30.
+- **Per-job timeout.** Each handler runs against a linked `CancellationTokenSource` that cancels after 5 minutes. A timed-out job throws `JobTimeoutException` and is a failed attempt — never retried, since another attempt gets the same budget. The timeout and the lease are independent: the timeout caps a runaway handler in a live process, the lease notices a dead process, and a five-minute job simply keeps renewing its two-minute lease. The application shutdown token also propagates — but a graceful shutdown awaits dispatched tasks before returning.
+- **Clocks.** Every lease and `RunAfter` comparison, and every timestamp the processor writes onto a job it holds, uses the database's `now()`. One clock decides what "expired" and "due" mean, whichever process asks.
 - **Handler resolution.** Handlers are auto-registered as scoped `IJobHandler` instances by assembly scan (`ProcessingServiceExtensions`). A job's `Type` is matched to the first handler with `handler.Type == job.Type`. Missing handler ⇒ the job lands in `Failed` with a "no handler registered" error and never blocks the queue.
 - **Each handler runs in its own DI scope.** The processor creates a new `AsyncScope` per dispatched job, gets the scope's `AppDbContext` and `IEnumerable<IJobHandler>`, and the handler is free to `await db.SaveChangesAsync` directly. The processor does **not** wrap the handler in a transaction.
 
 ## Crash recovery
 
-A job that was `InProgress` when the process died is **orphaned** — no worker is going to finish it. At startup, the processor runs:
+A job that was `InProgress` when its process died is **orphaned** — nothing is renewing its lease. Once `LockedUntil` passes, the ordinary claim treats it as claimable and runs it again. There is no startup sweep and no restart needed: a crash is recovered within `LeaseDuration` (2 minutes) by whichever process is running. A reclaim is **not** a failed attempt, so `Attempts` is unchanged — which also means a job that crashes the whole process every time it runs is reclaimed every time, with no attempt budget to stop it.
 
-```
-UPDATE processing.jobs
-SET Status = Pending, StartedAt = NULL
-WHERE Status = InProgress AND TotalChildCount = 0
-```
+Two rules keep reclaiming safe:
 
-The `TotalChildCount = 0` filter is load-bearing: a parent job with children spawned is *legitimately* `InProgress` (it is waiting for children to terminate, which `UpdateParentProgressAsync` will do as each child finishes). Recovering such a parent would re-run its handler, double-spawn children, and corrupt the count.
+- **Only childless jobs are reclaimable** (`TotalChildCount = 0`), and the guard is load-bearing. A parent with children spawned is *legitimately* `InProgress`, waiting for them to terminate. Parent handlers save their children and `TotalChildCount` in their own `SaveChanges`, before the processor clears the lease; reclaiming a parent past that point would re-run its handler, whose idempotency branch resets `TotalChildCount` to the number of child rows — undoing any decrement for children already cancelled, so the parent would never finalize.
+- **A NULL lease is never reclaimable.** A parent whose handler has returned gives up its lease while it waits on its children, because nothing is running on its behalf.
 
-This recovery is best-effort — a failure here is logged but does not prevent the worker from starting.
+The migration that introduced the lease handed every orphan left behind by the old code an already-expired lease — the startup sweep's last run, done through the new path.
 
-There is no recovery for failed jobs, no exponential-backoff retry, and no "stuck job" detection beyond the per-job 5-minute timeout. A handler that hangs without responding to its `CancellationToken` will not be killed before the timeout fires.
+A handler that hangs without responding to its `CancellationToken` is still only stopped by the per-job timeout: its heartbeat keeps the lease alive for as long as the process is.
+
+## Retries
+
+Retries are **opt-in per job type**. A handler declares its policy through three default interface members on `IJobHandler`:
+
+- `MaxAttempts` — total runs allowed. The default of **1** is the original "a failure is terminal" contract.
+- `ShouldRetry(exception)` — whether *this* failure is worth another attempt. The default, `JobFailureClassifier.IsTransient`, is an **allow-list** of transient shapes found anywhere in the exception chain: an HTTP request with no answer, or a 408/429/5xx (`HttpRequestException`, the OpenAI SDK's `ClientResultException`, Azure's `RequestFailedException`); an outbound timeout; a resilience pipeline rejecting the call; a transient Npgsql error. Anything else is final — in particular any `IStructuredJobError` (the handler's own verdict: a duplicate, a blocked source) and the job's own `JobTimeoutException`. An allow-list because most deterministic failures here are plain `InvalidOperationException` or an HTTP 4xx, and retrying those would turn an instant, actionable failure into a slow one.
+- `OnFinallyFailedAsync(job, exception, ct)` — the **final-failure hook** (below).
+
+Opting in is a promise that `HandleAsync` is idempotent: a retry re-runs it from the top with whatever an earlier attempt committed still in place.
+
+When an attempt fails, the processor re-reads the row and retries if the job is childless, attempts remain, and `ShouldRetry` says so. A retry is one fenced write: back to `Pending`, `Attempts + 1`, `RunAfter = now() + backoff`, lease and `StartedAt` cleared, `Error` set to this failure's message. It is **quiet** on purpose — no notification, no parent-progress update, no sibling cancellation. A retrying child is `Pending`, so it keeps blocking its lower-priority siblings just as it did while running, and the parent's tally does not move until the child reaches an outcome that counts. The backoff is `JobProcessingOptions.RetryBackoff`, default **10 s, 1 min, 5 min**, with the last entry repeating.
+
+Otherwise the attempt is the job's **final failure**: `Failed` with `Attempts`, the lower-priority siblings cancelled in the same transaction (see *Sibling ordering*), the Failed notification sent, and parent progress updated — then the hook.
+
+**The final-failure hook** runs once, after all of that has committed, so nothing it does or fails to do can change the job's recorded outcome. It gets a fresh DI scope, a read-only snapshot of the failed row, and its own 30-second token; its exceptions are logged and swallowed. It is not called for a retried attempt, a shutdown release, or a lost lease. At most once: a crash between the Failed write and the hook skips it. This is where a handler marks the entity it was working on as failed — `ImportCommodityPrices` stamps its price source's `LastImportStatus = Failed` here, rather than on every attempt as it used to.
+
+Which types opt in, and why the rest do not:
+
+| Job type | Attempts | Why |
+|---|---|---|
+| `ImportCommodityPrices` | 3 | HTTP against third parties; outages measured in minutes outlast the HttpClient resilience handler. Observations are upserted, so a re-run is safe. |
+| `ClassifyDocument` | 3 | The model call fails for reasons that pass (a provider restarting, a model loading, a rate limit). Also retries malformed model output (`JsonException`). The apply step reverts earlier AI suggestions, so a re-run is safe. |
+| `UploadDocument`, `UploadDocumentVersion` | 1 | The staged upload is deleted when the handler exits, so there is nothing for a retry to read. The duplicate check is deterministic anyway. |
+| `ParseAccountStatement`, `DownloadDocuments` | 1 | A user is waiting on the result in a dialog; a slow failure is worse than a fast one they can re-issue. |
+| `ReprocessDocumentVersion` | 1 | `TextExtractionFailedException` wraps transient and deterministic engine errors alike. Opting in needs a `ShouldRetry` that looks inside it. |
+| `BackupBatch`, `BackupToTarget` | 1 | A batch saves partial state and may enqueue a continuation before throwing, so a re-run would duplicate the continuation and double-count it on the parent. The next scheduled backup run is its retry. |
+| Bulk parents | 1 | Parents never retry once they have children. |
 
 ## Parent/child jobs
 
@@ -161,7 +195,7 @@ Some work fans out: bulk reprocessing N documents is N jobs, but the user issued
 
 Hierarchy is **flat**: children of a parent cannot themselves spawn children. There is no enforcement of this in the data layer — it is a convention. Any deeper nesting would break the progress-aggregation logic, which only walks one level up.
 
-A parent handler must be **idempotent on restart**: if the process crashes after spawning children but before saving, the recovery sweep will not requeue it (because `TotalChildCount` was set as part of that save). If it crashes after writing the rows but before committing the count, the saved transaction is atomic so children either all exist or none do. The handler also defends against re-entry by checking whether children already exist for this parent ID (`existingChildCount > 0`) and short-circuiting.
+A parent handler must be **idempotent on restart**: once its save of children and `TotalChildCount` has committed, the parent is no longer reclaimable (`TotalChildCount > 0`), even if the process dies before the processor clears its lease. If it crashes before that save, the transaction is atomic so children either all exist or none do, and the parent is reclaimed when its lease expires. Parents never retry once they have children, whatever their handler's `MaxAttempts`. The handler also defends against re-entry by checking whether children already exist for this parent ID (`existingChildCount > 0`) and short-circuiting.
 
 ## Notifications
 
@@ -176,9 +210,9 @@ Each notification carries the `JobStatusChangedMessage`:
 **When the worker emits a notification:**
 
 - **Non-parent, success:** the handler itself emits the notification. (It is the handler's responsibility, not the processor's, because handlers vary in *when* "complete enough to tell the user" happens. The upload handlers, for instance, send the notification before generating thumbnails, treating thumbnail generation as a non-critical post-step.)
-- **Non-parent, failure:** the processor emits the notification from its catch block, with the structured error if applicable.
+- **Non-parent, failure:** the processor emits the notification once the job has **finally** failed, with the structured error if applicable. A failed attempt that will be retried emits **nothing**: the frontend reads `Failed` as final (`waitForJob` rejects on it), and a job waiting to retry has not failed yet. It just stays `Pending` a little longer.
 - **Child of a parent, success:** the child handler **suppresses** its own notification (`if (job.ParentJobId is null)`). The user only sees the rolled-up parent notification.
-- **Child of a parent, failure:** the processor's catch block emits the failure notification. The user therefore sees per-child error toasts plus a parent summary. This is deliberate — individual child errors carry actionable detail (which document failed, why) that is lost in the aggregate.
+- **Child of a parent, failure:** the processor emits the failure notification on the child's final failure (never on an attempt it will retry). The user therefore sees per-child error toasts plus a parent summary. This is deliberate — individual child errors carry actionable detail (which document failed, why) that is lost in the aggregate.
 - **Parent, terminal or progress update:** `UpdateParentProgressAsync` emits one notification per child terminating, with the parent's running counts. The terminal transition emits the final one.
 
 The frontend hub client (`ProcessingHubService`) distinguishes **managed** jobs (the initiator awaits `waitForJob(jobId)` because it is going to handle the result inline — e.g., a dialog waiting on the document upload) from **unmanaged** jobs (background work whose completion should surface as a generic toast). Managed jobs suppress the generic toast; unmanaged ones receive `toast.success`, `toast.warning`, or `toast.error` based on the terminal status.
@@ -258,6 +292,8 @@ Enqueued as a child of a `BulkClassifyDocuments` parent — one per document. Bo
 
 When run as a child of `BulkClassifyDocuments`, the handler suppresses its own success notification — the parent's progress updates are the sole channel.
 
+**Retries:** up to 3 attempts, for transient failures of the model call and for malformed model output (see *Retries*). The trade-off is latency on a hard failure: when AI is down for good, a single-document classify's error toast arrives after roughly 70 seconds of backoff instead of immediately.
+
 Sets `EntityType = Document`, `EntityId = documentId`.
 
 ### `BulkClassifyDocuments` *(parent)*
@@ -281,6 +317,8 @@ The Finances module's commodity-price import (handler under `Modules/Finances/Pr
 5. Imports observations and applies them via `ApplyCommodityPriceObservationsCommand` through the standard unit-of-work pipeline. Scheduled runs stay system-attributed in the audit log; manual runs are attributed to the initiating user.
 
 It emits no SignalR success notification of its own — import status surfaces on the price-source settings row (`LastImportStatus` / `LastImportMessage`). See [finances/commodities.md](../finances/commodities.md#price-sources--model).
+
+**Retries:** up to 3 attempts for transient provider failures; import blockers (`PriceImportException` — disabled, not configured, system-managed) are final on the first attempt. The `Failed` stamp on the settings row is written by the final-failure hook, once, after the last attempt — so the row never reads Failed while a retry is still queued. A job timeout now records Failed there too.
 
 ### `BackupToTarget` *(parent)*
 
@@ -362,15 +400,15 @@ A trivial handler that returns immediately. Exists so the queue + scheduler pipe
 
 ### One process, one queue, one database
 
-The queue is a table in the same PostgreSQL the rest of the app uses. The worker is a `BackgroundService` in the same WebApi process. There are no external dependencies. This is the right shape for a self-hosted single-household deployment: one process to run, one database to back up, no extra moving parts. It is **not** the right shape for horizontal scale-out — running two WebApi instances would have them race to claim jobs, which the atomic claim handles, but no other coordination (e.g., scheduled work, leader election) exists. The product is single-instance and that is intentional.
+The queue is a table in the same PostgreSQL the rest of the app uses. The worker is a `BackgroundService` in the same WebApi process. There are no external dependencies. This is the right shape for a self-hosted single-household deployment: one process to run, one database to back up, no extra moving parts. It is **not** the right shape for horizontal scale-out. The queue itself would cope with two WebApi instances — the claim is atomic, leases are fenced, and crash recovery no longer depends on a single node sweeping at startup — but SignalR has no backplane and nothing else is coordinated. The product is single-instance, and that is intentional.
 
 ### Handlers own their domain transactions
 
 The processor does not open a transaction around `HandleAsync`. Each handler manages its own `SaveChangesAsync`, its own audit logging, its own file-system compensation. This keeps the processor agnostic to handler complexity and makes it natural for a handler to mix DB writes with side-effects (file moves, search-vector updates) and decide when "complete enough to notify the user" is. The price is that a handler crashing mid-transaction must clean up after itself; the upload handlers do this by deleting the placed file on save failure.
 
-### No retries — failures are user-visible
+### Retries are opt-in per job type — failures are user-visible by default
 
-A failed job stays failed. The user sees the failure message in real time and decides what to do. This is the right default for this product because most jobs are user-initiated (an upload, a reprocess); silently retrying would either succeed surprisingly late or pile up duplicate effort. If retry semantics are needed later — for a job class where the user does *not* want to be told about transient failures — that becomes an opt-in attribute of the job type, not a queue-wide policy.
+By default a failed job stays failed. The user sees the failure message in real time and decides what to do. That is the right default for this product, because most jobs are user-initiated (an upload, a reprocess): silently retrying would either succeed surprisingly late or pile up duplicate effort. Retrying is an **opt-in attribute of the job type**, not a queue-wide policy. It is for job classes whose failures are usually transient and where nobody is watching inline — a scheduled price import, a classification pass. A type opts in only if its handler is safe to re-run from the top, and it retries only failures the classifier recognises as transient. See *Retries*.
 
 ### Notifications are the handler's responsibility, except on failure
 
@@ -389,7 +427,7 @@ Background-job handlers that write to the audit log use `auditLogger.ForUser(job
 ## Distinctive UX decisions worth preserving
 
 1. **The job ID returned from enqueue is the contract.** Every async-initiating endpoint returns `{ jobId }`. Frontends decide whether to await the SignalR completion (managed jobs) or fire-and-forget with a generic toast on completion (unmanaged jobs).
-2. **The admin job list is read-only.** No retry button, no cancel button, no force-fail. If a job needs intervention, the user re-issues the action.
+2. **The admin job list is read-only.** No retry button, no cancel button, no force-fail. If a job needs intervention, the user re-issues the action. For job types that retry, the list shows the attempt story: "Retry 2/3 at 14:05" on a job waiting out its backoff, "3/3 attempts" on one that failed for good, and "Succeeded on attempt 2".
 3. **Bulk operations show *partial* failure as a first-class outcome.** `PartiallyCompleted` is not a degenerate `Failed`; the toast wording (`"Processing completed with N failed item(s)"`) tells the user some items succeeded and which did not.
 4. **Job notifications are scoped per user.** Two users in the same household uploading concurrently do not see each other's toasts.
 5. **The list view groups by parent.** Children only appear when their parent is expanded. The default view is "what work the user kicked off," not "every individual operation."
@@ -419,15 +457,15 @@ Schedules can be created and deleted via admin endpoints: `POST /api/v1/admin/sc
 
 The following must be addable without rewriting the tables or breaking existing job types:
 
-- **Retries with backoff** as an opt-in property of a job type. The `Error` column already stores the latest failure; adding `Attempt` / `MaxAttempts` / `NextAttemptAt` columns is the natural extension.
+- **More job types opting into retries.** Shipped for `ImportCommodityPrices` and `ClassifyDocument` (see *Retries*). `ReprocessDocumentVersion` is the next candidate, and needs a `ShouldRetry` that looks inside `TextExtractionFailedException`.
 - **Per-schedule retry/backoff for failed runs** — today a failed scheduled run is terminal; the next tick fires at the next normal occurrence. Adding a `RetryPolicy` column on `processing.schedules` (or job-type-level) is the natural place.
-- **Scheduled one-off jobs** (`RunAt` on `processing.jobs`) — the claim query becomes `WHERE Status = Pending AND (RunAt IS NULL OR RunAt <= now())`. Distinct from recurring schedules: this would be "remind me in 10 minutes" semantics.
+- **Scheduled one-off jobs** — the column and the claim predicate already exist: `RunAfter`, which retries use today. Enqueueing with a future `RunAfter` is all that is missing. Distinct from recurring schedules: this would be "remind me in 10 minutes" semantics.
 - **Per-module schedule CRUD endpoints** — shipped for Finances: `PUT`/`DELETE /api/v1/finances/settings/price-sources/{source}/schedule` filter the shared table by `JobType = ImportCommodityPrices` and render module-friendly forms, while the generic admin create deliberately rejects that type. New modules adding recurring work should follow the same pattern. The admin endpoint stays intentionally minimal — schedule update / `IsEnabled` toggle and a `Payload` field on create are deliberate omissions to be added when there is a consumer that needs them.
 - **Per-schedule timezone honour** — `TimeZone` column already exists; v1 always treats it as `Etc/UTC`. Honouring it changes only the Cronos `GetNextOccurrence` call.
 - **Per-job-type concurrency caps** (e.g., one OCR at a time, but ten ZIPs at a time). Today's single semaphore would split into per-type semaphores.
 - **Cancel from the admin UI** — the worker would need to expose a per-job cancellation token, and the API would set a `CancelRequested` flag the worker checks.
 - **External worker process** — the in-process `BackgroundService` is replaced by a separate executable that talks to the same table. The atomic-claim primitive already supports this.
-- **Multi-process WebApi** — beyond the queue, this needs a coordinated answer for SignalR (a backplane) and startup recovery (only one node should sweep). Not a queue concern in isolation.
+- **Multi-process WebApi** — the queue is ready: claims are atomic, leases are fenced, and there is no startup sweep to coordinate. What remains is SignalR (a backplane). Not a queue concern.
 - **Deeper hierarchies / DAG workflows** — would not extend `ParentJobId`; build a domain-level state machine that issues fresh top-level jobs and reads their results.
 
-None of these should require re-migrating historical rows. The current schemas' nullable `EntityType`, `EntityId`, `Payload`, `CreatedByUserId`, `ParentJobId`, and `ScheduleId` are deliberately permissive so future job and schedule types can fit without an ALTER TABLE.
+None of these should require re-migrating historical rows. The current schemas' nullable `EntityType`, `EntityId`, `Payload`, `CreatedByUserId`, `ParentJobId`, `ScheduleId`, `RunAfter`, and `LockedUntil` are deliberately permissive so future job and schedule types can fit without an ALTER TABLE.

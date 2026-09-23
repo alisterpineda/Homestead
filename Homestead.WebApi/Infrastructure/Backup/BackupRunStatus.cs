@@ -25,7 +25,7 @@ public record BackupScheduleSummary
 /// </summary>
 /// <remarks>
 /// Derived rather than denormalized onto the source row on purpose: a parent job's terminal transition
-/// happens inside the generic <c>JobProcessorService.UpdateParentProgressAsync</c>, which offers no
+/// happens inside the generic <c>JobRunner.UpdateParentProgressAsync</c>, which offers no
 /// per-type hook, so a handler-written status column could never be set reliably. Reading the job row
 /// sidesteps the race entirely and keeps the tables to genuine state.
 /// </remarks>

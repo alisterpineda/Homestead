@@ -17,6 +17,10 @@ namespace Homestead.WebApi.Tests.Integration.Processing;
 /// <c>ServiceCollection</c> and covers only the semaphore surface. There is also no per-test config seam
 /// (the host is a collection-wide singleton at <c>MaxConcurrency: 4</c>), which is fine: every assertion
 /// here is about <b>claimability</b>, never about execution timing.
+/// <para>
+/// The InProgress rows parked here as blockers and parents carry no lease (<c>LockedUntil</c> NULL), which
+/// is what keeps the claim from treating them as a crashed process's work and reclaiming them.
+/// </para>
 /// </remarks>
 [Collection("Integration")]
 public class JobClaimOrderingTests : IntegrationTestBase

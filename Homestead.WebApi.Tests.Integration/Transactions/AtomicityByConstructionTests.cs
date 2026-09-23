@@ -110,7 +110,7 @@ public class AtomicityByConstructionTests(PostgresFixture fixture) : Integration
         var adminClient = await CreateAdminClientAsync();
         var groupId = await CreateGroupAsync(adminClient, "Original Name");
 
-        // A bulk write run in a plain scope (no ISender → no command scope) mirrors the JobProcessorService
+        // A bulk write run in a plain scope (no ISender → no command scope) mirrors the JobRunner
         // background path: the interceptor stays a no-op (no command tx is opened), so the write autocommits.
         using var scope = CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();

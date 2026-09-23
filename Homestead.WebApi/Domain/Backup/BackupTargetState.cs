@@ -10,7 +10,7 @@ namespace Homestead.WebApi.Domain.Backup;
 /// breaker latch lives on <see cref="BackupSource"/>, because a latch is a fact about one pairing's
 /// change set. Last-run status is on neither — it is derived from <c>processing.jobs</c>, because a
 /// parent job's terminal transition happens inside the generic
-/// <c>JobProcessorService.UpdateParentProgressAsync</c>, which offers no per-type hook, so a
+/// <c>JobRunner.UpdateParentProgressAsync</c>, which offers no per-type hook, so a
 /// handler-written status column could never be set reliably.
 /// </remarks>
 public class BackupTargetState

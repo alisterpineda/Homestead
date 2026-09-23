@@ -1762,6 +1762,11 @@ namespace Homestead.WebApi.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<int>("Attempts")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
                     b.Property<DateTimeOffset?>("CompletedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -1792,6 +1797,14 @@ namespace Homestead.WebApi.Migrations
                         .HasColumnType("integer")
                         .HasDefaultValue(0);
 
+                    b.Property<DateTimeOffset?>("LockedUntil")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("MaxAttempts")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
+
                     b.Property<Guid?>("ParentJobId")
                         .HasColumnType("uuid");
 
@@ -1805,6 +1818,9 @@ namespace Homestead.WebApi.Migrations
 
                     b.Property<string>("Result")
                         .HasColumnType("jsonb");
+
+                    b.Property<DateTimeOffset?>("RunAfter")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid?>("ScheduleId")
                         .HasColumnType("uuid");

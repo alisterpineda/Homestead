@@ -76,7 +76,7 @@ The WebApi uses vertical slice architecture organized by module, with MediatR fo
 4. The endpoint should inject `ISender` and call `sender.Send(request, ct)`
 5. Register the endpoint in the module class (e.g., `DocumentsModule.cs`)
 6. Module-scoped services (interfaces + implementations shared across features) go in `Modules/{Module}/Services/`
-7. Background job handlers go in `Modules/{Module}/Processing/`
+7. Background job handlers go in `Modules/{Module}/Processing/`. A failure is terminal unless the job type opts into retries by overriding `IJobHandler.MaxAttempts` (and optionally `ShouldRetry`). Opt in only if `HandleAsync` is safe to re-run from the top. Mark a domain entity failed in `OnFinallyFailedAsync`, never in a catch block, which would run on every attempt. See `docs/product-design/processing/overview.md` › Retries.
 
 ## Full-Text Search
 

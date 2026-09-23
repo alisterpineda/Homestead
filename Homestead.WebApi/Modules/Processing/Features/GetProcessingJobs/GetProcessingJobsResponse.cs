@@ -19,4 +19,13 @@ public record GetProcessingJobsResponse
     public int TotalChildCount { get; init; }
     public int CompletedChildCount { get; init; }
     public int FailedChildCount { get; init; }
+
+    /// <summary>Runs that ended in an exception. Non-zero on a Pending row means it is waiting to retry.</summary>
+    public int Attempts { get; init; }
+
+    /// <summary>How many runs the job type allows. 1 for any type that has not opted into retries.</summary>
+    public int MaxAttempts { get; init; }
+
+    /// <summary>When a scheduled retry becomes due; null when the job is claimable now.</summary>
+    public DateTimeOffset? RunAfter { get; init; }
 }
