@@ -1,4 +1,4 @@
-import { test as base } from '@playwright/test';
+import { test as base } from './base.fixture';
 import { LoginPage } from '../pages/auth/login.page';
 import { KeycloakLoginPage } from '../pages/auth/keycloak-login.page';
 
@@ -16,4 +16,4 @@ export const test = base.extend<AuthFixtures>({
   },
 });
 
-export { expect } from '@playwright/test';
+export { expect } from './base.fixture';

@@ -1,4 +1,6 @@
 import { type Locator, type Page, expect } from '@playwright/test';
+import { expectOk } from '../../helpers/playwright.helpers';
+import { step } from '../../helpers/step';
 
 export class TrashListPage {
   readonly trashEmpty: Locator;
@@ -7,10 +9,10 @@ export class TrashListPage {
     this.trashEmpty = page.getByText('Trash is empty');
   }
 
-  async goto() {
+  async goto(): Promise<void> {
     const responsePromise = this.page.waitForResponse(
       (resp) =>
-        resp.url().includes('/api/v1/documents') &&
+        resp.url().includes('/api/v1/documents?') &&
         resp.url().includes('Deleted=true') &&
         resp.request().method() === 'GET' &&
         resp.status() === 200,
@@ -19,60 +21,51 @@ export class TrashListPage {
     await responsePromise;
   }
 
-  async selectDocument(name: string) {
-    await this.page.getByLabel(`Select ${name}`).click();
+  /** A trashed document's name as listed. */
+  document(name: string): Locator {
+    return this.page.getByRole('main').getByText(name, { exact: true });
   }
 
-  async selectAll() {
-    await this.page.getByLabel('Select all').click();
+  @step()
+  async select(name: string): Promise<void> {
+    const checkbox = this.page.getByRole('checkbox', { name: `Select ${name}`, exact: true });
+    await checkbox.click();
+    await expect(checkbox).toBeChecked();
   }
 
-  async restore() {
+  @step()
+  async restoreSelected(): Promise<void> {
     const responsePromise = this.page.waitForResponse(
-      (resp) => resp.url().includes('/api/v1/documents/bulk-restore') && resp.request().method() === 'POST',
+      (resp) => resp.url().endsWith('/api/v1/documents/bulk-restore') && resp.request().method() === 'POST',
     );
-    await this.page.getByRole('button', { name: /^Restore$|^Restoring/ }).click();
-    await responsePromise;
+    await this.page.getByRole('button', { name: /^(Restore|Restoring)/ }).click();
+    await expectOk(await responsePromise);
   }
 
-  async deletePermanently() {
+  @step()
+  async deleteSelectedPermanently(): Promise<void> {
     await this.page.getByRole('button', { name: /Delete Permanently/ }).click();
-    // Wait for the alert dialog to finish opening (V1 overlay animation) and scope the confirm
-    // click to the dialog content, so we never re-target the trigger button behind the backdrop.
-    const dialog = this.page.locator('[data-slot="alert-dialog-content"]');
-    await expect(dialog).toBeVisible();
+    const confirm = this.page.getByRole('alertdialog');
+    // Wait for the dialog to finish opening before confirming, so the click never lands on the
+    // trigger button behind the backdrop.
+    await expect(confirm.getByRole('heading')).toBeVisible();
     const deleteResponse = this.page.waitForResponse(
-      (resp) => resp.url().includes('/api/v1/documents/bulk-permanently-delete') && resp.request().method() === 'POST',
+      (resp) =>
+        resp.url().endsWith('/api/v1/documents/bulk-permanently-delete') && resp.request().method() === 'POST',
     );
-    await dialog.getByRole('button', { name: /Delete Permanently/ }).click();
-    await deleteResponse;
+    await confirm.getByRole('button', { name: /Delete Permanently/ }).click();
+    await expectOk(await deleteResponse);
   }
 
-  async emptyTrash() {
-    // Click the "Empty Trash" toolbar button (not in selection mode)
+  @step()
+  async emptyTrash(): Promise<void> {
     await this.page.getByRole('button', { name: 'Empty Trash' }).first().click();
-    // Wait for the alert dialog to finish opening, then confirm scoped to the dialog content.
-    const dialog = this.page.locator('[data-slot="alert-dialog-content"]');
-    await expect(dialog).toBeVisible();
+    const confirm = this.page.getByRole('alertdialog');
+    await expect(confirm.getByRole('heading')).toBeVisible();
     const emptyResponse = this.page.waitForResponse(
-      (resp) => resp.url().includes('/api/v1/documents/empty-trash') && resp.request().method() === 'POST',
+      (resp) => resp.url().endsWith('/api/v1/documents/empty-trash') && resp.request().method() === 'POST',
     );
-    await dialog.getByRole('button', { name: /Empty Trash/ }).click();
-    await emptyResponse;
-  }
-
-  async getFirstDocumentName(): Promise<string> {
-    const firstNameCell = this.page.locator('table tbody tr').first().locator('td').nth(1);
-    await expect(firstNameCell).toBeVisible();
-    const name = await firstNameCell.textContent();
-    return name?.trim() ?? '';
-  }
-
-  async waitForDocumentVisible(name: string, timeout = 10_000) {
-    await expect(this.page.getByText(name).first()).toBeVisible({ timeout });
-  }
-
-  async waitForEmpty(timeout = 10_000) {
-    await expect(this.trashEmpty).toBeVisible({ timeout });
+    await confirm.getByRole('button', { name: /Empty Trash/ }).click();
+    await expectOk(await emptyResponse);
   }
 }

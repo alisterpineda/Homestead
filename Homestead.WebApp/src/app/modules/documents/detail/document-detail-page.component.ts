@@ -234,7 +234,7 @@ import { toast } from '@spartan-ng/brain/sonner';
             Download
           </button>
           @if (auth.canWrite()) {
-            <button hlmBtn variant="outline" size="icon-sm" [hlmDropdownMenuTrigger]="moreMenu">
+            <button hlmBtn variant="outline" size="icon-sm" [hlmDropdownMenuTrigger]="moreMenu" aria-label="More actions">
               <ng-icon hlm name="lucideEllipsisVertical" size="sm" />
             </button>
             <button hlmBtn size="sm" (click)="handleSave()" [disabled]="!hasChanges() || saving()">

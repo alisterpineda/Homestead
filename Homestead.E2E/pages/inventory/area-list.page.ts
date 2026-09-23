@@ -1,4 +1,5 @@
 import { type Locator, type Page, expect } from '@playwright/test';
+import { step } from '../../helpers/step';
 import { pickParentArea } from './inventory-pickers';
 
 export class AreaListPage {
@@ -9,9 +10,7 @@ export class AreaListPage {
   constructor(readonly page: Page) {
     this.newAreaButton = page.getByRole('button', { name: 'New area' });
     this.noAreasEmpty = page.getByText('No areas yet');
-    this.createDialog = page.locator('hlm-dialog-content').filter({
-      has: page.getByRole('heading', { name: 'New area' }),
-    });
+    this.createDialog = page.getByRole('dialog', { name: 'New area' });
   }
 
   async goto(): Promise<void> {
@@ -35,9 +34,10 @@ export class AreaListPage {
     return this.page.locator('app-area-table').getByText(`in ${parentName}`, { exact: true });
   }
 
+  @step()
   async createArea(name: string, parentName?: string): Promise<void> {
     await this.newAreaButton.first().click();
-    await expect(this.createDialog).toBeVisible();
+    await expect(this.createDialog.getByRole('heading', { name: 'New area' })).toBeVisible();
 
     await this.createDialog.getByLabel('Name', { exact: true }).fill(name);
     if (parentName !== undefined) {
@@ -55,7 +55,7 @@ export class AreaListPage {
     );
     await this.createDialog.getByRole('button', { name: 'Create', exact: true }).click();
     await responsePromise;
-    await expect(this.createDialog).toBeHidden();
+    await expect(this.createDialog.getByRole('heading', { name: 'New area' })).toBeHidden();
     await expect(this.rowLink(name)).toBeVisible();
   }
 }

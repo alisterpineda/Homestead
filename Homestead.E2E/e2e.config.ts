@@ -1,70 +1,35 @@
+import { escapeRegExp } from './helpers/playwright.helpers';
+import { AUTH_DIR, KEYCLOAK_URL } from './e2e.env';
+
+/** Users pre-imported into the Keycloak realm (Homestead.AppHost/KeycloakRealms). */
 export const KEYCLOAK_ADMIN = { email: 'admin@test.com', password: 'admin123' };
 export const KEYCLOAK_USER = { email: 'user@test.com', password: 'user123' };
 
-export const KEYCLOAK_URL_PATTERN = /.*localhost:8888.*/;
+export const KEYCLOAK_URL_PATTERN = new RegExp(`^${escapeRegExp(KEYCLOAK_URL)}/`);
 
+/** Signed-in browser state written by tests/setup/auth.setup.ts. */
 export const AUTH_STATE = {
-  adminPath: '.auth/admin.json',
-  userPath: '.auth/user.json',
+  admin: `${AUTH_DIR}/admin.json`,
+  contributor: `${AUTH_DIR}/contributor.json`,
 };
 
-export const TEST_DATA = {
-  documents: {
-    tags: {
-      finance: 'e2e-finance',
-      invoices: 'e2e-finance/invoices',
-      contracts: 'e2e-contracts',
-      bulkTag1: 'e2e-bulk-tag-1',
-      bulkTag2: 'e2e-bulk-tag-2',
-    },
-    parties: {
-      acmeCorp: 'Acme Corporation',
-      johnDoe: 'John Doe',
-    },
-    files: {
-      pdfName: 'IRS W-9 Form',
-      imageName: 'E2E Test Image',
-      searchableText: 'Taxpayer',
-    },
-  },
-  finances: {
-    currency: 'CAD',
-    accounts: {
-      chequing: 'E2E Chequing',
-      savings: 'E2E Savings',
-      visa: 'E2E Visa',
-    },
-    amounts: {
-      chequingOpening: 3000,
-      savingsOpening: 1000,
-      cashOpening: 1000,
-      creditCardOpening: 500,
-      balanceEntryOpening: 2000,
-      balanceEntryAsserted: 2500,
-      transferAmount: 500,
-    },
-  },
-  inventory: {
-    areas: {
-      garage: 'E2E Garage',
-      basement: 'E2E Basement',
-      workshop: 'E2E Workshop',
-      pantry: 'E2E Pantry',
-    },
-    durables: {
-      toolbox: 'E2E Toolbox',
-      drill: 'E2E Drill',
-      headlamp: 'E2E Headlamp',
-      trackedBattery: 'E2E Battery #1',
-    },
-    consumables: {
-      paperTowels: 'E2E Paper Towels',
-      batteries: 'E2E AA Batteries',
-    },
-    tags: {
-      tools: 'e2e-tools',
-      powerTools: 'e2e-tools/power',
-      camping: 'e2e-camping',
-    },
-  },
-};
+/** Household-wide finance display currency, set once by the setup project. */
+export const DISPLAY_CURRENCY = 'CAD';
+
+/**
+ * Names for `test.describe(..., { lock })`. Tests holding the same lock never run concurrently —
+ * across files, workers and device projects — while everything else runs in parallel. Take one
+ * only for state that genuinely can't be partitioned by unique names.
+ */
+export const LOCKS = {
+  /** The trash is one household-wide bin: "Empty trash" purges every test's trashed documents. */
+  documentsTrash: 'documents-trash',
+  /** Household-wide Documents settings (e.g. the default text-extraction engine). */
+  documentsSettings: 'documents-settings',
+  /** A user may have only one ZIP download in flight, and every spec runs as the same admin. */
+  documentsDownload: 'documents-download',
+  /** Household-wide Finances settings (display currency, price sources). */
+  financesSettings: 'finances-settings',
+  /** Net worth sums every account: a spec asserting a total owns the far-past window it writes to. */
+  financesNetWorth: 'finances-net-worth',
+} as const;

@@ -54,7 +54,7 @@ When backend endpoints are added or modified, regenerate the frontend API client
 | `Homestead.WebApi.Tests.Unit/` | xUnit v3 + NSubstitute + EF InMemory | Backend unit tests |
 | `Homestead.WebApi.Tests.Integration/` | xUnit v3 + WebApplicationFactory + Testcontainers (PostgreSQL) + Respawn | Backend integration tests (requires Docker) |
 | `Homestead.WebApp/` (ng test) | Angular unit-test builder (Vitest) | Frontend unit tests (`*.spec.ts` files) |
-| `Homestead.E2E/` | Playwright + Testcontainers | End-to-end tests — auth flows + business workflows (requires Docker) |
+| `Homestead.E2E/` | Playwright + Testcontainers | End-to-end tests — auth flows, business workflows, roles, accessibility and layout, on desktop Chrome + Android Chrome + iPhone WebKit (requires Docker). Conventions in its [CLAUDE.md](Homestead.E2E/CLAUDE.md) |
 | `Homestead.WebApi.Tests.Eval/` | xUnit v3 + Microsoft.Extensions.AI.Evaluation (LLM-judge) | AI eval harness — scores doc-classification title/summary. Opt-in, **not** in the default test gate. `report.html` is regenerated manually via `aieval report` and only after an eval run has populated the store. See its [README](Homestead.WebApi.Tests.Eval/README.md). |
 
 ### Running Tests
@@ -79,9 +79,10 @@ cd Homestead.WebApp && npm test
 cd Homestead.E2E && npm run e2e
 ```
 
-**E2E business workflow tests only** (faster — skips auth suites):
+**E2E, narrowed** (one module, or one device project):
 ```bash
-cd Homestead.E2E && npx playwright test --project=documents-upload --project=documents-tags --project=documents-bulk-ops --project=documents-trash
+cd Homestead.E2E && npx playwright test tests/documents                # one module, every device
+cd Homestead.E2E && npx playwright test --project=desktop              # one device project
 ```
 
 ### Backend Test Filtering (xUnit v3 + MTP v2)
@@ -149,6 +150,6 @@ dotnet test --project Homestead.WebApi.Tests.Unit --no-build
 
 - Use `--filter-class`, `--filter-method`, or `--filter-namespace` to run fewer tests
 - Use `--stop-on-fail on` to stop at the first failure
-- For Playwright E2E tests, use `--project=<name>` or pass a test file path to narrow scope
+- For Playwright E2E tests, pass a test directory/file path or `--project=<desktop|android|iphone|auth>` to narrow scope
 
 This does **not** apply to fast tests (backend unit tests, Angular unit tests) where truncation is fine.

@@ -172,7 +172,7 @@ import { getModuleByPath } from '@/modules/registry';
               <ng-icon hlm name="lucideSearch" size="sm" />
               <span>Search…</span>
               <kbd
-                class="ml-auto hidden items-center gap-0.5 rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground lg:inline-flex"
+                class="ml-auto hidden items-center gap-0.5 rounded border border-border bg-background px-1.5 font-mono text-[10px] font-medium text-muted-foreground lg:inline-flex"
                 aria-hidden="true"
               >⌘K</kbd>
             </button>

@@ -1,10 +1,11 @@
-import { startAll } from './infra/start-all.js';
-import { ensureFixtureFiles } from './helpers/generate-fixtures';
+import { rm } from 'node:fs/promises';
+import { AUTH_DIR } from './e2e.env';
+import { startAll } from './infra/start-all';
 
-async function globalSetup(): Promise<() => Promise<void>> {
-  await ensureFixtureFiles();
+export default async function globalSetup(): Promise<() => Promise<void>> {
   const { teardown } = await startAll();
-  return teardown;
+  return async () => {
+    await teardown();
+    await rm(AUTH_DIR, { recursive: true, force: true });
+  };
 }
-
-export default globalSetup;

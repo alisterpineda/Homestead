@@ -1,4 +1,6 @@
-import { type Locator, type Page } from '@playwright/test';
+import { type Locator, type Page, expect } from '@playwright/test';
+import { KEYCLOAK_URL_PATTERN } from '../../e2e.config';
+import { step } from '../../helpers/step';
 
 export class KeycloakLoginPage {
   readonly usernameInput: Locator;
@@ -11,7 +13,9 @@ export class KeycloakLoginPage {
     this.signInButton = page.getByRole('button', { name: 'Sign In' });
   }
 
-  async login(username: string, password: string) {
+  @step()
+  async login(username: string, password: string): Promise<void> {
+    await expect(this.page).toHaveURL(KEYCLOAK_URL_PATTERN);
     await this.usernameInput.fill(username);
     await this.passwordInput.fill(password);
     await this.signInButton.click();

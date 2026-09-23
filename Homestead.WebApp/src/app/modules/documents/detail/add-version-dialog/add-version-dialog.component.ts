@@ -31,10 +31,10 @@ import { toast } from '@spartan-ng/brain/sonner';
 
         <form (submit)="handleSubmit($event)" class="flex flex-col gap-4">
           <div class="flex flex-col gap-1.5">
-            <label hlmLabel for="version-label">Label (optional)</label>
+            <label hlmLabel for="add-version-label">Label (optional)</label>
             <input
               hlmInput
-              id="version-label"
+              id="add-version-label"
               placeholder="e.g. Signed copy, Updated terms"
               [value]="label()"
               (input)="label.set(asInputValue($event))"

@@ -1,4 +1,5 @@
 import { type Locator, type Page, expect } from '@playwright/test';
+import { step } from '../../helpers/step';
 import type { AccountKind } from '../../helpers/api/finances';
 import { fillDatePicker } from '../../helpers/playwright.helpers';
 
@@ -23,14 +24,12 @@ export interface SubmitCreateInput {
 export class AccountListPage {
   readonly newAccountButton: Locator;
   readonly noAccountsEmpty: Locator;
-  readonly createDialogTitle: Locator;
-  readonly createDialogSubmit: Locator;
+  readonly createDialog: Locator;
 
   constructor(readonly page: Page) {
     this.newAccountButton = page.getByRole('button', { name: 'New account' });
     this.noAccountsEmpty = page.getByText('No accounts yet');
-    this.createDialogTitle = page.getByRole('heading', { name: 'New account' });
-    this.createDialogSubmit = page.getByRole('button', { name: 'Create account' });
+    this.createDialog = page.getByRole('dialog', { name: 'New account' });
   }
 
   async goto(): Promise<void> {
@@ -45,21 +44,28 @@ export class AccountListPage {
     await responsePromise;
   }
 
-  rowFor(name: string): Locator {
-    return this.page.getByRole('link', { name }).first();
+  /** The account's table row (desktop) or card (phones) — whichever layout is on screen. */
+  entryFor(name: string): Locator {
+    return this.page
+      .getByRole('row')
+      .or(this.page.locator('app-account-card-grid').getByRole('link'))
+      .filter({ hasText: name })
+      .visible();
   }
 
+  @step()
   async openCreateDialog(): Promise<void> {
     await this.newAccountButton.first().click();
-    await expect(this.createDialogTitle).toBeVisible();
+    await expect(this.createDialog.getByRole('heading', { name: 'New account' })).toBeVisible();
   }
 
+  @step()
   async submitCreate(input: SubmitCreateInput): Promise<void> {
-    await this.page.getByRole('radio', { name: KIND_LABELS[input.kind], exact: false }).click();
+    await this.createDialog.getByRole('radio', { name: KIND_LABELS[input.kind], exact: false }).click();
 
-    await this.page.getByLabel('Name', { exact: true }).fill(input.name);
+    await this.createDialog.getByLabel('Name', { exact: true }).fill(input.name);
 
-    await this.page.getByRole('button', { name: 'Reporting currency' }).click();
+    await this.createDialog.getByRole('button', { name: 'Reporting currency' }).click();
     await this.page.getByRole('textbox', { name: 'Search currencies' }).fill(input.currencyCode);
     await this.page
       .getByRole('button', { name: new RegExp(`^${input.currencyCode}\\b`) })
@@ -67,15 +73,15 @@ export class AccountListPage {
       .click();
 
     if (input.institution !== undefined) {
-      await this.page.getByLabel('Institution (optional)').fill(input.institution);
+      await this.createDialog.getByLabel('Institution (optional)').fill(input.institution);
     }
 
     if (input.initialAmount !== undefined && input.kind !== 'Investment') {
-      await this.page.getByLabel('Amount', { exact: true }).fill(input.initialAmount);
+      await this.createDialog.getByLabel('Amount', { exact: true }).fill(input.initialAmount);
     }
 
     if (input.asOfDate !== undefined && input.kind !== 'Investment') {
-      await fillDatePicker(this.page, 'As-of date', input.asOfDate);
+      await fillDatePicker(this.createDialog, 'As-of date', input.asOfDate);
     }
 
     const createResponse = this.page.waitForResponse(
@@ -84,7 +90,7 @@ export class AccountListPage {
         resp.request().method() === 'POST' &&
         resp.status() === 201,
     );
-    await this.createDialogSubmit.click();
+    await this.createDialog.getByRole('button', { name: 'Create account' }).click();
     await createResponse;
     await this.page.waitForURL(/\/finances\/accounts\/[0-9a-f-]+/);
   }

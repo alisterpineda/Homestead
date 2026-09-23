@@ -46,3 +46,13 @@ export async function pickParentArea(page: Page, scope: Locator, name: string): 
     name,
   );
 }
+
+/**
+ * The open brand picker's popover (`app-brand-picker`). Its search box shares the "Search brands"
+ * name with the Brands page's own search, so it is found through the popover that holds it.
+ */
+export function brandPickerPopover(page: Page): Locator {
+  return page.locator('[hlmPopoverContent]').filter({
+    has: page.getByRole('textbox', { name: 'Search brands' }),
+  });
+}

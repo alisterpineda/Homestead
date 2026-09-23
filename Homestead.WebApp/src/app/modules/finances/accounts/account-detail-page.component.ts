@@ -149,7 +149,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
           <div class="flex flex-row justify-end tabular-nums">
             <div class="text-right">
               <p class="text-xs uppercase tracking-wide text-muted-foreground">Balance</p>
-              <p class="text-3xl font-semibold">{{ displayText() ?? '—' }}</p>
+              <p class="text-3xl font-semibold" data-testid="account-balance">{{ displayText() ?? '—' }}</p>
               @if (showNative() && nativeText(); as nt) {
                 <p class="text-sm text-muted-foreground">{{ nt }}</p>
               }

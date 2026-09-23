@@ -1,13 +1,6 @@
 import { APIRequestContext, expect } from '@playwright/test';
 
 const BASE = '/api/v1/inventory';
-const AREAS_URL = `${BASE}/areas?Page=1&PageSize=200`;
-const DURABLES_URL = `${BASE}/durables?Page=1&PageSize=1000&IncludeInactive=true`;
-const CONSUMABLES_URL = `${BASE}/consumables?Page=1&PageSize=1000&IncludeInactive=true`;
-const TAGS_URL = `${BASE}/tags?Page=1&PageSize=1000`;
-const BRANDS_URL = `${BASE}/brands?Page=1&PageSize=1000`;
-
-const JSON_PATCH = { 'Content-Type': 'application/json-patch+json' };
 
 export type ItemStatus = 'Active' | 'Lent' | 'Archived';
 
@@ -17,13 +10,41 @@ export interface AreaHandle {
   readonly parentAreaId: string | null;
 }
 
+export type WarrantyStatus = 'None' | 'Active' | 'Expiring' | 'Expired';
+
 export interface DurableHandle {
   readonly id: string;
   readonly name: string;
   readonly status: ItemStatus;
+  readonly statusNote: string | null;
   readonly areaId: string | null;
   readonly parentItemId: string | null;
   readonly isContainer: boolean;
+  readonly brandId: string | null;
+  readonly tagPaths: string[];
+  readonly warrantyStatus: WarrantyStatus;
+}
+
+export interface BrandHandle {
+  readonly id: string;
+  readonly name: string;
+  readonly itemCount: number;
+}
+
+export interface TagHandle {
+  readonly id: string;
+  readonly name: string;
+  readonly path: string;
+  readonly parentId: string | null;
+}
+
+export interface ActivityRow {
+  readonly type: string;
+  readonly id: string;
+  readonly body: string | null;
+  /** A note's "when it happened" instant (ISO); null on audit rows. */
+  readonly occurredAt: string | null;
+  readonly isEdited: boolean;
 }
 
 export interface ConsumableHandle {
@@ -45,6 +66,9 @@ export interface CreateDurableInput {
   parentItemId?: string;
   isContainer?: boolean;
   tags?: string[];
+  brandId?: string;
+  /** `yyyy-MM-dd` — the base the warranty composer's year presets count from. */
+  acquiredOn?: string;
 }
 
 export interface CreateConsumableInput {
@@ -79,6 +103,8 @@ export async function createDurableViaApi(
       parentItemId: input.parentItemId ?? null,
       isContainer: input.isContainer ?? false,
       tags: input.tags ?? [],
+      brandId: input.brandId ?? null,
+      acquiredOn: input.acquiredOn ?? null,
     },
   });
   expect(response.status(), `create durable ${input.name}`).toBe(201);
@@ -104,151 +130,121 @@ export async function createConsumableViaApi(
   return toConsumableHandle(await response.json());
 }
 
-export async function listAreasViaApi(request: APIRequestContext): Promise<AreaHandle[]> {
-  const response = await request.get(AREAS_URL);
-  expect(response.ok(), 'list areas').toBeTruthy();
-  const body = await response.json();
-  return ((body.items ?? []) as Array<{ id: string; name: string; parentAreaId?: string | null }>).map(
-    (a) => ({ id: a.id, name: a.name, parentAreaId: a.parentAreaId ?? null }),
-  );
-}
-
-export async function listDurablesViaApi(request: APIRequestContext): Promise<DurableHandle[]> {
-  const response = await request.get(DURABLES_URL);
-  expect(response.ok(), 'list durables').toBeTruthy();
-  const body = await response.json();
-  return (body.items ?? []).map(toDurableHandle);
-}
-
-export async function listConsumablesViaApi(request: APIRequestContext): Promise<ConsumableHandle[]> {
-  const response = await request.get(CONSUMABLES_URL);
-  expect(response.ok(), 'list consumables').toBeTruthy();
-  const body = await response.json();
-  return (body.items ?? []).map(toConsumableHandle);
-}
-
 export async function getConsumableViaApi(
   request: APIRequestContext,
   id: string,
 ): Promise<{ consumable: ConsumableHandle; locations: StockEntry[] }> {
   const response = await request.get(`${BASE}/consumables/${id}`);
-  expect(response.ok(), `get consumable ${id}`).toBeTruthy();
+  await expect(response, `get consumable ${id}`).toBeOK();
   const body = await response.json();
   return { consumable: toConsumableHandle(body.consumable), locations: body.locations ?? [] };
 }
 
-/**
- * Reset all inventory data as far as the API allows. Items that carry history can't be deleted —
- * a consumable with ledger movements, a durable that has held contents or was tracked from stock —
- * so those are archived instead: terminal items are hidden from every default view and the
- * location pickers, and they no longer block deleting their area.
- *
- * Order matters: stock is used up first (stock sitting in an area or container blocks both the
- * area delete and archiving the container), then consumables, then durables leaf-first (a
- * container with live contents can't be archived), then areas leaf-first, then tags and brands.
- */
-export async function resetInventoryViaApi(request: APIRequestContext): Promise<void> {
-  for (const consumable of await listConsumablesViaApi(request)) {
-    const { locations } = await getConsumableViaApi(request, consumable.id);
-    for (const entry of locations) {
-      if (entry.quantity <= 0) continue;
-      const consume = await request.post(`${BASE}/consumables/${consumable.id}/consume`, {
-        data: {
-          areaId: entry.areaId,
-          containerItemId: entry.containerItemId,
-          quantity: entry.quantity,
-        },
-      });
-      expect(consume.ok(), `use up stock of ${consumable.name}: ${await consume.text()}`).toBeTruthy();
-    }
-    await deleteOrArchive(request, `${BASE}/consumables/${consumable.id}`, consumable.name, consumable.status);
-  }
-
-  // Leaf-first: each pass retires every live durable with no live children left, which frees its
-  // parent for the next pass.
-  let durables = await listDurablesViaApi(request);
-  for (;;) {
-    const live = durables.filter((d) => d.status !== 'Archived');
-    const leaves = live.filter((d) => !live.some((child) => child.parentItemId === d.id));
-    if (leaves.length === 0) break;
-    for (const durable of leaves) {
-      await deleteOrArchive(request, `${BASE}/durables/${durable.id}`, durable.name, durable.status);
-    }
-    durables = await listDurablesViaApi(request);
-  }
-  // Archived durables left over from an earlier run: delete the ones that allow it.
-  for (const durable of durables) {
-    await request.delete(`${BASE}/durables/${durable.id}`);
-  }
-
-  let areas = await listAreasViaApi(request);
-  while (areas.length > 0) {
-    const leaves = areas.filter((a) => !areas.some((child) => child.parentAreaId === a.id));
-    for (const area of leaves) {
-      const del = await request.delete(`${BASE}/areas/${area.id}`);
-      if (!del.ok() && del.status() !== 404) {
-        throw new Error(`failed to delete area ${area.name}: ${del.status()} ${await del.text()}`);
-      }
-    }
-    areas = await listAreasViaApi(request);
-  }
-
-  const tagsResponse = await request.get(TAGS_URL);
-  expect(tagsResponse.ok(), 'list inventory tags').toBeTruthy();
-  const tagIds = ((await tagsResponse.json()).items ?? []).map((t: { id: string }) => t.id);
-  if (tagIds.length > 0) {
-    const del = await request.post(`${BASE}/tags/bulk-delete`, { data: { ids: tagIds } });
-    expect(del.ok(), 'bulk-delete inventory tags').toBeTruthy();
-  }
-
-  const brandsResponse = await request.get(BRANDS_URL);
-  expect(brandsResponse.ok(), 'list brands').toBeTruthy();
-  for (const brand of ((await brandsResponse.json()).items ?? []) as Array<{ id: string; name: string }>) {
-    const del = await request.delete(`${BASE}/brands/${brand.id}`);
-    // 400 = still referenced by an item the reset could only archive (its history blocks a hard
-    // delete); archived items keep their brand, so leave that brand behind rather than fail the reset.
-    if (!del.ok() && del.status() !== 404 && del.status() !== 400) {
-      throw new Error(`failed to delete brand ${brand.name}: ${del.status()} ${await del.text()}`);
-    }
-  }
+export async function getDurableViaApi(request: APIRequestContext, id: string): Promise<DurableHandle> {
+  const response = await request.get(`${BASE}/durables/${id}`);
+  await expect(response, `get durable ${id}`).toBeOK();
+  return toDurableHandle(await response.json());
 }
 
-/** Hard-delete an item; when its history forbids that (400), archive it instead. */
-async function deleteOrArchive(
+/** Applies RFC 6902 `replace` ops to a durable, e.g. `{ status: 'Lent', statusNote: 'Dave' }`. */
+export async function patchDurableViaApi(
   request: APIRequestContext,
-  itemUrl: string,
-  name: string,
-  status: ItemStatus,
-): Promise<void> {
-  const del = await request.delete(itemUrl);
-  if (del.ok() || del.status() === 404) return;
-  if (del.status() !== 400) {
-    throw new Error(`failed to delete ${name}: ${del.status()} ${await del.text()}`);
-  }
-  if (status === 'Archived') return;
-  const archive = await request.patch(itemUrl, {
-    headers: JSON_PATCH,
-    data: [{ op: 'replace', path: '/status', value: 'Archived' }],
+  id: string,
+  changes: Record<string, unknown>,
+): Promise<DurableHandle> {
+  const response = await request.patch(`${BASE}/durables/${id}`, {
+    headers: { 'Content-Type': 'application/json-patch+json' },
+    data: Object.entries(changes).map(([key, value]) => ({ op: 'replace', path: `/${key}`, value })),
   });
-  expect(archive.ok(), `archive ${name}: ${await archive.text()}`).toBeTruthy();
+  await expect(response, `patch durable ${id}`).toBeOK();
+  return toDurableHandle(await response.json());
+}
+
+export async function createWarrantyViaApi(
+  request: APIRequestContext,
+  itemId: string,
+  input: { provider?: string; expiresOn?: string; notes?: string } = {},
+): Promise<void> {
+  const response = await request.post(`${BASE}/items/${itemId}/warranties`, {
+    data: { provider: input.provider ?? null, expiresOn: input.expiresOn ?? null, notes: input.notes ?? null },
+  });
+  expect(response.status(), `create warranty on ${itemId}`).toBe(201);
+}
+
+export async function getItemActivityViaApi(request: APIRequestContext, itemId: string): Promise<ActivityRow[]> {
+  const response = await request.get(`${BASE}/items/${itemId}/activity?PageSize=100`);
+  await expect(response, `get activity of ${itemId}`).toBeOK();
+  const body = await response.json();
+  return (body.items as ActivityRow[]).map((r) => ({
+    type: r.type,
+    id: r.id,
+    body: r.body ?? null,
+    occurredAt: r.occurredAt ?? null,
+    isEdited: r.isEdited === true,
+  }));
+}
+
+export async function createBrandViaApi(request: APIRequestContext, name: string): Promise<BrandHandle> {
+  const response = await request.post(`${BASE}/brands`, { data: { name } });
+  await expect(response, `create brand ${name}`).toBeOK();
+  return toBrandHandle(await response.json());
+}
+
+/** Brands whose name contains `search` (case-insensitive). */
+export async function findBrandsViaApi(request: APIRequestContext, search: string): Promise<BrandHandle[]> {
+  const response = await request.get(`${BASE}/brands`, { params: { Search: search, PageSize: 100 } });
+  await expect(response, `search brands for ${search}`).toBeOK();
+  const body = await response.json();
+  return (body.items as BrandHandle[]).map(toBrandHandle);
+}
+
+/** Creates a tag by its full path; missing ancestors are upserted alongside it. */
+export async function createTagViaApi(request: APIRequestContext, path: string): Promise<TagHandle> {
+  const response = await request.post(`${BASE}/tags`, { data: { path } });
+  await expect(response, `create tag ${path}`).toBeOK();
+  return toTagHandle(await response.json());
+}
+
+/** Tags whose name or path contains `search` (case-insensitive). */
+export async function findTagsViaApi(request: APIRequestContext, search: string): Promise<TagHandle[]> {
+  const response = await request.get(`${BASE}/tags`, { params: { Search: search, PageSize: 100 } });
+  await expect(response, `search tags for ${search}`).toBeOK();
+  const body = await response.json();
+  return (body.items as TagHandle[]).map(toTagHandle);
 }
 
 function toDurableHandle(d: {
   id: string;
   name: string;
   status: ItemStatus;
+  statusNote?: string | null;
   areaId?: string | null;
   parentItemId?: string | null;
   isContainer?: boolean | null;
+  brandId?: string | null;
+  tags?: { path: string }[] | null;
+  warrantyStatus?: WarrantyStatus;
 }): DurableHandle {
   return {
     id: d.id,
     name: d.name,
     status: d.status,
+    statusNote: d.statusNote ?? null,
     areaId: d.areaId ?? null,
     parentItemId: d.parentItemId ?? null,
     isContainer: d.isContainer === true,
+    brandId: d.brandId ?? null,
+    tagPaths: (d.tags ?? []).map((t) => t.path),
+    warrantyStatus: d.warrantyStatus ?? 'None',
   };
+}
+
+function toBrandHandle(b: BrandHandle): BrandHandle {
+  return { id: b.id, name: b.name, itemCount: b.itemCount };
+}
+
+function toTagHandle(t: TagHandle): TagHandle {
+  return { id: t.id, name: t.name, path: t.path, parentId: t.parentId ?? null };
 }
 
 function toConsumableHandle(c: {

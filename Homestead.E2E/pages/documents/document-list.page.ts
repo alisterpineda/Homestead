@@ -1,121 +1,202 @@
-import { type Locator, type Page, expect } from '@playwright/test';
-import { isMobileViewport } from '../../helpers/playwright.helpers';
+import { type Download, type Locator, type Page, type Response, expect } from '@playwright/test';
+import { expectOk, isMobileViewport } from '../../helpers/playwright.helpers';
+import { step } from '../../helpers/step';
+
+const isDocumentsList = (resp: Response) =>
+  /\/api\/v1\/documents\?/.test(resp.url()) && resp.request().method() === 'GET' && resp.status() === 200;
 
 export class DocumentListPage {
   readonly searchInput: Locator;
   readonly uploadButton: Locator;
+  readonly uploadEmptyStateButton: Locator;
   readonly noDocsEmpty: Locator;
   readonly noMatchingEmpty: Locator;
-  readonly tableViewButton: Locator;
-  readonly gridViewButton: Locator;
-  readonly selectButton: Locator;
+  readonly filterButton: Locator;
+  readonly selectAllCheckbox: Locator;
+  readonly selectionCount: Locator;
 
   constructor(readonly page: Page) {
-    this.searchInput = page.getByLabel('Search documents');
-    this.uploadButton = page.getByRole('button', { name: 'Upload Document' });
+    this.searchInput = page.getByRole('textbox', { name: 'Search documents' });
+    this.uploadButton = page.getByRole('button', { name: 'Upload', exact: true });
+    this.uploadEmptyStateButton = page.getByRole('button', { name: 'Upload Document' });
     this.noDocsEmpty = page.getByText('No documents yet');
     this.noMatchingEmpty = page.getByText('No matching documents');
-    this.tableViewButton = page.getByLabel('Table view');
-    this.gridViewButton = page.getByLabel('Grid view');
-    this.selectButton = page.getByLabel('Enter selection mode');
+    this.filterButton = page.getByRole('button', { name: 'Filter documents' });
+    this.selectAllCheckbox = page.getByRole('checkbox', { name: 'Select all' });
+    this.selectionCount = page.getByText(/\d+ documents? selected/);
   }
 
-  async goto() {
-    const responsePromise = this.page.waitForResponse(
-      (resp) => resp.url().includes('/api/v1/documents') && resp.request().method() === 'GET' && resp.status() === 200,
-    );
+  async goto(): Promise<void> {
+    const responsePromise = this.page.waitForResponse(isDocumentsList);
     await this.page.goto('/documents');
     await responsePromise;
   }
 
-  async search(term: string) {
+  /** Searches and waits for the server's answer to exactly this term. */
+  @step()
+  async search(term: string): Promise<void> {
     const responsePromise = this.page.waitForResponse(
-      (resp) =>
-        resp.url().includes('/api/v1/documents') &&
-        resp.url().includes('Search=') &&
-        resp.request().method() === 'GET' &&
-        resp.status() === 200,
+      (resp) => isDocumentsList(resp) && new URL(resp.url()).searchParams.get('Search') === term,
     );
     await this.searchInput.fill(term);
-    await this.page.waitForURL(/search=/, { timeout: 5_000 });
+    await expect(this.page).toHaveURL(/[?&]search=/);
     await responsePromise;
   }
 
-  async clearSearch() {
+  @step()
+  async clearSearch(): Promise<void> {
     const responsePromise = this.page.waitForResponse(
-      (resp) =>
-        resp.url().includes('/api/v1/documents') &&
-        !resp.url().includes('Search=') &&
-        resp.request().method() === 'GET' &&
-        resp.status() === 200,
+      (resp) => isDocumentsList(resp) && !new URL(resp.url()).searchParams.has('Search'),
     );
     await this.searchInput.fill('');
-    await this.page.waitForURL((url) => !url.searchParams.has('search'), { timeout: 5_000 });
+    await expect(this.page).not.toHaveURL(/[?&]search=/);
     await responsePromise;
   }
 
-  async clickDocument(name: string) {
-    await this.page.getByRole('cell', { name }).first().click();
+  /** A document's name as listed, in either the grid or the table view. */
+  document(name: string): Locator {
+    return this.page.getByRole('main').getByText(name, { exact: true });
   }
 
-  async waitForDocumentVisible(name: string, timeout = 15_000) {
-    await expect(this.page.getByText(name).first()).toBeVisible({ timeout });
+  /** Uploads through the toolbar's Upload popover; resolves to the upload job's id. */
+  @step()
+  async upload(file: { name: string; mimeType: string; buffer: Buffer }): Promise<string> {
+    await this.uploadButton.click();
+    const chooseFiles = this.page.getByRole('button', { name: 'Choose files' });
+    await expect(chooseFiles).toBeVisible();
+
+    const uploadResponse = this.page.waitForResponse(
+      (resp) => /\/api\/v1\/documents$/.test(resp.url()) && resp.request().method() === 'POST',
+    );
+    const fileChooser = this.page.waitForEvent('filechooser');
+    await chooseFiles.click();
+    await (await fileChooser).setFiles(file);
+    const response = await uploadResponse;
+    expect(response.status(), `upload ${file.name}`).toBe(202);
+    return (await response.json()).jobId as string;
   }
 
-  async switchToTableView() {
-    await Promise.race([
-      this.tableViewButton.waitFor({ state: 'visible', timeout: 10_000 }),
-      this.noDocsEmpty.waitFor({ state: 'visible', timeout: 10_000 }),
-      this.page.getByLabel('More options').waitFor({ state: 'visible', timeout: 10_000 }),
-    ]).catch(() => {});
+  /**
+   * Picks a tag in the Filters panel (a popover on desktop, a drawer on phones), waits for the
+   * filtered list, then closes the panel.
+   */
+  @step()
+  async filterByTag(path: string): Promise<void> {
+    await this.filterButton.click();
+    const panelTitle = this.page.getByText('Filters', { exact: true });
+    const search = this.page.getByPlaceholder('Search tags...');
+    // On phones the drawer slides in; click() waits for it to settle so the options anchor correctly.
+    await search.click();
 
-    if (await this.noDocsEmpty.isVisible()) return;
+    const options = this.page.waitForResponse(
+      (resp) =>
+        resp.url().includes('/api/v1/documents/tags?') &&
+        new URL(resp.url()).searchParams.get('Search') === path &&
+        resp.status() === 200,
+    );
+    await search.fill(path);
+    await options;
 
+    const filtered = this.page.waitForResponse(
+      (resp) => isDocumentsList(resp) && new URL(resp.url()).searchParams.has('TagIds'),
+    );
+    await this.page.getByRole('option', { name: path, exact: true }).click();
+    await filtered;
+
+    // Escape with focus still in the tag combobox clears the pick on phones, so move focus to the
+    // panel first. The first Escape can land on the combobox list while it is still closing, so
+    // retry until the panel itself is gone.
+    await panelTitle.click();
+    await expect(async () => {
+      await this.page.keyboard.press('Escape');
+      await expect(panelTitle).toBeHidden({ timeout: 1_000 });
+    }).toPass();
+  }
+
+  /** Switches to the table view: a toggle on desktop, an overflow-menu choice on phones. */
+  @step()
+  async switchToTableView(): Promise<void> {
     if (isMobileViewport(this.page)) {
-      await this.page.getByLabel('More options').click();
+      await this.page.getByRole('button', { name: 'More options' }).click();
       await this.page.getByRole('menuitemradio', { name: 'Table' }).click();
-    } else if (await this.tableViewButton.isVisible()) {
-      await this.tableViewButton.click();
+    } else {
+      await this.page.getByRole('button', { name: 'Table view' }).click();
     }
-    await expect(this.page.locator('table')).toBeVisible();
+    await expect(this.page.getByRole('table')).toBeVisible();
   }
 
-  async enterSelectionMode() {
-    // In table view, clicking a row checkbox enters selection mode automatically
-    // In grid view, click the "Select" button
-    try {
-      await expect(this.selectButton).toBeVisible({ timeout: 2_000 });
-      await this.selectButton.click();
-    } catch {
-      // Not visible = table view, where checkboxes handle selection directly
-    }
+  @step()
+  async select(name: string): Promise<void> {
+    const checkbox = this.page.getByRole('checkbox', { name: `Select ${name}`, exact: true });
+    await checkbox.click();
+    await expect(checkbox).toBeChecked();
   }
 
-  async selectDocumentCheckbox(name: string) {
-    await this.page.getByLabel(`Select ${name}`).click();
+  @step()
+  async exitSelectionMode(): Promise<void> {
+    await this.page.getByRole('button', { name: 'Exit selection mode' }).click();
+    await expect(this.selectionCount).toBeHidden();
   }
 
-  async selectAllOnPage() {
-    await this.page.getByRole('button', { name: 'Select all' }).click();
+  /** Moves the selected documents to the trash through the toolbar's confirm dialog. */
+  @step()
+  async trashSelected(): Promise<void> {
+    await this.page.getByRole('button', { name: 'Delete', exact: true }).click();
+    const confirm = this.page.getByRole('alertdialog', { name: /^Delete \d+ documents?\?$/ });
+    await expect(confirm.getByRole('heading')).toBeVisible();
+    const deleteResponse = this.page.waitForResponse(
+      (resp) => resp.url().endsWith('/api/v1/documents/bulk-delete') && resp.request().method() === 'POST',
+    );
+    await confirm.getByRole('button', { name: 'Delete', exact: true }).click();
+    await expectOk(await deleteResponse);
   }
 
-  async exitSelectionMode() {
-    await this.page.getByLabel('Exit selection mode').click();
+  /**
+   * Adds a tag or party to every selected document through the toolbar's bulk-edit popover:
+   * search, pick the suggestion, Apply, then Confirm.
+   */
+  @step()
+  async bulkAdd(kind: 'Tags' | 'Parties', value: string): Promise<void> {
+    await this.page.getByRole('button', { name: kind, exact: true }).click();
+    const search = this.page.getByRole('textbox', { name: new RegExp(`^Search ${kind.toLowerCase()} to add`, 'i') });
+
+    const suggestions = this.page.waitForResponse(
+      (resp) =>
+        resp.url().includes(`/api/v1/documents/${kind.toLowerCase()}?`) &&
+        new URL(resp.url()).searchParams.get('Search') === value &&
+        resp.status() === 200,
+    );
+    await search.pressSequentially(value);
+    await suggestions;
+    await this.page.getByRole('button', { name: value, exact: true }).click();
+
+    await this.page.getByRole('button', { name: 'Apply' }).click();
+    const bulkUpdate = this.page.waitForResponse(
+      (resp) => resp.url().endsWith('/api/v1/documents/bulk-update') && resp.request().method() === 'POST',
+    );
+    await this.page.getByRole('button', { name: 'Confirm' }).click();
+    await expectOk(await bulkUpdate);
   }
 
-  selectionCountText() {
-    return this.page.getByText(/\d+ documents? selected/);
-  }
+  /**
+   * Downloads the selected documents as one ZIP: the toolbar's Download starts a background job,
+   * the progress dialog waits for it, then offers the archive. Resolves to the browser download.
+   */
+  @step()
+  async downloadSelectedAsZip(): Promise<Download> {
+    const startResponse = this.page.waitForResponse(
+      (resp) => resp.url().endsWith('/api/v1/documents/download') && resp.request().method() === 'POST',
+    );
+    await this.page.getByRole('button', { name: 'Download', exact: true }).click();
+    await expectOk(await startResponse);
 
-  bulkDeleteButton() {
-    return this.page.getByRole('button', { name: 'Delete' });
-  }
+    const dialog = this.page.getByRole('dialog', { name: 'Download Documents' });
+    await expect(dialog.getByRole('heading', { name: 'Download Documents' })).toBeVisible();
+    const archiveLink = dialog.getByRole('link', { name: 'Download documents' });
+    await expect(archiveLink).toBeVisible({ timeout: 30_000 });
 
-  bulkTagsButton() {
-    return this.page.locator('app-bulk-edit-tags-popover button[hlmpopovertrigger]');
-  }
-
-  bulkPartiesButton() {
-    return this.page.locator('app-bulk-edit-parties-popover button[hlmpopovertrigger]');
+    const download = this.page.waitForEvent('download');
+    await archiveLink.click();
+    return download;
   }
 }

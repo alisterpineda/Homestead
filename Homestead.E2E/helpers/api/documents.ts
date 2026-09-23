@@ -1,108 +1,82 @@
-import { APIRequestContext, expect } from '@playwright/test';
-import * as fs from 'fs';
-import * as path from 'path';
-import { waitForProcessingComplete } from './processing';
+import { type APIRequestContext, expect } from '@playwright/test';
+import type { FilePayload } from '../files';
+import { waitForEntityJobs, waitForJob } from './processing';
 
-const FIXTURES_DIR = path.resolve(__dirname, '../../fixtures/files');
+export interface DocumentHandle {
+  readonly id: string;
+  readonly name: string;
+}
 
-// IncludeChildTags is required by the GetDocuments endpoint binder (non-nullable bool).
-const LIST_DOCUMENTS_URL = '/api/v1/documents?Page=1&PageSize=100&IncludeChildTags=false';
+/** The name the app gives an uploaded file: its file name without the extension. */
+export function documentNameOf(file: FilePayload): string {
+  return file.name.replace(/\.[^.]+$/, '');
+}
 
 /**
- * Drain a paginated list endpoint by repeatedly fetching the first page and bulk-deleting
- * its ids. Each iteration deletes up to the requested PageSize, so this works for arbitrary
- * backlogs without leaking residue.
+ * Uploads through the API and waits until the document exists and its text extraction is done, so
+ * callers can assert against search results straight away.
  */
-async function bulkDeleteAll(
+export async function uploadDocumentViaApi(request: APIRequestContext, file: FilePayload): Promise<DocumentHandle> {
+  const response = await request.post('/api/v1/documents', { multipart: { file } });
+  expect(response.status(), `upload ${file.name}`).toBe(202);
+  const { jobId } = await response.json();
+
+  const job = await waitForJob(request, jobId);
+  expect(job.status, `upload job for ${file.name}: ${job.error ?? ''}`).toBe('Completed');
+
+  const name = documentNameOf(file);
+  const document = await findDocumentByName(request, name);
+  await waitForEntityJobs(request, document.id);
+  return document;
+}
+
+/** Live (not trashed) documents the list's search finds for `term`. */
+export async function searchDocumentsViaApi(request: APIRequestContext, term: string): Promise<DocumentHandle[]> {
+  const response = await request.get(
+    `/api/v1/documents?Page=1&PageSize=20&IncludeChildTags=false&Search=${encodeURIComponent(term)}`,
+  );
+  await expect(response).toBeOK();
+  return ((await response.json()).items as DocumentHandle[]).map(({ id, name }) => ({ id, name }));
+}
+
+export async function findDocumentByName(request: APIRequestContext, name: string): Promise<DocumentHandle> {
+  const items = await searchDocumentsViaApi(request, name);
+  const match = items.find((d) => d.name === name);
+  expect(match, `document "${name}" exists`).toBeDefined();
+  return { id: match!.id, name: match!.name };
+}
+
+export interface DocumentDetail {
+  id: string;
+  name: string;
+  notes: string;
+  versionCount: number;
+  versions: Array<{ id: string; versionNumber: number; label: string | null }>;
+  tags: Array<{ id: string; path: string }>;
+  parties: Array<{ id: string; name: string }>;
+}
+
+export async function getDocumentViaApi(request: APIRequestContext, id: string): Promise<DocumentDetail> {
+  const response = await request.get(`/api/v1/documents/${id}`);
+  await expect(response, `get document ${id}`).toBeOK();
+  return response.json();
+}
+
+export async function patchDocumentViaApi(
   request: APIRequestContext,
-  listUrl: string,
-  bulkDeleteUrl: string,
+  id: string,
+  operations: Array<{ op: 'replace' | 'add' | 'remove'; path: string; value?: unknown }>,
 ): Promise<void> {
-  while (true) {
-    const response = await request.get(listUrl);
-    expect(response.ok()).toBeTruthy();
-    const body = await response.json();
-    const ids = (body.items ?? []).map((item: { id: string }) => item.id);
-    if (ids.length === 0) return;
-    const deleteResponse = await request.post(bulkDeleteUrl, { data: { ids } });
-    expect(deleteResponse.ok()).toBeTruthy();
-  }
-}
-
-const FIXTURES: Record<'pdf' | 'image', { file: string; mimeType: string }> = {
-  pdf: { file: 'test-document.pdf', mimeType: 'application/pdf' },
-  image: { file: 'test-image.png', mimeType: 'image/png' },
-};
-
-export async function deleteAllDocuments(request: APIRequestContext): Promise<void> {
-  await bulkDeleteAll(request, LIST_DOCUMENTS_URL, '/api/v1/documents/bulk-delete');
-  const emptyTrash = await request.post('/api/v1/documents/empty-trash');
-  expect(emptyTrash.ok()).toBeTruthy();
-}
-
-export async function deleteAllTags(request: APIRequestContext): Promise<void> {
-  await bulkDeleteAll(
-    request,
-    '/api/v1/documents/tags?Page=1&PageSize=100',
-    '/api/v1/documents/tags/bulk-delete',
-  );
-}
-
-export async function deleteAllParties(request: APIRequestContext): Promise<void> {
-  await bulkDeleteAll(
-    request,
-    '/api/v1/documents/parties?Page=1&PageSize=100',
-    '/api/v1/documents/parties/bulk-delete',
-  );
-}
-
-/**
- * Documents go first so the junction rows that link them to tags/parties are gone
- * before the bulk-delete checks; tags and parties are independent of each other.
- */
-export async function deleteAllDocumentMetadata(request: APIRequestContext): Promise<void> {
-  await deleteAllDocuments(request);
-  await Promise.all([deleteAllTags(request), deleteAllParties(request)]);
-}
-
-export async function uploadDocumentViaApi(
-  request: APIRequestContext,
-  filePath: string,
-  mimeType: string,
-): Promise<{ jobId: string }> {
-  const buffer = fs.readFileSync(filePath);
-  const response = await request.post('/api/v1/documents', {
-    multipart: {
-      file: {
-        name: path.basename(filePath),
-        mimeType,
-        buffer,
-      },
-    },
+  const response = await request.patch(`/api/v1/documents/${id}`, {
+    headers: { 'Content-Type': 'application/json-patch+json' },
+    data: operations,
   });
-  expect(response.status()).toBe(202);
-  const body = await response.json();
-  return { jobId: body.jobId };
+  await expect(response, `patch document ${id}`).toBeOK();
 }
 
-/**
- * Upload the standard fixture set, then wait for processing so OCR/text extraction
- * has run before callers assert against extracted-text search results.
- */
-export async function seedFixtureDocuments(
-  request: APIRequestContext,
-  opts: { include?: 'pdf' | 'image' | 'both' } = {},
-): Promise<void> {
-  const include = opts.include ?? 'both';
-  const kinds: ('pdf' | 'image')[] = include === 'both' ? ['pdf', 'image'] : [include];
-
-  await Promise.all(
-    kinds.map((kind) =>
-      uploadDocumentViaApi(request, path.join(FIXTURES_DIR, FIXTURES[kind].file), FIXTURES[kind].mimeType),
-    ),
-  );
-
-  await waitForProcessingComplete(request, 60_000);
+export async function trashDocumentsViaApi(request: APIRequestContext, ids: string[]): Promise<void> {
+  const response = await request.post('/api/v1/documents/bulk-delete', { data: { ids } });
+  await expect(response, 'bulk-delete documents').toBeOK();
 }
 
 export async function createTagViaApi(
@@ -111,13 +85,9 @@ export async function createTagViaApi(
   options?: { color?: string; description?: string },
 ): Promise<{ id: string }> {
   const response = await request.post('/api/v1/documents/tags', {
-    data: {
-      path: tagPath,
-      color: options?.color ?? null,
-      description: options?.description ?? null,
-    },
+    data: { path: tagPath, color: options?.color ?? null, description: options?.description ?? null },
   });
-  expect(response.status()).toBe(201);
+  expect(response.status(), `create tag ${tagPath}`).toBe(201);
   return response.json();
 }
 
@@ -129,6 +99,76 @@ export async function createPartyViaApi(
   const response = await request.post('/api/v1/documents/parties', {
     data: { name, description: description ?? null },
   });
-  expect(response.status()).toBe(201);
+  expect(response.status(), `create party ${name}`).toBe(201);
   return response.json();
+}
+
+/**
+ * Uploads `file` as a new version of an existing document and waits for its processing job (text
+ * extraction included). Resolves to the new version as the document now lists it.
+ */
+export async function addVersionViaApi(
+  request: APIRequestContext,
+  documentId: string,
+  file: FilePayload,
+  label?: string,
+): Promise<{ id: string; versionNumber: number; label: string | null }> {
+  const response = await request.post(`/api/v1/documents/${documentId}/versions`, {
+    multipart: label ? { file, label } : { file },
+  });
+  expect(response.status(), `upload version ${file.name}`).toBe(202);
+  const { jobId } = await response.json();
+
+  const job = await waitForJob(request, jobId);
+  expect(job.status, `version upload job for ${file.name}: ${job.error ?? ''}`).toBe('Completed');
+  await waitForEntityJobs(request, documentId);
+
+  const { versions } = await getDocumentViaApi(request, documentId);
+  return versions.reduce((latest, v) => (v.versionNumber > latest.versionNumber ? v : latest));
+}
+
+export interface ActivityItem {
+  type: 'audit_log' | 'comment';
+  summary: string | null;
+  body: string | null;
+}
+
+/** A document's activity stream (audit entries and comments), newest first. */
+export async function getActivityViaApi(request: APIRequestContext, documentId: string): Promise<ActivityItem[]> {
+  const response = await request.get(`/api/v1/documents/${documentId}/activity?Page=1&PageSize=100`);
+  await expect(response, `get activity for ${documentId}`).toBeOK();
+  return (await response.json()).items;
+}
+
+export interface DocumentSettings {
+  autoClassifyOnUpload: boolean | null;
+}
+
+export async function getDocumentSettingsViaApi(request: APIRequestContext): Promise<DocumentSettings> {
+  const response = await request.get('/api/v1/documents/settings');
+  await expect(response, 'get document settings').toBeOK();
+  return response.json();
+}
+
+export async function patchDocumentSettingsViaApi(
+  request: APIRequestContext,
+  settings: Partial<DocumentSettings>,
+): Promise<void> {
+  const response = await request.patch('/api/v1/documents/settings', {
+    headers: { 'Content-Type': 'application/json-patch+json' },
+    data: Object.entries(settings).map(([key, value]) => ({ op: 'replace', path: `/${key}`, value })),
+  });
+  await expect(response, 'patch document settings').toBeOK();
+}
+
+/** Parties whose name matches `search`. */
+export async function findPartiesViaApi(
+  request: APIRequestContext,
+  search: string,
+): Promise<Array<{ id: string; name: string; description: string | null }>> {
+  const response = await request.get(
+    `/api/v1/documents/parties?Page=1&PageSize=20&Search=${encodeURIComponent(search)}`,
+  );
+  await expect(response, `find parties "${search}"`).toBeOK();
+  return (await response.json()).items;
 }

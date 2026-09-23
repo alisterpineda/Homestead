@@ -1,4 +1,5 @@
 import { type Locator, type Page, expect } from '@playwright/test';
+import { step } from '../../helpers/step';
 import { pickLocation } from './inventory-pickers';
 
 export interface CreateItemInput {
@@ -17,22 +18,23 @@ export interface CreateItemInput {
  */
 export class CreateItemDialog {
   readonly root: Locator;
+  readonly heading: Locator;
 
   constructor(readonly page: Page) {
-    this.root = page.locator('hlm-dialog-content').filter({
-      has: page.getByRole('heading', { name: 'New item' }),
-    });
+    this.root = page.getByRole('dialog', { name: 'New item' });
+    this.heading = this.root.getByRole('heading', { name: 'New item' });
   }
 
   async open(trigger: Locator): Promise<void> {
     await trigger.click();
-    await expect(this.root).toBeVisible();
+    await expect(this.heading).toBeVisible();
   }
 
   locationTrigger(): Locator {
     return this.root.getByRole('button', { name: 'Location', exact: true });
   }
 
+  @step()
   async fill(input: CreateItemInput): Promise<void> {
     await this.root.getByRole('button', { name: input.kind, exact: true }).click();
     await this.root.getByLabel('Name', { exact: true }).fill(input.name);
@@ -56,6 +58,7 @@ export class CreateItemDialog {
   }
 
   /** Submits with "Create" and waits for the item POST; resolves to the new item's id. */
+  @step()
   async submit(kind: CreateItemInput['kind']): Promise<string> {
     const endpoint = kind === 'Durable' ? '/api/v1/inventory/durables' : '/api/v1/inventory/consumables';
     const responsePromise = this.page.waitForResponse(
@@ -64,11 +67,12 @@ export class CreateItemDialog {
     );
     await this.root.getByRole('button', { name: 'Create', exact: true }).click();
     const response = await responsePromise;
-    await expect(this.root).toBeHidden();
+    await expect(this.heading).toBeHidden();
     const body = await response.json();
     return body.id as string;
   }
 
+  @step()
   async create(input: CreateItemInput): Promise<string> {
     await this.fill(input);
     return this.submit(input.kind);

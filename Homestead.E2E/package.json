@@ -6,12 +6,20 @@
     "e2e:ui": "playwright test --ui",
     "e2e:headed": "playwright test --headed",
     "e2e:report": "playwright show-report",
-    "e2e:desktop": "playwright test --project=auth-anonymous --project=auth-setup --project=auth-login --project=documents-upload --project=documents-tags --project=documents-bulk-ops --project=documents-trash",
-    "e2e:mobile": "playwright test --project=documents-upload-mobile --project=documents-tags-mobile --project=documents-bulk-ops-mobile --project=documents-trash-mobile"
+    "e2e:desktop": "playwright test --project=auth --project=desktop",
+    "e2e:phones": "playwright test --project=android --project=iphone",
+    "lint": "eslint . --max-warnings=0",
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "@playwright/test": "^1.60.0",
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^24.13.6",
+    "eslint": "^10.11.0",
+    "eslint-plugin-playwright": "^2.12.0",
     "pdf-lib": "^1.17.1",
-    "testcontainers": "^11.12.0"
+    "testcontainers": "^12.1.0",
+    "typescript": "~6.0",
+    "typescript-eslint": "^8.70.1"
   }
 }

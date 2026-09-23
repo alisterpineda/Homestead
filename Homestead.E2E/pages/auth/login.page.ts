@@ -1,4 +1,6 @@
-import { type Locator, type Page } from '@playwright/test';
+import { type Locator, type Page, expect } from '@playwright/test';
+import { step } from '../../helpers/step';
+import { KeycloakLoginPage } from './keycloak-login.page';
 
 export class LoginPage {
   readonly heading: Locator;
@@ -11,7 +13,16 @@ export class LoginPage {
     this.oidcButton = page.getByRole('button', { name: /Sign in with/ });
   }
 
-  async goto() {
+  async goto(): Promise<void> {
     await this.page.goto('/login');
+  }
+
+  /** The full OIDC round trip from a signed-out browser: app → login page → Keycloak → app. */
+  @step()
+  async signIn(user: { email: string; password: string }): Promise<void> {
+    await this.page.goto('/');
+    await expect(this.page).toHaveURL(/\/login(\?|$)/);
+    await this.oidcButton.click();
+    await new KeycloakLoginPage(this.page).login(user.email, user.password);
   }
 }

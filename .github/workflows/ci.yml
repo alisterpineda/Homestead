@@ -189,10 +189,16 @@ jobs:
         working-directory: Homestead.E2E
         run: npm ci
 
+      - name: Lint and type-check E2E
+        working-directory: Homestead.E2E
+        run: |
+          npm run lint
+          npm run typecheck
+
       - name: Install Playwright browsers
         working-directory: Homestead.E2E
         timeout-minutes: 5
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium webkit
 
       - name: Run E2E tests
         working-directory: Homestead.E2E
