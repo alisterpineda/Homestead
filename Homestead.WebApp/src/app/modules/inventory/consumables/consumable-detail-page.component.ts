@@ -214,35 +214,37 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
             </div>
           } @else {
             <div class="overflow-clip rounded-md border">
-              <table hlmTable class="w-full">
-                <thead hlmTHead class="bg-background">
-                  <tr hlmTr>
-                    <th hlmTh>Location</th>
-                    <th hlmTh class="text-right">Quantity</th>
-                    <th hlmTh class="w-px"></th>
-                  </tr>
-                </thead>
-                <tbody hlmTBody>
-                  @for (entry of locations(); track entry.id) {
+              <div hlmTableContainer>
+                <table hlmTable class="w-full">
+                  <thead hlmTHead class="bg-background">
                     <tr hlmTr>
-                      <!-- max-w-0 + w-full lets the truncating path clip inside this auto-layout
-                           table; the Quantity and action columns keep their intrinsic widths. -->
-                      <td hlmTd class="w-full max-w-0">
-                        <app-location-path [path]="stockEntryLocationPath(entry)" [collapse]="false" />
-                      </td>
-                      <td hlmTd class="text-right tabular-nums">{{ formatQty(entry.quantity) }} {{ s.unit | unit }}</td>
-                      <td hlmTd class="whitespace-nowrap text-right">
-                        <button hlmBtn variant="ghost" size="sm" (click)="openConsume(entry)">Use</button>
-                        <button hlmBtn variant="ghost" size="sm" (click)="openTransfer(entry)">Move</button>
-                        <button hlmBtn variant="ghost" size="sm" (click)="openAdjust(entry)">Correct</button>
-                        @if (s.status === 'Active' && isWholeCount(entry.quantity)) {
-                          <button hlmBtn variant="ghost" size="sm" (click)="openTrackOne(entry)">Track one</button>
-                        }
-                      </td>
+                      <th hlmTh>Location</th>
+                      <th hlmTh class="text-right">Quantity</th>
+                      <th hlmTh class="w-px"></th>
                     </tr>
-                  }
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody hlmTBody>
+                    @for (entry of locations(); track entry.id) {
+                      <tr hlmTr>
+                        <!-- max-w-0 + w-full lets the truncating path clip inside this auto-layout
+                             table; the Quantity and action columns keep their intrinsic widths. -->
+                        <td hlmTd class="w-full max-w-0">
+                          <app-location-path [path]="stockEntryLocationPath(entry)" [collapse]="false" />
+                        </td>
+                        <td hlmTd class="text-right tabular-nums">{{ formatQty(entry.quantity) }} {{ s.unit | unit }}</td>
+                        <td hlmTd class="whitespace-nowrap text-right">
+                          <button hlmBtn variant="ghost" size="sm" (click)="openConsume(entry)">Use</button>
+                          <button hlmBtn variant="ghost" size="sm" (click)="openTransfer(entry)">Move</button>
+                          <button hlmBtn variant="ghost" size="sm" (click)="openAdjust(entry)">Correct</button>
+                          @if (s.status === 'Active' && isWholeCount(entry.quantity)) {
+                            <button hlmBtn variant="ghost" size="sm" (click)="openTrackOne(entry)">Track one</button>
+                          }
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
             </div>
           }
         </section>
@@ -256,61 +258,63 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
             </div>
           } @else {
             <div class="overflow-clip rounded-md border">
-              <table hlmTable class="w-full">
-                <thead hlmTHead class="bg-background">
-                  <tr hlmTr>
-                    <th hlmTh>When</th>
-                    <th hlmTh>Change</th>
-                    <th hlmTh>Movement</th>
-                    <th hlmTh class="text-right">Amount</th>
-                    <th hlmTh>By</th>
-                  </tr>
-                </thead>
-                <tbody hlmTBody>
-                  @for (m of movements(); track m.id) {
+              <div hlmTableContainer>
+                <table hlmTable class="w-full">
+                  <thead hlmTHead class="bg-background">
                     <tr hlmTr>
-                      <td hlmTd class="whitespace-nowrap text-muted-foreground">{{ occurred(m) }}</td>
-                      <td hlmTd>
-                        <span class="inline-flex items-center gap-1.5 text-sm">
-                          @if (direction(m) === 'inflow') {
-                            <ng-icon hlm name="lucideArrowRight" size="xs" class="text-emerald-600" />
-                            <span>{{ m.toLabel ?? '—' }}</span>
-                          } @else if (direction(m) === 'outflow') {
-                            <span>{{ m.fromLabel ?? '—' }}</span>
-                            <ng-icon hlm name="lucideArrowRight" size="xs" class="text-destructive" />
-                          } @else if (direction(m) === 'transfer') {
-                            <span>{{ m.fromLabel ?? '—' }}</span>
-                            <ng-icon hlm name="lucideArrowRight" size="xs" class="text-muted-foreground" />
-                            <span>{{ m.toLabel ?? '—' }}</span>
-                          } @else {
-                            <ng-icon hlm name="lucideMinus" size="xs" class="text-muted-foreground" />
-                          }
-                        </span>
-                        @if (movementMeta(m); as meta) {
-                          <!-- title: the row truncates, and this line is the only surface showing a
-                               movement's source — hover must still reveal the full text. -->
-                          <span class="block truncate text-xs text-muted-foreground" [title]="meta">{{ meta }}</span>
-                        }
-                      </td>
-                      <td hlmTd>
-                        <span class="text-xs text-muted-foreground">{{ kindLabel(m) }}</span>
-                        @if (m.kind === 'Conversion' && m.relatedItemName) {
-                          <span class="block truncate text-xs text-muted-foreground">{{ m.relatedItemName }}</span>
-                        }
-                      </td>
-                      <td hlmTd class="whitespace-nowrap text-right tabular-nums" [class]="amountClass(m)">
-                        {{ amountPrefix(m) }}{{ formatQty(m.quantity) }} {{ s.unit | unit }}
-                        @if (m.unitCost != null) {
-                          <span class="block text-xs font-normal text-muted-foreground">
-                            {{ formatQty(m.unitCost) }}{{ m.unitCostCurrencySymbol ? ' ' + m.unitCostCurrencySymbol : '' }}/{{ s.unit | unit }}
-                          </span>
-                        }
-                      </td>
-                      <td hlmTd class="whitespace-nowrap text-muted-foreground">{{ m.createdByDisplayName ?? '—' }}</td>
+                      <th hlmTh>When</th>
+                      <th hlmTh>Change</th>
+                      <th hlmTh>Movement</th>
+                      <th hlmTh class="text-right">Amount</th>
+                      <th hlmTh>By</th>
                     </tr>
-                  }
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody hlmTBody>
+                    @for (m of movements(); track m.id) {
+                      <tr hlmTr>
+                        <td hlmTd class="whitespace-nowrap text-muted-foreground">{{ occurred(m) }}</td>
+                        <td hlmTd>
+                          <span class="inline-flex items-center gap-1.5 text-sm">
+                            @if (direction(m) === 'inflow') {
+                              <ng-icon hlm name="lucideArrowRight" size="xs" class="text-emerald-600" />
+                              <span>{{ m.toLabel ?? '—' }}</span>
+                            } @else if (direction(m) === 'outflow') {
+                              <span>{{ m.fromLabel ?? '—' }}</span>
+                              <ng-icon hlm name="lucideArrowRight" size="xs" class="text-destructive" />
+                            } @else if (direction(m) === 'transfer') {
+                              <span>{{ m.fromLabel ?? '—' }}</span>
+                              <ng-icon hlm name="lucideArrowRight" size="xs" class="text-muted-foreground" />
+                              <span>{{ m.toLabel ?? '—' }}</span>
+                            } @else {
+                              <ng-icon hlm name="lucideMinus" size="xs" class="text-muted-foreground" />
+                            }
+                          </span>
+                          @if (movementMeta(m); as meta) {
+                            <!-- title: the row truncates, and this line is the only surface showing a
+                                 movement's source — hover must still reveal the full text. -->
+                            <span class="block truncate text-xs text-muted-foreground" [title]="meta">{{ meta }}</span>
+                          }
+                        </td>
+                        <td hlmTd>
+                          <span class="text-xs text-muted-foreground">{{ kindLabel(m) }}</span>
+                          @if (m.kind === 'Conversion' && m.relatedItemName) {
+                            <span class="block truncate text-xs text-muted-foreground">{{ m.relatedItemName }}</span>
+                          }
+                        </td>
+                        <td hlmTd class="whitespace-nowrap text-right tabular-nums" [class]="amountClass(m)">
+                          {{ amountPrefix(m) }}{{ formatQty(m.quantity) }} {{ s.unit | unit }}
+                          @if (m.unitCost != null) {
+                            <span class="block text-xs font-normal text-muted-foreground">
+                              {{ formatQty(m.unitCost) }}{{ m.unitCostCurrencySymbol ? ' ' + m.unitCostCurrencySymbol : '' }}/{{ s.unit | unit }}
+                            </span>
+                          }
+                        </td>
+                        <td hlmTd class="whitespace-nowrap text-muted-foreground">{{ m.createdByDisplayName ?? '—' }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             @if (totalPages() > 1) {

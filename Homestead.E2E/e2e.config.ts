@@ -44,4 +44,27 @@ export const TEST_DATA = {
       transferAmount: 500,
     },
   },
+  inventory: {
+    areas: {
+      garage: 'E2E Garage',
+      basement: 'E2E Basement',
+      workshop: 'E2E Workshop',
+      pantry: 'E2E Pantry',
+    },
+    durables: {
+      toolbox: 'E2E Toolbox',
+      drill: 'E2E Drill',
+      headlamp: 'E2E Headlamp',
+      trackedBattery: 'E2E Battery #1',
+    },
+    consumables: {
+      paperTowels: 'E2E Paper Towels',
+      batteries: 'E2E AA Batteries',
+    },
+    tags: {
+      tools: 'e2e-tools',
+      powerTools: 'e2e-tools/power',
+      camping: 'e2e-camping',
+    },
+  },
 };

@@ -113,6 +113,44 @@ export default defineConfig({
       use: { ...MOBILE, baseURL: OIDC_URL, storageState: '.auth/admin.json' },
       dependencies: ['finances-transfers'],
     },
+    // --- Inventory (desktop) ---
+    {
+      name: 'inventory-places',
+      testDir: './tests/inventory/places',
+      use: { ...DESKTOP, baseURL: OIDC_URL, storageState: '.auth/admin.json' },
+      dependencies: ['auth-setup'],
+    },
+    {
+      name: 'inventory-stock',
+      testDir: './tests/inventory/stock',
+      use: { ...DESKTOP, baseURL: OIDC_URL, storageState: '.auth/admin.json' },
+      dependencies: ['auth-setup'],
+    },
+    {
+      name: 'inventory-items',
+      testDir: './tests/inventory/items',
+      use: { ...DESKTOP, baseURL: OIDC_URL, storageState: '.auth/admin.json' },
+      dependencies: ['auth-setup'],
+    },
+    // --- Inventory (mobile) ---
+    {
+      name: 'inventory-places-mobile',
+      testDir: './tests/inventory/places',
+      use: { ...MOBILE, baseURL: OIDC_URL, storageState: '.auth/admin.json' },
+      dependencies: ['inventory-places'],
+    },
+    {
+      name: 'inventory-stock-mobile',
+      testDir: './tests/inventory/stock',
+      use: { ...MOBILE, baseURL: OIDC_URL, storageState: '.auth/admin.json' },
+      dependencies: ['inventory-stock'],
+    },
+    {
+      name: 'inventory-items-mobile',
+      testDir: './tests/inventory/items',
+      use: { ...MOBILE, baseURL: OIDC_URL, storageState: '.auth/admin.json' },
+      dependencies: ['inventory-items'],
+    },
     // --- Mobile documents pipeline ---
     {
       name: 'documents-upload-mobile',

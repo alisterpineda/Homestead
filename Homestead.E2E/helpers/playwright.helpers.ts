@@ -2,6 +2,11 @@ import type { Locator, Page } from '@playwright/test';
 
 export const MOBILE_BREAKPOINT_PX = 640; // Tailwind sm
 
+/** Escapes `value` for literal use inside a `RegExp` (e.g. prefix-matching an accessible name). */
+export function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 export function isMobileViewport(page: Page): boolean {
   const vp = page.viewportSize();
   return !!vp && vp.width < MOBILE_BREAKPOINT_PX;
