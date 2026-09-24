@@ -105,7 +105,7 @@ The facet is **deep-linkable** as `?warranty=` with values `any` · `active` · 
 
 ## Overview tile
 
-Browse's needs-attention region gains a **"Warranty expiring"** tile at its **root scope only**, beside low stock, lent out, and unplaced: an exact count plus a most-urgent-first preview of up to five items with their expiry dates, and a "View all" landing on the Items list at `?warranty=expiring`. It counts **live durables only** — `Active` and `Lent`; an archived item is out of the active picture by definition — whose status is `Expiring` — so an item with an open-ended row is never in it, matching the status rules exactly.
+Browse's needs-attention region gains a **"Warranty expiring"** tile at its **root scope only**, beside low stock and lent out: an exact count plus a most-urgent-first preview of up to five items with their expiry dates, and a "View all" landing on the Items list at `?warranty=expiring`. It counts **live durables only** — `Active` and `Lent`; an archived item is out of the active picture by definition — whose status is `Expiring` — so an item with an open-ended row is never in it, matching the status rules exactly.
 
 It is deliberately **not** added to the drilled place scope. The place-scoped panels answer "what needs attention *here*", and coverage lapsing is a property of a thing and its paperwork, not of the room it is stored in; adding a fourth panel to every drilled area would cost vertical space on the surface the module most wants to keep fast.
 

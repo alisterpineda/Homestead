@@ -43,6 +43,29 @@ test.describe('Inventory — brands', () => {
     expect(await findBrandsViaApi(request, uid)).toEqual([expect.objectContaining({ id: typo.id, name: bosch })]);
   });
 
+  test("a brand's name opens the items list filtered to it, and the Filter button says so", async ({
+    request,
+    page,
+    brandListPage,
+    itemListPage,
+    uid,
+  }) => {
+    const sony = await createBrandViaApi(request, `Sony ${uid}`);
+    await createDurableViaApi(request, { name: `Camera ${uid}`, brandId: sony.id });
+    await createDurableViaApi(request, { name: `Tripod ${uid}` });
+
+    await brandListPage.goto();
+    await brandListPage.search(uid);
+    await brandListPage.nameLink(sony.name).click();
+
+    // The one-shot `?brand=` deep link is read and then stripped, so the button is what shows it.
+    await expect(page).toHaveURL(/\/inventory\/items$/);
+    await expect(itemListPage.filterButton).toHaveText(`Filter: ${sony.name}`);
+    await itemListPage.search(uid);
+    await expect(itemListPage.item(`Camera ${uid}`)).toBeVisible();
+    await expect(itemListPage.item(`Tripod ${uid}`)).toHaveCount(0);
+  });
+
   test('merging moves every item onto the surviving brand and deletes the source', async ({
     request,
     page,

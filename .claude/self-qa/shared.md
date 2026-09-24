@@ -44,6 +44,9 @@ playwright-cli -s=self-qa --raw eval "location.pathname"               # must be
 
 ## Cross-cutting gotchas
 
+- `run-code` has no `setTimeout` or `URL`. To simulate a slow request, hold the `page.route` handler
+  and release it later; to check a download's bytes, `page.waitForEvent('download')` + `saveAs`.
+
 - `hlm-checkbox` aria-label: bind `[aria-label]`, NOT `[attr.aria-label]`.
 - **Dark mode**: sidebar user menu → **Theme** → dialog with Light / Dark / System radios. The
   `<input type=radio>` is intercepted by its wrapping `<label>` — click the label, not the radio.

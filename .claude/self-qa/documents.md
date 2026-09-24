@@ -15,6 +15,14 @@
 under `@if (narrow())`. The mobile instance defaults to **Preview**, so a mobile run must click
 Metadata explicitly.
 
+**Download** (header button, both breakpoints) goes to `GET /api/v1/documents/{id}/file?download=true`
+(`&versionId=` on an older version), served with `Content-Disposition: attachment`; it doesn't wait for
+the preview. The version switcher only renders when the document has more than one version; it is
+the breadcrumb's last item — an unnamed button wrapping a link that reads `Latest` (`Latest - <label>`
+if the latest version is labelled) or `v<N>` / `v<N> - <label>` while an older version is selected,
+opening menu items in the same form (`Latest…`, `v1`…). A `find` straight after `goto` can
+come back empty before the page renders; wait for the Name field or Download button first.
+
 ## Backup section (Metadata tab, admin-only)
 
 Read-only report of where this document stands in each documents backup mirror. Rendered after the

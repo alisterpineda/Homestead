@@ -164,7 +164,7 @@ interface ListData {
             [initialWarranty]="initialWarranty"
             [initialSort]="initialSort"
             [extraFiltersActive]="extraFiltersActive()"
-            [scopeLabel]="scopeLabel()"
+            [scopeFilters]="scopeFilters()"
             (changed)="onChanged()"
             (openDurable)="onOpenDurable($event)"
             (openConsumable)="onOpenConsumable($event)"
@@ -506,22 +506,23 @@ export class InventoryListPageComponent {
     return parts.length ? `Showing ${parts.join(' and ')} — refine with search to narrow the list.` : null;
   });
 
-  // Higher-precedence trigger label for the refine popover: the selected area (the items-view falls
-  // back to its own low/lent/inactive label when this is null).
-  protected scopeLabel = computed<string | null>(() => {
+  // The filters this page owns, for the refine popover's trigger label (the items-view adds its own
+  // after these): area, brand, then tags — tags by dimension, since the search-driven tag options may
+  // not hold the picked tags' names. Search isn't listed; the search box already shows it.
+  protected scopeFilters = computed<string[]>(() => {
+    const labels: string[] = [];
     const af = this.areaFilter();
-    if (af === 'unplaced') return 'Filter: Unplaced';
-    if (af !== 'all') {
-      const name = this.areas().find(a => a.id === af)?.name;
-      return name ? `Filter: ${name}` : 'Filter';
-    }
-    return null;
+    if (af === 'unplaced') labels.push('Unplaced');
+    else if (af !== 'all') labels.push(this.areas().find(a => a.id === af)?.name ?? 'Area');
+    const bf = this.brandFilter();
+    if (bf !== 'all') labels.push(this.brands().find(b => b.id === bf)?.name ?? 'Brand');
+    if (this.tagFilter().size > 0) labels.push('Tags');
+    return labels;
   });
 
   // Drives the items-view Reset button: the popover's own filters OR any parent scope (area/search)
-  // being active.
-  protected extraFiltersActive = computed(() =>
-    this.areaFilter() !== 'all' || this.brandFilter() !== 'all' || this.tagFilter().size > 0 || this.searchTerm() !== '');
+  // being active. Derived from scopeFilters so the label and Reset can't disagree about which filters exist.
+  protected extraFiltersActive = computed(() => this.scopeFilters().length > 0 || this.searchTerm() !== '');
 
   constructor() {
     // Debounced URL sync for the search box: commit the trimmed term once typing pauses. No

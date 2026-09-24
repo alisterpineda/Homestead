@@ -151,24 +151,17 @@ export class DocumentDetailPage {
   }
 
   /**
-   * Clicks Download and resolves to the browser download. The button hands over the file the page
-   * has already fetched for its preview, and does nothing until that fetch lands — so retry the
-   * click until a download starts.
+   * Clicks Download and resolves to the browser download.
    *
    * Headless Chromium doesn't render PDFs inline: when the preview iframe loads its blob it fires a
    * download of its own, named after the blob's UUID. Those are ignored.
    */
   @step()
   async download(): Promise<Download> {
-    let download: Download | undefined;
-    await expect(async () => {
-      const started = this.page.waitForEvent('download', {
-        predicate: (d) => !/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}(\.\w+)?$/.test(d.suggestedFilename()),
-        timeout: 2_000,
-      });
-      await this.downloadButton.click();
-      download = await started;
-    }).toPass();
-    return download!;
+    const started = this.page.waitForEvent('download', {
+      predicate: (d) => !/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}(\.\w+)?$/.test(d.suggestedFilename()),
+    });
+    await this.downloadButton.click();
+    return started;
   }
 }

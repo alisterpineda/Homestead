@@ -345,11 +345,20 @@ describe('InventoryListPageComponent', () => {
   });
 
   it('exposes the area scope as the items-view trigger label', () => {
-    expect(component['scopeLabel']()).toBeNull();
+    expect(component['scopeFilters']()).toEqual([]);
     component.areaFilter.set(GARAGE);
-    expect(component['scopeLabel']()).toBe('Filter: Garage');
+    expect(component['scopeFilters']()).toEqual(['Garage']);
     component.areaFilter.set('unplaced');
-    expect(component['scopeLabel']()).toBe('Filter: Unplaced');
+    expect(component['scopeFilters']()).toEqual(['Unplaced']);
+  });
+
+  // A brand link from the Brands page lands with only `?brand=`, which is then stripped — the trigger
+  // label is the one place left that shows the filter.
+  it('names the brand filter and counts a tag filter in the trigger label', () => {
+    component.brandFilter.set(APPLE);
+    expect(component['scopeFilters']()).toEqual(['Apple']);
+    component.tagFilter.set(new Set(['t-a', 't-b']));
+    expect(component['scopeFilters']()).toEqual(['Apple', 'Tags']);
   });
 
   // Drive the committed term the way the app does — through the URL.

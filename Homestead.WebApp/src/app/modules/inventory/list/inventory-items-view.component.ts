@@ -124,7 +124,7 @@ export const kindFilterFromParam = (v: string | null): KindFilter => (isKindFilt
   host: { class: 'flex min-h-0 flex-1 flex-col gap-4' },
   template: `
     <div class="flex flex-wrap items-center justify-between gap-2">
-      <div class="flex flex-wrap items-center gap-2">
+      <div class="flex min-w-0 flex-wrap items-center gap-2">
         <ng-content select="[toolbarStart]" />
         <hlm-toggle-group
           type="single"
@@ -139,10 +139,15 @@ export const kindFilterFromParam = (v: string | null): KindFilter => (isKindFilt
           <button hlmToggleGroupItem value="consumables">Consumables</button>
         </hlm-toggle-group>
 
-        <div hlmPopover>
-          <button hlmPopoverTrigger hlmBtn variant="outline">
+        <!-- A long area/brand name truncates rather than widening the toolbar; the +N stays visible. -->
+        <div hlmPopover class="min-w-0 max-w-full">
+          <button hlmPopoverTrigger hlmBtn variant="outline" class="max-w-full sm:max-w-72">
             <ng-icon hlm name="lucideListFilter" size="sm" class="text-muted-foreground" />
-            {{ filterLabel() }}
+            <span class="truncate">{{ filterParts().name }}</span>
+            <!-- &ngsp; keeps a real space before the count in the text; the flex gap does the spacing. -->
+            @if (filterParts().more > 0) {
+              &ngsp;<span class="shrink-0">+{{ filterParts().more }}</span>
+            }
           </button>
           <div hlmPopoverContent *hlmPopoverPortal class="max-h-[min(70vh,32rem)] w-[260px] overflow-y-auto p-0" align="start">
             <div class="flex items-center justify-between px-3 py-2">
@@ -455,8 +460,8 @@ export class InventoryItemsViewComponent implements OnInit {
   showInactiveFilter = input(true);
   /** Parent-owned scope filters (area/container/search) so Reset shows whenever any filter is active. */
   extraFiltersActive = input(false);
-  /** Higher-precedence trigger label for the parent's scope (e.g. "In: Tool chest"); null → own label. */
-  scopeLabel = input<string | null>(null);
+  /** Parent-owned active filters for the trigger label (e.g. an area or brand name), listed first. */
+  scopeFilters = input<string[]>([]);
   /** Parent is mid-fetch (e.g. a container drill): show the spinner instead of "Nothing matches". */
   loading = input(false);
   /** Per-column visibility passed straight to the table/card grid — Browse hides Location. */
@@ -580,15 +585,18 @@ export class InventoryItemsViewComponent implements OnInit {
   sortFieldLabel = computed(() =>
     this.allSortFields.find(f => f.id === this.sort().id)?.label ?? 'Sort');
 
-  filterLabel = computed(() => {
-    const scope = this.scopeLabel();
-    if (scope) return scope;
-    if (this.lowStockOnly()) return 'Filter: Low stock';
-    if (this.lentOnly()) return 'Filter: Lent';
+  // Names the first active filter and counts the rest (`Filter: Garage +2`), so no active filter
+  // goes unannounced (table-ux: the trigger transforms when filters are active). Split in two so the
+  // trigger can truncate the name and keep the count.
+  filterParts = computed(() => {
+    const active = [...this.scopeFilters()];
+    if (this.lowStockOnly()) active.push('Low stock');
+    if (this.lentOnly()) active.push('Lent');
     // The facet *value* ('expiring') reads better in the trigger than its menu label ('Expiring soon').
     const warranty = this.warrantyFilter();
-    if (warranty !== 'any') return `Filter: Warranty ${warranty}`;
-    return this.showInactive() ? 'Filter: Inactive' : 'Filter';
+    if (warranty !== 'any') active.push(`Warranty ${warranty}`);
+    if (this.showInactive()) active.push('Inactive');
+    return { name: active.length ? `Filter: ${active[0]}` : 'Filter', more: Math.max(active.length - 1, 0) };
   });
 
   onKindFilterChange(value: unknown): void {

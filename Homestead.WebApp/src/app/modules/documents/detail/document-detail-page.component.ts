@@ -1505,11 +1505,16 @@ export class DocumentDetailPageComponent implements OnDestroy {
     return (event.target as HTMLInputElement).value;
   }
 
+  // Downloads straight from the server rather than reusing the preview blob: the blob is missing
+  // until the preview fetch lands (or for good if it failed), and briefly still holds the previous
+  // version's bytes after a version switch.
   handleDownload(): void {
-    const url = this.fileBlobUrl();
     const doc = this.document();
-    if (!url || !doc) return;
-    triggerDownload(url, `${doc.name}${this.displayFileExtension()}`);
+    if (!doc) return;
+    triggerDownload(
+      this.documentApi.getDocumentDownloadUrl(doc.id, this.versionId()),
+      `${doc.name}${this.displayFileExtension()}`,
+    );
   }
 
   handleDelete(): void {

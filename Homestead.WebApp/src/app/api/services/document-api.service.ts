@@ -171,6 +171,12 @@ export class DocumentApiService {
     return this.buildVersionedUrl(id, 'file', versionId);
   }
 
+  /** The same file served as an attachment named after the document, for a plain browser download. */
+  getDocumentDownloadUrl(id: string, versionId?: string | null): string {
+    const url = this.getDocumentFileUrl(id, versionId);
+    return `${url}${versionId == null ? '?' : '&'}download=true`;
+  }
+
   getDocumentThumbnailUrl(id: string, versionId?: string | null): string {
     return this.buildVersionedUrl(id, 'thumbnail', versionId);
   }

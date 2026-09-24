@@ -19,6 +19,12 @@
   comes from the API's `PlaceContentsResponse.path`.
 - **`/inventory/items` rows do not navigate.** Clicking a row opens the item's **quick-panel
   dialog**; reach `/inventory/items/:id` via that panel's "Details" action or a direct URL.
+- **Filter trigger label** (`app-inventory-items-view`): `Filter` when nothing is active, else
+  `Filter: <first> +N` — order area name (or `Unplaced`), brand name, `Tags`, `Low stock`, `Lent`,
+  `Warranty <value>`, `Inactive`. The name truncates (button capped at 18rem from `sm` up, toolbar
+  width below); `+N` is a separate span that must stay visible. Search is not counted. Popover `Reset` clears them and closes the popover.
+- **Brand name links** on `/inventory/brands` go to `/inventory/items?brand=<id>`; like the other
+  list deep links, the param is read once and stripped, so the trigger label is the only sign of it.
 - **Re-parenting an area is behind "Rename", not a "Move".** The area row's actions menu offers only
   Rename and Delete; Rename opens a dialog titled **Edit area** carrying the `Parent area` picker
   ("Moving an area takes its contents with it"). This is the only straightforward way to restructure
@@ -107,8 +113,8 @@ queries hit both:
 
 - The filter popover has a single-choice **Warranty** group after the checkboxes:
   `Any` · `Active` · `Expiring soon` · `Expired` · `None`, each with a count and a check on the
-  selected one. Choosing one sets the trigger label to `Filter: Warranty expiring` (the facet
-  *value*, not the menu label). `Reset` returns it to `Any`. Consumables drop out of every facet but
+  selected one. Choosing one adds `Warranty expiring` (the facet *value*, not the menu label) to the
+  trigger label — `Filter: Warranty expiring` when it's the only filter. `Reset` returns it to `Any`. Consumables drop out of every facet but
   `Any` — warranties are durables-only.
 - The group is on the shared `app-inventory-items-view`, so it appears **both** on
   `/inventory/items` and in a drilled Browse place's item table (`/inventory/browse/area/:areaId`),

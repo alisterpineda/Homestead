@@ -148,13 +148,22 @@ describe('InventoryItemsViewComponent', () => {
     expect(component.sortedVisibleRows().map(r => r.id)).toEqual(['wrench', 'screws', 'tape', 'ladder']);
   });
 
-  it('computes the sort field label and the popover filter label', () => {
-    expect(component.filterLabel()).toBe('Filter');
+  /** The refine popover trigger's rendered text (`Filter: Garage +3`), whitespace-normalised. */
+  function filterTriggerText(): string {
+    fixture.detectChanges();
+    const trigger = (fixture.nativeElement as HTMLElement).querySelector('button[hlmPopoverTrigger]')!;
+    return trigger.textContent!.replace(/\s+/g, ' ').trim();
+  }
+
+  it('computes the sort field label and renders the popover filter trigger', () => {
+    expect(filterTriggerText()).toBe('Filter');
     component.lowStockOnly.set(true);
-    expect(component.filterLabel()).toBe('Filter: Low stock');
-    // A parent scope label wins over the component's own filters.
-    fixture.componentRef.setInput('scopeLabel', 'In: Tool chest');
-    expect(component.filterLabel()).toBe('In: Tool chest');
+    expect(filterTriggerText()).toBe('Filter: Low stock');
+    component.lentOnly.set(true);
+    expect(filterTriggerText()).toBe('Filter: Low stock +1');
+    // The parent's filters come first; every active filter is counted.
+    fixture.componentRef.setInput('scopeFilters', ['Garage', 'Makita']);
+    expect(filterTriggerText()).toBe('Filter: Garage +3');
 
     component.onSortByChange('updatedAt');
     expect(component.sortFieldLabel()).toBe('Updated');
@@ -428,9 +437,9 @@ describe('InventoryItemsViewComponent', () => {
 
     it('names the active facet in the popover trigger label', () => {
       component.warrantyFilter.set('expiring');
-      expect(component.filterLabel()).toBe('Filter: Warranty expiring');
+      expect(filterTriggerText()).toBe('Filter: Warranty expiring');
       component.warrantyFilter.set('none');
-      expect(component.filterLabel()).toBe('Filter: Warranty none');
+      expect(filterTriggerText()).toBe('Filter: Warranty none');
     });
   });
 

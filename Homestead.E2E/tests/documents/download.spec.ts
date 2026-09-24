@@ -3,6 +3,7 @@ import { test, expect } from '../../fixtures/documents.fixture';
 import { LOCKS } from '../../e2e.config';
 import { createPartyViaApi, patchDocumentViaApi, uploadDocumentViaApi } from '../../helpers/api/documents';
 import { makePdf, makePng } from '../../helpers/files';
+import { stubFailure } from '../../helpers/network';
 
 /** The entry names in a ZIP archive, read from its central directory. */
 function zipEntryNames(zip: Buffer): string[] {
@@ -27,6 +28,29 @@ test.describe('Documents — download', () => {
     const doc = await uploadDocumentViaApi(request, file);
 
     await documentDetailPage.goto(doc.id);
+    const download = await documentDetailPage.download();
+
+    expect(download.suggestedFilename()).toBe(`${doc.name}.pdf`);
+    expect(fs.readFileSync(await download.path()).equals(file.buffer), 'downloaded bytes match the upload').toBe(
+      true,
+    );
+  });
+
+  test("downloads the file even when the page couldn't load its preview", async ({
+    page,
+    request,
+    documentDetailPage,
+    uid,
+  }) => {
+    const file = await makePdf(`invoice-${uid}`, 'Plumber invoice');
+    const doc = await uploadDocumentViaApi(request, file);
+    // Fails the preview's fetch (`…/file`) but not the download itself (`…/file?download=true`).
+    const previewPath = `/api/v1/documents/${doc.id}/file`;
+    await stubFailure(page, new RegExp(`${previewPath}$`));
+    const preview = page.waitForResponse((resp) => new URL(resp.url()).pathname === previewPath);
+
+    await documentDetailPage.goto(doc.id);
+    expect((await preview).status(), 'the preview fetch fails').toBe(500);
     const download = await documentDetailPage.download();
 
     expect(download.suggestedFilename()).toBe(`${doc.name}.pdf`);

@@ -22,11 +22,9 @@ import type { GetInventoryOverviewResponse } from '@/api/generated/models/get-in
  * clear resolution), **lent out** (durables currently out on loan), and **warranty expiring** (live
  * durables whose latest cover runs out within 30 days). Lent is folded in here as an alert tile
  * rather than left as a standalone neutral status row, so the panel now renders whenever something
- * is lent even if nothing is low. (Unplaced is deliberately **not** a tile here — it stays
- * a location bucket surfaced as a place card; that diverges from the product-design doc, which lists
- * unplaced as a third needs-attention tile.) The
- * generic frame stays so future alert types (overdue loans, service due) can slot in. The
- * single light card holds stacked, flat alert sections (`InventoryWarningSectionComponent`) laid out
+ * is lent even if nothing is low. (Unplaced is deliberately **not** a tile here — it stays a
+ * location bucket surfaced as a place card.) The generic frame stays so future alert types (overdue
+ * loans, service due) can slot in. The single light card holds stacked, flat alert sections (`InventoryWarningSectionComponent`) laid out
  * in a content-aware `auto-fit` grid — one section fills the row (matching the page's full-width
  * rhythm), two-plus flow into equal side-by-side columns, mobile collapses to one. Two modes:
  *

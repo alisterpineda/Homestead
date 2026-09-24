@@ -123,4 +123,11 @@ describe('DocumentApiService', () => {
     expect(req.request.method).toBe('GET');
     req.flush(new Blob());
   });
+
+  it('getDocumentDownloadUrl asks for the file as an attachment', () => {
+    expect(service.getDocumentDownloadUrl('doc-1')).toBe('/api/v1/documents/doc-1/file?download=true');
+    expect(service.getDocumentDownloadUrl('doc-1', 'ver-2')).toBe(
+      '/api/v1/documents/doc-1/file?versionId=ver-2&download=true',
+    );
+  });
 });

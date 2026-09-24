@@ -346,6 +346,7 @@ describe('DocumentDetailPageComponent — edit-state guards on refresh', () => {
     let guardDocumentApi: {
       getDocument: ReturnType<typeof vi.fn>;
       getDocumentFile: ReturnType<typeof vi.fn>;
+      getDocumentDownloadUrl: ReturnType<typeof vi.fn>;
       patchDocument: ReturnType<typeof vi.fn>;
       bulkClassifyDocuments: ReturnType<typeof vi.fn>;
       bulkSummarizeDocuments: ReturnType<typeof vi.fn>;
@@ -457,6 +458,7 @@ describe('DocumentDetailPageComponent — edit-state guards on refresh', () => {
       guardDocumentApi = {
         getDocument: vi.fn(() => of(docResponse)),
         getDocumentFile: vi.fn(() => EMPTY),
+        getDocumentDownloadUrl: vi.fn((id: string, versionId: string | null) => `/download/${id}/${versionId}`),
         patchDocument: vi.fn(() => of(null)),
         bulkClassifyDocuments: vi.fn(() => of({ jobIds: ['job-1'] })),
         bulkSummarizeDocuments: vi.fn(() => of({ jobIds: ['job-1'] })),
@@ -518,6 +520,47 @@ describe('DocumentDetailPageComponent — edit-state guards on refresh', () => {
 
     afterEach(() => {
       vi.unstubAllGlobals();
+    });
+
+    // getDocumentFile never emits here, so these run with the preview still loading.
+    describe('handleDownload', () => {
+      let clicked: HTMLAnchorElement[];
+
+      beforeEach(() => {
+        clicked = [];
+        vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+          clicked.push(this);
+        });
+      });
+
+      afterEach(() => {
+        vi.restoreAllMocks();
+      });
+
+      it('downloads from the server without waiting for the preview', () => {
+        docResponse = makeDoc();
+        setGuardDocumentId('doc-1');
+        guardFixture.detectChanges();
+
+        guardComponent.handleDownload();
+
+        expect(guardDocumentApi.getDocumentDownloadUrl).toHaveBeenCalledWith('doc-1', null);
+        expect(clicked).toHaveLength(1);
+        expect(clicked[0].getAttribute('href')).toBe('/download/doc-1/null');
+        expect(clicked[0].download).toBe('Doc 1.pdf');
+      });
+
+      it('downloads the version being viewed', () => {
+        docResponse = makeDoc({ versions: [makeVersion({ id: 'ver-2', versionNumber: 2 }), makeVersion()] });
+        setGuardDocumentId('doc-1');
+        guardFixture.detectChanges();
+        guardComponent.onVersionSelected('ver-1');
+        guardFixture.detectChanges();
+
+        guardComponent.handleDownload();
+
+        expect(guardDocumentApi.getDocumentDownloadUrl).toHaveBeenCalledWith('doc-1', 'ver-1');
+      });
     });
 
     it('refreshTrigger increment does not wipe editVersionLabel or editExtractedText', () => {
