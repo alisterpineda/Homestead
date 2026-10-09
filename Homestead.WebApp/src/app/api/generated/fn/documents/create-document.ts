@@ -18,7 +18,7 @@ export interface CreateDocument$Params {
 } & {
 'groupId'?: string;
 } & {
-'file'?: IFormFile;
+'file': IFormFile;
 } & {
 }
 }
