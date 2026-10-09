@@ -390,9 +390,15 @@ if (app.Environment.IsDevelopment())
 // A miss under /api is a client error, not a client-side route. Without this the fallback
 // below would answer with index.html and the caller would fail parsing JSON. A catch-all
 // segment has the lowest route precedence, so real endpoints still win. RequireAuthorization
-// keeps the 401 for anonymous callers so an unauthenticated probe learns nothing about which
+// keeps the 401 for anonymous GETs so an unauthenticated probe learns nothing about which
 // paths exist; signed-in users get the 404.
-app.Map("/api/{**rest}", () => Results.NotFound())
+// GET/HEAD only, like the SPA fallback it guards against: an any-method catch-all declares no
+// accepted content types, so routing's content-type policy (dotnet/aspnetcore#41060) would route
+// every body-less or wrong-Content-Type POST/PUT under /api to it — a 404 instead of the real
+// endpoint (optional body) or its 400/415. The accepted cost: any other method on an unmatched
+// path (including an unsupported API version) gets routing's unauthenticated 405, so the 401
+// masking holds for GET/HEAD only.
+app.MapMethods("/api/{**rest}", [HttpMethods.Get, HttpMethods.Head], () => Results.NotFound())
     .RequireAuthorization()
     .ExcludeFromDescription();
 
