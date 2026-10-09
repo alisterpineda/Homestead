@@ -87,7 +87,7 @@ cd Homestead.E2E && npx playwright test --project=desktop              # one dev
 
 ### Backend Test Filtering (xUnit v3 + MTP v2)
 
-Backend tests use xUnit v3 with Microsoft Testing Platform v2 (opted in via `global.json`). This means the old VSTest `--filter "FullyQualifiedName~Foo"` syntax does **not** work. Use the xUnit-native filter switches instead.
+Backend tests use xUnit v3 (the `xunit.v3.mtp-v2` 4.x packages) with Microsoft Testing Platform v2 (opted in via `global.json`). xUnit 4 also accepts the old VSTest `--filter "FullyQualifiedName~Foo"` syntax, but prefer the xUnit-native filter switches below. A VSTest `--filter` can't be combined with any other filter switch.
 
 **Simple filters** — include/exclude by class, method, namespace, or trait:
 

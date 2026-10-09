@@ -1,5 +1,7 @@
 using System.IO.Compression;
+using Homestead.WebApi.Processing;
 using Homestead.WebApi.Tests.Integration.Infrastructure;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Homestead.WebApi.Tests.Integration.Documents;
 
@@ -135,16 +137,16 @@ public class DownloadTests : IntegrationTestBase
         var client = await CreateAdminClientAsync();
         await UploadAndWaitAsync(client, "ConcurrentDoc.pdf");
 
-        // Start first download
+        // Hold the worker so the first download stays pending — otherwise it can finish before the second request.
+        await using var _ = await Factory.Services.GetRequiredService<IJobProcessorControl>().PauseAsync(CT);
+
         var first = await client.PostAsJsonAsync("/api/v1/documents/download",
             new { ids = (List<Guid>?)null }, CT);
         Assert.Equal(HttpStatusCode.Accepted, first.StatusCode);
 
-        // Immediately try a second download (first may still be processing)
         var second = await client.PostAsJsonAsync("/api/v1/documents/download",
             new { ids = (List<Guid>?)null }, CT);
 
-        // Should be rejected (400) if first is still pending/in-progress
         Assert.Equal(HttpStatusCode.BadRequest, second.StatusCode);
     }
 
