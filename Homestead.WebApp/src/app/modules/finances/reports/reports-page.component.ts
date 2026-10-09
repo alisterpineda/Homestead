@@ -4,7 +4,6 @@ import { RouterLink } from '@angular/router';
 import { EMPTY, switchMap, tap } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideTriangleAlert, lucideCircleAlert } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { HlmButton } from '@/shared/components/spartan/button';
@@ -29,7 +28,6 @@ import { formatNetWorthValue } from './format-net-worth';
   imports: [
     RouterLink,
     NgIcon,
-    HlmIconImports,
     HlmSpinner,
     HlmEmptyImports,
     HlmButton,
@@ -97,7 +95,7 @@ import { formatNetWorthValue } from './format-net-worth';
         } @else {
           @if (response.hasUnpriced) {
             <div class="flex items-start gap-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-100">
-              <ng-icon hlm name="lucideTriangleAlert" size="sm" class="mt-0.5 shrink-0" />
+              <ng-icon name="lucideTriangleAlert" class="text-[length:--spacing(4)] mt-0.5 shrink-0" />
               <div class="flex-1">
                 <p class="font-medium">Some periods have unpriced holdings</p>
                 <p class="text-amber-900/80 dark:text-amber-100/80">

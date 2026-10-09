@@ -16,7 +16,6 @@ import {
   lucideArrowUp,
   lucideArrowDown,
 } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
@@ -43,7 +42,6 @@ interface AreaSortFieldOption {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     NgIcon,
-    HlmIconImports,
     HlmButton,
     HlmSpinner,
     HlmEmptyImports,
@@ -93,7 +91,7 @@ interface AreaSortFieldOption {
             </div>
             <div hlmEmptyContent>
               <app-create-area-dialog (created)="onChanged()">
-                <ng-icon hlm name="lucidePlus" size="sm" />
+                <ng-icon name="lucidePlus" class="text-[length:--spacing(4)]" />
                 New area
               </app-create-area-dialog>
             </div>
@@ -101,7 +99,7 @@ interface AreaSortFieldOption {
         } @else {
           <div class="flex items-center justify-between gap-2">
             <button hlmBtn variant="outline" [hlmDropdownMenuTrigger]="sortMenu">
-              <ng-icon hlm [name]="sortState().desc ? 'lucideArrowDown' : 'lucideArrowUp'" size="sm" />
+              <ng-icon [name]="sortState().desc ? 'lucideArrowDown' : 'lucideArrowUp'" class="text-[length:--spacing(4)]" />
               {{ sortFieldLabel() }}
             </button>
             <ng-template #sortMenu>
@@ -135,7 +133,7 @@ interface AreaSortFieldOption {
             </ng-template>
 
             <app-create-area-dialog (created)="onChanged()">
-              <ng-icon hlm name="lucidePlus" size="sm" />
+              <ng-icon name="lucidePlus" class="text-[length:--spacing(4)]" />
               New area
             </app-create-area-dialog>
           </div>

@@ -7,7 +7,6 @@ import { UserPreferencesService } from '@/shared/services/user-preferences.servi
 import { switchMap, map, combineLatest, firstValueFrom } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideTrash2, lucideRotateCcw, lucideX, lucideEye } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { HlmButton } from '@/shared/components/spartan/button';
@@ -28,7 +27,6 @@ import { toast } from '@spartan-ng/brain/sonner';
   imports: [
     DatePipe,
     NgIcon,
-    HlmIconImports,
     HlmSpinner,
     HlmEmptyImports,
     HlmButton,
@@ -78,7 +76,7 @@ import { toast } from '@spartan-ng/brain/sonner';
                 @if (auth.canWrite()) {
                   <hlm-alert-dialog>
                     <button hlmBtn variant="destructive" size="sm" hlmAlertDialogTrigger>
-                      <ng-icon hlm name="lucideTrash2" size="sm" />
+                      <ng-icon name="lucideTrash2" class="text-[length:--spacing(4)]" />
                       Empty Trash
                     </button>
                     <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
@@ -103,7 +101,7 @@ import { toast } from '@spartan-ng/brain/sonner';
             <!-- Selection toolbar: absolute overlay -->
             <div class="absolute inset-x-0 top-0 flex items-center gap-2 h-8 bg-background" [class.opacity-0]="!isInSelectionState() || !auth.canWrite()" [class.pointer-events-none]="!isInSelectionState() || !auth.canWrite()" [attr.inert]="!isInSelectionState() || !auth.canWrite() ? '' : null">
               <button hlmBtn variant="ghost" size="icon-sm" (click)="clearSelection()" aria-label="Exit selection mode">
-                <ng-icon hlm name="lucideX" size="sm" />
+                <ng-icon name="lucideX" class="text-[length:--spacing(4)]" />
               </button>
               @if (isInSelectionState()) {
                 <span class="text-sm text-muted-foreground">
@@ -116,12 +114,12 @@ import { toast } from '@spartan-ng/brain/sonner';
                 }
                 <div class="ml-auto flex items-center gap-2">
                   <button hlmBtn variant="outline" size="sm" (click)="onBulkRestore()" [disabled]="restoring()">
-                    <ng-icon hlm name="lucideRotateCcw" size="sm" />
+                    <ng-icon name="lucideRotateCcw" class="text-[length:--spacing(4)]" />
                     {{ restoring() ? 'Restoring...' : 'Restore' }}
                   </button>
                   <hlm-alert-dialog>
                     <button hlmBtn variant="destructive" size="sm" hlmAlertDialogTrigger>
-                      <ng-icon hlm name="lucideTrash2" size="sm" />
+                      <ng-icon name="lucideTrash2" class="text-[length:--spacing(4)]" />
                       Delete Permanently
                     </button>
                     <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
@@ -191,7 +189,7 @@ import { toast } from '@spartan-ng/brain/sonner';
                             target="_blank"
                             aria-label="View file"
                           >
-                            <ng-icon hlm name="lucideEye" size="sm" />
+                            <ng-icon name="lucideEye" class="text-[length:--spacing(4)]" />
                           </a>
                         </td>
                       </tr>

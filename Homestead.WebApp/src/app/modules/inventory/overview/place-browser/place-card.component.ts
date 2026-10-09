@@ -2,7 +2,6 @@ import { Component, ChangeDetectionStrategy, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideTriangleAlert, lucideChevronRight } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { LOW_STOCK_BADGE_CLASS } from '../../shared/item-status-meta';
 
 /**
@@ -13,7 +12,7 @@ import { LOW_STOCK_BADGE_CLASS } from '../../shared/item-status-meta';
 @Component({
   selector: 'app-place-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, NgIcon, HlmIconImports],
+  imports: [RouterLink, NgIcon],
   providers: [provideIcons({ lucideTriangleAlert, lucideChevronRight })],
   // Flex host so the anchor fills the grid cell's stretched height — cards in a row stay equal
   // height even when only some carry a contents-preview line.
@@ -25,7 +24,7 @@ import { LOW_STOCK_BADGE_CLASS } from '../../shared/item-status-meta';
     >
       <span class="flex min-w-0 flex-1 flex-col gap-0.5">
         <span class="flex min-w-0 items-center gap-2">
-          <ng-icon hlm [name]="icon()" size="sm" class="shrink-0 text-muted-foreground" />
+          <ng-icon [name]="icon()" class="text-[length:--spacing(4)] shrink-0 text-muted-foreground" />
           <span class="truncate text-sm font-medium">{{ name() }}</span>
         </span>
         @if (previewNames().length > 0) {
@@ -38,13 +37,13 @@ import { LOW_STOCK_BADGE_CLASS } from '../../shared/item-status-meta';
             [class]="lowStockBadgeClass"
             [attr.aria-label]="lowStockCount() + ' low stock'"
           >
-            <ng-icon hlm name="lucideTriangleAlert" size="xs" />
+            <ng-icon name="lucideTriangleAlert" class="text-[length:--spacing(3)]" />
             {{ lowStockCount() }}
           </span>
         }
         <span class="text-sm text-muted-foreground tabular-nums">{{ count() }}</span>
         @if (chevron()) {
-          <ng-icon hlm name="lucideChevronRight" size="sm" class="text-muted-foreground" />
+          <ng-icon name="lucideChevronRight" class="text-[length:--spacing(4)] text-muted-foreground" />
         }
       </span>
     </a>

@@ -12,7 +12,6 @@ import {
 import { formatDate } from '@angular/common';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideTriangleAlert } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmTableImports } from '@/shared/components/spartan/table';
 import {
   type CellContext,
@@ -115,7 +114,7 @@ export class InventoryNameCell {
 @Component({
   selector: 'app-inventory-onhand-cell',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgIcon, HlmIconImports, UnitPipe],
+  imports: [NgIcon, UnitPipe],
   providers: [provideIcons({ lucideTriangleAlert })],
   template: `
     @if (row.kind === 'consumable') {
@@ -127,7 +126,7 @@ export class InventoryNameCell {
         }
         @if (row.isLow) {
           <span [class]="lowStockBadgeClass">
-            <ng-icon hlm name="lucideTriangleAlert" size="xs" />
+            <ng-icon name="lucideTriangleAlert" class="text-[length:--spacing(3)]" />
             Low
           </span>
         }

@@ -25,7 +25,6 @@ import {
   lucideStickyNote,
   lucideTrash2,
 } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog';
@@ -66,7 +65,6 @@ const PAGE_SIZE = 20;
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     NgIcon,
-    HlmIconImports,
     HlmButton,
     HlmSpinner,
     HlmAlertDialogImports,
@@ -123,7 +121,7 @@ const PAGE_SIZE = 20;
                 } @else {
                   <div class="flex gap-2.5 py-2">
                     <div class="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted">
-                      <ng-icon hlm size="xs" name="lucideStickyNote" />
+                      <ng-icon class="text-[length:--spacing(3)]" name="lucideStickyNote" />
                     </div>
                     <div class="min-w-0 flex-1">
                       <div class="flex flex-wrap items-baseline gap-x-2">
@@ -145,17 +143,17 @@ const PAGE_SIZE = 20;
                       [hlmDropdownMenuTrigger]="rowMenu"
                       aria-label="Note actions"
                     >
-                      <ng-icon hlm name="lucideEllipsisVertical" size="sm" />
+                      <ng-icon name="lucideEllipsisVertical" class="text-[length:--spacing(4)]" />
                     </button>
                     <ng-template #rowMenu>
                       <hlm-dropdown-menu class="w-36">
                         <hlm-dropdown-menu-group>
                           <button hlmDropdownMenuItem (triggered)="startEdit(row)">
-                            <ng-icon hlm name="lucidePencil" size="sm" />
+                            <ng-icon name="lucidePencil" class="text-[length:--spacing(4)]" />
                             Edit
                           </button>
                           <button hlmDropdownMenuItem variant="destructive" (triggered)="onDeleteRequest(row)">
-                            <ng-icon hlm name="lucideTrash2" size="sm" />
+                            <ng-icon name="lucideTrash2" class="text-[length:--spacing(4)]" />
                             Delete
                           </button>
                         </hlm-dropdown-menu-group>
@@ -168,7 +166,7 @@ const PAGE_SIZE = 20;
                      form rather than implying an occurrence date. -->
                 <div class="flex items-center gap-2.5 py-1.5">
                   <div class="flex size-6 shrink-0 items-center justify-center">
-                    <ng-icon hlm size="xs" name="lucideHistory" class="text-muted-foreground" />
+                    <ng-icon name="lucideHistory" class="text-[length:--spacing(3)] text-muted-foreground" />
                   </div>
                   <p class="text-xs text-muted-foreground">
                     {{ row.summary }}
@@ -186,10 +184,10 @@ const PAGE_SIZE = 20;
         <div class="flex items-center justify-end gap-2">
           <span class="text-xs text-muted-foreground">Page {{ page() }} of {{ totalPages() }}</span>
           <button hlmBtn variant="outline" size="icon-sm" [disabled]="page() <= 1" (click)="prevPage()" aria-label="Previous page">
-            <ng-icon hlm name="lucideChevronLeft" size="sm" />
+            <ng-icon name="lucideChevronLeft" class="text-[length:--spacing(4)]" />
           </button>
           <button hlmBtn variant="outline" size="icon-sm" [disabled]="page() >= totalPages()" (click)="nextPage()" aria-label="Next page">
-            <ng-icon hlm name="lucideChevronRight" size="sm" />
+            <ng-icon name="lucideChevronRight" class="text-[length:--spacing(4)]" />
           </button>
         </div>
       }

@@ -18,7 +18,6 @@ import { lucidePlus } from '@ng-icons/lucide';
 import { BrnCombobox } from '@spartan-ng/brain/combobox';
 import { BrnPopover } from '@spartan-ng/brain/popover';
 import { HlmComboboxImports } from '@/shared/components/spartan/combobox';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { FinancesCategoryApiService } from '@/api/services/finances-category-api.service';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
@@ -52,7 +51,7 @@ export interface LineCategorySelection {
 @Component({
   selector: 'app-line-category-combobox',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmComboboxImports, NgIcon, HlmIconImports, HlmSpinner],
+  imports: [HlmComboboxImports, NgIcon, HlmSpinner],
   providers: [provideIcons({ lucidePlus })],
   template: `
     <!-- Single-select popup combobox. closeOnSelect is the BrnCombobox config default (true) and isn't a
@@ -105,7 +104,7 @@ export interface LineCategorySelection {
                 @if (creating()) {
                   <hlm-spinner class="size-3" />
                 } @else {
-                  <ng-icon hlm name="lucidePlus" size="sm" />
+                  <ng-icon name="lucidePlus" class="text-[length:--spacing(4)]" />
                 }
               </span>
               <span class="truncate">Create {{ direction() }} category "{{ search().trim() }}"</span>

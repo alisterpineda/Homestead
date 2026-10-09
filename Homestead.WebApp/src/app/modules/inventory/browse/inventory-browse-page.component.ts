@@ -14,7 +14,6 @@ import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, of, tap, startWith } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideCircleAlert } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { HlmBreadcrumbImports } from '@/shared/components/spartan/breadcrumb';
@@ -48,7 +47,6 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     NgIcon,
-    HlmIconImports,
     HlmSpinner,
     HlmEmptyImports,
     HlmBreadcrumbImports,

@@ -14,7 +14,6 @@ import {
   lucideExternalLink,
 } from '@ng-icons/lucide';
 import { toast } from '@spartan-ng/brain/sonner';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmCardImports } from '@/shared/components/spartan/card';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmBadge } from '@/shared/components/spartan/badge';
@@ -54,7 +53,6 @@ type DeleteStage = 'confirm' | 'cancelRun' | 'retry';
     DatePipe,
     DecimalPipe,
     NgIcon,
-    HlmIconImports,
     HlmCardImports,
     HlmButton,
     HlmBadge,
@@ -156,7 +154,7 @@ type DeleteStage = 'confirm' | 'cancelRun' | 'retry';
                         [attr.data-testid]="'location-link-' + t.key"
                       >
                         {{ t.location }}
-                        <ng-icon hlm name="lucideExternalLink" size="xs" class="shrink-0" />
+                        <ng-icon name="lucideExternalLink" class="text-[length:--spacing(3)] shrink-0" />
                       </a>
                     } @else {
                       {{ t.location }}
@@ -219,7 +217,7 @@ type DeleteStage = 'confirm' | 'cancelRun' | 'retry';
                             [attr.data-testid]="'disconnect-' + t.key"
                             [disabled]="busy()"
                           >
-                            <ng-icon hlm name="lucideUnlink" size="sm" />
+                            <ng-icon name="lucideUnlink" class="text-[length:--spacing(4)]" />
                             Disconnect
                           </button>
                           <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
@@ -254,7 +252,7 @@ type DeleteStage = 'confirm' | 'cancelRun' | 'retry';
                           [attr.data-testid]="'auth-failed-banner-' + t.key"
                         >
                           <p class="flex items-start gap-2">
-                            <ng-icon hlm name="lucideTriangleAlert" size="sm" class="mt-0.5 shrink-0" />
+                            <ng-icon name="lucideTriangleAlert" class="text-[length:--spacing(4)] mt-0.5 shrink-0" />
                             <span>{{ reason }}</span>
                           </p>
                           <div>
@@ -263,7 +261,7 @@ type DeleteStage = 'confirm' | 'cancelRun' | 'retry';
                               triggerVariant="destructive"
                               (connected)="load()"
                             >
-                              <ng-icon hlm name="lucideLink" size="sm" />
+                              <ng-icon name="lucideLink" class="text-[length:--spacing(4)]" />
                               Reconnect
                             </app-connect-google-dialog>
                           </div>
@@ -277,7 +275,7 @@ type DeleteStage = 'confirm' | 'cancelRun' | 'retry';
                         </p>
                         <div>
                           <app-connect-google-dialog [targetKey]="t.key" (connected)="load()">
-                            <ng-icon hlm name="lucideLink" size="sm" />
+                            <ng-icon name="lucideLink" class="text-[length:--spacing(4)]" />
                             Connect Google account
                           </app-connect-google-dialog>
                         </div>
@@ -355,7 +353,7 @@ type DeleteStage = 'confirm' | 'cancelRun' | 'retry';
                             [attr.data-testid]="'prune-blocked-banner-' + s.id"
                           >
                             <p class="flex items-start gap-2">
-                              <ng-icon hlm name="lucideTriangleAlert" size="sm" class="mt-0.5 shrink-0" />
+                              <ng-icon name="lucideTriangleAlert" class="text-[length:--spacing(4)] mt-0.5 shrink-0" />
                               <span>
                                 <strong>{{ s.pruneBlockedCount }} deletion(s) were blocked</strong> on
                                 {{ s.pruneBlockedAt | date: 'medium' }}. The run copied and moved
@@ -535,7 +533,7 @@ type DeleteStage = 'confirm' | 'cancelRun' | 'retry';
                             [disabled]="!canRun(t, s)"
                             (click)="run(t, s, {})"
                           >
-                            <ng-icon hlm name="lucidePlay" size="sm" />
+                            <ng-icon name="lucidePlay" class="text-[length:--spacing(4)]" />
                             Back up now
                           </button>
                           <button
@@ -546,7 +544,7 @@ type DeleteStage = 'confirm' | 'cancelRun' | 'retry';
                             [disabled]="!canRun(t, s)"
                             (click)="run(t, s, { dryRun: true })"
                           >
-                            <ng-icon hlm name="lucideEye" size="sm" />
+                            <ng-icon name="lucideEye" class="text-[length:--spacing(4)]" />
                             Dry run
                           </button>
 
@@ -557,7 +555,7 @@ type DeleteStage = 'confirm' | 'cancelRun' | 'retry';
                             [schedule]="s.schedule ?? null"
                             (saved)="load()"
                           >
-                            <ng-icon hlm name="lucideCalendarClock" size="sm" />
+                            <ng-icon name="lucideCalendarClock" class="text-[length:--spacing(4)]" />
                             {{ s.schedule ? 'Edit schedule' : 'Add schedule' }}
                           </app-backup-schedule-dialog>
 
@@ -585,7 +583,7 @@ type DeleteStage = 'confirm' | 'cancelRun' | 'retry';
                                 'Remove ' + (s.sourceDisplayName ?? s.sourceKind) + ' backup'
                               "
                             >
-                              <ng-icon hlm name="lucideTrash2" size="sm" />
+                              <ng-icon name="lucideTrash2" class="text-[length:--spacing(4)]" />
                             </button>
                             <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
                               <div hlmAlertDialogHeader>

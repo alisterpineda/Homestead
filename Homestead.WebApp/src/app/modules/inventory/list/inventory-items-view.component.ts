@@ -22,7 +22,6 @@ import {
   lucideEllipsisVertical,
   lucideCheck,
 } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmButtonGroupImports } from '@/shared/components/spartan/button-group';
 import { HlmToggleGroupImports } from '@/shared/components/spartan/toggle-group';
@@ -93,7 +92,6 @@ export const kindFilterFromParam = (v: string | null): KindFilter => (isKindFilt
   imports: [
     NgTemplateOutlet,
     NgIcon,
-    HlmIconImports,
     HlmButton,
     HlmButtonGroupImports,
     HlmToggleGroupImports,
@@ -142,7 +140,7 @@ export const kindFilterFromParam = (v: string | null): KindFilter => (isKindFilt
         <!-- A long area/brand name truncates rather than widening the toolbar; the +N stays visible. -->
         <div hlmPopover class="min-w-0 max-w-full">
           <button hlmPopoverTrigger hlmBtn variant="outline" class="max-w-full sm:max-w-72">
-            <ng-icon hlm name="lucideListFilter" size="sm" class="text-muted-foreground" />
+            <ng-icon name="lucideListFilter" class="text-[length:--spacing(4)] text-muted-foreground" />
             <span class="truncate">{{ filterParts().name }}</span>
             <!-- &ngsp; keeps a real space before the count in the text; the flex gap does the spacing. -->
             @if (filterParts().more > 0) {
@@ -202,7 +200,7 @@ export const kindFilterFromParam = (v: string | null): KindFilter => (isKindFilt
                   (click)="warrantyFilter.set(facet.value)"
                 >
                   <span>{{ facet.label }} ({{ warrantyCounts()[facet.value] }})</span>
-                  @if (warrantyFilter() === facet.value) { <ng-icon hlm name="lucideCheck" size="sm" /> }
+                  @if (warrantyFilter() === facet.value) { <ng-icon name="lucideCheck" class="text-[length:--spacing(4)]" /> }
                 </button>
               }
             </div>
@@ -211,7 +209,7 @@ export const kindFilterFromParam = (v: string | null): KindFilter => (isKindFilt
         </div>
 
         <button hlmBtn variant="outline" class="hidden sm:inline-flex" [hlmDropdownMenuTrigger]="sortMenu">
-          <ng-icon hlm [name]="sort().desc ? 'lucideArrowDown' : 'lucideArrowUp'" size="sm" />
+          <ng-icon [name]="sort().desc ? 'lucideArrowDown' : 'lucideArrowUp'" class="text-[length:--spacing(4)]" />
           {{ sortFieldLabel() }}
         </button>
         <ng-template #sortGroup>
@@ -256,7 +254,7 @@ export const kindFilterFromParam = (v: string | null): KindFilter => (isKindFilt
               (click)="setViewMode('card')"
               aria-label="Card view"
             >
-              <ng-icon hlm name="lucideLayoutGrid" size="sm" />
+              <ng-icon name="lucideLayoutGrid" class="text-[length:--spacing(4)]" />
             </button>
             <button
               hlmBtn
@@ -265,14 +263,14 @@ export const kindFilterFromParam = (v: string | null): KindFilter => (isKindFilt
               (click)="setViewMode('table')"
               aria-label="Table view"
             >
-              <ng-icon hlm name="lucideTable" size="sm" />
+              <ng-icon name="lucideTable" class="text-[length:--spacing(4)]" />
             </button>
           </div>
         }
 
         <button hlmBtn variant="outline" size="icon" class="sm:hidden"
                 [hlmDropdownMenuTrigger]="overflowMenu" aria-label="More options">
-          <ng-icon hlm name="lucideEllipsisVertical" size="sm" />
+          <ng-icon name="lucideEllipsisVertical" class="text-[length:--spacing(4)]" />
         </button>
         <ng-template #overflowMenu>
           <hlm-dropdown-menu class="w-44">

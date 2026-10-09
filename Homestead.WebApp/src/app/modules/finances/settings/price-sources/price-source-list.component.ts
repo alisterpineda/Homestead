@@ -12,7 +12,6 @@ import { Router } from '@angular/router';
 import { DatePipe } from '@angular/common';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideRss } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { HlmTableImports } from '@/shared/components/spartan/table';
@@ -32,7 +31,6 @@ type StatusPill = { label: string; variant: 'default' | 'destructive' | 'seconda
   imports: [
     DatePipe,
     NgIcon,
-    HlmIconImports,
     HlmSpinner,
     HlmEmptyImports,
     HlmTableImports,

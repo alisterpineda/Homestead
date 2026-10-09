@@ -3,7 +3,6 @@ import { BrnDialog } from '@spartan-ng/brain/dialog';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideCircleCheck, lucideCircleAlert, lucideTriangleAlert } from '@ng-icons/lucide';
 import { HlmDialogImports } from '@/shared/components/spartan/dialog';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmProgressImports } from '@/shared/components/spartan/progress';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 
@@ -15,7 +14,6 @@ type ReprocessStatus = 'idle' | 'in-progress' | 'completed' | 'partially-complet
   imports: [
     NgIcon,
     HlmDialogImports,
-    HlmIconImports,
     HlmProgressImports,
     HlmSpinner,
   ],
@@ -44,15 +42,15 @@ type ReprocessStatus = 'idle' | 'in-progress' | 'completed' | 'partially-complet
               </p>
             }
             @case ('completed') {
-              <ng-icon hlm name="lucideCircleCheck" size="xl" class="text-primary" />
+              <ng-icon name="lucideCircleCheck" class="text-[length:--spacing(12)] text-primary" />
               <p class="text-foreground text-center text-sm">{{ resultMessage() }}</p>
             }
             @case ('partially-completed') {
-              <ng-icon hlm name="lucideTriangleAlert" size="xl" class="text-yellow-500" />
+              <ng-icon name="lucideTriangleAlert" class="text-[length:--spacing(12)] text-yellow-500" />
               <p class="text-foreground text-center text-sm">{{ resultMessage() }}</p>
             }
             @case ('failed') {
-              <ng-icon hlm name="lucideCircleAlert" size="xl" class="text-destructive" />
+              <ng-icon name="lucideCircleAlert" class="text-[length:--spacing(12)] text-destructive" />
               <p class="text-destructive text-center text-sm">{{ resultMessage() }}</p>
             }
           }

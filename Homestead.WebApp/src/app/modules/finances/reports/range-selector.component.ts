@@ -1,7 +1,6 @@
 import { Component, ChangeDetectionStrategy, computed, input, output, signal } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideCalendar, lucideCheck, lucideChevronLeft, lucideChevronRight } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmPopoverImports } from '@/shared/components/spartan/popover';
 import { HlmButton } from '@/shared/components/spartan/button';
 import type { NetWorthRange } from '@/api/generated/models/net-worth-range';
@@ -62,7 +61,7 @@ function currentMonthValue(today: Date): MonthValue {
 @Component({
   selector: 'app-net-worth-range-selector',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgIcon, HlmIconImports, HlmPopoverImports, HlmButton, MonthPickerComponent],
+  imports: [NgIcon, HlmPopoverImports, HlmButton, MonthPickerComponent],
   providers: [provideIcons({ lucideCalendar, lucideCheck, lucideChevronLeft, lucideChevronRight })],
   template: `
     <div class="inline-flex items-center rounded-full border border-border bg-card">
@@ -76,7 +75,7 @@ function currentMonthValue(today: Date): MonthValue {
         [disabled]="cannotStepBack()"
         (click)="step(-1)"
       >
-        <ng-icon hlm size="sm" name="lucideChevronLeft" />
+        <ng-icon class="text-[length:--spacing(4)]" name="lucideChevronLeft" />
       </button>
       <div hlmPopover [state]="popoverState()" (stateChanged)="onPopoverStateChanged($event)">
         <button
@@ -84,7 +83,7 @@ function currentMonthValue(today: Date): MonthValue {
           type="button"
           class="hover:bg-accent hover:text-accent-foreground focus-visible:ring-ring inline-flex h-9 items-center gap-2 rounded-full px-3 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
         >
-          <ng-icon hlm size="sm" name="lucideCalendar" />
+          <ng-icon class="text-[length:--spacing(4)]" name="lucideCalendar" />
           <span class="tabular-nums">{{ rangeLabel() }}</span>
         </button>
         <div hlmPopoverContent *hlmPopoverPortal class="w-72 p-2" align="center">
@@ -101,7 +100,7 @@ function currentMonthValue(today: Date): MonthValue {
                 >
                   <span>{{ preset.label }}</span>
                   @if (preset.kind === value().kind) {
-                    <ng-icon hlm size="sm" name="lucideCheck" />
+                    <ng-icon class="text-[length:--spacing(4)]" name="lucideCheck" />
                   }
                 </button>
               </li>
@@ -154,7 +153,7 @@ function currentMonthValue(today: Date): MonthValue {
         [disabled]="cannotStepForward()"
         (click)="step(1)"
       >
-        <ng-icon hlm size="sm" name="lucideChevronRight" />
+        <ng-icon class="text-[length:--spacing(4)]" name="lucideChevronRight" />
       </button>
     </div>
   `,

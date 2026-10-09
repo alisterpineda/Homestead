@@ -2,7 +2,6 @@ import { Component, ChangeDetectionStrategy, input, output } from '@angular/core
 import { RouterLink } from '@angular/router';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideTriangleAlert, lucideChevronRight } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { ItemStatusBadgeComponent } from '../shared/item-status-badge.component';
 import { LOW_STOCK_BADGE_CLASS } from '../shared/item-status-meta';
 import { formatQty } from '../consumables/consumable-shared';
@@ -32,7 +31,7 @@ import type { ConsumableResponse } from '@/api/generated/models/consumable-respo
 @Component({
   selector: 'app-inventory-recently-updated',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, NgIcon, HlmIconImports, ItemStatusBadgeComponent, UnitPipe],
+  imports: [RouterLink, NgIcon, ItemStatusBadgeComponent, UnitPipe],
   providers: [provideIcons({ lucideTriangleAlert, lucideChevronRight })],
   template: `
     @if (items().length) {
@@ -44,7 +43,7 @@ import type { ConsumableResponse } from '@/api/generated/models/consumable-respo
         >
           <h2 class="text-sm font-medium text-muted-foreground">Recently updated</h2>
           <span class="ml-auto flex shrink-0 items-center gap-1 text-xs font-medium text-muted-foreground">
-            View all <ng-icon hlm name="lucideChevronRight" size="xs" />
+            View all <ng-icon name="lucideChevronRight" class="text-[length:--spacing(3)]" />
           </span>
         </a>
         <ul class="space-y-1">
@@ -75,7 +74,7 @@ import type { ConsumableResponse } from '@/api/generated/models/consumable-respo
                     <span class="truncate font-medium">{{ c.name }}</span>
                     @if (c.isLow) {
                       <span [class]="lowStockBadgeClass">
-                        <ng-icon hlm name="lucideTriangleAlert" size="xs" />
+                        <ng-icon name="lucideTriangleAlert" class="text-[length:--spacing(3)]" />
                         Low
                       </span>
                     }

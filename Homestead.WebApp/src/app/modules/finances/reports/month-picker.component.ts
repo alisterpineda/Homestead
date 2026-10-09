@@ -1,7 +1,6 @@
 import { Component, ChangeDetectionStrategy, computed, input, model, signal } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideChevronDown, lucideChevronLeft, lucideChevronRight } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmPopoverImports } from '@/shared/components/spartan/popover';
 import { HlmButton } from '@/shared/components/spartan/button';
 
@@ -21,7 +20,7 @@ function compare(a: MonthValue, b: MonthValue): number {
 @Component({
   selector: 'app-month-picker',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgIcon, HlmIconImports, HlmPopoverImports, HlmButton],
+  imports: [NgIcon, HlmPopoverImports, HlmButton],
   providers: [provideIcons({ lucideChevronDown, lucideChevronLeft, lucideChevronRight })],
   template: `
     <div hlmPopover [state]="popoverState()" (stateChanged)="onStateChanged($event)">
@@ -32,7 +31,7 @@ function compare(a: MonthValue, b: MonthValue): number {
         class="border-input bg-background hover:bg-accent dark:bg-input/30 dark:hover:bg-input/50 hover:text-accent-foreground focus-visible:ring-ring inline-flex h-9 w-full cursor-default items-center justify-between gap-2 rounded-md border px-3 py-2 text-left text-sm font-normal whitespace-nowrap transition-all focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50"
       >
         <span class="truncate">{{ displayLabel() }}</span>
-        <ng-icon hlm size="sm" name="lucideChevronDown" />
+        <ng-icon class="text-[length:--spacing(4)]" name="lucideChevronDown" />
       </button>
       <div hlmPopoverContent *hlmPopoverPortal class="w-64 p-3" align="start">
         <div class="mb-2 flex items-center justify-between">
@@ -45,7 +44,7 @@ function compare(a: MonthValue, b: MonthValue): number {
             aria-label="Previous year"
             (click)="prevYear()"
           >
-            <ng-icon hlm size="sm" name="lucideChevronLeft" />
+            <ng-icon class="text-[length:--spacing(4)]" name="lucideChevronLeft" />
           </button>
           <div class="text-sm font-medium tabular-nums">{{ viewYear() }}</div>
           <button
@@ -57,7 +56,7 @@ function compare(a: MonthValue, b: MonthValue): number {
             aria-label="Next year"
             (click)="nextYear()"
           >
-            <ng-icon hlm size="sm" name="lucideChevronRight" />
+            <ng-icon class="text-[length:--spacing(4)]" name="lucideChevronRight" />
           </button>
         </div>
         <div class="grid grid-cols-3 gap-1">

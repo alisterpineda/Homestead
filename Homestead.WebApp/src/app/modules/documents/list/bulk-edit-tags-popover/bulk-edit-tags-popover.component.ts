@@ -15,7 +15,6 @@ import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, debounceTime, of, map, tap, catchError, firstValueFrom } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideTags, lucideCheck, lucideMinus, lucideX } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmPopoverImports } from '@/shared/components/spartan/popover';
 import { HlmSeparatorImports } from '@/shared/components/spartan/separator';
 import { HlmInput } from '@/shared/components/spartan/input';
@@ -37,7 +36,6 @@ import { type TagCheckboxItem, nextState, isChanged, buildConfirmationMessage } 
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     NgIcon,
-    HlmIconImports,
     HlmPopoverImports,
     HlmSeparatorImports,
     HlmInput,
@@ -53,7 +51,7 @@ import { type TagCheckboxItem, nextState, isChanged, buildConfirmationMessage } 
   template: `
     <div hlmPopover [state]="popoverState()" [closeOnOutsidePointerEvents]="!dialogOpen()" (stateChanged)="onPopoverStateChanged($event)">
       <button hlmPopoverTrigger hlmBtn variant="outline" [disabled]="disabled()">
-        <ng-icon hlm name="lucideTags" size="sm" />
+        <ng-icon name="lucideTags" class="text-[length:--spacing(4)]" />
         Tags
       </button>
       <div hlmPopoverContent *hlmPopoverPortal class="w-[280px] p-0" align="start">

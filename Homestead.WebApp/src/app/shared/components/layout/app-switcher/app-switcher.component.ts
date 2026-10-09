@@ -9,7 +9,6 @@ import {
   lucideWallet,
   lucidePackage,
 } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSidebarImports } from '@/shared/components/spartan/sidebar';
 import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-menu';
 import { modules } from '@/modules/registry';
@@ -19,7 +18,7 @@ import { AuthService } from '@/shared/services/auth.service';
 @Component({
   selector: 'app-switcher',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, NgIcon, HlmIconImports, HlmSidebarImports, HlmDropdownMenuImports],
+  imports: [RouterLink, NgIcon, HlmSidebarImports, HlmDropdownMenuImports],
   providers: [
     provideIcons({ lucideChevronsUpDown, lucideLayoutGrid, lucideSettings, lucideFileText, lucideWallet, lucidePackage }),
   ],
@@ -33,15 +32,15 @@ import { AuthService } from '@/shared/services/auth.service';
           align="start"
           aria-label="Switch module"
         >
-          <ng-icon hlm [name]="activeModule()?.icon ?? 'lucideLayoutGrid'" size="sm" />
+          <ng-icon [name]="activeModule()?.icon ?? 'lucideLayoutGrid'" class="text-[length:--spacing(4)]" />
           <span class="truncate font-semibold">{{ activeModule()?.label ?? 'Select Module' }}</span>
-          <ng-icon hlm name="lucideChevronsUpDown" size="sm" class="ml-auto" />
+          <ng-icon name="lucideChevronsUpDown" class="text-[length:--spacing(4)] ml-auto" />
         </button>
         <ng-template #menu>
           <div hlmDropdownMenu class="w-52">
             @for (mod of visibleModules(); track mod.id) {
               <a [routerLink]="mod.basePath" hlmDropdownMenuItem class="gap-2">
-                <ng-icon hlm [name]="mod.icon" size="sm" />
+                <ng-icon [name]="mod.icon" class="text-[length:--spacing(4)]" />
                 {{ mod.label }}
               </a>
             }

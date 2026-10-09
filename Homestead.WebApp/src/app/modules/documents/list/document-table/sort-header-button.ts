@@ -2,17 +2,16 @@ import { Component, computed, input } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideArrowDown, lucideArrowUp, lucideArrowUpDown } from '@ng-icons/lucide';
 import { HlmButton } from '@/shared/components/spartan/button';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { type HeaderContext, injectFlexRenderContext } from '@tanstack/angular-table';
 
 @Component({
   selector: 'app-sort-header-button',
-  imports: [HlmButton, NgIcon, HlmIconImports],
+  imports: [HlmButton, NgIcon],
   providers: [provideIcons({ lucideArrowDown, lucideArrowUp, lucideArrowUpDown })],
   template: `
     <button hlmBtn size="sm" variant="ghost" class="-ml-3" (click)="handleClick()">
       {{ label() }}
-      <ng-icon hlm size="sm" [name]="sortIcon()" />
+      <ng-icon class="text-[length:--spacing(4)]" [name]="sortIcon()" />
     </button>
   `,
 })

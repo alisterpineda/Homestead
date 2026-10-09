@@ -29,7 +29,6 @@ import {
   lucideUserRound,
   lucideUndo2,
 } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmLabel } from '@/shared/components/spartan/label';
@@ -81,7 +80,6 @@ import { toast } from '@spartan-ng/brain/sonner';
   imports: [
     RouterLink,
     NgIcon,
-    HlmIconImports,
     HlmButton,
     HlmInput,
     HlmLabel,
@@ -132,9 +130,9 @@ import { toast } from '@spartan-ng/brain/sonner';
           <div class="min-w-0 space-y-1">
             <div class="flex flex-wrap items-center gap-3">
               @if (it.isContainer) {
-                <ng-icon hlm name="lucideBox" size="sm" class="shrink-0 text-muted-foreground" aria-label="Container" />
+                <ng-icon name="lucideBox" class="text-[length:--spacing(4)] shrink-0 text-muted-foreground" aria-label="Container" />
               } @else if (it.hasComponents) {
-                <ng-icon hlm name="lucideCpu" size="sm" class="shrink-0 text-muted-foreground" aria-label="Assembly" />
+                <ng-icon name="lucideCpu" class="text-[length:--spacing(4)] shrink-0 text-muted-foreground" aria-label="Assembly" />
               }
               <h1 class="text-2xl font-semibold">{{ it.name }}</h1>
               <app-item-status-badge [status]="it.status" [note]="it.statusNote" />
@@ -145,7 +143,7 @@ import { toast } from '@spartan-ng/brain/sonner';
                  four-segment path read as a second title competing with the text-2xl name. -->
             <p class="flex items-center gap-1.5 text-sm"
                [class.text-muted-foreground]="locationText() === 'Unplaced'">
-              <ng-icon hlm name="lucideMapPin" size="sm" class="shrink-0 text-muted-foreground" />
+              <ng-icon name="lucideMapPin" class="text-[length:--spacing(4)] shrink-0 text-muted-foreground" />
               <!-- Full width here, so no middle collapse — segments only truncate if they must. -->
               <app-location-path [path]="locationPath()" [collapse]="false" />
               @if (it.compartment) {
@@ -167,11 +165,11 @@ import { toast } from '@spartan-ng/brain/sonner';
           </div>
           <div class="flex items-center gap-2">
             <button hlmBtn variant="outline" size="sm" (click)="openEdit(it)">
-              <ng-icon hlm name="lucidePencil" size="sm" />
+              <ng-icon name="lucidePencil" class="text-[length:--spacing(4)]" />
               Edit
             </button>
             <button hlmBtn variant="outline" size="icon-sm" [hlmDropdownMenuTrigger]="actionsMenu" aria-label="Durable actions">
-              <ng-icon hlm name="lucideEllipsisVertical" size="sm" />
+              <ng-icon name="lucideEllipsisVertical" class="text-[length:--spacing(4)]" />
             </button>
             <ng-template #actionsMenu>
               <hlm-dropdown-menu class="w-44">
@@ -180,22 +178,22 @@ import { toast } from '@spartan-ng/brain/sonner';
                        confirm. Both lending gestures are durable-only, so they live here. -->
                   @if (it.status === 'Active') {
                     <button hlmDropdownMenuItem (triggered)="onLendRequest()" [disabled]="archiving()">
-                      <ng-icon hlm name="lucideUserRound" size="sm" />
+                      <ng-icon name="lucideUserRound" class="text-[length:--spacing(4)]" />
                       Lend…
                     </button>
                   } @else if (it.status === 'Lent') {
                     <button hlmDropdownMenuItem (triggered)="onMarkReturned(it)" [disabled]="archiving()">
-                      <ng-icon hlm name="lucideUndo2" size="sm" />
+                      <ng-icon name="lucideUndo2" class="text-[length:--spacing(4)]" />
                       Mark returned
                     </button>
                   }
                   <button hlmDropdownMenuItem (triggered)="onArchiveRestore(it)" [disabled]="archiving()">
-                    <ng-icon hlm [name]="terminal() ? 'lucideArchiveRestore' : 'lucideArchive'" size="sm" />
+                    <ng-icon [name]="terminal() ? 'lucideArchiveRestore' : 'lucideArchive'" class="text-[length:--spacing(4)]" />
                     {{ terminal() ? 'Restore' : 'Archive' }}
                   </button>
                   <hlm-dropdown-menu-separator />
                   <button hlmDropdownMenuItem variant="destructive" (triggered)="onDeleteRequest()">
-                    <ng-icon hlm name="lucideTrash2" size="sm" />
+                    <ng-icon name="lucideTrash2" class="text-[length:--spacing(4)]" />
                     Delete
                   </button>
                 </hlm-dropdown-menu-group>
@@ -255,7 +253,7 @@ import { toast } from '@spartan-ng/brain/sonner';
                      it has parts (an assembly can't be flipped to a container — the backend guards it too). -->
                 @if (!it.hasComponents) {
                   <button hlmBtn variant="outline" size="sm" (click)="onStoreItemsInside(it)" [disabled]="storingItems()">
-                    <ng-icon hlm name="lucideBox" size="sm" />
+                    <ng-icon name="lucideBox" class="text-[length:--spacing(4)]" />
                     Store items inside
                   </button>
                 }
@@ -265,7 +263,7 @@ import { toast } from '@spartan-ng/brain/sonner';
                   [initialLocationLabel]="it.name"
                   (created)="onChanged()"
                 >
-                  <ng-icon hlm name="lucidePlus" size="sm" />
+                  <ng-icon name="lucidePlus" class="text-[length:--spacing(4)]" />
                   Add part
                 </app-create-entry-dialog>
               </div>
@@ -321,7 +319,7 @@ import { toast } from '@spartan-ng/brain/sonner';
                 [initialLocationLabel]="it.name"
                 (created)="onChanged()"
               >
-                <ng-icon hlm name="lucidePlus" size="sm" />
+                <ng-icon name="lucidePlus" class="text-[length:--spacing(4)]" />
                 Add item
               </app-create-entry-dialog>
             </div>
@@ -345,12 +343,12 @@ import { toast } from '@spartan-ng/brain/sonner';
                       [routerLink]="['/inventory/items', container.id]"
                     >
                       <span class="flex min-w-0 items-center gap-2">
-                        <ng-icon hlm name="lucideBox" size="sm" class="shrink-0 text-muted-foreground" />
+                        <ng-icon name="lucideBox" class="text-[length:--spacing(4)] shrink-0 text-muted-foreground" />
                         <span class="truncate">{{ container.name }}</span>
                       </span>
                       <span class="flex shrink-0 items-center gap-2 text-xs text-muted-foreground tabular-nums">
                         {{ container.itemCount }} {{ container.itemCount === 1 ? 'item' : 'items' }}
-                        <ng-icon hlm name="lucideChevronRight" size="sm" />
+                        <ng-icon name="lucideChevronRight" class="text-[length:--spacing(4)]" />
                       </span>
                     </a>
                   </li>
@@ -374,7 +372,7 @@ import { toast } from '@spartan-ng/brain/sonner';
                       [routerLink]="['/inventory/items', row.consumable.id]"
                     >
                       <span class="flex min-w-0 items-center gap-2">
-                        <ng-icon hlm name="lucideBoxes" size="sm" class="shrink-0 text-muted-foreground" />
+                        <ng-icon name="lucideBoxes" class="text-[length:--spacing(4)] shrink-0 text-muted-foreground" />
                         <span class="truncate">{{ row.consumable.name }}</span>
                       </span>
                       <span class="shrink-0 text-xs text-muted-foreground tabular-nums">

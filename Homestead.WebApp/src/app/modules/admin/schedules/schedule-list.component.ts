@@ -5,7 +5,6 @@ import { switchMap, map, combineLatest } from 'rxjs';
 import { DatePipe } from '@angular/common';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideCalendarClock, lucidePlus, lucideTrash2 } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { HlmButton } from '@/shared/components/spartan/button';
@@ -27,7 +26,7 @@ import { processingJobTypeLabel } from '@/shared/utils/processing-job-type.utils
   selector: 'app-schedule-list',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    DatePipe, NgIcon, HlmIconImports, HlmSpinner, HlmEmptyImports, HlmButton,
+    DatePipe, NgIcon, HlmSpinner, HlmEmptyImports, HlmButton,
     HlmTableImports, HlmBadge, HlmAlertDialogImports,
     PaginationComponent, CreateScheduleDialogComponent,
   ],
@@ -66,7 +65,7 @@ import { processingJobTypeLabel } from '@/shared/utils/processing-job-type.utils
               </div>
               <div hlmEmptyContent>
                 <app-create-schedule-dialog (created)="onRefresh()">
-                  <ng-icon hlm name="lucidePlus" size="sm" class="mr-1" />
+                  <ng-icon name="lucidePlus" class="text-[length:--spacing(4)] mr-1" />
                   Create Schedule
                 </app-create-schedule-dialog>
               </div>
@@ -74,7 +73,7 @@ import { processingJobTypeLabel } from '@/shared/utils/processing-job-type.utils
           } @else {
             <div class="flex justify-end mb-4 shrink-0">
               <app-create-schedule-dialog triggerSize="sm" (created)="onRefresh()">
-                <ng-icon hlm name="lucidePlus" size="sm" class="mr-1" />
+                <ng-icon name="lucidePlus" class="text-[length:--spacing(4)] mr-1" />
                 Create Schedule
               </app-create-schedule-dialog>
             </div>
@@ -135,7 +134,7 @@ import { processingJobTypeLabel } from '@/shared/utils/processing-job-type.utils
                             <hlm-alert-dialog>
                               <button hlmBtn variant="ghost" size="icon" hlmAlertDialogTrigger
                                 [attr.aria-label]="'Delete schedule ' + schedule.name">
-                                <ng-icon hlm name="lucideTrash2" size="sm" />
+                                <ng-icon name="lucideTrash2" class="text-[length:--spacing(4)]" />
                               </button>
                               <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
                                 <div hlmAlertDialogHeader>

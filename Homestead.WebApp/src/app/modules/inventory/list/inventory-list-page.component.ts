@@ -24,7 +24,6 @@ import {
   lucidePackage,
   lucideCircleAlert,
   lucideCheck,} from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { SearchInputComponent } from '@/shared/components/search-input/search-input.component';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
@@ -96,7 +95,6 @@ interface ListData {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     NgIcon,
-    HlmIconImports,
     SearchInputComponent,
     HlmSpinner,
     HlmEmptyImports,
@@ -147,7 +145,7 @@ interface ListData {
             </div>
             <div hlmEmptyContent>
               <app-create-entry-dialog (created)="onChanged()">
-                <ng-icon hlm name="lucidePlus" size="sm" />
+                <ng-icon name="lucidePlus" class="text-[length:--spacing(4)]" />
                 New item
               </app-create-entry-dialog>
             </div>
@@ -174,7 +172,7 @@ interface ListData {
             <app-search-input toolbarStart class="w-full min-w-0 sm:w-56 lg:w-64" [(value)]="searchInput" placeholder="Search items..." ariaLabel="Search items" />
 
             <app-create-entry-dialog toolbarEnd (created)="onChanged()">
-              <ng-icon hlm name="lucidePlus" size="sm" />
+              <ng-icon name="lucidePlus" class="text-[length:--spacing(4)]" />
               New item
             </app-create-entry-dialog>
 
@@ -188,7 +186,7 @@ interface ListData {
                   (click)="selectAreaFilter('all')"
                 >
                   <span>All areas</span>
-                  @if (areaFilter() === 'all') { <ng-icon hlm name="lucideCheck" size="sm" /> }
+                  @if (areaFilter() === 'all') { <ng-icon name="lucideCheck" class="text-[length:--spacing(4)]" /> }
                 </button>
                 <button
                   type="button"
@@ -196,7 +194,7 @@ interface ListData {
                   (click)="selectAreaFilter('unplaced')"
                 >
                   <span class="italic text-muted-foreground">Unplaced</span>
-                  @if (areaFilter() === 'unplaced') { <ng-icon hlm name="lucideCheck" size="sm" /> }
+                  @if (areaFilter() === 'unplaced') { <ng-icon name="lucideCheck" class="text-[length:--spacing(4)]" /> }
                 </button>
                 @for (node of areaTree(); track node.area.id) {
                   <button
@@ -205,7 +203,7 @@ interface ListData {
                     (click)="selectAreaFilter(node.area.id)"
                   >
                     <span class="truncate" [style.marginInlineStart.px]="node.depth * 14">{{ node.area.name }}</span>
-                    @if (areaFilter() === node.area.id) { <ng-icon hlm name="lucideCheck" size="sm" /> }
+                    @if (areaFilter() === node.area.id) { <ng-icon name="lucideCheck" class="text-[length:--spacing(4)]" /> }
                   </button>
                 }
               </div>
@@ -220,7 +218,7 @@ interface ListData {
                     (click)="selectBrandFilter('all')"
                   >
                     <span>All brands</span>
-                    @if (brandFilter() === 'all') { <ng-icon hlm name="lucideCheck" size="sm" /> }
+                    @if (brandFilter() === 'all') { <ng-icon name="lucideCheck" class="text-[length:--spacing(4)]" /> }
                   </button>
                   @for (brand of brands(); track brand.id) {
                     <button
@@ -229,7 +227,7 @@ interface ListData {
                       (click)="selectBrandFilter(brand.id)"
                     >
                       <span class="truncate">{{ brand.name }}</span>
-                      @if (brandFilter() === brand.id) { <ng-icon hlm name="lucideCheck" size="sm" /> }
+                      @if (brandFilter() === brand.id) { <ng-icon name="lucideCheck" class="text-[length:--spacing(4)]" /> }
                     </button>
                   }
                 </div>
@@ -264,7 +262,7 @@ interface ListData {
                       (click)="toggleTagFilter(tag.id)"
                     >
                       <span class="truncate">{{ tag.path }}</span>
-                      @if (tagFilter().has(tag.id)) { <ng-icon hlm name="lucideCheck" size="sm" /> }
+                      @if (tagFilter().has(tag.id)) { <ng-icon name="lucideCheck" class="text-[length:--spacing(4)]" /> }
                     </button>
                   } @empty {
                     <span class="block px-2 py-2 text-xs text-muted-foreground">No tags found.</span>

@@ -10,7 +10,6 @@ import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-i
 import { switchMap, map, debounceTime, distinctUntilChanged, combineLatest, filter, take, firstValueFrom, forkJoin, of } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucidePlus, lucideCircleAlert, lucideCoins, lucideListFilter } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { SearchInputComponent } from '@/shared/components/search-input/search-input.component';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
@@ -47,7 +46,6 @@ const COMMODITY_TOTAL_GUARD = 1000;
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     NgIcon,
-    HlmIconImports,
     HlmButton,
     SearchInputComponent,
     HlmSpinner,
@@ -70,7 +68,7 @@ const COMMODITY_TOTAL_GUARD = 1000;
           <app-search-input class="max-w-sm flex-1 min-w-0" [(value)]="searchInput" placeholder="Search by symbol or name" ariaLabel="Search commodities" />
           <div hlmPopover>
             <button hlmPopoverTrigger hlmBtn variant="outline">
-              <ng-icon hlm name="lucideListFilter" size="sm" class="text-muted-foreground" />
+              <ng-icon name="lucideListFilter" class="text-[length:--spacing(4)] text-muted-foreground" />
               {{ filterTriggerLabel() }}
             </button>
             <div hlmPopoverContent *hlmPopoverPortal class="w-[260px] p-0" align="start">
@@ -111,7 +109,7 @@ const COMMODITY_TOTAL_GUARD = 1000;
           </div>
         </div>
         <app-create-commodity-dialog (created)="onChanged()">
-          <ng-icon hlm name="lucidePlus" size="sm" />
+          <ng-icon name="lucidePlus" class="text-[length:--spacing(4)]" />
           New security
         </app-create-commodity-dialog>
       </div>

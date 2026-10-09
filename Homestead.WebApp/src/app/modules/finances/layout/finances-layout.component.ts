@@ -10,7 +10,6 @@ import {
 import { RouterOutlet } from '@angular/router';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideEye, lucideEyeOff } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { PageHeaderService } from '@/shared/services/page-header.service';
 import { UserPreferencesService } from '@/shared/services/user-preferences.service';
@@ -19,7 +18,7 @@ import { FinanceSettingsService } from '../shared/finance-settings.service';
 @Component({
   selector: 'app-finances-layout',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterOutlet, NgIcon, HlmIconImports, HlmButton],
+  imports: [RouterOutlet, NgIcon, HlmButton],
   providers: [provideIcons({ lucideEye, lucideEyeOff })],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
   template: `
@@ -34,9 +33,8 @@ import { FinanceSettingsService } from '../shared/finance-settings.service';
         (click)="togglePrivacy()"
       >
         <ng-icon
-          hlm
           [name]="prefs.financesPrivacyMasked() ? 'lucideEyeOff' : 'lucideEye'"
-          size="sm"
+          class="text-[length:--spacing(4)]"
         />
       </button>
     </ng-template>

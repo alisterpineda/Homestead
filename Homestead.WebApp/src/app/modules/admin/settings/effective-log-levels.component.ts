@@ -1,7 +1,6 @@
 import { Component, ChangeDetectionStrategy, inject, signal, OnInit, OnDestroy } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideRefreshCw, lucideTriangleAlert, lucideSearch } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmCardImports } from '@/shared/components/spartan/card';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmInput } from '@/shared/components/spartan/input';
@@ -22,7 +21,7 @@ type BadgeVariant = 'default' | 'secondary' | 'outline';
   selector: 'app-effective-log-levels',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    NgIcon, HlmIconImports, HlmCardImports, HlmButton, HlmInput, HlmLabel,
+    NgIcon, HlmCardImports, HlmButton, HlmInput, HlmLabel,
     HlmSpinner, HlmEmptyImports, HlmBadge,
   ],
   providers: [provideIcons({ lucideRefreshCw, lucideTriangleAlert, lucideSearch })],
@@ -35,7 +34,7 @@ type BadgeVariant = 'default' | 'secondary' | 'outline';
         </p>
         <button hlmCardAction hlmBtn variant="ghost" size="icon" (click)="refresh()" [disabled]="loading()"
           aria-label="Refresh effective log levels">
-          <ng-icon hlm name="lucideRefreshCw" size="sm" />
+          <ng-icon name="lucideRefreshCw" class="text-[length:--spacing(4)]" />
         </button>
       </div>
 
@@ -91,7 +90,7 @@ type BadgeVariant = 'default' | 'secondary' | 'outline';
                 @if (resolving()) {
                   <hlm-spinner />
                 } @else {
-                  <ng-icon hlm name="lucideSearch" size="sm" class="mr-1" />
+                  <ng-icon name="lucideSearch" class="text-[length:--spacing(4)] mr-1" />
                   Check
                 }
               </button>

@@ -4,7 +4,6 @@ import { Router, RouterOutlet, NavigationEnd } from '@angular/router';
 import { filter } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideUpload } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { AuthService } from '@/shared/services/auth.service';
 import { UploadManagerService } from '@/shared/services/upload-manager.service';
 import { PageHeaderService } from '@/shared/services/page-header.service';
@@ -13,7 +12,7 @@ import { UploadPopoverComponent } from '../list/upload-popover/upload-popover.co
 @Component({
   selector: 'app-documents-layout',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterOutlet, NgIcon, HlmIconImports, UploadPopoverComponent],
+  imports: [RouterOutlet, NgIcon, UploadPopoverComponent],
   providers: [provideIcons({ lucideUpload })],
   host: {
     class: 'flex min-h-0 flex-1 flex-col',
@@ -33,7 +32,7 @@ import { UploadPopoverComponent } from '../list/upload-popover/upload-popover.co
       <div class="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-3">
         <div class="flex h-full w-full items-center justify-center rounded-lg border-2 border-dashed border-primary">
           <div class="flex flex-col items-center gap-2 text-primary">
-            <ng-icon hlm name="lucideUpload" size="xl" />
+            <ng-icon name="lucideUpload" class="text-[length:--spacing(12)]" />
             <p class="text-lg font-medium">Drop files to upload</p>
             <p class="text-sm text-muted-foreground">Files will be uploaded and processed automatically</p>
           </div>

@@ -1,7 +1,6 @@
 import { Component, ChangeDetectionStrategy, input, output } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideEllipsisVertical, lucidePencil, lucideArchive, lucideArchiveRestore, lucideTrash2 } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-menu';
 import type { AccountResponse } from '@/api/generated/models/account-response';
@@ -9,7 +8,7 @@ import type { AccountResponse } from '@/api/generated/models/account-response';
 @Component({
   selector: 'app-account-row-actions',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgIcon, HlmIconImports, HlmButton, HlmDropdownMenuImports],
+  imports: [NgIcon, HlmButton, HlmDropdownMenuImports],
   providers: [provideIcons({ lucideEllipsisVertical, lucidePencil, lucideArchive, lucideArchiveRestore, lucideTrash2 })],
   template: `
     <button
@@ -21,17 +20,17 @@ import type { AccountResponse } from '@/api/generated/models/account-response';
       aria-label="Account actions"
       (click)="onTriggerClick($event)"
     >
-      <ng-icon hlm name="lucideEllipsisVertical" size="sm" />
+      <ng-icon name="lucideEllipsisVertical" class="text-[length:--spacing(4)]" />
     </button>
     <ng-template #menu>
       <hlm-dropdown-menu class="w-44">
         <hlm-dropdown-menu-group>
           <button hlmDropdownMenuItem (triggered)="edit.emit(account())">
-            <ng-icon hlm name="lucidePencil" size="sm" />
+            <ng-icon name="lucidePencil" class="text-[length:--spacing(4)]" />
             Edit
           </button>
           <button hlmDropdownMenuItem (triggered)="archiveToggle.emit(account())">
-            <ng-icon hlm [name]="account().isArchived ? 'lucideArchiveRestore' : 'lucideArchive'" size="sm" />
+            <ng-icon [name]="account().isArchived ? 'lucideArchiveRestore' : 'lucideArchive'" class="text-[length:--spacing(4)]" />
             {{ account().isArchived ? 'Unarchive' : 'Archive' }}
           </button>
           <hlm-dropdown-menu-separator />
@@ -42,7 +41,7 @@ import type { AccountResponse } from '@/api/generated/models/account-response';
             [title]="account().hasTransactions ? 'Accounts with transactions cannot be deleted — archive them instead.' : null"
             (triggered)="delete.emit(account())"
           >
-            <ng-icon hlm name="lucideTrash2" size="sm" />
+            <ng-icon name="lucideTrash2" class="text-[length:--spacing(4)]" />
             Delete
           </button>
         </hlm-dropdown-menu-group>

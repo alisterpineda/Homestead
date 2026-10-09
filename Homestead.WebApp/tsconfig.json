@@ -142,9 +142,6 @@
       ],
       "@/shared/components/spartan/toggle-group": [
         "./src/app/shared/components/spartan/toggle-group/src/index.ts"
-      ],
-      "@/shared/components/spartan/icon": [
-        "./src/app/shared/components/spartan/icon/src/index.ts"
       ]
     }
   },

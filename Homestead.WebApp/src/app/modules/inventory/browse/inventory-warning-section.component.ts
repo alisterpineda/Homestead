@@ -1,7 +1,6 @@
 import { Component, ChangeDetectionStrategy, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { NgIcon } from '@ng-icons/core';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 
 /**
  * One "needs attention" alert section: a flat header row (icon + label + count, optionally a
@@ -18,7 +17,7 @@ import { HlmIconImports } from '@/shared/components/spartan/icon';
 @Component({
   selector: 'app-inventory-warning-section',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, NgIcon, HlmIconImports],
+  imports: [RouterLink, NgIcon],
   template: `
     <section class="flex flex-col gap-2">
       @if (viewAllParams(); as params) {
@@ -27,16 +26,16 @@ import { HlmIconImports } from '@/shared/components/spartan/icon';
           routerLink="/inventory/items"
           [queryParams]="params"
         >
-          <ng-icon hlm [name]="icon()" size="sm" class="shrink-0 text-muted-foreground" />
+          <ng-icon [name]="icon()" class="text-[length:--spacing(4)] shrink-0 text-muted-foreground" />
           <h3 class="text-sm font-medium">{{ label() }}</h3>
           <span class="text-xs text-muted-foreground tabular-nums">{{ count() }}</span>
           <span class="ml-auto flex shrink-0 items-center gap-1 text-xs font-medium text-muted-foreground">
-            View all <ng-icon hlm name="lucideChevronRight" size="xs" />
+            View all <ng-icon name="lucideChevronRight" class="text-[length:--spacing(3)]" />
           </span>
         </a>
       } @else {
         <div class="flex items-center gap-2 py-1">
-          <ng-icon hlm [name]="icon()" size="sm" class="shrink-0 text-muted-foreground" />
+          <ng-icon [name]="icon()" class="text-[length:--spacing(4)] shrink-0 text-muted-foreground" />
           <h3 class="text-sm font-medium">{{ label() }}</h3>
           <span class="text-xs text-muted-foreground tabular-nums">{{ count() }}</span>
         </div>

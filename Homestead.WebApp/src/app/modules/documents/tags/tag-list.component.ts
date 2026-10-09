@@ -6,7 +6,6 @@ import { toObservable, toSignal, takeUntilDestroyed } from '@angular/core/rxjs-i
 import { switchMap, map, catchError, of, combineLatest, debounceTime, distinctUntilChanged, filter, take, firstValueFrom } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideTags, lucidePlus, lucideTrash2, lucideSlidersHorizontal, lucideEllipsisVertical, lucideArrowUp, lucideArrowDown } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { SearchInputComponent } from '@/shared/components/search-input/search-input.component';
@@ -36,7 +35,6 @@ import { toast } from '@spartan-ng/brain/sonner';
   imports: [
     NgIcon,
     NgTemplateOutlet,
-    HlmIconImports,
     HlmSpinner,
     HlmEmptyImports,
     SearchInputComponent,
@@ -82,7 +80,7 @@ import { toast } from '@spartan-ng/brain/sonner';
           @if (auth.canWrite()) {
             <div hlmEmptyContent>
               <app-create-tag-dialog (created)="onRefresh()">
-                <ng-icon hlm name="lucidePlus" size="sm" />
+                <ng-icon name="lucidePlus" class="text-[length:--spacing(4)]" />
                 New Tag
               </app-create-tag-dialog>
             </div>
@@ -95,7 +93,7 @@ import { toast } from '@spartan-ng/brain/sonner';
               <app-search-input class="flex-1 min-w-0" [(value)]="searchInput" placeholder="Search tags..." ariaLabel="Search tags" />
               <div class="flex items-center gap-2">
                 <button hlmBtn variant="outline" class="hidden sm:inline-flex" [hlmDropdownMenuTrigger]="sortMenu">
-                  <ng-icon hlm [name]="effectiveSortDir() === 'Asc' ? 'lucideArrowUp' : 'lucideArrowDown'" size="sm" />
+                  <ng-icon [name]="effectiveSortDir() === 'Asc' ? 'lucideArrowUp' : 'lucideArrowDown'" class="text-[length:--spacing(4)]" />
                   {{ sortLabel() }}
                 </button>
                 <ng-template #sortGroup>
@@ -127,7 +125,7 @@ import { toast } from '@spartan-ng/brain/sonner';
                   </hlm-dropdown-menu>
                 </ng-template>
                 <button hlmBtn variant="outline" class="hidden sm:inline-flex" [hlmDropdownMenuTrigger]="columnsMenu">
-                  <ng-icon hlm name="lucideSlidersHorizontal" size="sm" />
+                  <ng-icon name="lucideSlidersHorizontal" class="text-[length:--spacing(4)]" />
                   Columns
                 </button>
                 <ng-template #columnsContent>
@@ -146,7 +144,7 @@ import { toast } from '@spartan-ng/brain/sonner';
                 <!-- Mobile: Overflow menu (below sm) -->
                 <button hlmBtn variant="outline" size="icon" class="sm:hidden"
                         [hlmDropdownMenuTrigger]="overflowMenu" aria-label="More options">
-                  <ng-icon hlm name="lucideEllipsisVertical" size="sm" />
+                  <ng-icon name="lucideEllipsisVertical" class="text-[length:--spacing(4)]" />
                 </button>
                 <ng-template #overflowMenu>
                   <hlm-dropdown-menu class="w-44">
@@ -172,7 +170,7 @@ import { toast } from '@spartan-ng/brain/sonner';
                 </ng-template>
                 @if (auth.canWrite()) {
                   <app-create-tag-dialog (created)="onRefresh()">
-                    <ng-icon hlm name="lucidePlus" size="sm" />
+                    <ng-icon name="lucidePlus" class="text-[length:--spacing(4)]" />
                     New Tag
                   </app-create-tag-dialog>
                 }
@@ -191,7 +189,7 @@ import { toast } from '@spartan-ng/brain/sonner';
               </button>
               <hlm-alert-dialog>
                 <button hlmBtn variant="destructive" hlmAlertDialogTrigger>
-                  <ng-icon hlm name="lucideTrash2" size="sm" />
+                  <ng-icon name="lucideTrash2" class="text-[length:--spacing(4)]" />
                   Delete
                 </button>
                 <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">

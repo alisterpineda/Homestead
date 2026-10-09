@@ -35,7 +35,6 @@ import {
   lucideX,
 } from '@ng-icons/lucide';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
@@ -90,7 +89,7 @@ interface ActivityRowViewModel {
 @Component({
   selector: 'app-activity-shape-cell',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgIcon, HlmIconImports],
+  imports: [NgIcon],
   providers: [provideIcons({
     lucideArrowRightLeft, lucideScale, lucideFlag, lucideCircleDashed,
     lucideTrendingUp, lucideTrendingDown, lucideBanknote,
@@ -99,7 +98,7 @@ interface ActivityRowViewModel {
   template: `
     <div class="flex items-center gap-2">
       <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-        <ng-icon hlm [name]="context.row.original.iconName" size="sm" />
+        <ng-icon [name]="context.row.original.iconName" class="text-[length:--spacing(4)]" />
       </span>
       <div class="flex min-w-0 flex-col">
         <span class="text-sm">{{ context.row.original.shapeLabel }}</span>
@@ -158,7 +157,7 @@ interface ActivityTableMeta {
 @Component({
   selector: 'app-activity-actions-cell',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgIcon, HlmIconImports, HlmButton, HlmDropdownMenuImports],
+  imports: [NgIcon, HlmButton, HlmDropdownMenuImports],
   providers: [provideIcons({ lucideEllipsisVertical, lucidePaperclip })],
   template: `
     <div class="flex items-center justify-end gap-1">
@@ -167,7 +166,7 @@ interface ActivityTableMeta {
           class="inline-flex items-center gap-0.5 text-xs text-muted-foreground"
           [attr.aria-label]="tx.documentLinkCount + ' linked document' + (tx.documentLinkCount === 1 ? '' : 's')"
         >
-          <ng-icon hlm name="lucidePaperclip" size="sm" />
+          <ng-icon name="lucidePaperclip" class="text-[length:--spacing(4)]" />
           {{ tx.documentLinkCount }}
         </span>
       }
@@ -180,13 +179,13 @@ interface ActivityTableMeta {
         aria-label="Transaction actions"
         (click)="onTriggerClick($event)"
       >
-        <ng-icon hlm name="lucideEllipsisVertical" size="sm" />
+        <ng-icon name="lucideEllipsisVertical" class="text-[length:--spacing(4)]" />
       </button>
       <ng-template #menu>
         <hlm-dropdown-menu class="w-48">
           <hlm-dropdown-menu-group>
             <button hlmDropdownMenuItem (triggered)="onLinkedDocuments()">
-              <ng-icon hlm name="lucidePaperclip" size="sm" />
+              <ng-icon name="lucidePaperclip" class="text-[length:--spacing(4)]" />
               Linked documents
             </button>
           </hlm-dropdown-menu-group>
@@ -213,7 +212,7 @@ class ActivityActionsCell {
 @Component({
   selector: 'app-account-activity-tab',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgIcon, HlmIconImports, HlmButton, HlmSpinner, HlmEmptyImports, HlmTableImports, HlmAlertDialogImports, FlexRenderDirective, LinkedDocumentsDialogComponent],
+  imports: [NgIcon, HlmButton, HlmSpinner, HlmEmptyImports, HlmTableImports, HlmAlertDialogImports, FlexRenderDirective, LinkedDocumentsDialogComponent],
   providers: [provideIcons({
     lucideArrowRightLeft, lucideScale, lucideFlag, lucideCircleDashed,
     lucideTrendingUp, lucideTrendingDown, lucideBanknote,
@@ -259,7 +258,7 @@ class ActivityActionsCell {
               class="text-destructive hover:bg-destructive/10 hover:text-destructive"
               hlmAlertDialogTrigger
             >
-              <ng-icon hlm name="lucideTrash2" size="sm" />
+              <ng-icon name="lucideTrash2" class="text-[length:--spacing(4)]" />
               Delete
             </button>
             <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
@@ -295,7 +294,7 @@ class ActivityActionsCell {
             (click)="clearSelection()"
             aria-label="Clear selection"
           >
-            <ng-icon hlm name="lucideX" size="sm" />
+            <ng-icon name="lucideX" class="text-[length:--spacing(4)]" />
           </button>
         </div>
       }
@@ -356,12 +355,12 @@ class ActivityActionsCell {
         </p>
         <div class="flex items-center gap-2">
           <button hlmBtn variant="outline" size="sm" (click)="prevPage()" [disabled]="page() <= 1 || loading()">
-            <ng-icon hlm name="lucideChevronLeft" size="sm" />
+            <ng-icon name="lucideChevronLeft" class="text-[length:--spacing(4)]" />
             Prev
           </button>
           <button hlmBtn variant="outline" size="sm" (click)="nextPage()" [disabled]="page() >= totalPages() || loading()">
             Next
-            <ng-icon hlm name="lucideChevronRight" size="sm" />
+            <ng-icon name="lucideChevronRight" class="text-[length:--spacing(4)]" />
           </button>
         </div>
       </div>

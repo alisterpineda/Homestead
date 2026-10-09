@@ -12,7 +12,6 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucidePlus } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmDialogImports } from '@/shared/components/spartan/dialog';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmLabel } from '@/shared/components/spartan/label';
@@ -31,7 +30,7 @@ import type { BackupSourceKindResponse } from '@/api/generated/models/backup-sou
 @Component({
   selector: 'app-add-backup-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgIcon, HlmIconImports, HlmDialogImports, HlmButton, HlmLabel, HlmSelectImports],
+  imports: [NgIcon, HlmDialogImports, HlmButton, HlmLabel, HlmSelectImports],
   providers: [provideIcons({ lucidePlus })],
   template: `
     <hlm-dialog (stateChanged)="onStateChanged($event)">
@@ -43,7 +42,7 @@ import type { BackupSourceKindResponse } from '@/api/generated/models/backup-sou
         [disabled]="available().length === 0"
         [attr.data-testid]="'add-backup-' + targetKey()"
       >
-        <ng-icon hlm name="lucidePlus" size="sm" />
+        <ng-icon name="lucidePlus" class="text-[length:--spacing(4)]" />
         Add backup
       </button>
 

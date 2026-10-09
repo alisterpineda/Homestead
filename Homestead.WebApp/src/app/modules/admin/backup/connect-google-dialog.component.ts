@@ -13,7 +13,6 @@ import { lucideCopy, lucideExternalLink, lucideTriangleAlert } from '@ng-icons/l
 import { BrnDialog } from '@spartan-ng/brain/dialog';
 import { toast } from '@spartan-ng/brain/sonner';
 import { HlmDialogImports } from '@/shared/components/spartan/dialog';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { AdminBackupApiService } from '@/api/services/admin-backup-api.service';
@@ -25,7 +24,7 @@ export type ConnectStage = 'starting' | 'waiting' | 'mismatch' | 'expired' | 'de
 @Component({
   selector: 'app-connect-google-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgIcon, HlmDialogImports, HlmIconImports, HlmButton, HlmSpinner],
+  imports: [NgIcon, HlmDialogImports, HlmButton, HlmSpinner],
   providers: [provideIcons({ lucideCopy, lucideExternalLink, lucideTriangleAlert })],
   template: `
     <hlm-dialog (stateChanged)="onStateChanged($event)">
@@ -65,7 +64,7 @@ export type ConnectStage = 'starting' | 'waiting' | 'mismatch' | 'expired' | 'de
                     data-testid="connect-verification-url"
                   >
                     {{ verificationUrl() }}
-                    <ng-icon hlm name="lucideExternalLink" size="xs" />
+                    <ng-icon name="lucideExternalLink" class="text-[length:--spacing(3)]" />
                   </a>
                   on any device.
                 </li>
@@ -86,7 +85,7 @@ export type ConnectStage = 'starting' | 'waiting' | 'mismatch' | 'expired' | 'de
                       data-testid="connect-copy-code"
                       (click)="copyCode()"
                     >
-                      <ng-icon hlm name="lucideCopy" size="sm" />
+                      <ng-icon name="lucideCopy" class="text-[length:--spacing(4)]" />
                     </button>
                   </div>
                 </li>
@@ -107,7 +106,7 @@ export type ConnectStage = 'starting' | 'waiting' | 'mismatch' | 'expired' | 'de
           @case ('mismatch') {
             <div class="flex flex-col gap-4" data-testid="connect-mismatch">
               <p class="flex items-start gap-2 text-sm text-destructive">
-                <ng-icon hlm name="lucideTriangleAlert" size="sm" class="mt-0.5 shrink-0" />
+                <ng-icon name="lucideTriangleAlert" class="text-[length:--spacing(4)] mt-0.5 shrink-0" />
                 <span>
                   You approved <span class="font-medium">{{ pendingEmail() }}</span
                   >, but this target is connected to

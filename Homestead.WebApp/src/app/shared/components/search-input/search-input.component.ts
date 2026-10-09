@@ -1,7 +1,6 @@
 import { ChangeDetectionStrategy, Component, input, model } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideSearch } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmInputGroupImports } from '@/shared/components/spartan/input-group';
 
 /**
@@ -17,13 +16,13 @@ import { HlmInputGroupImports } from '@/shared/components/spartan/input-group';
 @Component({
   selector: 'app-search-input',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgIcon, HlmIconImports, HlmInputGroupImports],
+  imports: [NgIcon, HlmInputGroupImports],
   providers: [provideIcons({ lucideSearch })],
   host: { class: 'block min-w-0' },
   template: `
     <hlm-input-group>
       <hlm-input-group-addon>
-        <ng-icon hlm name="lucideSearch" size="sm" />
+        <ng-icon name="lucideSearch" class="text-[length:--spacing(4)]" />
       </hlm-input-group-addon>
       <input
         hlmInputGroupInput

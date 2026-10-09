@@ -2,7 +2,6 @@ import { Component, ChangeDetectionStrategy, inject, signal, computed, input, ou
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideUserPlus } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmDialogImports } from '@/shared/components/spartan/dialog';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { SearchInputComponent } from '@/shared/components/search-input/search-input.component';
@@ -19,12 +18,12 @@ import { toast } from '@spartan-ng/brain/sonner';
 @Component({
   selector: 'app-add-member-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgIcon, HlmIconImports, HlmDialogImports, HlmButton, SearchInputComponent, HlmLabel, HlmSelectImports, ],
+  imports: [NgIcon, HlmDialogImports, HlmButton, SearchInputComponent, HlmLabel, HlmSelectImports, ],
   providers: [provideIcons({ lucideUserPlus })],
   template: `
     <hlm-dialog (stateChanged)="onStateChanged($event)">
       <button hlmBtn size="sm" hlmDialogTrigger>
-        <ng-icon hlm name="lucideUserPlus" size="sm" class="mr-1" />
+        <ng-icon name="lucideUserPlus" class="text-[length:--spacing(4)] mr-1" />
         Add Member
       </button>
 

@@ -4,7 +4,6 @@ import { of } from 'rxjs';
 import { map, debounceTime, switchMap, catchError } from 'rxjs/operators';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideFileText } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { SearchInputComponent } from '@/shared/components/search-input/search-input.component';
 import { DocumentApiService } from '@/api/services/document-api.service';
 import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-response';
@@ -18,7 +17,7 @@ import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-
 @Component({
   selector: 'app-document-picker',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgIcon, HlmIconImports, SearchInputComponent],
+  imports: [NgIcon, SearchInputComponent],
   providers: [provideIcons({ lucideFileText })],
   template: `
     <app-search-input [(value)]="search" placeholder="Search documents…" />
@@ -36,7 +35,7 @@ import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-
                 class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-accent"
                 (click)="documentSelected.emit(doc)"
               >
-                <ng-icon hlm name="lucideFileText" size="sm" class="text-muted-foreground" />
+                <ng-icon name="lucideFileText" class="text-[length:--spacing(4)] text-muted-foreground" />
                 <span class="truncate">{{ doc.name }}</span>
               </button>
             </li>

@@ -22,7 +22,6 @@ import {
   lucideShieldCheck,
   lucideTrash2,
 } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog';
@@ -65,7 +64,6 @@ import { toast } from '@spartan-ng/brain/sonner';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     NgIcon,
-    HlmIconImports,
     HlmButton,
     HlmSpinner,
     HlmAlertDialogImports,
@@ -121,7 +119,7 @@ import { toast } from '@spartan-ng/brain/sonner';
                 } @else {
                   <div class="flex items-center gap-2.5 px-4 py-2.5">
                     <div class="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted">
-                      <ng-icon hlm size="xs" name="lucideShieldCheck" />
+                      <ng-icon class="text-[length:--spacing(3)]" name="lucideShieldCheck" />
                     </div>
                     <div class="min-w-0 flex-1">
                       <div class="flex flex-wrap items-baseline gap-x-2">
@@ -146,17 +144,17 @@ import { toast } from '@spartan-ng/brain/sonner';
                       [hlmDropdownMenuTrigger]="rowMenu"
                       aria-label="Warranty actions"
                     >
-                      <ng-icon hlm name="lucideEllipsisVertical" size="sm" />
+                      <ng-icon name="lucideEllipsisVertical" class="text-[length:--spacing(4)]" />
                     </button>
                     <ng-template #rowMenu>
                       <hlm-dropdown-menu class="w-36">
                         <hlm-dropdown-menu-group>
                           <button hlmDropdownMenuItem (triggered)="startEdit(row)">
-                            <ng-icon hlm name="lucidePencil" size="sm" />
+                            <ng-icon name="lucidePencil" class="text-[length:--spacing(4)]" />
                             Edit
                           </button>
                           <button hlmDropdownMenuItem variant="destructive" (triggered)="onDeleteRequest(row)">
-                            <ng-icon hlm name="lucideTrash2" size="sm" />
+                            <ng-icon name="lucideTrash2" class="text-[length:--spacing(4)]" />
                             Delete
                           </button>
                         </hlm-dropdown-menu-group>

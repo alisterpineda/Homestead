@@ -2,7 +2,6 @@ import { Component, ChangeDetectionStrategy, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideTrendingUp, lucideCircleAlert } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { HlmButton } from '@/shared/components/spartan/button';
 
@@ -11,7 +10,7 @@ export type NetWorthEmptyReason = 'no_transactions' | 'no_display_currency';
 @Component({
   selector: 'app-net-worth-empty-state',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, NgIcon, HlmIconImports, HlmEmptyImports, HlmButton],
+  imports: [RouterLink, NgIcon, HlmEmptyImports, HlmButton],
   providers: [provideIcons({ lucideTrendingUp, lucideCircleAlert })],
   template: `
     <div hlmEmpty>

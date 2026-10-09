@@ -12,7 +12,6 @@ import { toObservable, toSignal, takeUntilDestroyed } from '@angular/core/rxjs-i
 import { switchMap, of, map, catchError, debounceTime } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideX } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmDialogImports } from '@/shared/components/spartan/dialog';
 import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog';
 import { HlmCheckboxImports } from '@/shared/components/spartan/checkbox';
@@ -45,7 +44,6 @@ import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     NgIcon,
-    HlmIconImports,
     HlmDialogImports,
     HlmAlertDialogImports,
     HlmCheckboxImports,
@@ -79,7 +77,7 @@ import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
                 <span hlmBadge variant="secondary" class="gap-1">
                   {{ item.name }}
                   <button type="button" class="ml-0.5 rounded-full hover:text-foreground" (click)="deselect(item.id)" [attr.aria-label]="'Remove ' + item.name">
-                    <ng-icon hlm name="lucideX" size="xs" />
+                    <ng-icon name="lucideX" class="text-[length:--spacing(3)]" />
                   </button>
                 </span>
               }

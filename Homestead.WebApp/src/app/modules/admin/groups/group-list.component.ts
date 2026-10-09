@@ -5,7 +5,6 @@ import { switchMap, map, combineLatest } from 'rxjs';
 import { debounceTime, distinctUntilChanged, filter } from 'rxjs/operators';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideUsers2, lucidePlus } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { SearchInputComponent } from '@/shared/components/search-input/search-input.component';
@@ -21,7 +20,7 @@ import { handleQueryError } from '@/shared/utils/rxjs-error.utils';
   selector: 'app-group-list',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    NgIcon, HlmIconImports, HlmSpinner, HlmEmptyImports, SearchInputComponent,
+    NgIcon, HlmSpinner, HlmEmptyImports, SearchInputComponent,
     HlmTableImports, HlmBadge, PaginationComponent, CreateGroupDialogComponent,
   ],
   providers: [provideIcons({ lucideUsers2, lucidePlus })],
@@ -50,7 +49,7 @@ import { handleQueryError } from '@/shared/utils/rxjs-error.utils';
         <div class="flex items-center gap-2 mb-4 shrink-0">
           <app-search-input class="flex-1" [(value)]="searchInput" placeholder="Search groups..." ariaLabel="Search groups" />
           <app-create-group-dialog (created)="onRefresh()">
-            <ng-icon hlm name="lucidePlus" size="sm" class="mr-1" />
+            <ng-icon name="lucidePlus" class="text-[length:--spacing(4)] mr-1" />
             Create Group
           </app-create-group-dialog>
         </div>

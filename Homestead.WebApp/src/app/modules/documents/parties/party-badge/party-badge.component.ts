@@ -2,12 +2,11 @@ import { Component, ChangeDetectionStrategy, input, output } from '@angular/core
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideX, lucideSparkles, lucideCheck } from '@ng-icons/lucide';
 import { HlmBadge } from '@/shared/components/spartan/badge';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 
 @Component({
   selector: 'app-party-badge',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgIcon, HlmIconImports, HlmBadge],
+  imports: [NgIcon, HlmBadge],
   providers: [provideIcons({ lucideX, lucideSparkles, lucideCheck })],
   styles: `
     :host {
@@ -34,7 +33,7 @@ import { HlmIconImports } from '@/shared/components/spartan/icon';
       class="gap-1 max-w-full min-w-0"
     >
       @if (aiSuggested()) {
-        <ng-icon hlm name="lucideSparkles" class="shrink-0" size="xs" />
+        <ng-icon name="lucideSparkles" class="text-[length:--spacing(3)] shrink-0" />
       }
       <span class="truncate">{{ name() }}</span>
       @if (aiSuggested() && !aiTransient()) {
@@ -44,7 +43,7 @@ import { HlmIconImports } from '@/shared/components/spartan/icon';
           class="ml-0.5 flex h-5 w-5 cursor-pointer items-center justify-center rounded hover:bg-muted-foreground/20"
           aria-label="Approve suggestion"
         >
-          <ng-icon hlm name="lucideCheck" size="xs" />
+          <ng-icon name="lucideCheck" class="text-[length:--spacing(3)]" />
         </button>
         <button
           type="button"
@@ -52,7 +51,7 @@ import { HlmIconImports } from '@/shared/components/spartan/icon';
           class="flex h-5 w-5 cursor-pointer items-center justify-center rounded hover:bg-muted-foreground/20"
           aria-label="Decline suggestion"
         >
-          <ng-icon hlm name="lucideX" size="xs" />
+          <ng-icon name="lucideX" class="text-[length:--spacing(3)]" />
         </button>
       } @else if ((aiSuggested() && aiTransient()) || removable()) {
         <button
@@ -61,7 +60,7 @@ import { HlmIconImports } from '@/shared/components/spartan/icon';
           class="ml-0.5 cursor-pointer rounded hover:bg-muted-foreground/20"
           aria-label="Remove party"
         >
-          <ng-icon hlm name="lucideX" size="xs" />
+          <ng-icon name="lucideX" class="text-[length:--spacing(3)]" />
         </button>
       }
     </span>

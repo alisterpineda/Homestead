@@ -7,7 +7,6 @@ import {
   lucideShieldAlert,
   lucideUserRound,
 } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmCollapsibleImports } from '@/shared/components/spartan/collapsible';
 import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
 import { InventoryWarningSectionComponent } from './inventory-warning-section.component';
@@ -55,7 +54,6 @@ export type WarningPanelsScope =
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     NgIcon,
-    HlmIconImports,
     HlmCollapsibleImports,
     InventoryWarningSectionComponent,
     UnitPipe,
@@ -74,7 +72,7 @@ export type WarningPanelsScope =
           hlmCollapsibleTrigger
           class="flex w-full items-center gap-2 px-4 py-3 text-left text-sm transition-colors hover:bg-accent rounded-lg data-[state=open]:rounded-b-none"
         >
-          <ng-icon hlm name="lucideTriangleAlert" size="sm" class="shrink-0 text-muted-foreground" />
+          <ng-icon name="lucideTriangleAlert" class="text-[length:--spacing(4)] shrink-0 text-muted-foreground" />
           <span class="font-medium">Needs attention</span>
           <span
             class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground tabular-nums"
@@ -82,16 +80,14 @@ export type WarningPanelsScope =
           >
             @for (part of summaryParts(); track part.label) {
               <span class="flex items-center gap-1">
-                <ng-icon hlm [name]="part.icon" size="xs" />
+                <ng-icon [name]="part.icon" class="text-[length:--spacing(3)]" />
                 {{ part.count }} {{ part.label }}
               </span>
             }
           </span>
           <ng-icon
-            hlm
             name="lucideChevronRight"
-            size="sm"
-            class="ml-auto shrink-0 text-muted-foreground transition-transform"
+            class="text-[length:--spacing(4)] ml-auto shrink-0 text-muted-foreground transition-transform"
             [class.rotate-90]="expanded()"
           />
         </button>

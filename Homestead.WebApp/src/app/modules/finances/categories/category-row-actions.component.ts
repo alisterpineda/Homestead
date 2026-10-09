@@ -1,7 +1,6 @@
 import { Component, ChangeDetectionStrategy, input, output } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideEllipsisVertical, lucidePencil, lucideTrash2 } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-menu';
 import type { CategoryResponse } from '@/api/generated/models/category-response';
@@ -9,7 +8,7 @@ import type { CategoryResponse } from '@/api/generated/models/category-response'
 @Component({
   selector: 'app-category-row-actions',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgIcon, HlmIconImports, HlmButton, HlmDropdownMenuImports],
+  imports: [NgIcon, HlmButton, HlmDropdownMenuImports],
   providers: [provideIcons({ lucideEllipsisVertical, lucidePencil, lucideTrash2 })],
   template: `
     <button
@@ -20,18 +19,18 @@ import type { CategoryResponse } from '@/api/generated/models/category-response'
       aria-label="Category actions"
       (click)="$event.stopPropagation()"
     >
-      <ng-icon hlm name="lucideEllipsisVertical" size="sm" />
+      <ng-icon name="lucideEllipsisVertical" class="text-[length:--spacing(4)]" />
     </button>
     <ng-template #menu>
       <hlm-dropdown-menu class="w-44">
         <hlm-dropdown-menu-group>
           <button hlmDropdownMenuItem (triggered)="edit.emit(category())">
-            <ng-icon hlm name="lucidePencil" size="sm" />
+            <ng-icon name="lucidePencil" class="text-[length:--spacing(4)]" />
             Edit
           </button>
           <hlm-dropdown-menu-separator />
           <button hlmDropdownMenuItem variant="destructive" (triggered)="delete.emit(category())">
-            <ng-icon hlm name="lucideTrash2" size="sm" />
+            <ng-icon name="lucideTrash2" class="text-[length:--spacing(4)]" />
             Delete
           </button>
         </hlm-dropdown-menu-group>

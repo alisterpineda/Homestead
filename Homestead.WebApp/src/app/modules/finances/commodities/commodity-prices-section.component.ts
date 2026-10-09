@@ -18,7 +18,6 @@ import {
   lucideListFilter,
   lucideTrash2,
 } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
@@ -68,7 +67,6 @@ type DatePreset = 'last30' | 'thisMonth' | 'ytd' | 'lastYear';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     NgIcon,
-    HlmIconImports,
     HlmButton,
     HlmSpinner,
     HlmEmptyImports,
@@ -100,7 +98,7 @@ type DatePreset = 'last30' | 'thisMonth' | 'ytd' | 'lastYear';
         >
         <div hlmPopover>
           <button hlmPopoverTrigger hlmBtn variant="outline">
-            <ng-icon hlm name="lucideListFilter" size="sm" class="text-muted-foreground" />
+            <ng-icon name="lucideListFilter" class="text-[length:--spacing(4)] text-muted-foreground" />
             {{ filterTriggerLabel() }}
           </button>
           <div hlmPopoverContent *hlmPopoverPortal class="w-[300px] p-0" align="start">
@@ -196,7 +194,7 @@ type DatePreset = 'last30' | 'thisMonth' | 'ytd' | 'lastYear';
           </div>
         </div>
         <app-new-price-dialog [commodity]="commodity()" (created)="onChanged()">
-          <ng-icon hlm name="lucidePlus" size="sm" />
+          <ng-icon name="lucidePlus" class="text-[length:--spacing(4)]" />
           New manual price
         </app-new-price-dialog>
         </div>
@@ -217,7 +215,7 @@ type DatePreset = 'last30' | 'thisMonth' | 'ytd' | 'lastYear';
               class="text-destructive hover:bg-destructive/10 hover:text-destructive"
               hlmAlertDialogTrigger
             >
-              <ng-icon hlm name="lucideTrash2" size="sm" />
+              <ng-icon name="lucideTrash2" class="text-[length:--spacing(4)]" />
               Delete
             </button>
             <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">

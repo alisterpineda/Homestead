@@ -15,7 +15,6 @@ import {
 import { formatDate } from '@angular/common';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideCalendar, lucideMessageSquareText, lucideSend } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmInputGroupImports } from '@/shared/components/spartan/input-group';
 import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-menu';
@@ -66,7 +65,7 @@ const MAX_NOTES = 500;
 @Component({
   selector: 'app-item-warranty-composer',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgIcon, HlmIconImports, HlmButton, HlmInputGroupImports, HlmDropdownMenuImports],
+  imports: [NgIcon, HlmButton, HlmInputGroupImports, HlmDropdownMenuImports],
   providers: [provideIcons({ lucideCalendar, lucideMessageSquareText, lucideSend })],
   template: `
     <!-- flex-wrap carries the notes line onto its own row, and in edit mode lets Cancel / Save drop
@@ -87,7 +86,7 @@ const MAX_NOTES = 500;
           [hlmDropdownMenuTrigger]="expiryMenu"
           (click)="refreshToday()"
         >
-          <ng-icon hlm name="lucideCalendar" size="sm" />
+          <ng-icon name="lucideCalendar" class="text-[length:--spacing(4)]" />
           {{ chipLabel() }}
         </button>
         <ng-template #expiryMenu>
@@ -144,7 +143,7 @@ const MAX_NOTES = 500;
               [disabled]="disabled()"
               (click)="revealNotes()"
             >
-              <ng-icon hlm name="lucideMessageSquareText" size="sm" />
+              <ng-icon name="lucideMessageSquareText" class="text-[length:--spacing(4)]" />
             </button>
           }
           @if (mode() === 'create') {
@@ -156,7 +155,7 @@ const MAX_NOTES = 500;
               [disabled]="!canSubmit()"
               (click)="submit()"
             >
-              <ng-icon hlm name="lucideSend" size="sm" />
+              <ng-icon name="lucideSend" class="text-[length:--spacing(4)]" />
             </button>
           }
         </hlm-input-group-addon>

@@ -4,14 +4,13 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { filter, map } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucidePackage, lucideMapPin, lucideCompass, lucideTags, lucideBookmark } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSidebarImports } from '@/shared/components/spartan/sidebar';
 import { isNavItemActive } from '@/shared/utils';
 
 @Component({
   selector: 'app-inventory-sidebar',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, NgIcon, HlmIconImports, HlmSidebarImports],
+  imports: [RouterLink, NgIcon, HlmSidebarImports],
   providers: [provideIcons({ lucidePackage, lucideMapPin, lucideCompass, lucideTags, lucideBookmark })],
   template: `
     <div hlmSidebarGroup>
@@ -19,7 +18,7 @@ import { isNavItemActive } from '@/shared/utils';
         <ul hlmSidebarMenu>
           <li hlmSidebarMenuItem>
             <a hlmSidebarMenuButton routerLink="/inventory/browse" [isActive]="isActive('/inventory/browse')">
-              <ng-icon hlm name="lucideCompass" size="sm" />
+              <ng-icon name="lucideCompass" class="text-[length:--spacing(4)]" />
               <span>Browse</span>
             </a>
           </li>
@@ -33,25 +32,25 @@ import { isNavItemActive } from '@/shared/utils';
         <ul hlmSidebarMenu>
           <li hlmSidebarMenuItem>
             <a hlmSidebarMenuButton routerLink="/inventory/items" [isActive]="isActive('/inventory/items')">
-              <ng-icon hlm name="lucidePackage" size="sm" />
+              <ng-icon name="lucidePackage" class="text-[length:--spacing(4)]" />
               <span>Items</span>
             </a>
           </li>
           <li hlmSidebarMenuItem>
             <a hlmSidebarMenuButton routerLink="/inventory/areas" [isActive]="isActive('/inventory/areas')">
-              <ng-icon hlm name="lucideMapPin" size="sm" />
+              <ng-icon name="lucideMapPin" class="text-[length:--spacing(4)]" />
               <span>Areas</span>
             </a>
           </li>
           <li hlmSidebarMenuItem>
             <a hlmSidebarMenuButton routerLink="/inventory/tags" [isActive]="isActive('/inventory/tags')">
-              <ng-icon hlm name="lucideTags" size="sm" />
+              <ng-icon name="lucideTags" class="text-[length:--spacing(4)]" />
               <span>Tags</span>
             </a>
           </li>
           <li hlmSidebarMenuItem>
             <a hlmSidebarMenuButton routerLink="/inventory/brands" [isActive]="isActive('/inventory/brands')">
-              <ng-icon hlm name="lucideBookmark" size="sm" />
+              <ng-icon name="lucideBookmark" class="text-[length:--spacing(4)]" />
               <span>Brands</span>
             </a>
           </li>

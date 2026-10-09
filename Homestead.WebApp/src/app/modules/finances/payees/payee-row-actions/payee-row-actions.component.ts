@@ -1,7 +1,6 @@
 import { Component, ChangeDetectionStrategy, computed, input, output } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideEllipsisVertical, lucidePencil, lucideMerge, lucideTrash2 } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-menu';
 import type { PayeeResponse } from '@/api/generated/models/payee-response';
@@ -9,7 +8,7 @@ import type { PayeeResponse } from '@/api/generated/models/payee-response';
 @Component({
   selector: 'app-payee-row-actions',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgIcon, HlmIconImports, HlmButton, HlmDropdownMenuImports],
+  imports: [NgIcon, HlmButton, HlmDropdownMenuImports],
   providers: [provideIcons({ lucideEllipsisVertical, lucidePencil, lucideMerge, lucideTrash2 })],
   template: `
     <button
@@ -21,17 +20,17 @@ import type { PayeeResponse } from '@/api/generated/models/payee-response';
       aria-label="Payee actions"
       (click)="onTriggerClick($event)"
     >
-      <ng-icon hlm name="lucideEllipsisVertical" size="sm" />
+      <ng-icon name="lucideEllipsisVertical" class="text-[length:--spacing(4)]" />
     </button>
     <ng-template #menu>
       <hlm-dropdown-menu class="w-44">
         <hlm-dropdown-menu-group>
           <button hlmDropdownMenuItem (triggered)="edit.emit(payee())">
-            <ng-icon hlm name="lucidePencil" size="sm" />
+            <ng-icon name="lucidePencil" class="text-[length:--spacing(4)]" />
             Edit
           </button>
           <button hlmDropdownMenuItem (triggered)="merge.emit(payee())">
-            <ng-icon hlm name="lucideMerge" size="sm" />
+            <ng-icon name="lucideMerge" class="text-[length:--spacing(4)]" />
             Merge into…
           </button>
           <hlm-dropdown-menu-separator />
@@ -42,7 +41,7 @@ import type { PayeeResponse } from '@/api/generated/models/payee-response';
             [title]="deleteTitle()"
             (triggered)="delete.emit(payee())"
           >
-            <ng-icon hlm name="lucideTrash2" size="sm" />
+            <ng-icon name="lucideTrash2" class="text-[length:--spacing(4)]" />
             Delete
           </button>
         </hlm-dropdown-menu-group>

@@ -1,7 +1,6 @@
 import { Component, ChangeDetectionStrategy, computed, inject, signal, OnInit } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideSparkles, lucideCircleCheck, lucideCircleX, lucideTriangleAlert } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmCardImports } from '@/shared/components/spartan/card';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
@@ -16,7 +15,7 @@ import type { TestAiConnectionResponse } from '@/api/generated/models/test-ai-co
   selector: 'app-ai-status',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    NgIcon, HlmIconImports, HlmCardImports, HlmButton, HlmSpinner, HlmBadge, HlmEmptyImports,
+    NgIcon, HlmCardImports, HlmButton, HlmSpinner, HlmBadge, HlmEmptyImports,
   ],
   providers: [provideIcons({ lucideSparkles, lucideCircleCheck, lucideCircleX, lucideTriangleAlert })],
   template: `
@@ -69,7 +68,7 @@ import type { TestAiConnectionResponse } from '@/api/generated/models/test-ai-co
             <div hlmCardContent class="flex flex-col">
               @if (noDefault()) {
                 <p class="mb-4 flex items-start gap-2 rounded-md border border-destructive/50 p-3 text-sm text-destructive">
-                  <ng-icon hlm name="lucideTriangleAlert" size="sm" class="mt-0.5 shrink-0" />
+                  <ng-icon name="lucideTriangleAlert" class="text-[length:--spacing(4)] mt-0.5 shrink-0" />
                   <span>
                     No default provider is selected, so AI features are <strong>disabled</strong> even though
                     providers are configured — with more than one provider,
@@ -128,12 +127,12 @@ import type { TestAiConnectionResponse } from '@/api/generated/models/test-ai-co
                     @if (testResults()[p.key]; as r) {
                       @if (r.success) {
                         <p class="flex items-center gap-2 text-sm text-muted-foreground">
-                          <ng-icon hlm name="lucideCircleCheck" size="sm" class="text-primary" />
+                          <ng-icon name="lucideCircleCheck" class="text-[length:--spacing(4)] text-primary" />
                           <span>{{ r.message }}{{ r.latencyMs != null ? ' (' + r.latencyMs + ' ms)' : '' }}</span>
                         </p>
                       } @else {
                         <p class="flex items-center gap-2 text-sm text-destructive">
-                          <ng-icon hlm name="lucideCircleX" size="sm" />
+                          <ng-icon name="lucideCircleX" class="text-[length:--spacing(4)]" />
                           <span>{{ r.message }}</span>
                         </p>
                       }

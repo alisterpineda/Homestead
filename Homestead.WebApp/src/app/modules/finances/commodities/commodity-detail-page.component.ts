@@ -13,7 +13,6 @@ import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-i
 import { switchMap, map, filter, combineLatest, catchError } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucidePencil, lucideCircleAlert } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
@@ -33,7 +32,6 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
   imports: [
     RouterLink,
     NgIcon,
-    HlmIconImports,
     HlmButton,
     HlmSpinner,
     HlmEmptyImports,
@@ -65,7 +63,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
       @if (commodity(); as c) {
         @if (!c.isSystemManaged) {
           <button hlmBtn variant="outline" (click)="openEdit()">
-            <ng-icon hlm name="lucidePencil" size="sm" />
+            <ng-icon name="lucidePencil" class="text-[length:--spacing(4)]" />
             Edit
           </button>
         }

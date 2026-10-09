@@ -19,7 +19,6 @@ import {
   lucideEllipsisVertical,
   lucidePencil,
 } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
@@ -49,7 +48,6 @@ interface PositionRow {
   imports: [
     RouterLink,
     NgIcon,
-    HlmIconImports,
     HlmButton,
     HlmSpinner,
     HlmEmptyImports,
@@ -139,13 +137,13 @@ interface PositionRow {
                     [hlmDropdownMenuTrigger]="rowMenu"
                     [attr.aria-label]="'Position actions for ' + (row.commodity?.symbol ?? '')"
                   >
-                    <ng-icon hlm name="lucideEllipsisVertical" size="sm" />
+                    <ng-icon name="lucideEllipsisVertical" class="text-[length:--spacing(4)]" />
                   </button>
                   <ng-template #rowMenu>
                     <hlm-dropdown-menu class="w-52">
                       <hlm-dropdown-menu-group>
                         <button hlmDropdownMenuItem (triggered)="onEditOpeningBalance(row.position.commodityId)">
-                          <ng-icon hlm name="lucidePencil" size="sm" />
+                          <ng-icon name="lucidePencil" class="text-[length:--spacing(4)]" />
                           Edit opening balance
                         </button>
                       </hlm-dropdown-menu-group>

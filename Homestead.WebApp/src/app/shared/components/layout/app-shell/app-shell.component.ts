@@ -11,7 +11,6 @@ import {
   lucideSunMoon,
   lucideSearch,
 } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmSidebarImports } from '@/shared/components/spartan/sidebar';
 import { HlmSeparator } from '@/shared/components/spartan/separator';
@@ -37,7 +36,6 @@ import { getModuleByPath } from '@/modules/registry';
     NgComponentOutlet,
     NgTemplateOutlet,
     NgIcon,
-    HlmIconImports,
     HlmButton,
     HlmSidebarImports,
     HlmSeparator,
@@ -81,7 +79,7 @@ import { getModuleByPath } from '@/modules/registry';
                   <p class="truncate text-sm font-medium">{{ auth.userName() }}</p>
                   <p class="truncate text-xs text-sidebar-foreground/70">{{ auth.userEmail() }}</p>
                 </div>
-                <ng-icon hlm name="lucideEllipsisVertical" size="sm" class="ml-auto" />
+                <ng-icon name="lucideEllipsisVertical" class="text-[length:--spacing(4)] ml-auto" />
               </button>
 
               <ng-template #userMenu>
@@ -103,18 +101,18 @@ import { getModuleByPath } from '@/modules/registry';
                   <hlm-dropdown-menu-separator />
                   <hlm-dropdown-menu-group>
                     <button hlmDropdownMenuItem class="gap-2" (triggered)="profileDialog.open()">
-                      <ng-icon hlm name="lucideCircleUserRound" size="sm" />
+                      <ng-icon name="lucideCircleUserRound" class="text-[length:--spacing(4)]" />
                       Profile
                     </button>
                     <button hlmDropdownMenuItem class="gap-2" (triggered)="themeDialog.open()">
-                      <ng-icon hlm name="lucideSunMoon" size="sm" />
+                      <ng-icon name="lucideSunMoon" class="text-[length:--spacing(4)]" />
                       Theme
                     </button>
                   </hlm-dropdown-menu-group>
                   <hlm-dropdown-menu-separator />
                   <hlm-dropdown-menu-group>
                     <button hlmDropdownMenuItem class="gap-2" (triggered)="onLogoutRequest()">
-                      <ng-icon hlm name="lucideLogOut" size="sm" />
+                      <ng-icon name="lucideLogOut" class="text-[length:--spacing(4)]" />
                       Log out
                     </button>
                   </hlm-dropdown-menu-group>
@@ -169,7 +167,7 @@ import { getModuleByPath } from '@/modules/registry';
               class="hidden h-8 w-64 items-center gap-2 rounded-md border border-input bg-transparent px-3 text-sm text-muted-foreground shadow-xs transition-colors hover:bg-accent/50 md:flex"
               aria-label="Search"
             >
-              <ng-icon hlm name="lucideSearch" size="sm" />
+              <ng-icon name="lucideSearch" class="text-[length:--spacing(4)]" />
               <span>Search…</span>
               <kbd
                 class="ml-auto hidden items-center gap-0.5 rounded border border-border bg-background px-1.5 font-mono text-[10px] font-medium text-muted-foreground lg:inline-flex"
@@ -186,7 +184,7 @@ import { getModuleByPath } from '@/modules/registry';
               class="flex md:hidden"
               aria-label="Search"
             >
-              <ng-icon hlm name="lucideSearch" size="sm" />
+              <ng-icon name="lucideSearch" class="text-[length:--spacing(4)]" />
             </button>
 
             @if (headerSecondaryActions()) {

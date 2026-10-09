@@ -13,7 +13,6 @@ import {
 import { formatDate } from '@angular/common';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideCalendar, lucideSend } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmInputGroupImports } from '@/shared/components/spartan/input-group';
 import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
@@ -46,7 +45,7 @@ const MAX_BODY = 4000;
 @Component({
   selector: 'app-item-note-composer',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgIcon, HlmIconImports, HlmButton, HlmInputGroupImports],
+  imports: [NgIcon, HlmButton, HlmInputGroupImports],
   providers: [provideIcons({ lucideCalendar, lucideSend })],
   template: `
     <!-- flex-wrap only matters in edit mode, where Cancel / Save can drop to their own line at
@@ -65,7 +64,7 @@ const MAX_BODY = 4000;
           [attr.aria-label]="'Date: ' + chipLabel()"
           (click)="openPicker()"
         >
-          <ng-icon hlm name="lucideCalendar" size="sm" />
+          <ng-icon name="lucideCalendar" class="text-[length:--spacing(4)]" />
           {{ chipLabel() }}
         </button>
         <input
@@ -108,7 +107,7 @@ const MAX_BODY = 4000;
               [disabled]="!canSubmit()"
               (click)="submit()"
             >
-              <ng-icon hlm name="lucideSend" size="sm" />
+              <ng-icon name="lucideSend" class="text-[length:--spacing(4)]" />
             </button>
           </hlm-input-group-addon>
         }

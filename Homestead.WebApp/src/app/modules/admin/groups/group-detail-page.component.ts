@@ -4,7 +4,6 @@ import { toObservable, toSignal, takeUntilDestroyed } from '@angular/core/rxjs-i
 import { switchMap, map, catchError, of, combineLatest } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideUsers2, lucideEdit, lucideTrash2, lucideShield, lucidePen, lucideEye } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmTableImports } from '@/shared/components/spartan/table';
@@ -25,7 +24,7 @@ import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
   selector: 'app-group-detail-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    NgIcon, HlmIconImports, HlmSpinner, HlmButton, HlmTableImports,
+    NgIcon, HlmSpinner, HlmButton, HlmTableImports,
     HlmAlertDialogImports, HlmSelectImports,     EditGroupSheetComponent, AddMemberDialogComponent,
   ],
   providers: [provideIcons({ lucideUsers2, lucideEdit, lucideTrash2, lucideShield, lucidePen, lucideEye })],
@@ -47,12 +46,12 @@ import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
           </div>
           <div class="flex items-center gap-2">
             <button hlmBtn variant="outline" size="sm" (click)="openEditSheet()">
-              <ng-icon hlm name="lucideEdit" size="sm" class="mr-1" />
+              <ng-icon name="lucideEdit" class="text-[length:--spacing(4)] mr-1" />
               Edit
             </button>
             <hlm-alert-dialog>
               <button hlmBtn variant="destructive" size="sm" hlmAlertDialogTrigger>
-                <ng-icon hlm name="lucideTrash2" size="sm" class="mr-1" />
+                <ng-icon name="lucideTrash2" class="text-[length:--spacing(4)] mr-1" />
                 Delete
               </button>
               <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
@@ -117,7 +116,7 @@ import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
                           <button hlmBtn variant="ghost" size="icon"
                             (click)="onRemoveMember(g.id, member.userId, member.displayName)"
                             [attr.aria-label]="'Remove ' + member.displayName">
-                            <ng-icon hlm name="lucideTrash2" size="sm" class="text-destructive" />
+                            <ng-icon name="lucideTrash2" class="text-[length:--spacing(4)] text-destructive" />
                           </button>
                         </td>
                       </tr>

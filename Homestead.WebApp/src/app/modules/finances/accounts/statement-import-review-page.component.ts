@@ -38,7 +38,6 @@ import { HlmButtonGroupImports } from '@/shared/components/spartan/button-group'
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmLabel } from '@/shared/components/spartan/label';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmResizableImports } from '@/shared/components/spartan/resizable';
 import { HlmTabsImports } from '@/shared/components/spartan/tabs';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
@@ -146,7 +145,6 @@ function sameCategory(a: LineCategory | null, b: LineCategory | null): boolean {
     HlmInput,
     MoneyInputDirective,
     HlmLabel,
-    HlmIconImports,
     HlmResizableImports,
     HlmTabsImports,
     HlmEmptyImports,
@@ -258,7 +256,7 @@ function sameCategory(a: LineCategory | null, b: LineCategory | null): boolean {
         <div class="flex h-full items-center justify-center"><hlm-spinner /></div>
       } @else {
         <div class="flex h-full flex-col items-center justify-center gap-2 bg-muted text-muted-foreground">
-          <ng-icon hlm name="lucideFileQuestion" size="xl" />
+          <ng-icon name="lucideFileQuestion" class="text-[length:--spacing(12)]" />
           <span class="text-sm">Preview not available</span>
         </div>
       }
@@ -305,15 +303,15 @@ function sameCategory(a: LineCategory | null, b: LineCategory | null): boolean {
           >
             @switch (d.accountNumberMatch) {
               @case ('Match') {
-                <ng-icon hlm name="lucideCircleCheck" size="sm" class="text-emerald-600" />
+                <ng-icon name="lucideCircleCheck" class="text-[length:--spacing(4)] text-emerald-600" />
                 <span>Statement account matches this account.</span>
               }
               @case ('Mismatch') {
-                <ng-icon hlm name="lucideTriangleAlert" size="sm" />
+                <ng-icon name="lucideTriangleAlert" class="text-[length:--spacing(4)]" />
                 <span>The statement's account number doesn't match this account.</span>
               }
               @default {
-                <ng-icon hlm name="lucideCircleHelp" size="sm" class="text-muted-foreground" />
+                <ng-icon name="lucideCircleHelp" class="text-[length:--spacing(4)] text-muted-foreground" />
                 <span class="text-muted-foreground">Couldn't verify the statement's account number.</span>
               }
             }
@@ -321,14 +319,14 @@ function sameCategory(a: LineCategory | null, b: LineCategory | null): boolean {
 
           @if (d.textTruncated) {
             <div class="flex items-center gap-2 rounded-md border border-amber-500/50 px-3 py-2 text-sm text-amber-600">
-              <ng-icon hlm name="lucideTriangleAlert" size="sm" />
+              <ng-icon name="lucideTriangleAlert" class="text-[length:--spacing(4)]" />
               <span>This statement's text was long and may have been truncated — verify no lines are missing.</span>
             </div>
           }
 
           @if (d.duplicateAssertionExists) {
             <div class="flex items-center gap-2 rounded-md border border-amber-500/50 px-3 py-2 text-sm text-amber-600">
-              <ng-icon hlm name="lucideTriangleAlert" size="sm" />
+              <ng-icon name="lucideTriangleAlert" class="text-[length:--spacing(4)]" />
               <span>A balance assertion already exists for this date.</span>
             </div>
           }
@@ -386,7 +384,7 @@ function sameCategory(a: LineCategory | null, b: LineCategory | null): boolean {
                   @if (hasSuggestions()) {
                     <div hlmButtonGroup>
                       <button hlmBtn size="sm" variant="outline" (click)="acceptAllSuggestions()">
-                        <ng-icon hlm name="lucideSparkles" size="sm" class="mr-1 text-violet-500" />
+                        <ng-icon name="lucideSparkles" class="text-[length:--spacing(4)] mr-1 text-violet-500" />
                         Accept all ({{ suggestionCount() }})
                       </button>
                       <button hlmBtn size="sm" variant="outline" (click)="showSuggestions()">Review</button>
@@ -416,19 +414,19 @@ function sameCategory(a: LineCategory | null, b: LineCategory | null): boolean {
               @switch (checksum().state) {
                 @case ('balanced') {
                   <div class="flex items-center gap-2 rounded-md border border-emerald-500/40 px-3 py-2 text-sm text-emerald-600">
-                    <ng-icon hlm name="lucideCircleCheck" size="sm" />
+                    <ng-icon name="lucideCircleCheck" class="text-[length:--spacing(4)]" />
                     <span>Balanced — the included lines reconcile to the closing balance.</span>
                   </div>
                 }
                 @case ('off') {
                   <div class="flex items-center gap-2 rounded-md border border-amber-500/50 px-3 py-2 text-sm text-amber-600">
-                    <ng-icon hlm name="lucideTriangleAlert" size="sm" />
+                    <ng-icon name="lucideTriangleAlert" class="text-[length:--spacing(4)]" />
                     <span>Off by {{ offAmount() }} — some lines may be missing or need editing.</span>
                   </div>
                 }
                 @default {
                   <div class="flex items-center gap-2 rounded-md border px-3 py-2 text-sm text-muted-foreground">
-                    <ng-icon hlm name="lucideCircleHelp" size="sm" />
+                    <ng-icon name="lucideCircleHelp" class="text-[length:--spacing(4)]" />
                     <span>Checksum unavailable — the statement didn't show both an opening and closing balance.</span>
                   </div>
                 }
@@ -466,7 +464,7 @@ function sameCategory(a: LineCategory | null, b: LineCategory | null): boolean {
                     (click)="clearSelection()"
                     aria-label="Clear selection"
                   >
-                    <ng-icon hlm name="lucideX" size="sm" />
+                    <ng-icon name="lucideX" class="text-[length:--spacing(4)]" />
                   </button>
                 </div>
               }
@@ -532,7 +530,7 @@ function sameCategory(a: LineCategory | null, b: LineCategory | null): boolean {
                             <tr hlmTr>
                               <td hlmTd></td>
                               <td hlmTd [attr.colspan]="6" class="px-2 pb-2 text-xs text-amber-600">
-                                <ng-icon hlm name="lucideTriangleAlert" size="xs" /> Needs an amount and date — fix it or exclude it to import.
+                                <ng-icon name="lucideTriangleAlert" class="text-[length:--spacing(3)]" /> Needs an amount and date — fix it or exclude it to import.
                               </td>
                             </tr>
                           }
@@ -540,7 +538,7 @@ function sameCategory(a: LineCategory | null, b: LineCategory | null): boolean {
                             <tr hlmTr>
                               <td hlmTd></td>
                               <td hlmTd [attr.colspan]="6" class="px-2 pb-2 text-xs text-amber-600">
-                                <ng-icon hlm name="lucideTriangleAlert" size="xs" /> Possible duplicate of an existing transaction.
+                                <ng-icon name="lucideTriangleAlert" class="text-[length:--spacing(3)]" /> Possible duplicate of an existing transaction.
                               </td>
                             </tr>
                           }
@@ -568,7 +566,7 @@ function sameCategory(a: LineCategory | null, b: LineCategory | null): boolean {
                 class="w-full border-dashed"
                 (click)="addManualRow()"
               >
-                <ng-icon hlm name="lucidePlus" size="sm" class="mr-1" />
+                <ng-icon name="lucidePlus" class="text-[length:--spacing(4)] mr-1" />
                 Add row
               </button>
 

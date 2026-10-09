@@ -1,7 +1,6 @@
 import { Component, ChangeDetectionStrategy, input, computed } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideChevronRight } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmBadge } from '@/shared/components/spartan/badge';
 import { CategoryRowActionsComponent } from './category-row-actions.component';
@@ -16,7 +15,7 @@ import type { CategoryResponse } from '@/api/generated/models/category-response'
 @Component({
   selector: 'app-category-tree-node',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgIcon, HlmIconImports, HlmButton, HlmBadge, CategoryRowActionsComponent],
+  imports: [NgIcon, HlmButton, HlmBadge, CategoryRowActionsComponent],
   providers: [provideIcons({ lucideChevronRight })],
   template: `
     <div class="flex items-center gap-1 rounded-md pr-1 hover:bg-accent/50" [style.paddingLeft.px]="node().category.depth * 20">
@@ -29,7 +28,7 @@ import type { CategoryResponse } from '@/api/generated/models/category-response'
           [attr.aria-label]="isExpanded() ? 'Collapse' : 'Expand'"
           (click)="toggle()(node().category.id)"
         >
-          <ng-icon hlm name="lucideChevronRight" size="sm" class="transition-transform" [class.rotate-90]="isExpanded()" />
+          <ng-icon name="lucideChevronRight" class="text-[length:--spacing(4)] transition-transform" [class.rotate-90]="isExpanded()" />
         </button>
       } @else {
         <span class="inline-block size-7 shrink-0"></span>

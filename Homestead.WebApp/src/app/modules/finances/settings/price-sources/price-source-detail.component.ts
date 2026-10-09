@@ -21,7 +21,6 @@ import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmBadge } from '@/shared/components/spartan/badge';
 import { HlmCheckbox } from '@/shared/components/spartan/checkbox';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmBreadcrumbImports } from '@/shared/components/spartan/breadcrumb';
 import { FinancesPriceSourcesApiService } from '@/api/services/finances-price-sources-api.service';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
@@ -36,7 +35,7 @@ import type { CommodityPriceSource } from '@/api/generated/models/commodity-pric
   imports: [
     FormsModule, DatePipe, HlmSpinner,
     HlmButton, HlmInput, HlmLabel, HlmBadge, HlmCheckbox,
-    NgIcon, HlmIconImports,
+    NgIcon,
     HlmBreadcrumbImports,
   ],
   providers: [provideIcons({ lucideX, lucidePlus })],
@@ -213,7 +212,7 @@ import type { CommodityPriceSource } from '@/api/generated/models/commodity-pric
                       (click)="removePair(symbol)"
                       [attr.aria-label]="'Remove ' + symbol"
                     >
-                      <ng-icon hlm name="lucideX" size="sm" />
+                      <ng-icon name="lucideX" class="text-[length:--spacing(4)]" />
                     </button>
                   </span>
                 }
@@ -232,7 +231,7 @@ import type { CommodityPriceSource } from '@/api/generated/models/commodity-pric
                 aria-label="Symbol to watch"
               />
               <button hlmBtn variant="outline" (click)="addPair()" [disabled]="!canAddPair()">
-                <ng-icon hlm name="lucidePlus" size="sm" />
+                <ng-icon name="lucidePlus" class="text-[length:--spacing(4)]" />
                 Add
               </button>
               <button

@@ -22,7 +22,6 @@ import {
   lucideArrowUp,
   lucideArrowDown,
 } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmButtonGroup } from '@/shared/components/spartan/button-group';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
@@ -69,7 +68,6 @@ function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, 
     RouterLink,
     NgTemplateOutlet,
     NgIcon,
-    HlmIconImports,
     HlmButton,
     HlmButtonGroup,
     HlmSpinner,
@@ -121,7 +119,7 @@ function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, 
       @if (data() !== null) {
         @if (!settingsService.hasDisplayCurrency() && settingsService.loaded()) {
           <div class="flex items-start gap-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-100">
-            <ng-icon hlm name="lucideTriangleAlert" size="sm" class="mt-0.5 shrink-0" />
+            <ng-icon name="lucideTriangleAlert" class="text-[length:--spacing(4)] mt-0.5 shrink-0" />
             <div class="flex-1">
               <p class="font-medium">Display currency not set</p>
               <p class="text-amber-900/80 dark:text-amber-100/80">
@@ -143,7 +141,7 @@ function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, 
             </div>
             <div hlmEmptyContent>
               <app-create-account-dialog (created)="onChanged()">
-                <ng-icon hlm name="lucidePlus" size="sm" />
+                <ng-icon name="lucidePlus" class="text-[length:--spacing(4)]" />
                 New account
               </app-create-account-dialog>
             </div>
@@ -154,7 +152,7 @@ function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, 
               @if (archivedCount() > 0) {
                 <div hlmPopover>
                   <button hlmPopoverTrigger hlmBtn variant="outline">
-                    <ng-icon hlm name="lucideListFilter" size="sm" class="text-muted-foreground" />
+                    <ng-icon name="lucideListFilter" class="text-[length:--spacing(4)] text-muted-foreground" />
                     {{ showArchived() ? 'Filter: Archived' : 'Filter' }}
                   </button>
                   <div hlmPopoverContent *hlmPopoverPortal class="w-[240px] p-0" align="start">
@@ -185,7 +183,7 @@ function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, 
               }
 
               <button hlmBtn variant="outline" class="hidden sm:inline-flex" [hlmDropdownMenuTrigger]="sortMenu">
-                <ng-icon hlm [name]="sortState().desc ? 'lucideArrowDown' : 'lucideArrowUp'" size="sm" />
+                <ng-icon [name]="sortState().desc ? 'lucideArrowDown' : 'lucideArrowUp'" class="text-[length:--spacing(4)]" />
                 {{ sortFieldLabel() }}
               </button>
               <ng-template #sortGroup>
@@ -237,7 +235,7 @@ function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, 
                   (click)="setViewMode('card')"
                   aria-label="Card view"
                 >
-                  <ng-icon hlm name="lucideRows3" size="sm" />
+                  <ng-icon name="lucideRows3" class="text-[length:--spacing(4)]" />
                 </button>
                 <button
                   hlmBtn
@@ -246,13 +244,13 @@ function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, 
                   (click)="setViewMode('table')"
                   aria-label="Table view"
                 >
-                  <ng-icon hlm name="lucideTable" size="sm" />
+                  <ng-icon name="lucideTable" class="text-[length:--spacing(4)]" />
                 </button>
               </div>
 
               <button hlmBtn variant="outline" size="icon" class="sm:hidden"
                       [hlmDropdownMenuTrigger]="overflowMenu" aria-label="More options">
-                <ng-icon hlm name="lucideEllipsisVertical" size="sm" />
+                <ng-icon name="lucideEllipsisVertical" class="text-[length:--spacing(4)]" />
               </button>
               <ng-template #overflowMenu>
                 <hlm-dropdown-menu class="w-44">
@@ -283,7 +281,7 @@ function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, 
               </ng-template>
             </div>
             <app-create-account-dialog (created)="onChanged()">
-              <ng-icon hlm name="lucidePlus" size="sm" />
+              <ng-icon name="lucidePlus" class="text-[length:--spacing(4)]" />
               New account
             </app-create-account-dialog>
           </div>

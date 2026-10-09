@@ -1,7 +1,6 @@
 import { Component, ChangeDetectionStrategy, inject, computed } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideUpload, lucideCheck, lucideAlertCircle, lucideLoader, lucideX, lucideRotateCw, lucideListX, lucideInfo } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmPopoverImports } from '@/shared/components/spartan/popover';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { RouterLink } from '@angular/router';
@@ -11,12 +10,12 @@ import { formatBytes, handleFileInputChange } from '@/shared/utils';
 @Component({
   selector: 'app-upload-popover',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgIcon, HlmIconImports, HlmPopoverImports, HlmButton, RouterLink],
+  imports: [NgIcon, HlmPopoverImports, HlmButton, RouterLink],
   providers: [provideIcons({ lucideUpload, lucideCheck, lucideAlertCircle, lucideLoader, lucideX, lucideRotateCw, lucideListX, lucideInfo })],
   template: `
     <div hlmPopover align="end">
       <button hlmPopoverTrigger hlmBtn variant="ghost" class="relative" aria-label="Upload">
-        <ng-icon hlm name="lucideUpload" size="sm" />
+        <ng-icon name="lucideUpload" class="text-[length:--spacing(4)]" />
         <span class="hidden sm:inline">Upload</span>
         @switch (triggerBadge()) {
           @case ('active') {
@@ -44,7 +43,7 @@ import { formatBytes, handleFileInputChange } from '@/shared/utils';
         <input #fileInput type="file" multiple class="hidden" (change)="onFilesSelected($event)" />
         <div class="px-3 py-3" [class.border-b]="uploadManager.hasItems()" [class.border-border]="uploadManager.hasItems()">
           <button hlmBtn variant="outline" size="sm" class="w-full" (click)="fileInput.click()">
-            <ng-icon hlm name="lucideUpload" size="sm" />
+            <ng-icon name="lucideUpload" class="text-[length:--spacing(4)]" />
             Choose files
           </button>
           <p class="mt-1.5 text-center text-xs text-muted-foreground">Or drag and drop files anywhere on the page</p>
@@ -55,7 +54,7 @@ import { formatBytes, handleFileInputChange } from '@/shared/utils';
           <div class="flex items-center justify-between border-b border-border px-3 py-2">
             <span class="text-sm font-medium">{{ statusText() }}</span>
             <button hlmBtn variant="ghost" size="icon-sm" (click)="uploadManager.clearFinished()" aria-label="Clear finished">
-              <ng-icon hlm name="lucideListX" size="xs" />
+              <ng-icon name="lucideListX" class="text-[length:--spacing(3)]" />
             </button>
           </div>
 
@@ -67,22 +66,22 @@ import { formatBytes, handleFileInputChange } from '@/shared/utils';
                 <div class="mt-0.5 shrink-0">
                   @switch (item.status) {
                     @case ('queued') {
-                      <ng-icon hlm name="lucideLoader" size="sm" class="text-muted-foreground" />
+                      <ng-icon name="lucideLoader" class="text-[length:--spacing(4)] text-muted-foreground" />
                     }
                     @case ('uploading') {
-                      <ng-icon hlm name="lucideLoader" size="sm" class="animate-spin text-primary" />
+                      <ng-icon name="lucideLoader" class="text-[length:--spacing(4)] animate-spin text-primary" />
                     }
                     @case ('processing') {
-                      <ng-icon hlm name="lucideLoader" size="sm" class="animate-spin text-primary" />
+                      <ng-icon name="lucideLoader" class="text-[length:--spacing(4)] animate-spin text-primary" />
                     }
                     @case ('completed') {
-                      <ng-icon hlm name="lucideCheck" size="sm" class="text-green-600 dark:text-green-400" />
+                      <ng-icon name="lucideCheck" class="text-[length:--spacing(4)] text-green-600 dark:text-green-400" />
                     }
                     @case ('failed') {
-                      <ng-icon hlm name="lucideAlertCircle" size="sm" class="text-destructive" />
+                      <ng-icon name="lucideAlertCircle" class="text-[length:--spacing(4)] text-destructive" />
                     }
                     @case ('duplicate') {
-                      <ng-icon hlm name="lucideInfo" size="sm" class="text-blue-600 dark:text-blue-400" />
+                      <ng-icon name="lucideInfo" class="text-[length:--spacing(4)] text-blue-600 dark:text-blue-400" />
                     }
                   }
                 </div>
@@ -134,12 +133,12 @@ import { formatBytes, handleFileInputChange } from '@/shared/utils';
                 <div class="mt-0.5 shrink-0">
                   @if (item.status === 'failed') {
                     <button hlmBtn variant="ghost" size="icon-sm" (click)="uploadManager.retryItem(item.id)" aria-label="Retry upload">
-                      <ng-icon hlm name="lucideRotateCw" size="xs" />
+                      <ng-icon name="lucideRotateCw" class="text-[length:--spacing(3)]" />
                     </button>
                   }
                   @if (item.status === 'completed' || item.status === 'failed' || item.status === 'duplicate') {
                     <button hlmBtn variant="ghost" size="icon-sm" (click)="uploadManager.removeItem(item.id)" aria-label="Remove">
-                      <ng-icon hlm name="lucideX" size="xs" />
+                      <ng-icon name="lucideX" class="text-[length:--spacing(3)]" />
                     </button>
                   }
                 </div>

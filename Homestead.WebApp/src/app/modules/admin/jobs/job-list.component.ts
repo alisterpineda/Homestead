@@ -5,7 +5,6 @@ import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, map, combineLatest } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideActivity, lucideChevronRight, lucideChevronDown } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { HlmTableImports } from '@/shared/components/spartan/table';
@@ -31,7 +30,6 @@ import { handleQueryError } from '@/shared/utils/rxjs-error.utils';
   imports: [
     DatePipe,
     NgIcon,
-    HlmIconImports,
     HlmSpinner,
     HlmEmptyImports,
     HlmTableImports,
@@ -137,7 +135,7 @@ import { handleQueryError } from '@/shared/utils/rxjs-error.utils';
                                 [attr.aria-expanded]="isExpanded(job.id)"
                                 aria-label="Toggle child jobs"
                               >
-                                <ng-icon hlm [name]="isExpanded(job.id) ? 'lucideChevronDown' : 'lucideChevronRight'" size="sm" />
+                                <ng-icon [name]="isExpanded(job.id) ? 'lucideChevronDown' : 'lucideChevronRight'" class="text-[length:--spacing(4)]" />
                               </button>
                             }
                           </td>

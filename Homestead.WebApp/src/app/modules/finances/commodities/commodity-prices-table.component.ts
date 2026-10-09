@@ -10,7 +10,6 @@ import { HlmTableImports } from '@/shared/components/spartan/table';
 import { HlmBadgeImports } from '@/shared/components/spartan/badge';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-menu';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucidePencil, lucideTrash2, lucideEllipsisVertical } from '@ng-icons/lucide';
 import {
@@ -139,7 +138,7 @@ export class CommodityPriceSourceCell {
 @Component({
   selector: 'app-commodity-price-actions-cell',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmButton, HlmDropdownMenuImports, HlmIconImports, NgIcon],
+  imports: [HlmButton, HlmDropdownMenuImports, NgIcon],
   providers: [provideIcons({ lucidePencil, lucideTrash2, lucideEllipsisVertical })],
   template: `
     @if (price.source !== 'Transaction') {
@@ -150,20 +149,20 @@ export class CommodityPriceSourceCell {
         [hlmDropdownMenuTrigger]="menu"
         aria-label="Price actions"
       >
-        <ng-icon hlm name="lucideEllipsisVertical" size="sm" />
+        <ng-icon name="lucideEllipsisVertical" class="text-[length:--spacing(4)]" />
       </button>
       <ng-template #menu>
         <hlm-dropdown-menu class="w-40">
           <hlm-dropdown-menu-group>
             @if (price.source === 'Manual') {
               <button hlmDropdownMenuItem (triggered)="onEdit()">
-                <ng-icon hlm name="lucidePencil" size="sm" />
+                <ng-icon name="lucidePencil" class="text-[length:--spacing(4)]" />
                 Edit
               </button>
               <hlm-dropdown-menu-separator />
             }
             <button hlmDropdownMenuItem variant="destructive" (triggered)="onDelete()">
-              <ng-icon hlm name="lucideTrash2" size="sm" />
+              <ng-icon name="lucideTrash2" class="text-[length:--spacing(4)]" />
               Delete
             </button>
           </hlm-dropdown-menu-group>

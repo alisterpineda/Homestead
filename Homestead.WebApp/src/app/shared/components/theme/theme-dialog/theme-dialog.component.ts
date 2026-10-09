@@ -1,7 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject, viewChild } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideSun, lucideMoon, lucideMonitor } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmDialogImports } from '@/shared/components/spartan/dialog';
 import { HlmRadioGroupImports } from '@/shared/components/spartan/radio-group';
 import { BrnDialog } from '@spartan-ng/brain/dialog';
@@ -16,7 +15,7 @@ const themeModes: { value: ThemeMode; icon: string; label: string }[] = [
 @Component({
   selector: 'app-theme-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgIcon, HlmIconImports, HlmDialogImports, HlmRadioGroupImports],
+  imports: [NgIcon, HlmDialogImports, HlmRadioGroupImports],
   providers: [provideIcons({ lucideSun, lucideMoon, lucideMonitor })],
   template: `
     <hlm-dialog>
@@ -39,7 +38,7 @@ const themeModes: { value: ThemeMode; icon: string; label: string }[] = [
                   <hlm-radio-indicator indicator />
                 </hlm-radio>
                 <div class="flex flex-col items-center gap-2">
-                  <ng-icon hlm [name]="mode.icon" size="sm" class="text-foreground" />
+                  <ng-icon [name]="mode.icon" class="text-[length:--spacing(4)] text-foreground" />
                   <span class="text-sm font-medium">{{ mode.label }}</span>
                 </div>
               </label>

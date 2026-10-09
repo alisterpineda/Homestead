@@ -9,7 +9,7 @@ import {
   computed,
   viewChild,
 } from '@angular/core';
-import { provideIcons } from '@ng-icons/core';
+import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideChevronRight } from '@ng-icons/lucide';
 import { BrnDialog } from '@spartan-ng/brain/dialog';
 import { HlmDialogImports } from '@/shared/components/spartan/dialog';
@@ -17,7 +17,6 @@ import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmToggleGroupImports } from '@/shared/components/spartan/toggle-group';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmLabel } from '@/shared/components/spartan/label';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmCollapsibleImports } from '@/shared/components/spartan/collapsible';
 import type { BrandPickerValue } from '../../shared/brand-picker/brand-picker.component';
 import { InventoryDurableApiService } from '@/api/services/inventory-durable-api.service';
@@ -56,7 +55,7 @@ type EntryKind = 'durable' | 'consumable';
     HlmToggleGroupImports,
     HlmInput,
     HlmLabel,
-    HlmIconImports,
+    NgIcon,
     HlmCollapsibleImports,
     LocationPickerComponent,
     BrandPickerComponent,
@@ -158,10 +157,8 @@ type EntryKind = 'durable' | 'consumable';
               class="flex items-center gap-1 text-sm text-muted-foreground"
             >
               <ng-icon
-                hlm
                 name="lucideChevronRight"
-                size="sm"
-                class="shrink-0 transition-transform"
+                class="text-[length:--spacing(4)] shrink-0 transition-transform"
                 [class.rotate-90]="moreOpen()"
               />
               More details

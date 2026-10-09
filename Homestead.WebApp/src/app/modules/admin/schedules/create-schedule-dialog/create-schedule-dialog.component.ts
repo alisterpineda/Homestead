@@ -1,7 +1,6 @@
 import { Component, ChangeDetectionStrategy, inject, signal, computed, input, output, viewChild } from '@angular/core';
 import { provideIcons } from '@ng-icons/core';
 import { lucidePlus } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmDialogImports } from '@/shared/components/spartan/dialog';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmInput } from '@/shared/components/spartan/input';
@@ -15,7 +14,7 @@ import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 @Component({
   selector: 'app-create-schedule-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmIconImports, HlmDialogImports, HlmButton, HlmInput, HlmLabel, HlmCheckboxImports],
+  imports: [HlmDialogImports, HlmButton, HlmInput, HlmLabel, HlmCheckboxImports],
   providers: [provideIcons({ lucidePlus })],
   template: `
     <hlm-dialog (stateChanged)="onStateChanged($event)">

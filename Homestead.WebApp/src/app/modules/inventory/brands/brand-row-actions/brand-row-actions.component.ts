@@ -1,7 +1,6 @@
 import { Component, ChangeDetectionStrategy, computed, input, output } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideEllipsisVertical, lucidePencil, lucideGitMerge, lucideTrash2 } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-menu';
 import type { BrandResponse } from '@/api/generated/models/brand-response';
@@ -9,7 +8,7 @@ import type { BrandResponse } from '@/api/generated/models/brand-response';
 @Component({
   selector: 'app-brand-row-actions',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgIcon, HlmIconImports, HlmButton, HlmDropdownMenuImports],
+  imports: [NgIcon, HlmButton, HlmDropdownMenuImports],
   providers: [provideIcons({ lucideEllipsisVertical, lucidePencil, lucideGitMerge, lucideTrash2 })],
   template: `
     <button
@@ -21,17 +20,17 @@ import type { BrandResponse } from '@/api/generated/models/brand-response';
       aria-label="Brand actions"
       (click)="onTriggerClick($event)"
     >
-      <ng-icon hlm name="lucideEllipsisVertical" size="sm" />
+      <ng-icon name="lucideEllipsisVertical" class="text-[length:--spacing(4)]" />
     </button>
     <ng-template #menu>
       <hlm-dropdown-menu class="w-44">
         <hlm-dropdown-menu-group>
           <button hlmDropdownMenuItem (triggered)="edit.emit(brand())">
-            <ng-icon hlm name="lucidePencil" size="sm" />
+            <ng-icon name="lucidePencil" class="text-[length:--spacing(4)]" />
             Rename
           </button>
           <button hlmDropdownMenuItem (triggered)="merge.emit(brand())">
-            <ng-icon hlm name="lucideGitMerge" size="sm" />
+            <ng-icon name="lucideGitMerge" class="text-[length:--spacing(4)]" />
             Merge into…
           </button>
           <hlm-dropdown-menu-separator />
@@ -42,7 +41,7 @@ import type { BrandResponse } from '@/api/generated/models/brand-response';
             [title]="deleteTitle()"
             (triggered)="delete.emit(brand())"
           >
-            <ng-icon hlm name="lucideTrash2" size="sm" />
+            <ng-icon name="lucideTrash2" class="text-[length:--spacing(4)]" />
             Delete
           </button>
         </hlm-dropdown-menu-group>

@@ -3,7 +3,6 @@ import { BrnDialog } from '@spartan-ng/brain/dialog';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideCircleCheck, lucideCircleAlert, lucideDownload } from '@ng-icons/lucide';
 import { HlmDialogImports } from '@/shared/components/spartan/dialog';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 
@@ -17,7 +16,6 @@ const DEFAULT_ERROR = 'Download failed. Please try again.';
   imports: [
     NgIcon,
     HlmDialogImports,
-    HlmIconImports,
     HlmButton,
     HlmSpinner,
   ],
@@ -40,15 +38,15 @@ const DEFAULT_ERROR = 'Download failed. Please try again.';
               </p>
             }
             @case ('completed') {
-              <ng-icon hlm name="lucideCircleCheck" size="xl" class="text-primary" />
+              <ng-icon name="lucideCircleCheck" class="text-[length:--spacing(12)] text-primary" />
               <p class="text-center text-sm text-foreground">Your download is ready.</p>
               <a hlmBtn [href]="downloadUrl()" aria-label="Download documents">
-                <ng-icon hlm name="lucideDownload" size="sm" />
+                <ng-icon name="lucideDownload" class="text-[length:--spacing(4)]" />
                 Download
               </a>
             }
             @case ('failed') {
-              <ng-icon hlm name="lucideCircleAlert" size="xl" class="text-destructive" />
+              <ng-icon name="lucideCircleAlert" class="text-[length:--spacing(12)] text-destructive" />
               <p class="text-center text-sm text-destructive">
                 {{ errorMessage() }}
               </p>

@@ -14,7 +14,6 @@ import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-i
 import { switchMap, map, of, catchError } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideBox, lucideCpu, lucideArrowRight } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmInput } from '@/shared/components/spartan/input';
@@ -55,7 +54,6 @@ type InlineForm = 'move' | 'lent' | null;
   imports: [
     RouterLink,
     NgIcon,
-    HlmIconImports,
     QuickPanelComponent,
     HlmButton,
     HlmLabel,
@@ -70,9 +68,9 @@ type InlineForm = 'move' | 'lent' | null;
   template: `
     <app-quick-panel [title]="view()?.name" [state]="state()" (stateChanged)="onStateChanged($event)">
       @if (view()?.isContainer) {
-        <ng-icon hlm panelTitleStart name="lucideBox" size="sm" class="shrink-0 text-muted-foreground" aria-label="Container" />
+        <ng-icon panelTitleStart name="lucideBox" class="text-[length:--spacing(4)] shrink-0 text-muted-foreground" aria-label="Container" />
       } @else if (view()?.hasComponents) {
-        <ng-icon hlm panelTitleStart name="lucideCpu" size="sm" class="shrink-0 text-muted-foreground" aria-label="Assembly" />
+        <ng-icon panelTitleStart name="lucideCpu" class="text-[length:--spacing(4)] shrink-0 text-muted-foreground" aria-label="Assembly" />
       }
       @if (view()?.status; as status) {
         <app-item-status-badge panelTitleEnd [status]="status" [note]="view()?.statusNote" />
@@ -240,7 +238,7 @@ type InlineForm = 'move' | 'lent' | null;
                 <div hlmItemActions>
                   <button hlmBtn variant="ghost" size="sm" class="max-md:h-11" (click)="onViewContents()">
                     {{ isAssembly() ? 'View components' : 'View contents' }}
-                    <ng-icon hlm name="lucideArrowRight" size="sm" />
+                    <ng-icon name="lucideArrowRight" class="text-[length:--spacing(4)]" />
                   </button>
                 </div>
               </div>
@@ -254,7 +252,7 @@ type InlineForm = 'move' | 'lent' | null;
               class="flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
             >
               View details
-              <ng-icon hlm name="lucideArrowRight" size="sm" />
+              <ng-icon name="lucideArrowRight" class="text-[length:--spacing(4)]" />
             </a>
           </div>
         }

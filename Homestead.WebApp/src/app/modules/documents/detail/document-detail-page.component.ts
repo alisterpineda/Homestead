@@ -40,7 +40,6 @@ import {
   lucideSparkles,
   lucideDatabaseBackup,
 } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmButtonGroupImports } from '@/shared/components/spartan/button-group';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
@@ -95,7 +94,6 @@ import { toast } from '@spartan-ng/brain/sonner';
   imports: [
     NgTemplateOutlet,
     NgIcon,
-    HlmIconImports,
     HlmButton,
     HlmButtonGroupImports,
     HlmSpinner,
@@ -170,7 +168,7 @@ import { toast } from '@spartan-ng/brain/sonner';
             <li hlmBreadcrumbItem>
               <button class="flex items-center gap-1" [hlmDropdownMenuTrigger]="versionMenu">
                 <span hlmBreadcrumbPage>{{ selectedVersionLabel() }}</span>
-                <ng-icon hlm size="xs" name="lucideChevronDown" />
+                <ng-icon class="text-[length:--spacing(3)]" name="lucideChevronDown" />
               </button>
               <ng-template #versionMenu>
                 <hlm-dropdown-menu>
@@ -210,7 +208,7 @@ import { toast } from '@spartan-ng/brain/sonner';
         </div>
         <div hlmEmptyContent>
           <a hlmBtn variant="outline" routerLink="/documents">
-            <ng-icon hlm name="lucideArrowLeft" size="sm" />
+            <ng-icon name="lucideArrowLeft" class="text-[length:--spacing(4)]" />
             Back to Documents
           </a>
         </div>
@@ -219,67 +217,67 @@ import { toast } from '@spartan-ng/brain/sonner';
       <div class="flex items-center gap-2 mb-4">
         <div hlmButtonGroup aria-label="Document navigation">
           <button hlmBtn size="icon-sm" variant="outline" (click)="hasChanges() ? closeDialogTrigger.click() : handleClose()" aria-label="Close document">
-            <ng-icon hlm name="lucideX" size="sm" />
+            <ng-icon name="lucideX" class="text-[length:--spacing(4)]" />
           </button>
           <button hlmBtn size="icon-sm" variant="outline" (click)="navigatePrev()" [disabled]="!canNavigatePrev()" aria-label="Previous document">
-            <ng-icon hlm name="lucideChevronLeft" size="sm" />
+            <ng-icon name="lucideChevronLeft" class="text-[length:--spacing(4)]" />
           </button>
           <button hlmBtn size="icon-sm" variant="outline" (click)="navigateNext()" [disabled]="!canNavigateNext()" aria-label="Next document">
-            <ng-icon hlm name="lucideChevronRight" size="sm" />
+            <ng-icon name="lucideChevronRight" class="text-[length:--spacing(4)]" />
           </button>
         </div>
         <div class="ml-auto flex items-center gap-2">
           <button hlmBtn size="sm" variant="outline" (click)="handleDownload()">
-            <ng-icon hlm name="lucideDownload" size="sm" />
+            <ng-icon name="lucideDownload" class="text-[length:--spacing(4)]" />
             Download
           </button>
           @if (auth.canWrite()) {
             <button hlmBtn variant="outline" size="icon-sm" [hlmDropdownMenuTrigger]="moreMenu" aria-label="More actions">
-              <ng-icon hlm name="lucideEllipsisVertical" size="sm" />
+              <ng-icon name="lucideEllipsisVertical" class="text-[length:--spacing(4)]" />
             </button>
             <button hlmBtn size="sm" (click)="handleSave()" [disabled]="!hasChanges() || saving()">
-              <ng-icon hlm name="lucideSave" size="sm" />
+              <ng-icon name="lucideSave" class="text-[length:--spacing(4)]" />
               {{ saving() ? 'Saving...' : 'Save' }}
             </button>
             <ng-template #moreMenu>
               <hlm-dropdown-menu class="w-48">
                 <button hlmDropdownMenuItem (triggered)="classifyOptionsDialog.open()" [disabled]="classifyingPreview()">
-                  <ng-icon hlm name="lucideSparkles" size="sm" />
+                  <ng-icon name="lucideSparkles" class="text-[length:--spacing(4)]" />
                   <span>{{ classifyingPreview() ? 'Classifying...' : 'Classify' }}</span>
                 </button>
                 <button hlmDropdownMenuItem (triggered)="summarizeOptionsDialog.open()" [disabled]="summarizing()">
-                  <ng-icon hlm name="lucideFileText" size="sm" />
+                  <ng-icon name="lucideFileText" class="text-[length:--spacing(4)]" />
                   <span>{{ summarizing() ? 'Summarizing...' : 'Summarize' }}</span>
                 </button>
                 <button hlmDropdownMenuItem (triggered)="addVersionDialog.open()">
-                  <ng-icon hlm name="lucideFilePlus2" size="sm" />
+                  <ng-icon name="lucideFilePlus2" class="text-[length:--spacing(4)]" />
                   <span>Add Version</span>
                 </button>
                 <button hlmDropdownMenuItem (triggered)="reprocessDialog.open()">
-                  <ng-icon hlm name="lucideRefreshCw" size="sm" />
+                  <ng-icon name="lucideRefreshCw" class="text-[length:--spacing(4)]" />
                   <span>Reprocess Text</span>
                 </button>
                 @if (hasMultipleVersions()) {
                   <button hlmDropdownMenuItem variant="destructive" [hlmDropdownMenuTrigger]="deleteSubMenu" [disabled]="deleting() || deletingVersion()">
-                    <ng-icon hlm name="lucideTrash2" size="sm" />
+                    <ng-icon name="lucideTrash2" class="text-[length:--spacing(4)]" />
                     <span>Delete</span>
                     <hlm-dropdown-menu-item-sub-indicator />
                   </button>
                   <ng-template #deleteSubMenu>
                     <hlm-dropdown-menu-sub>
                       <button hlmDropdownMenuItem variant="destructive" (triggered)="deleteVersionDialogTrigger.click()" [disabled]="deletingVersion()">
-                        <ng-icon hlm name="lucideTrash2" size="sm" />
+                        <ng-icon name="lucideTrash2" class="text-[length:--spacing(4)]" />
                         <span>This version</span>
                       </button>
                       <button hlmDropdownMenuItem variant="destructive" (triggered)="deleteDialogTrigger.click()" [disabled]="deleting()">
-                        <ng-icon hlm name="lucideTrash2" size="sm" />
+                        <ng-icon name="lucideTrash2" class="text-[length:--spacing(4)]" />
                         <span>Entire document</span>
                       </button>
                     </hlm-dropdown-menu-sub>
                   </ng-template>
                 } @else {
                   <button hlmDropdownMenuItem variant="destructive" (triggered)="deleteDialogTrigger.click()" [disabled]="deleting()">
-                    <ng-icon hlm name="lucideTrash2" size="sm" />
+                    <ng-icon name="lucideTrash2" class="text-[length:--spacing(4)]" />
                     <span>Delete</span>
                   </button>
                 }
@@ -394,7 +392,7 @@ import { toast } from '@spartan-ng/brain/sonner';
           <div
             class="flex h-full flex-col items-center justify-center gap-2 bg-muted text-muted-foreground"
           >
-            <ng-icon hlm name="lucideFileQuestion" size="xl" />
+            <ng-icon name="lucideFileQuestion" class="text-[length:--spacing(12)]" />
             <span class="text-sm">Preview not available</span>
           </div>
         }
@@ -405,7 +403,7 @@ import { toast } from '@spartan-ng/brain/sonner';
           <!-- AI Suggestions summary -->
           @if (pendingSuggestionCount() > 0) {
             <div class="flex items-center gap-2 rounded-md border border-border bg-muted/50 px-3 py-2 text-sm">
-              <ng-icon hlm name="lucideSparkles" size="sm" class="text-muted-foreground" />
+              <ng-icon name="lucideSparkles" class="text-[length:--spacing(4)] text-muted-foreground" />
               <span class="text-muted-foreground">AI suggestions ({{ pendingSuggestionCount() }})</span>
               <span class="ml-auto flex items-center gap-1">
                 @if (pendingSuggestionCount() >= 2) {
@@ -422,7 +420,7 @@ import { toast } from '@spartan-ng/brain/sonner';
               Name
               @if (pendingNameSuggestion()) {
                 <span hlmBadge class="ml-auto bg-ai/10 text-ai border-transparent dark:bg-ai/20">
-                  <ng-icon hlm name="lucideSparkles" size="xs" />
+                  <ng-icon name="lucideSparkles" class="text-[length:--spacing(3)]" />
                   AI Suggested
                 </span>
               }
@@ -437,10 +435,10 @@ import { toast } from '@spartan-ng/brain/sonner';
                   [hlmTooltip]="'Original: ' + (suggestion.originalValue ?? '(none)')"
                 />
                 <button hlmInputGroupButton size="icon-xs" (click)="approveSuggestion(suggestion.id)" aria-label="Approve name suggestion">
-                  <ng-icon hlm name="lucideCheck" size="xs" />
+                  <ng-icon name="lucideCheck" class="text-[length:--spacing(3)]" />
                 </button>
                 <button hlmInputGroupButton size="icon-xs" (click)="declineSuggestion(suggestion.id)" aria-label="Decline name suggestion">
-                  <ng-icon hlm name="lucideX" size="xs" />
+                  <ng-icon name="lucideX" class="text-[length:--spacing(3)]" />
                 </button>
               </hlm-input-group>
             } @else {
@@ -639,7 +637,7 @@ import { toast } from '@spartan-ng/brain/sonner';
                   @if (backupStateLoading()) {
                     <hlm-spinner class="size-4" />
                   } @else {
-                    <ng-icon hlm name="lucideRefreshCw" size="sm" />
+                    <ng-icon name="lucideRefreshCw" class="text-[length:--spacing(4)]" />
                   }
                 </button>
               </div>
@@ -657,7 +655,7 @@ import { toast } from '@spartan-ng/brain/sonner';
 
                 <!-- No per-source anchor exists on /admin/backup, so this stays a plain link. -->
                 <a hlmBtn variant="link" class="w-fit px-0" routerLink="/admin/backup">
-                  <ng-icon hlm name="lucideDatabaseBackup" size="sm" />
+                  <ng-icon name="lucideDatabaseBackup" class="text-[length:--spacing(4)]" />
                   Manage backups
                 </a>
               }
@@ -704,7 +702,7 @@ import { toast } from '@spartan-ng/brain/sonner';
                   @if (item.type === 'comment') {
                     <div class="flex gap-2.5 py-2">
                       <div class="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted">
-                        <ng-icon hlm size="xs" name="lucideMessageSquare" />
+                        <ng-icon class="text-[length:--spacing(3)]" name="lucideMessageSquare" />
                       </div>
                       <div class="min-w-0 flex-1">
                         <div class="flex items-baseline gap-2">
@@ -717,7 +715,7 @@ import { toast } from '@spartan-ng/brain/sonner';
                   } @else {
                     <div class="flex items-center gap-2.5 py-1.5">
                       <div class="flex size-6 shrink-0 items-center justify-center">
-                        <ng-icon hlm size="xs" name="lucideHistory" class="text-muted-foreground" />
+                        <ng-icon name="lucideHistory" class="text-[length:--spacing(3)] text-muted-foreground" />
                       </div>
                       <p class="text-xs text-muted-foreground">
                         {{ item.summary }}
@@ -750,7 +748,7 @@ import { toast } from '@spartan-ng/brain/sonner';
                   (click)="submitComment()"
                   aria-label="Send comment"
                 >
-                  <ng-icon hlm name="lucideSend" size="sm" />
+                  <ng-icon name="lucideSend" class="text-[length:--spacing(4)]" />
                 </button>
               </hlm-input-group-addon>
             </div>

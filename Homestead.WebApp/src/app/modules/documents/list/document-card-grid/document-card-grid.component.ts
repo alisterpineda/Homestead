@@ -2,7 +2,6 @@ import { Component, ChangeDetectionStrategy, input, output, signal, inject, LOCA
 import { formatDate as ngFormatDate } from '@angular/common';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideCalendar, lucideFileText, lucideImage, lucideUsers } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmCardImports } from '@/shared/components/spartan/card';
 import { HlmCheckbox } from '@/shared/components/spartan/checkbox';
 import { HlmBadge } from '@/shared/components/spartan/badge';
@@ -17,7 +16,6 @@ import { MatchSnippetComponent } from '../match-snippet/match-snippet.component'
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     NgIcon,
-    HlmIconImports,
     HlmCardImports,
     HlmCheckbox,
     HlmBadge,
@@ -74,10 +72,8 @@ import { MatchSnippetComponent } from '../match-snippet/match-snippet.component'
           } @else {
             <div class="absolute inset-0 bg-muted flex items-center justify-center">
               <ng-icon
-                hlm
                 [name]="isImageType(doc.contentType) ? 'lucideImage' : 'lucideFileText'"
-                size="xl"
-                class="text-muted-foreground"
+                class="text-[length:--spacing(12)] text-muted-foreground"
               />
             </div>
           }
@@ -131,13 +127,13 @@ import { MatchSnippetComponent } from '../match-snippet/match-snippet.component'
             <!-- Detail lines above the title -->
             @if (doc.documentDate) {
               <div class="h-4 mb-0.5 flex items-center gap-1 overflow-hidden">
-                <ng-icon hlm name="lucideCalendar" size="xs" class="shrink-0 text-white/90" />
+                <ng-icon name="lucideCalendar" class="text-[length:--spacing(3)] shrink-0 text-white/90" />
                 <p class="text-shadow-scrim text-white/90 text-xs truncate">{{ formatDate(doc.documentDate) }}</p>
               </div>
             }
             @if (doc.parties.length > 0) {
               <div class="h-4 mb-0.5 flex items-center gap-1 overflow-hidden">
-                <ng-icon hlm name="lucideUsers" size="xs" class="shrink-0 text-white/90" />
+                <ng-icon name="lucideUsers" class="text-[length:--spacing(3)] shrink-0 text-white/90" />
                 <p class="text-shadow-scrim text-white/90 text-xs truncate">{{ getPartyNames(doc.parties) }}</p>
               </div>
             }

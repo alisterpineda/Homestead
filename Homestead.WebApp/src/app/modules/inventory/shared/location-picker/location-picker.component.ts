@@ -11,7 +11,6 @@ import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, of, map, catchError, forkJoin } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideChevronDown, lucideCheck, lucideBox, lucideCpu } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmPopoverImports } from '@/shared/components/spartan/popover';
 import { SearchInputComponent } from '@/shared/components/search-input/search-input.component';
 import { PickerTriggerDirective } from '@/shared/directives/picker-trigger.directive';
@@ -45,7 +44,7 @@ const EMPTY_OPTIONS: LoadedOptions = { areas: [], containers: [] };
 @Component({
   selector: 'app-location-picker',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgIcon, HlmIconImports, HlmPopoverImports, SearchInputComponent, HlmSpinner, PickerTriggerDirective],
+  imports: [NgIcon, HlmPopoverImports, SearchInputComponent, HlmSpinner, PickerTriggerDirective],
   providers: [provideIcons({ lucideChevronDown, lucideCheck, lucideBox, lucideCpu })],
   template: `
     <div hlmPopover [state]="popoverState()" (stateChanged)="popoverState.set($event)">
@@ -61,7 +60,7 @@ const EMPTY_OPTIONS: LoadedOptions = { areas: [], containers: [] };
         } @else {
           <span class="min-w-0 truncate text-muted-foreground italic">{{ allowUnplaced() ? 'Unplaced' : (placeholder() ?? 'Select location') }}</span>
         }
-        <ng-icon hlm name="lucideChevronDown" size="sm" class="shrink-0 text-muted-foreground" />
+        <ng-icon name="lucideChevronDown" class="text-[length:--spacing(4)] shrink-0 text-muted-foreground" />
       </button>
       <div hlmPopoverContent *hlmPopoverPortal class="w-[340px] p-0" align="start">
         <div class="p-2">
@@ -79,7 +78,7 @@ const EMPTY_OPTIONS: LoadedOptions = { areas: [], containers: [] };
               >
                 <span class="truncate italic text-muted-foreground">Unplaced</span>
                 @if (value().kind === 'unplaced') {
-                  <ng-icon hlm name="lucideCheck" size="sm" />
+                  <ng-icon name="lucideCheck" class="text-[length:--spacing(4)]" />
                 }
               </button>
             }
@@ -94,7 +93,7 @@ const EMPTY_OPTIONS: LoadedOptions = { areas: [], containers: [] };
                 >
                   <span class="truncate" [style.marginInlineStart.px]="node.depth * 14">{{ node.area.name }}</span>
                   @if (isSelectedArea(node.area.id)) {
-                    <ng-icon hlm name="lucideCheck" size="sm" />
+                    <ng-icon name="lucideCheck" class="text-[length:--spacing(4)]" />
                   }
                 </button>
               }
@@ -109,7 +108,7 @@ const EMPTY_OPTIONS: LoadedOptions = { areas: [], containers: [] };
                   (click)="onSelectContainer(container)"
                 >
                   <span class="flex min-w-0 items-center gap-2">
-                    <ng-icon hlm name="lucideBox" size="sm" class="shrink-0 text-muted-foreground" />
+                    <ng-icon name="lucideBox" class="text-[length:--spacing(4)] shrink-0 text-muted-foreground" />
                     <span class="min-w-0">
                       <span class="block truncate">{{ container.name }}</span>
                       @if (containerSubtitle(container); as subtitle) {
@@ -118,7 +117,7 @@ const EMPTY_OPTIONS: LoadedOptions = { areas: [], containers: [] };
                     </span>
                   </span>
                   @if (isSelectedContainer(container.id)) {
-                    <ng-icon hlm name="lucideCheck" size="sm" />
+                    <ng-icon name="lucideCheck" class="text-[length:--spacing(4)]" />
                   }
                 </button>
               }
@@ -133,7 +132,7 @@ const EMPTY_OPTIONS: LoadedOptions = { areas: [], containers: [] };
                   (click)="onSelectContainer(assembly)"
                 >
                   <span class="flex min-w-0 items-center gap-2">
-                    <ng-icon hlm name="lucideCpu" size="sm" class="shrink-0 text-muted-foreground" />
+                    <ng-icon name="lucideCpu" class="text-[length:--spacing(4)] shrink-0 text-muted-foreground" />
                     <span class="min-w-0">
                       <span class="block truncate">{{ assembly.name }}</span>
                       @if (containerSubtitle(assembly); as subtitle) {
@@ -142,7 +141,7 @@ const EMPTY_OPTIONS: LoadedOptions = { areas: [], containers: [] };
                     </span>
                   </span>
                   @if (isSelectedContainer(assembly.id)) {
-                    <ng-icon hlm name="lucideCheck" size="sm" />
+                    <ng-icon name="lucideCheck" class="text-[length:--spacing(4)]" />
                   }
                 </button>
               }

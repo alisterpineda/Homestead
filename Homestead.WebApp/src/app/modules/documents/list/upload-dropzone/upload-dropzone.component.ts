@@ -9,13 +9,12 @@ import {
 } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideUpload } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { formatBytes } from '@/shared/utils';
 
 @Component({
   selector: 'app-upload-dropzone',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgIcon, HlmIconImports],
+  imports: [NgIcon],
   providers: [provideIcons({ lucideUpload })],
   template: `
     <div
@@ -32,9 +31,8 @@ import { formatBytes } from '@/shared/utils';
     >
       <input #fileInput type="file" class="hidden" (change)="onFileChange($event)" />
       <ng-icon
-        hlm
         name="lucideUpload"
-        size="lg"
+        class="text-[length:--spacing(8)]"
         [class]="'mb-3 ' + (file() ? 'text-primary' : 'text-muted-foreground')"
       />
       @if (file()) {

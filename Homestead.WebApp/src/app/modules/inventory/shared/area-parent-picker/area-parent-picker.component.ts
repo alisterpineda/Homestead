@@ -11,7 +11,6 @@ import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, of, map, catchError } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideChevronDown, lucideCheck, lucideMapPin } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmPopoverImports } from '@/shared/components/spartan/popover';
 import { SearchInputComponent } from '@/shared/components/search-input/search-input.component';
 import { PickerTriggerDirective } from '@/shared/directives/picker-trigger.directive';
@@ -30,7 +29,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 @Component({
   selector: 'app-area-parent-picker',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgIcon, HlmIconImports, HlmPopoverImports, SearchInputComponent, HlmSpinner, PickerTriggerDirective],
+  imports: [NgIcon, HlmPopoverImports, SearchInputComponent, HlmSpinner, PickerTriggerDirective],
   providers: [provideIcons({ lucideChevronDown, lucideCheck, lucideMapPin })],
   template: `
     <div hlmPopover [state]="popoverState()" (stateChanged)="popoverState.set($event)">
@@ -46,7 +45,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
         } @else {
           <span class="min-w-0 truncate text-muted-foreground italic">None (top-level)</span>
         }
-        <ng-icon hlm name="lucideChevronDown" size="sm" class="shrink-0 text-muted-foreground" />
+        <ng-icon name="lucideChevronDown" class="text-[length:--spacing(4)] shrink-0 text-muted-foreground" />
       </button>
       <div hlmPopoverContent *hlmPopoverPortal class="w-[340px] p-0" align="start">
         <div class="p-2">
@@ -63,7 +62,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
             >
               <span class="truncate italic text-muted-foreground">None (top-level)</span>
               @if (value() == null) {
-                <ng-icon hlm name="lucideCheck" size="sm" />
+                <ng-icon name="lucideCheck" class="text-[length:--spacing(4)]" />
               }
             </button>
 
@@ -74,11 +73,11 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
                 (click)="onSelect(node.area.id, node.area.name)"
               >
                 <span class="flex min-w-0 items-center gap-2">
-                  <ng-icon hlm name="lucideMapPin" size="sm" class="shrink-0 text-muted-foreground" />
+                  <ng-icon name="lucideMapPin" class="text-[length:--spacing(4)] shrink-0 text-muted-foreground" />
                   <span class="truncate" [style.marginInlineStart.px]="node.depth * 14">{{ node.area.name }}</span>
                 </span>
                 @if (value() === node.area.id) {
-                  <ng-icon hlm name="lucideCheck" size="sm" />
+                  <ng-icon name="lucideCheck" class="text-[length:--spacing(4)]" />
                 }
               </button>
             }

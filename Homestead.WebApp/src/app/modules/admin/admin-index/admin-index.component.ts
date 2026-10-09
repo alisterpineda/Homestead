@@ -2,14 +2,13 @@ import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideSettings } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { HlmButton } from '@/shared/components/spartan/button';
 
 @Component({
   selector: 'app-admin-index',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, NgIcon, HlmIconImports, HlmEmptyImports, HlmButton],
+  imports: [RouterLink, NgIcon, HlmEmptyImports, HlmButton],
   providers: [provideIcons({ lucideSettings })],
   template: `
     <div>
@@ -23,7 +22,7 @@ import { HlmButton } from '@/shared/components/spartan/button';
         </div>
         <div hlmEmptyContent>
           <a hlmBtn variant="outline" routerLink="/admin/settings">
-            <ng-icon hlm name="lucideSettings" size="sm" class="mr-1" />
+            <ng-icon name="lucideSettings" class="text-[length:--spacing(4)] mr-1" />
             System Settings
           </a>
         </div>

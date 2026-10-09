@@ -18,7 +18,6 @@ import { HlmDialogImports } from '@/shared/components/spartan/dialog';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmTabsImports } from '@/shared/components/spartan/tabs';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { DocumentPickerComponent } from '../../shared/document-picker/document-picker.component';
 import { UploadDropzoneComponent } from '../../../documents/list/upload-dropzone/upload-dropzone.component';
 import { DocumentApiService } from '@/api/services/document-api.service';
@@ -49,7 +48,6 @@ const STATEMENT_ALREADY_IMPORTED = 'statement_already_imported';
     HlmButton,
     HlmSpinner,
     HlmTabsImports,
-    HlmIconImports,
     NgIcon,
     DocumentPickerComponent,
     UploadDropzoneComponent,
@@ -134,11 +132,11 @@ const STATEMENT_ALREADY_IMPORTED = 'statement_already_imported';
           <hlm-tabs [tab]="activeTab()" (tabActivated)="onTabActivated($event)" class="w-full">
             <hlm-tabs-list class="w-full" aria-label="Statement source">
               <button hlmTabsTrigger="upload" class="flex-1">
-                <ng-icon hlm name="lucideFileUp" size="sm" />
+                <ng-icon name="lucideFileUp" class="text-[length:--spacing(4)]" />
                 Upload
               </button>
               <button hlmTabsTrigger="existing" class="flex-1">
-                <ng-icon hlm name="lucideFileText" size="sm" />
+                <ng-icon name="lucideFileText" class="text-[length:--spacing(4)]" />
                 Existing
               </button>
             </hlm-tabs-list>

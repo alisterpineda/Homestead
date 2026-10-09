@@ -4,7 +4,6 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { filter, map } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideFileText, lucideFiles, lucideUsers, lucideTags, lucideTrash2, lucideX, lucideSettings } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSidebarImports } from '@/shared/components/spartan/sidebar';
 import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog';
 import { isNavItemActive } from '@/shared/utils';
@@ -18,7 +17,6 @@ import { DocumentEditStateService } from '../detail/document-edit-state.service'
   imports: [
     RouterLink,
     NgIcon,
-    HlmIconImports,
     HlmSidebarImports,
     HlmAlertDialogImports,
   ],
@@ -29,7 +27,7 @@ import { DocumentEditStateService } from '../detail/document-edit-state.service'
         <ul hlmSidebarMenu>
           <li hlmSidebarMenuItem>
             <a hlmSidebarMenuButton routerLink="/documents" [isActive]="isActive('/documents')">
-              <ng-icon hlm name="lucideFiles" size="sm" />
+              <ng-icon name="lucideFiles" class="text-[length:--spacing(4)]" />
               <span>Documents</span>
             </a>
           </li>
@@ -56,7 +54,7 @@ import { DocumentEditStateService } from '../detail/document-edit-state.service'
                   [routerLink]="'/documents/' + doc.id"
                   [isActive]="isOpenDocActive(doc.id)"
                 >
-                  <ng-icon hlm name="lucideFileText" size="sm" />
+                  <ng-icon name="lucideFileText" class="text-[length:--spacing(4)]" />
                   <span>{{ doc.name }}</span>
                 </a>
                 @if (isDocModified(doc.id)) {
@@ -70,7 +68,7 @@ import { DocumentEditStateService } from '../detail/document-edit-state.service'
                   (click)="onCloseDocument($event, doc.id)"
                   aria-label="Close document"
                 >
-                  <ng-icon hlm name="lucideX" />
+                  <ng-icon name="lucideX" />
                 </button>
               </li>
             }
@@ -121,13 +119,13 @@ import { DocumentEditStateService } from '../detail/document-edit-state.service'
         <ul hlmSidebarMenu>
           <li hlmSidebarMenuItem>
             <a hlmSidebarMenuButton routerLink="/documents/parties" [isActive]="isActive('/documents/parties')">
-              <ng-icon hlm name="lucideUsers" size="sm" />
+              <ng-icon name="lucideUsers" class="text-[length:--spacing(4)]" />
               <span>Parties</span>
             </a>
           </li>
           <li hlmSidebarMenuItem>
             <a hlmSidebarMenuButton routerLink="/documents/tags" [isActive]="isActive('/documents/tags')">
-              <ng-icon hlm name="lucideTags" size="sm" />
+              <ng-icon name="lucideTags" class="text-[length:--spacing(4)]" />
               <span>Tags</span>
             </a>
           </li>
@@ -140,7 +138,7 @@ import { DocumentEditStateService } from '../detail/document-edit-state.service'
         <ul hlmSidebarMenu>
           <li hlmSidebarMenuItem>
             <a hlmSidebarMenuButton routerLink="/documents/trash" [isActive]="isActive('/documents/trash')">
-              <ng-icon hlm name="lucideTrash2" size="sm" />
+              <ng-icon name="lucideTrash2" class="text-[length:--spacing(4)]" />
               <span>Trash</span>
             </a>
           </li>
@@ -155,7 +153,7 @@ import { DocumentEditStateService } from '../detail/document-edit-state.service'
           <ul hlmSidebarMenu>
             <li hlmSidebarMenuItem>
               <a hlmSidebarMenuButton routerLink="/documents/settings" [isActive]="isActive('/documents/settings')">
-                <ng-icon hlm name="lucideSettings" size="sm" />
+                <ng-icon name="lucideSettings" class="text-[length:--spacing(4)]" />
                 <span>Settings</span>
               </a>
             </li>

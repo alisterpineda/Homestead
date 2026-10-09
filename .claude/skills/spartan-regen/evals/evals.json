@@ -10,9 +10,9 @@
     },
     {
       "id": 1,
-      "name": "bulk-regen-keeps-icon",
+      "name": "bulk-regen",
       "prompt": "Regenerate all the Spartan helm components from the current CLI templates.",
-      "expected_output": "Loops one `npx ng g @spartan-ng/cli:ui <name>` per component (utils first) rather than the interactive picker, strips the tsconfig aliases first, then restores the vendored `icon` helm via `git checkout HEAD -- Homestead.WebApp/src/app/shared/components/spartan/icon` and does NOT migrate `<ng-icon hlm size>` usages. Finishes with healthcheck, build, npm test, and the self-qa subagent.",
+      "expected_output": "Loops one `npx ng g @spartan-ng/cli:ui <name>` per component (utils first) rather than the interactive picker, strips the tsconfig aliases first, and does not try to restore or recreate an `icon` helm (there is none; icons follow the official skill's `rules/icons.md`). Finishes with healthcheck, build, npm test, and the self-qa subagent.",
       "files": []
     },
     {

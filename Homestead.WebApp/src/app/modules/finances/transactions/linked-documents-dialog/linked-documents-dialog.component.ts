@@ -17,7 +17,6 @@ import { HlmDialogImports } from '@/shared/components/spartan/dialog';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmBadgeImports } from '@/shared/components/spartan/badge';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 import { FinancesTransactionApiService } from '@/api/services/finances-transaction-api.service';
@@ -39,7 +38,6 @@ import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-
     HlmButton,
     HlmBadgeImports,
     HlmSpinner,
-    HlmIconImports,
     NgIcon,
     RouterLink,
     DocumentPickerComponent,
@@ -68,7 +66,7 @@ import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-
               <li class="flex items-center gap-2 px-3 py-2">
                 @switch (link.availability) {
                   @case ('Available') {
-                    <ng-icon hlm name="lucideFileText" size="sm" class="shrink-0 text-muted-foreground" />
+                    <ng-icon name="lucideFileText" class="text-[length:--spacing(4)] shrink-0 text-muted-foreground" />
                     <a
                       [routerLink]="['/documents', link.documentId]"
                       (click)="ctx.close()"
@@ -78,14 +76,14 @@ import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-
                     </a>
                   }
                   @case ('Trashed') {
-                    <ng-icon hlm name="lucideFileX2" size="sm" class="shrink-0 text-muted-foreground" />
+                    <ng-icon name="lucideFileX2" class="text-[length:--spacing(4)] shrink-0 text-muted-foreground" />
                     <span class="min-w-0 truncate text-sm text-muted-foreground">
                       {{ link.documentName }}
                     </span>
                     <span class="shrink-0 text-xs text-muted-foreground">In trash</span>
                   }
                   @default {
-                    <ng-icon hlm name="lucideFileX2" size="sm" class="shrink-0 text-muted-foreground" />
+                    <ng-icon name="lucideFileX2" class="text-[length:--spacing(4)] shrink-0 text-muted-foreground" />
                     <span class="min-w-0 truncate text-sm italic text-muted-foreground">
                       Not accessible
                     </span>
@@ -102,7 +100,7 @@ import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-
                     title="This link was created by a statement import. Roll back the import to remove it."
                     aria-label="Remove link (unavailable for statement imports)"
                   >
-                    <ng-icon hlm name="lucideTrash2" size="sm" />
+                    <ng-icon name="lucideTrash2" class="text-[length:--spacing(4)]" />
                   </button>
                 } @else {
                   <button
@@ -115,7 +113,7 @@ import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-
                     (click)="onRemove(link)"
                     aria-label="Remove link"
                   >
-                    <ng-icon hlm name="lucideTrash2" size="sm" />
+                    <ng-icon name="lucideTrash2" class="text-[length:--spacing(4)]" />
                   </button>
                 }
               </li>

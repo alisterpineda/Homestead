@@ -10,7 +10,6 @@ import {
 } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideChevronDown, lucideCheck } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmPopoverImports } from '@/shared/components/spartan/popover';
 import { SearchInputComponent } from '@/shared/components/search-input/search-input.component';
 import { PickerTriggerDirective } from '@/shared/directives/picker-trigger.directive';
@@ -24,7 +23,7 @@ const PAGE_SIZE = 200;
 @Component({
   selector: 'app-account-picker',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgIcon, HlmIconImports, HlmPopoverImports, SearchInputComponent, HlmSpinner, PickerTriggerDirective],
+  imports: [NgIcon, HlmPopoverImports, SearchInputComponent, HlmSpinner, PickerTriggerDirective],
   providers: [provideIcons({ lucideChevronDown, lucideCheck })],
   template: `
     <div hlmPopover [state]="popoverState()" (stateChanged)="popoverState.set($event)">
@@ -40,7 +39,7 @@ const PAGE_SIZE = 200;
         } @else {
           <span class="min-w-0 truncate text-muted-foreground">{{ placeholder() }}</span>
         }
-        <ng-icon hlm name="lucideChevronDown" size="sm" class="shrink-0 text-muted-foreground" />
+        <ng-icon name="lucideChevronDown" class="text-[length:--spacing(4)] shrink-0 text-muted-foreground" />
       </button>
       <div hlmPopoverContent *hlmPopoverPortal class="w-[360px] p-0" align="start">
         <div class="p-2">
@@ -62,7 +61,7 @@ const PAGE_SIZE = 200;
               >
                 <span class="size-4 shrink-0 flex items-center justify-center">
                   @if (a.id === value()) {
-                    <ng-icon hlm name="lucideCheck" size="sm" />
+                    <ng-icon name="lucideCheck" class="text-[length:--spacing(4)]" />
                   }
                 </span>
                 <span class="font-medium truncate">{{ a.name }}</span>

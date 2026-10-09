@@ -2,7 +2,6 @@ import { Component, ChangeDetectionStrategy, inject, signal, computed, viewChild
 import { FormsModule } from '@angular/forms';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucidePlus, lucideTrash2, lucideTriangleAlert, lucideSettings } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmCardImports } from '@/shared/components/spartan/card';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmInput } from '@/shared/components/spartan/input';
@@ -30,7 +29,7 @@ const WELL_KNOWN_CATEGORIES = [DEFAULT_CATEGORY, 'Microsoft.AspNetCore', 'Micros
   selector: 'app-system-settings',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    FormsModule, NgIcon, HlmIconImports, HlmCardImports, HlmButton, HlmInput, HlmLabel,
+    FormsModule, NgIcon, HlmCardImports, HlmButton, HlmInput, HlmLabel,
     HlmSpinner, HlmEmptyImports, HlmSelectImports, EffectiveLogLevelsComponent,
   ],
   providers: [provideIcons({ lucidePlus, lucideTrash2, lucideTriangleAlert, lucideSettings })],
@@ -83,7 +82,7 @@ const WELL_KNOWN_CATEGORIES = [DEFAULT_CATEGORY, 'Microsoft.AspNetCore', 'Micros
                   </hlm-select>
                   <button hlmBtn variant="ghost" size="icon" (click)="removeRow(row.category)"
                     [attr.aria-label]="'Remove ' + row.category">
-                    <ng-icon hlm name="lucideTrash2" size="sm" />
+                    <ng-icon name="lucideTrash2" class="text-[length:--spacing(4)]" />
                   </button>
                 </div>
               } @empty {
@@ -98,7 +97,7 @@ const WELL_KNOWN_CATEGORIES = [DEFAULT_CATEGORY, 'Microsoft.AspNetCore', 'Micros
                 <span class="text-sm text-muted-foreground">Quick add:</span>
                 @for (cat of availableWellKnown(); track cat) {
                   <button hlmBtn variant="outline" size="sm" (click)="addCategory(cat)">
-                    <ng-icon hlm name="lucidePlus" size="sm" class="mr-1" />
+                    <ng-icon name="lucidePlus" class="text-[length:--spacing(4)] mr-1" />
                     {{ cat }}
                   </button>
                 }
@@ -118,7 +117,7 @@ const WELL_KNOWN_CATEGORIES = [DEFAULT_CATEGORY, 'Microsoft.AspNetCore', 'Micros
             </div>
 
             <p class="flex items-start gap-2 text-sm text-muted-foreground">
-              <ng-icon hlm name="lucideTriangleAlert" size="sm" class="mt-0.5 shrink-0" />
+              <ng-icon name="lucideTriangleAlert" class="text-[length:--spacing(4)] mt-0.5 shrink-0" />
               <span>Trace/Debug can record verbose internal data, including AI prompts and responses.</span>
             </p>
           </div>

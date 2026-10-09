@@ -12,7 +12,6 @@ import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-i
 import { switchMap, of, catchError, combineLatest } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideX } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmDialogImports } from '@/shared/components/spartan/dialog';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmInput } from '@/shared/components/spartan/input';
@@ -33,7 +32,7 @@ import { toast } from '@spartan-ng/brain/sonner';
   selector: 'app-edit-payee-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    NgIcon, HlmIconImports, HlmDialogImports, HlmButton, HlmInput, HlmLabel, HlmCheckboxImports,
+    NgIcon, HlmDialogImports, HlmButton, HlmInput, HlmLabel, HlmCheckboxImports,
     CategoryPickerComponent,
   ],
   providers: [provideIcons({ lucideX })],
@@ -130,7 +129,7 @@ import { toast } from '@spartan-ng/brain/sonner';
                       [disabled]="removingId() === m.id"
                       (click)="removeMapping(m.id)"
                     >
-                      <ng-icon hlm name="lucideX" size="xs" />
+                      <ng-icon name="lucideX" class="text-[length:--spacing(3)]" />
                     </button>
                   </li>
                 }

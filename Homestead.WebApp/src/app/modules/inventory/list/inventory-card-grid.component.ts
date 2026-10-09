@@ -1,7 +1,6 @@
 import { Component, ChangeDetectionStrategy, computed, input, output } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideMapPin, lucideTriangleAlert } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmCardImports } from '@/shared/components/spartan/card';
 import type { VisibilityState } from '@tanstack/angular-table';
 import { TagBadgeComponent } from '@/shared/components/tag-badge/tag-badge.component';
@@ -41,7 +40,6 @@ interface CardView {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     NgIcon,
-    HlmIconImports,
     HlmCardImports,
     TagBadgeComponent,
     ItemStatusBadgeComponent,
@@ -95,7 +93,7 @@ interface CardView {
           @if (showLocation()) {
             @let loc = card.location;
             <div class="flex min-w-0 items-center gap-1.5 text-sm">
-              <ng-icon hlm name="lucideMapPin" size="xs" class="shrink-0 text-muted-foreground" />
+              <ng-icon name="lucideMapPin" class="text-[length:--spacing(3)] shrink-0 text-muted-foreground" />
               @switch (loc.kind) {
                 @case ('path') {
                   <!-- Narrow by construction, so the middle collapses; the tooltip keeps the full path. -->
@@ -124,7 +122,7 @@ interface CardView {
               }
               @if (row.isLow) {
                 <span [class]="lowStockBadgeClass">
-                  <ng-icon hlm name="lucideTriangleAlert" size="xs" />
+                  <ng-icon name="lucideTriangleAlert" class="text-[length:--spacing(3)]" />
                   Low
                 </span>
               }

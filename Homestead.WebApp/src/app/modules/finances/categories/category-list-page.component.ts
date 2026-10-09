@@ -10,7 +10,6 @@ import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, map, firstValueFrom } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucidePlus, lucideCircleAlert, lucideFolderTree } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmToggleGroupImports } from '@/shared/components/spartan/toggle-group';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
@@ -32,7 +31,6 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     NgIcon,
-    HlmIconImports,
     HlmToggleGroupImports,
     HlmSpinner,
     HlmEmptyImports,
@@ -59,7 +57,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
           <button hlmToggleGroupItem value="Income">Income</button>
         </hlm-toggle-group>
         <app-create-category-dialog (created)="onChanged()">
-          <ng-icon hlm name="lucidePlus" size="sm" />
+          <ng-icon name="lucidePlus" class="text-[length:--spacing(4)]" />
           New category
         </app-create-category-dialog>
       </div>

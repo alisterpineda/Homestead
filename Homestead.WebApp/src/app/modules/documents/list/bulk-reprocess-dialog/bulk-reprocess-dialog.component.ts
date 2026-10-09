@@ -4,7 +4,6 @@ import { BrnDialog } from '@spartan-ng/brain/dialog';
 import { HlmDialogImports } from '@/shared/components/spartan/dialog';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmLabel } from '@/shared/components/spartan/label';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideRefreshCw, lucideTriangleAlert } from '@ng-icons/lucide';
 import { DocumentApiService } from '@/api/services/document-api.service';
@@ -21,7 +20,6 @@ import { TextExtractionEnginesService } from '@/modules/documents/shared/text-ex
     HlmDialogImports,
     HlmButton,
     HlmLabel,
-    HlmIconImports,
     NgIcon,
     EngineSelectComponent,
   ],
@@ -29,7 +27,7 @@ import { TextExtractionEnginesService } from '@/modules/documents/shared/text-ex
   template: `
     <hlm-dialog (stateChanged)="onStateChanged($event)">
       <button hlmBtn variant="outline" hlmDialogTrigger [disabled]="disabled()">
-        <ng-icon hlm name="lucideRefreshCw" size="sm" />
+        <ng-icon name="lucideRefreshCw" class="text-[length:--spacing(4)]" />
         Reprocess
       </button>
 
@@ -48,7 +46,7 @@ import { TextExtractionEnginesService } from '@/modules/documents/shared/text-ex
 
           @if (showCostWarning()) {
             <div class="mt-2 flex items-start gap-2 rounded-md border border-border bg-muted p-3 text-sm">
-              <ng-icon hlm name="lucideTriangleAlert" size="sm" class="mt-0.5 shrink-0 text-muted-foreground" />
+              <ng-icon name="lucideTriangleAlert" class="text-[length:--spacing(4)] mt-0.5 shrink-0 text-muted-foreground" />
               <span>
                 <strong>{{ engineKey() }}</strong> is billed per page. This run sends
                 {{ documentCount() }} document{{ documentCount() > 1 ? 's' : '' }} — every page of each — to

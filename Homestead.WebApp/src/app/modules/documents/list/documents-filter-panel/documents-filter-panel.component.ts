@@ -2,7 +2,6 @@ import { Component, ChangeDetectionStrategy, input, output, signal, computed, ef
 import { NgTemplateOutlet } from '@angular/common';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideListFilter } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmPopoverImports } from '@/shared/components/spartan/popover';
 import { HlmDrawerImports } from '@/shared/components/spartan/drawer';
 import { HlmCheckboxImports } from '@/shared/components/spartan/checkbox';
@@ -23,7 +22,6 @@ export interface FilterOption {
   imports: [
     NgTemplateOutlet,
     NgIcon,
-    HlmIconImports,
     HlmPopoverImports,
     HlmDrawerImports,
     HlmCheckboxImports,
@@ -37,7 +35,7 @@ export interface FilterOption {
     @if (!narrow()) {
       <div hlmPopover>
         <button hlmPopoverTrigger hlmBtn variant="outline" aria-label="Filter documents">
-          <ng-icon hlm name="lucideListFilter" size="sm" class="text-muted-foreground" />
+          <ng-icon name="lucideListFilter" class="text-[length:--spacing(4)] text-muted-foreground" />
           <span>{{ triggerLabel() }}</span>
         </button>
         <div hlmPopoverContent *hlmPopoverPortal class="w-80 p-0" align="start">
@@ -47,7 +45,7 @@ export interface FilterOption {
     } @else {
       <hlm-drawer>
         <button hlmDrawerTrigger hlmBtn variant="outline" aria-label="Filter documents">
-          <ng-icon hlm name="lucideListFilter" size="sm" class="text-muted-foreground" />
+          <ng-icon name="lucideListFilter" class="text-[length:--spacing(4)] text-muted-foreground" />
           @if (activeCount() > 0) {
             <span hlmBadge variant="secondary" class="font-normal">{{ activeCount() }}</span>
           }

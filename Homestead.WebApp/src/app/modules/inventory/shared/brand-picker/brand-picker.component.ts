@@ -13,7 +13,6 @@ import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, debounceTime, of, map, catchError, distinctUntilChanged } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideChevronDown, lucideCheck, lucidePlus } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmPopoverImports } from '@/shared/components/spartan/popover';
 import { SearchInputComponent } from '@/shared/components/search-input/search-input.component';
 import { PickerTriggerDirective } from '@/shared/directives/picker-trigger.directive';
@@ -34,7 +33,6 @@ export type BrandPickerValue = Pick<BrandResponse, 'id' | 'name'>;
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     NgIcon,
-    HlmIconImports,
     HlmPopoverImports,
     SearchInputComponent,
     PickerTriggerDirective,
@@ -55,7 +53,7 @@ export type BrandPickerValue = Pick<BrandResponse, 'id' | 'name'>;
         } @else {
           <span class="min-w-0 truncate text-muted-foreground">{{ placeholder() }}</span>
         }
-        <ng-icon hlm name="lucideChevronDown" size="sm" class="shrink-0 text-muted-foreground" />
+        <ng-icon name="lucideChevronDown" class="text-[length:--spacing(4)] shrink-0 text-muted-foreground" />
       </button>
       <div hlmPopoverContent *hlmPopoverPortal class="w-[320px] p-0" align="start">
         <div class="p-2">
@@ -70,7 +68,7 @@ export type BrandPickerValue = Pick<BrandResponse, 'id' | 'name'>;
             >
               <span class="size-4 shrink-0 flex items-center justify-center">
                 @if (value() === null) {
-                  <ng-icon hlm name="lucideCheck" size="sm" />
+                  <ng-icon name="lucideCheck" class="text-[length:--spacing(4)]" />
                 }
               </span>
               <span class="text-muted-foreground">No brand</span>
@@ -90,7 +88,7 @@ export type BrandPickerValue = Pick<BrandResponse, 'id' | 'name'>;
               >
                 <span class="size-4 shrink-0 flex items-center justify-center">
                   @if (b.id === value()?.id) {
-                    <ng-icon hlm name="lucideCheck" size="sm" />
+                    <ng-icon name="lucideCheck" class="text-[length:--spacing(4)]" />
                   }
                 </span>
                 <span class="truncate">{{ b.name }}</span>
@@ -107,7 +105,7 @@ export type BrandPickerValue = Pick<BrandResponse, 'id' | 'name'>;
                   @if (creating()) {
                     <hlm-spinner class="size-3" />
                   } @else {
-                    <ng-icon hlm name="lucidePlus" size="sm" />
+                    <ng-icon name="lucidePlus" class="text-[length:--spacing(4)]" />
                   }
                 </span>
                 <span class="truncate">Create "{{ searchTerm().trim() }}"</span>

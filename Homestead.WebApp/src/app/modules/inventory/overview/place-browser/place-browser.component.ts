@@ -9,7 +9,6 @@ import {
   lucidePackage,
   lucidePlus,
 } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
@@ -38,7 +37,6 @@ import type { ConsumableResponse } from '@/api/generated/models/consumable-respo
   imports: [
     RouterLink,
     NgIcon,
-    HlmIconImports,
     HlmButton,
     HlmSpinner,
     HlmEmptyImports,
@@ -75,7 +73,7 @@ import type { ConsumableResponse } from '@/api/generated/models/consumable-respo
           <div class="flex flex-wrap items-center justify-between gap-2">
             <div class="min-w-0">
               <h2 class="flex items-center gap-2 text-lg font-semibold">
-                <ng-icon hlm [name]="placeIcon()" size="sm" class="shrink-0 text-muted-foreground" />
+                <ng-icon [name]="placeIcon()" class="text-[length:--spacing(4)] shrink-0 text-muted-foreground" />
                 <span class="truncate">{{ placeName() }}</span>
               </h2>
             </div>
@@ -90,7 +88,7 @@ import type { ConsumableResponse } from '@/api/generated/models/consumable-respo
                   [initialLocationLabel]="placeName()"
                   (created)="changed.emit()"
                 >
-                  <ng-icon hlm name="lucidePlus" size="sm" />
+                  <ng-icon name="lucidePlus" class="text-[length:--spacing(4)]" />
                   New item
                 </app-create-entry-dialog>
               }
@@ -112,7 +110,7 @@ import type { ConsumableResponse } from '@/api/generated/models/consumable-respo
                   [initialLocationLabel]="placeName()"
                   (created)="changed.emit()"
                 >
-                  <ng-icon hlm name="lucidePlus" size="sm" />
+                  <ng-icon name="lucidePlus" class="text-[length:--spacing(4)]" />
                   New item
                 </app-create-entry-dialog>
               </div>
@@ -179,7 +177,7 @@ import type { ConsumableResponse } from '@/api/generated/models/consumable-respo
                     [initialLocationLabel]="placeName()"
                     (created)="changed.emit()"
                   >
-                    <ng-icon hlm name="lucidePlus" size="sm" />
+                    <ng-icon name="lucidePlus" class="text-[length:--spacing(4)]" />
                     New item
                   </app-create-entry-dialog>
                 </app-inventory-items-view>
@@ -204,7 +202,7 @@ import type { ConsumableResponse } from '@/api/generated/models/consumable-respo
             <div hlmEmptyContent>
               <div class="flex flex-col gap-2 sm:flex-row">
                 <app-create-entry-dialog (created)="changed.emit()">
-                  <ng-icon hlm name="lucidePlus" size="sm" />
+                  <ng-icon name="lucidePlus" class="text-[length:--spacing(4)]" />
                   Add your first item
                 </app-create-entry-dialog>
                 <a hlmBtn variant="outline" routerLink="/inventory/areas">Set up areas</a>
@@ -215,7 +213,7 @@ import type { ConsumableResponse } from '@/api/generated/models/consumable-respo
           <div class="mb-3 flex items-center justify-between gap-2">
             <h2 class="text-sm font-medium text-muted-foreground">Browse by place</h2>
             <app-create-entry-dialog triggerSize="sm" (created)="changed.emit()">
-              <ng-icon hlm name="lucidePlus" size="sm" />
+              <ng-icon name="lucidePlus" class="text-[length:--spacing(4)]" />
               New item
             </app-create-entry-dialog>
           </div>

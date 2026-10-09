@@ -5,7 +5,6 @@ import {
   lucideSparkles, lucideCheck, lucidePlus, lucideX,
   lucideEllipsisVertical, lucideBan, lucideCircleCheck, lucideRotateCcw, lucideTrash2,
 } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmButtonGroup, HlmButtonGroupText } from '@/shared/components/spartan/button-group';
 import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-menu';
@@ -228,7 +227,7 @@ export class LineCategoryCell {
 @Component({
   selector: 'app-line-payee-cell',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [PayeePickerComponent, NgIcon, HlmIconImports, HlmButton, HlmButtonGroup, HlmButtonGroupText],
+  imports: [PayeePickerComponent, NgIcon, HlmButton, HlmButtonGroup, HlmButtonGroupText],
   providers: [provideIcons({ lucideSparkles, lucideCheck, lucidePlus, lucideX })],
   template: `
     <div class="flex w-full flex-col gap-1">
@@ -245,7 +244,7 @@ export class LineCategoryCell {
             [title]="'Change payee (suggested: ' + (row.suggestedPayeeName ?? '') + ')'"
             (click)="startOverride()"
           >
-            <ng-icon hlm name="lucideSparkles" size="xs" class="shrink-0 text-violet-500" />
+            <ng-icon name="lucideSparkles" class="text-[length:--spacing(3)] shrink-0 text-violet-500" />
             <span class="min-w-0 truncate font-normal italic text-muted-foreground">{{ row.suggestedPayeeName }}</span>
           </button>
           <button
@@ -256,7 +255,7 @@ export class LineCategoryCell {
             [title]="acceptLabel"
             (click)="onAccept()"
           >
-            <ng-icon hlm [name]="isNew ? 'lucidePlus' : 'lucideCheck'" size="sm" />
+            <ng-icon [name]="isNew ? 'lucidePlus' : 'lucideCheck'" class="text-[length:--spacing(4)]" />
           </button>
           <button
             hlmBtn
@@ -266,7 +265,7 @@ export class LineCategoryCell {
             title="Dismiss suggestion"
             (click)="onDismiss()"
           >
-            <ng-icon hlm name="lucideX" size="sm" />
+            <ng-icon name="lucideX" class="text-[length:--spacing(4)]" />
           </button>
         </div>
       } @else {
@@ -400,7 +399,7 @@ export class LineAmountCell {
 @Component({
   selector: 'app-line-actions-cell',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgIcon, HlmIconImports, HlmButton, HlmDropdownMenuImports],
+  imports: [NgIcon, HlmButton, HlmDropdownMenuImports],
   providers: [provideIcons({ lucideEllipsisVertical, lucideBan, lucideCircleCheck, lucideRotateCcw, lucideTrash2 })],
   template: `
     <button
@@ -411,29 +410,29 @@ export class LineAmountCell {
       [hlmDropdownMenuTrigger]="menu"
       aria-label="Line actions"
     >
-      <ng-icon hlm name="lucideEllipsisVertical" size="sm" />
+      <ng-icon name="lucideEllipsisVertical" class="text-[length:--spacing(4)]" />
     </button>
     <ng-template #menu>
       <hlm-dropdown-menu class="w-48">
         <hlm-dropdown-menu-group>
           @if (row.manual) {
             <button hlmDropdownMenuItem variant="destructive" (triggered)="onDelete()">
-              <ng-icon hlm name="lucideTrash2" size="sm" />
+              <ng-icon name="lucideTrash2" class="text-[length:--spacing(4)]" />
               Delete row
             </button>
           } @else {
             <button hlmDropdownMenuItem (triggered)="onToggleExcluded()">
               @if (row.excluded) {
-                <ng-icon hlm name="lucideCircleCheck" size="sm" />
+                <ng-icon name="lucideCircleCheck" class="text-[length:--spacing(4)]" />
                 Include
               } @else {
-                <ng-icon hlm name="lucideBan" size="sm" />
+                <ng-icon name="lucideBan" class="text-[length:--spacing(4)]" />
                 Exclude
               }
             </button>
             @if (isDirty) {
               <button hlmDropdownMenuItem (triggered)="onReset()">
-                <ng-icon hlm name="lucideRotateCcw" size="sm" />
+                <ng-icon name="lucideRotateCcw" class="text-[length:--spacing(4)]" />
                 Reset to original
               </button>
             }

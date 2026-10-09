@@ -18,7 +18,6 @@ import {
   lucideArrowUp,
   lucideArrowDown,
 } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { SearchInputComponent } from '@/shared/components/search-input/search-input.component';
@@ -54,7 +53,6 @@ interface PayeeSortFieldOption {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     NgIcon,
-    HlmIconImports,
     HlmSpinner,
     HlmEmptyImports,
     SearchInputComponent,
@@ -113,7 +111,7 @@ interface PayeeSortFieldOption {
             Include archived
           </label>
           <button hlmBtn variant="outline" [hlmDropdownMenuTrigger]="sortMenu">
-            <ng-icon hlm [name]="effectiveSortDir() === 'asc' ? 'lucideArrowUp' : 'lucideArrowDown'" size="sm" />
+            <ng-icon [name]="effectiveSortDir() === 'asc' ? 'lucideArrowUp' : 'lucideArrowDown'" class="text-[length:--spacing(4)]" />
             {{ sortLabel() }}
           </button>
           <ng-template #sortMenu>
@@ -143,7 +141,7 @@ interface PayeeSortFieldOption {
           </ng-template>
           @if (auth.canWrite()) {
             <app-create-payee-dialog (created)="onRefresh()">
-              <ng-icon hlm name="lucidePlus" size="sm" />
+              <ng-icon name="lucidePlus" class="text-[length:--spacing(4)]" />
               New payee
             </app-create-payee-dialog>
           }

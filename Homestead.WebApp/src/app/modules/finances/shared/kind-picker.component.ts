@@ -8,7 +8,6 @@ import {
   lucideLandmark,
   lucideCircleMinus,
 } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import {
   USER_ACCOUNT_KINDS,
   KIND_LABELS,
@@ -20,7 +19,7 @@ import {
 @Component({
   selector: 'app-kind-picker',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgIcon, HlmIconImports],
+  imports: [NgIcon],
   providers: [provideIcons({
     lucideWallet,
     lucideChartLine,
@@ -42,7 +41,7 @@ import {
           [class.bg-accent]="value() === kind"
           [class.border-input]="value() !== kind"
         >
-          <ng-icon hlm [name]="iconFor(kind)" size="sm" class="text-muted-foreground" />
+          <ng-icon [name]="iconFor(kind)" class="text-[length:--spacing(4)] text-muted-foreground" />
           <span class="text-sm font-medium">{{ labelFor(kind) }}</span>
           <span class="text-xs text-muted-foreground">{{ descFor(kind) }}</span>
         </button>

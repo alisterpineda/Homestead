@@ -30,7 +30,6 @@ import {
   lucideRepeat,
   lucideFileUp,
 } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
@@ -73,7 +72,6 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
   imports: [
     RouterLink,
     NgIcon,
-    HlmIconImports,
     HlmButton,
     HlmSpinner,
     HlmEmptyImports,
@@ -142,7 +140,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
               }
             </div>
             <button hlmBtn variant="outline" class="shrink-0" (click)="openEdit()">
-              <ng-icon hlm name="lucidePencil" size="sm" />
+              <ng-icon name="lucidePencil" class="text-[length:--spacing(4)]" />
               Edit
             </button>
           </div>
@@ -161,25 +159,25 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
           <div class="flex flex-wrap items-center justify-end gap-2">
             @if (a.kind === 'Investment') {
               <button hlmBtn (click)="openAddPosition()">
-                <ng-icon hlm name="lucidePackagePlus" size="sm" />
+                <ng-icon name="lucidePackagePlus" class="text-[length:--spacing(4)]" />
                 Add position
               </button>
             } @else if (openingBalanceExists() === false) {
               <button hlmBtn variant="outline" (click)="openAddOpeningBalance()">
-                <ng-icon hlm name="lucidePlus" size="sm" />
+                <ng-icon name="lucidePlus" class="text-[length:--spacing(4)]" />
                 Add opening balance
               </button>
             }
 
             <button hlmBtn [hlmDropdownMenuTrigger]="newTxMenu">
-              <ng-icon hlm name="lucidePlus" size="sm" />
+              <ng-icon name="lucidePlus" class="text-[length:--spacing(4)]" />
               New transaction
-              <ng-icon hlm name="lucideChevronDown" size="sm" />
+              <ng-icon name="lucideChevronDown" class="text-[length:--spacing(4)]" />
             </button>
 
             @if (a.kind !== 'Investment') {
               <app-statement-import-dialog [accountId]="a.id">
-                <ng-icon hlm name="lucideFileUp" size="sm" />
+                <ng-icon name="lucideFileUp" class="text-[length:--spacing(4)]" />
                 Import statement
               </app-statement-import-dialog>
             }
@@ -188,11 +186,11 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
                 @if (a.kind !== 'Investment') {
                   <hlm-dropdown-menu-group>
                     <button hlmDropdownMenuItem (triggered)="openNewFlow('Expense')">
-                      <ng-icon hlm name="lucideBanknoteArrowDown" size="sm" />
+                      <ng-icon name="lucideBanknoteArrowDown" class="text-[length:--spacing(4)]" />
                       Expense
                     </button>
                     <button hlmDropdownMenuItem (triggered)="openNewFlow('Income')">
-                      <ng-icon hlm name="lucideBanknoteArrowUp" size="sm" />
+                      <ng-icon name="lucideBanknoteArrowUp" class="text-[length:--spacing(4)]" />
                       Income
                     </button>
                   </hlm-dropdown-menu-group>
@@ -200,11 +198,11 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
                 }
                 <hlm-dropdown-menu-group>
                   <button hlmDropdownMenuItem (triggered)="openNewTransfer()">
-                    <ng-icon hlm name="lucideArrowRightLeft" size="sm" />
+                    <ng-icon name="lucideArrowRightLeft" class="text-[length:--spacing(4)]" />
                     Transfer
                   </button>
                   <button hlmDropdownMenuItem (triggered)="openRecordBalance()">
-                    <ng-icon hlm name="lucideScale" size="sm" />
+                    <ng-icon name="lucideScale" class="text-[length:--spacing(4)]" />
                     Record balance
                   </button>
                 </hlm-dropdown-menu-group>
@@ -213,19 +211,19 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
                   <hlm-dropdown-menu-label>Trade</hlm-dropdown-menu-label>
                   <hlm-dropdown-menu-group>
                     <button hlmDropdownMenuItem (triggered)="openTrade('Buy')">
-                      <ng-icon hlm name="lucideTrendingUp" size="sm" />
+                      <ng-icon name="lucideTrendingUp" class="text-[length:--spacing(4)]" />
                       Buy
                     </button>
                     <button hlmDropdownMenuItem (triggered)="openTrade('Sell')">
-                      <ng-icon hlm name="lucideTrendingDown" size="sm" />
+                      <ng-icon name="lucideTrendingDown" class="text-[length:--spacing(4)]" />
                       Sell
                     </button>
                     <button hlmDropdownMenuItem (triggered)="openNewDividend()">
-                      <ng-icon hlm name="lucideBanknote" size="sm" />
+                      <ng-icon name="lucideBanknote" class="text-[length:--spacing(4)]" />
                       Dividend
                     </button>
                     <button hlmDropdownMenuItem (triggered)="openNewDrip()">
-                      <ng-icon hlm name="lucideRepeat" size="sm" />
+                      <ng-icon name="lucideRepeat" class="text-[length:--spacing(4)]" />
                       Reinvest dividend
                     </button>
                   </hlm-dropdown-menu-group>

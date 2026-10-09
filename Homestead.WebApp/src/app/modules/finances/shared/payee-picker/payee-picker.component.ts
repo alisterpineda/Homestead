@@ -20,7 +20,6 @@ import { lucideChevronDown, lucideCheck, lucidePlus, lucideX } from '@ng-icons/l
 // Reach past the helm wrapper for the overlay's updatePosition() — HlmPopover doesn't re-expose it, and the
 // picker's host scroll containers aren't cdkScrollable, so we re-anchor the panel on scroll ourselves.
 import { BrnPopover } from '@spartan-ng/brain/popover';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmPopoverImports } from '@/shared/components/spartan/popover';
 import { HlmInputGroupImports } from '@/shared/components/spartan/input-group';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
@@ -52,7 +51,7 @@ let payeePickerSeq = 0;
 @Component({
   selector: 'app-payee-picker',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgIcon, HlmIconImports, HlmPopoverImports, HlmInputGroupImports, HlmSpinner],
+  imports: [NgIcon, HlmPopoverImports, HlmInputGroupImports, HlmSpinner],
   providers: [provideIcons({ lucideChevronDown, lucideCheck, lucidePlus, lucideX })],
   template: `
     <div
@@ -99,7 +98,7 @@ let payeePickerSeq = 0;
               (mousedown)="$event.preventDefault()"
               (click)="onClear()"
             >
-              <ng-icon hlm name="lucideX" size="sm" class="text-muted-foreground" />
+              <ng-icon name="lucideX" class="text-[length:--spacing(4)] text-muted-foreground" />
             </button>
           }
           <button
@@ -113,10 +112,8 @@ let payeePickerSeq = 0;
             (click)="onChevron()"
           >
             <ng-icon
-              hlm
               name="lucideChevronDown"
-              size="sm"
-              class="text-muted-foreground transition-transform"
+              class="text-[length:--spacing(4)] text-muted-foreground transition-transform"
               [class.rotate-180]="popoverState() === 'open'"
             />
           </button>
@@ -145,7 +142,7 @@ let payeePickerSeq = 0;
           >
             <span class="size-4 shrink-0 flex items-center justify-center">
               @if (value() === null) {
-                <ng-icon hlm name="lucideCheck" size="sm" />
+                <ng-icon name="lucideCheck" class="text-[length:--spacing(4)]" />
               }
             </span>
             <span class="text-muted-foreground">No payee</span>
@@ -168,7 +165,7 @@ let payeePickerSeq = 0;
               >
                 <span class="size-4 shrink-0 flex items-center justify-center">
                   @if (p.id === value()?.id) {
-                    <ng-icon hlm name="lucideCheck" size="sm" />
+                    <ng-icon name="lucideCheck" class="text-[length:--spacing(4)]" />
                   }
                 </span>
                 <span class="truncate">{{ p.name }}</span>
@@ -189,7 +186,7 @@ let payeePickerSeq = 0;
                   @if (creating()) {
                     <hlm-spinner class="size-3" />
                   } @else {
-                    <ng-icon hlm name="lucidePlus" size="sm" />
+                    <ng-icon name="lucidePlus" class="text-[length:--spacing(4)]" />
                   }
                 </span>
                 <span class="truncate">Create "{{ searchTerm().trim() }}"</span>

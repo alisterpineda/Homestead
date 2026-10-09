@@ -14,24 +14,12 @@
  * *today* — a Spartan upgrade that adds a token to that list fails here rather than silently killing
  * another utility.
  */
-import { existsSync, readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-/**
- * The builder hands Vitest a bundle, so `import.meta.url` is not a `file:` URL here. Anchor on the
- * nearest ancestor of the working directory that actually holds `src/styles.css` instead.
- */
-function projectRoot(): string {
-  let dir = process.cwd();
-  for (;;) {
-    if (existsSync(join(dir, 'src', 'styles.css'))) return dir;
-    const parent = dirname(dir);
-    if (parent === dir) throw new Error(`Could not locate src/styles.css above ${process.cwd()}`);
-    dir = parent;
-  }
-}
+import { projectRoot } from '@/shared/testing/project-root';
 
 /** Both files explain these very tokens in prose, so a commented-out declaration must not count. */
 function stripComments(css: string): string {

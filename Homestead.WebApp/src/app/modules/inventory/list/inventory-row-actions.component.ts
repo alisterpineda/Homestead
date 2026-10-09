@@ -9,7 +9,6 @@ import {
   lucidePackageOpen,
   lucideExternalLink,
 } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-menu';
 import { isTerminalStatus } from '../shared/item-status-meta';
@@ -18,7 +17,7 @@ import type { InventoryRow } from './inventory-row';
 @Component({
   selector: 'app-inventory-row-actions',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgIcon, HlmIconImports, HlmButton, HlmDropdownMenuImports],
+  imports: [NgIcon, HlmButton, HlmDropdownMenuImports],
   providers: [provideIcons({
     lucideEllipsisVertical,
     lucidePencil,
@@ -40,32 +39,32 @@ import type { InventoryRow } from './inventory-row';
       (keydown.enter)="onTriggerKeydown($event)"
       (keydown.space)="onTriggerKeydown($event)"
     >
-      <ng-icon hlm name="lucideEllipsisVertical" size="sm" />
+      <ng-icon name="lucideEllipsisVertical" class="text-[length:--spacing(4)]" />
     </button>
     <ng-template #menu>
       <hlm-dropdown-menu class="w-44">
         <hlm-dropdown-menu-group>
           <button hlmDropdownMenuItem (triggered)="edit.emit(row())">
-            <ng-icon hlm name="lucidePencil" size="sm" />
+            <ng-icon name="lucidePencil" class="text-[length:--spacing(4)]" />
             Edit
           </button>
           @if (row().durable?.isContainer) {
             <button hlmDropdownMenuItem (triggered)="viewContents.emit(row())">
-              <ng-icon hlm name="lucidePackageOpen" size="sm" />
+              <ng-icon name="lucidePackageOpen" class="text-[length:--spacing(4)]" />
               View contents
             </button>
           } @else if (row().durable?.hasComponents) {
             <button hlmDropdownMenuItem (triggered)="viewContents.emit(row())">
-              <ng-icon hlm name="lucidePackageOpen" size="sm" />
+              <ng-icon name="lucidePackageOpen" class="text-[length:--spacing(4)]" />
               View components
             </button>
           }
           <button hlmDropdownMenuItem (triggered)="viewDetails.emit(row())">
-            <ng-icon hlm name="lucideExternalLink" size="sm" />
+            <ng-icon name="lucideExternalLink" class="text-[length:--spacing(4)]" />
             View details
           </button>
           <button hlmDropdownMenuItem (triggered)="archiveRestore.emit(row())">
-            <ng-icon hlm [name]="terminal() ? 'lucideArchiveRestore' : 'lucideArchive'" size="sm" />
+            <ng-icon [name]="terminal() ? 'lucideArchiveRestore' : 'lucideArchive'" class="text-[length:--spacing(4)]" />
             {{ terminal() ? 'Restore' : 'Archive' }}
           </button>
           <hlm-dropdown-menu-separator />
@@ -74,7 +73,7 @@ import type { InventoryRow } from './inventory-row';
             variant="destructive"
             (triggered)="delete.emit(row())"
           >
-            <ng-icon hlm name="lucideTrash2" size="sm" />
+            <ng-icon name="lucideTrash2" class="text-[length:--spacing(4)]" />
             Delete
           </button>
         </hlm-dropdown-menu-group>

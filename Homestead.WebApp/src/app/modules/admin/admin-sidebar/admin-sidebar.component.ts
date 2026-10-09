@@ -4,7 +4,6 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { filter, map } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideLayoutDashboard, lucideUsers, lucideUsers2, lucideActivity, lucideCalendarClock, lucideSettings, lucideSparkles, lucideDatabaseBackup } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSidebarImports } from '@/shared/components/spartan/sidebar';
 import { isNavItemActive } from '@/shared/utils';
 
@@ -14,7 +13,6 @@ import { isNavItemActive } from '@/shared/utils';
   imports: [
     RouterLink,
     NgIcon,
-    HlmIconImports,
     HlmSidebarImports,
   ],
   providers: [provideIcons({ lucideLayoutDashboard, lucideUsers, lucideUsers2, lucideActivity, lucideCalendarClock, lucideSettings, lucideSparkles, lucideDatabaseBackup })],
@@ -24,7 +22,7 @@ import { isNavItemActive } from '@/shared/utils';
         <ul hlmSidebarMenu>
           <li hlmSidebarMenuItem>
             <a hlmSidebarMenuButton routerLink="/admin" [isActive]="isActive('/admin')">
-              <ng-icon hlm name="lucideLayoutDashboard" size="sm" />
+              <ng-icon name="lucideLayoutDashboard" class="text-[length:--spacing(4)]" />
               <span>Overview</span>
             </a>
           </li>
@@ -38,25 +36,25 @@ import { isNavItemActive } from '@/shared/utils';
         <ul hlmSidebarMenu>
           <li hlmSidebarMenuItem>
             <a hlmSidebarMenuButton routerLink="/admin/users" [isActive]="isActive('/admin/users')">
-              <ng-icon hlm name="lucideUsers" size="sm" />
+              <ng-icon name="lucideUsers" class="text-[length:--spacing(4)]" />
               <span>Users</span>
             </a>
           </li>
           <li hlmSidebarMenuItem>
             <a hlmSidebarMenuButton routerLink="/admin/groups" [isActive]="isActive('/admin/groups')">
-              <ng-icon hlm name="lucideUsers2" size="sm" />
+              <ng-icon name="lucideUsers2" class="text-[length:--spacing(4)]" />
               <span>Groups</span>
             </a>
           </li>
           <li hlmSidebarMenuItem>
             <a hlmSidebarMenuButton routerLink="/admin/jobs" [isActive]="isActive('/admin/jobs')">
-              <ng-icon hlm name="lucideActivity" size="sm" />
+              <ng-icon name="lucideActivity" class="text-[length:--spacing(4)]" />
               <span>Jobs</span>
             </a>
           </li>
           <li hlmSidebarMenuItem>
             <a hlmSidebarMenuButton routerLink="/admin/schedules" [isActive]="isActive('/admin/schedules')">
-              <ng-icon hlm name="lucideCalendarClock" size="sm" />
+              <ng-icon name="lucideCalendarClock" class="text-[length:--spacing(4)]" />
               <span>Schedules</span>
             </a>
           </li>
@@ -70,19 +68,19 @@ import { isNavItemActive } from '@/shared/utils';
         <ul hlmSidebarMenu>
           <li hlmSidebarMenuItem>
             <a hlmSidebarMenuButton routerLink="/admin/settings" [isActive]="isActive('/admin/settings')">
-              <ng-icon hlm name="lucideSettings" size="sm" />
+              <ng-icon name="lucideSettings" class="text-[length:--spacing(4)]" />
               <span>System Settings</span>
             </a>
           </li>
           <li hlmSidebarMenuItem>
             <a hlmSidebarMenuButton routerLink="/admin/ai" [isActive]="isActive('/admin/ai')">
-              <ng-icon hlm name="lucideSparkles" size="sm" />
+              <ng-icon name="lucideSparkles" class="text-[length:--spacing(4)]" />
               <span>AI</span>
             </a>
           </li>
           <li hlmSidebarMenuItem>
             <a hlmSidebarMenuButton routerLink="/admin/backup" [isActive]="isActive('/admin/backup')">
-              <ng-icon hlm name="lucideDatabaseBackup" size="sm" />
+              <ng-icon name="lucideDatabaseBackup" class="text-[length:--spacing(4)]" />
               <span>Backup</span>
             </a>
           </li>

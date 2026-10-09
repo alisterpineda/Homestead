@@ -38,21 +38,16 @@ names=$(ls src/app/shared/components/spartan/)
 rm -rf src/app/shared/components/spartan/*/
 # remove every "@/shared/components/spartan/*" alias from tsconfig.json (keep "@/*")
 npx ng g @spartan-ng/cli:ui utils </dev/null
-for c in $names; do case "$c" in utils|icon) ;; *) npx ng g @spartan-ng/cli:ui "$c" </dev/null ;; esac; done
+for c in $names; do [ "$c" = utils ] || npx ng g @spartan-ng/cli:ui "$c" </dev/null; done
 ```
 
-Then **immediately** restore the `icon` helm (next section) before building. The regen re-adds every alias except `icon`'s; if `git diff tsconfig.json` shows only that alias missing, `git checkout HEAD -- tsconfig.json` restores it. A full regen on a clean tree is also the cheapest way to confirm the vendored helm has no local drift — the diff should contain only the upstream template changes.
+The regen re-adds every alias, so `git diff tsconfig.json` should be empty afterwards. A full regen on a clean tree is also the cheapest way to confirm the vendored helm has no local drift — the diff should contain only the upstream template changes.
 
 ## Known regen gotchas
 
 A green `ng build` **and** a clean `healthcheck` are **not sufficient** — the worst regressions here are runtime-only. Always finish with the `self-qa` subagent.
 
-- **`icon` helm: never regenerate, never migrate.** Upstream removed the icon helm in 1.1.0 (there's no `ui:icon` template that produces a directive; regenerated helm imports `NgIcon` from `@ng-icons/core` and the official skill's `rules/icons.md` sizes icons with font-size classes). This app relies on the vendored `HlmIcon` directive — `HlmIconImports` in ~86 files and `<ng-icon hlm size="sm|xs">` at ~448 sites. Restore it from git and keep its alias:
-  ```bash
-  git checkout HEAD -- Homestead.WebApp/src/app/shared/components/spartan/icon
-  # ensure "@/shared/components/spartan/icon" is still in tsconfig.json paths
-  ```
-  It's self-contained, decoupled from the rest of helm, and the `Helm Icons` healthcheck passes with it.
+- **There is no `icon` helm.** Upstream removed it in 1.1.0 and this app no longer vendors one; icons are plain `<ng-icon>` + `NgIcon`, sized per the official skill's `rules/icons.md`. If a regen or `ui icon` ever recreates `components/spartan/icon`, delete it and its alias.
 - **Date-picker `min`/`max` → `minDate`/`maxDate` (1.3.x).** Build error, so it's caught: rename bindings on every `<hlm-date-picker>` (8 component files). `hlm-calendar` still takes `min`/`max`.
 - **`HlmButton` via `hostDirectives` → runtime NG0309.** `hlmAlertDialogCancel`, `hlmAlertDialogAction`, `hlmInputGroupButton`, `hlmSidebarTrigger` bring `HlmButton` themselves (exposing `variant`/`size`). Adding `hlmBtn` alongside double-applies `BrnButton` → `NG0309 "matches multiple times"` at runtime only (build passes; only opening the dialog / self-QA catches it). Drop the redundant `hlmBtn`, pass `variant`/`size` as inputs. `hlmDialogClose`, `hlmSheetClose`, `hlmDialogTrigger`, `hlmAlertDialogTrigger`, `hlmPopoverTrigger`, `hlmDropdownMenuTrigger` do **not** bring it, so pairing those with `hlmBtn` stays correct. After a regen, `grep -r hostDirectives src/app/shared/components/spartan` and diff the set against this list.
 - **`HlmDatePickerConfig.parseDate` returns `T | null`** (not `undefined`); `dateChange` emits `T | null`. Handled in `shared/utils/date-picker-config.ts` — keep the `null` returns.

@@ -1,7 +1,6 @@
 import { Component, ChangeDetectionStrategy, computed, input } from '@angular/core';
 import { DatePipe } from '@angular/common';
 
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideTriangleAlert } from '@ng-icons/lucide';
 import type { TextExtractionProvenanceResponse } from '@/api/generated/models/text-extraction-provenance-response';
@@ -13,7 +12,7 @@ import type { TextExtractionProvenanceResponse } from '@/api/generated/models/te
 @Component({
   selector: 'app-text-extraction-provenance',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, HlmIconImports, NgIcon],
+  imports: [DatePipe, NgIcon],
   providers: [provideIcons({ lucideTriangleAlert })],
   template: `
     @if (provenance(); as p) {
@@ -27,7 +26,7 @@ import type { TextExtractionProvenanceResponse } from '@/api/generated/models/te
 
         @if (p.requestedEngineKey) {
           <div class="flex items-start gap-2 rounded-md border border-border bg-muted p-2">
-            <ng-icon hlm name="lucideTriangleAlert" size="sm" class="mt-0.5 shrink-0" />
+            <ng-icon name="lucideTriangleAlert" class="text-[length:--spacing(4)] mt-0.5 shrink-0" />
             <span>
               <span class="font-medium text-foreground">{{ p.requestedEngineKey }}</span> was requested but
               unavailable ({{ p.fallbackReason }}), so {{ p.engineKey }} ran instead.

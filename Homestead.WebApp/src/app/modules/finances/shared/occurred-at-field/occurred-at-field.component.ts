@@ -7,7 +7,6 @@ import {
 } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideClock, lucideX } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmInput } from '@/shared/components/spartan/input';
@@ -22,7 +21,7 @@ import { tomorrowIso } from '../date';
 @Component({
   selector: 'app-occurred-at-field',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgIcon, HlmIconImports, HlmButton, HlmLabel, HlmInput, HlmDatePicker, HlmDatePickerInput],
+  imports: [NgIcon, HlmButton, HlmLabel, HlmInput, HlmDatePicker, HlmDatePickerInput],
   providers: [provideIcons({ lucideClock, lucideX })],
   template: `
     <div class="space-y-2">
@@ -55,11 +54,11 @@ import { tomorrowIso } from '../date';
             aria-label="Clear time"
             (click)="clearTime()"
           >
-            <ng-icon hlm name="lucideX" size="sm" />
+            <ng-icon name="lucideX" class="text-[length:--spacing(4)]" />
           </button>
         } @else {
           <button type="button" hlmBtn variant="ghost" (click)="addTime()">
-            <ng-icon hlm name="lucideClock" size="sm" />
+            <ng-icon name="lucideClock" class="text-[length:--spacing(4)]" />
             Add time
           </button>
         }

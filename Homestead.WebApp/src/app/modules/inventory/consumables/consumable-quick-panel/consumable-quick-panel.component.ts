@@ -13,7 +13,6 @@ import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { switchMap, map, of, defer, type Observable } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideMinus, lucidePlus, lucideTriangleAlert, lucideArrowRight } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmInput } from '@/shared/components/spartan/input';
@@ -74,7 +73,6 @@ interface StepperPayload {
   imports: [
     RouterLink,
     NgIcon,
-    HlmIconImports,
     QuickPanelComponent,
     HlmButton,
     HlmLabel,
@@ -127,7 +125,7 @@ interface StepperPayload {
                 }
                 @if (isLowNow()) {
                   <p class="flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-300">
-                    <ng-icon hlm name="lucideTriangleAlert" size="xs" />
+                    <ng-icon name="lucideTriangleAlert" class="text-[length:--spacing(3)]" />
                     Low — restock at or below {{ formatQty(s.restockThreshold!) }} {{ s.unit | unit }}
                   </p>
                 }
@@ -155,7 +153,7 @@ interface StepperPayload {
               <h4 class="text-sm font-medium text-muted-foreground">Stored at</h4>
               @if (!archived() && inlineForm()?.kind !== 'assign') {
                 <button hlmBtn variant="ghost" size="sm" (click)="openAssign()">
-                  <ng-icon hlm name="lucidePlus" size="sm" />
+                  <ng-icon name="lucidePlus" class="text-[length:--spacing(4)]" />
                   Assign to a place
                 </button>
               }
@@ -229,7 +227,7 @@ interface StepperPayload {
                           [attr.aria-label]="'Use one ' + (s.unit | unit)"
                           (click)="onTap(entry, -1)"
                         >
-                          <ng-icon hlm name="lucideMinus" size="sm" />
+                          <ng-icon name="lucideMinus" class="text-[length:--spacing(4)]" />
                         </button>
                         <span hlmButtonGroupText class="min-w-16 justify-center px-2 text-sm tabular-nums max-md:h-11">
                           {{ formatQty(displayedQty(entry)) }} {{ s.unit | unit }}
@@ -242,7 +240,7 @@ interface StepperPayload {
                           [attr.aria-label]="'Receive one ' + (s.unit | unit)"
                           (click)="onTap(entry, 1)"
                         >
-                          <ng-icon hlm name="lucidePlus" size="sm" />
+                          <ng-icon name="lucidePlus" class="text-[length:--spacing(4)]" />
                         </button>
                       </div>
                       <div class="flex items-center gap-2">
@@ -338,7 +336,7 @@ interface StepperPayload {
               class="flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground disabled:pointer-events-none disabled:opacity-60"
             >
               {{ navigating() ? 'Saving changes...' : 'View details' }}
-              <ng-icon hlm name="lucideArrowRight" size="sm" />
+              <ng-icon name="lucideArrowRight" class="text-[length:--spacing(4)]" />
             </button>
           </div>
         }

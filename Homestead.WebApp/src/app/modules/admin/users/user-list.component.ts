@@ -5,7 +5,6 @@ import { switchMap, map, combineLatest, firstValueFrom } from 'rxjs';
 import { debounceTime, distinctUntilChanged, filter } from 'rxjs/operators';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideUsers, lucideSearch, lucidePlus, lucideTrash2 } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { SearchInputComponent } from '@/shared/components/search-input/search-input.component';
@@ -28,7 +27,6 @@ import { toast } from '@spartan-ng/brain/sonner';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     NgIcon,
-    HlmIconImports,
     HlmSpinner,
     HlmEmptyImports,
     SearchInputComponent,
@@ -73,7 +71,7 @@ import { toast } from '@spartan-ng/brain/sonner';
             </div>
             <div hlmEmptyContent>
               <app-create-user-dialog (created)="onRefresh()">
-                <ng-icon hlm name="lucidePlus" size="sm" />
+                <ng-icon name="lucidePlus" class="text-[length:--spacing(4)]" />
                 New User
               </app-create-user-dialog>
             </div>
@@ -86,7 +84,7 @@ import { toast } from '@spartan-ng/brain/sonner';
                 <app-search-input class="flex-1 min-w-0" [(value)]="searchInput" placeholder="Search users..." ariaLabel="Search users" />
                 <div class="ml-auto flex items-center gap-2">
                   <app-create-user-dialog (created)="onRefresh()">
-                    <ng-icon hlm name="lucidePlus" size="sm" />
+                    <ng-icon name="lucidePlus" class="text-[length:--spacing(4)]" />
                     New User
                   </app-create-user-dialog>
                 </div>
@@ -104,7 +102,7 @@ import { toast } from '@spartan-ng/brain/sonner';
                 </button>
                 <hlm-alert-dialog>
                   <button hlmBtn variant="destructive" hlmAlertDialogTrigger>
-                    <ng-icon hlm name="lucideTrash2" size="sm" />
+                    <ng-icon name="lucideTrash2" class="text-[length:--spacing(4)]" />
                     Delete
                   </button>
                   <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">

@@ -4,7 +4,6 @@ import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideExternalLink, lucideTriangleAlert } from '@ng-icons/lucide';
 
 import { HlmBadge } from '@/shared/components/spartan/badge';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { formatBytes } from '@/shared/utils';
 import { formatRelativeAge } from '@/shared/utils/relative-age';
 import {
@@ -36,7 +35,7 @@ import type { DocumentBackupVersionState } from '@/api/generated/models/document
 @Component({
   selector: 'app-document-backup-state',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, NgIcon, HlmIconImports, HlmBadge],
+  imports: [DatePipe, NgIcon, HlmBadge],
   providers: [DatePipe, provideIcons({ lucideExternalLink, lucideTriangleAlert })],
   template: `
     <div class="flex flex-col gap-3" data-testid="document-backup-state">
@@ -132,7 +131,7 @@ import type { DocumentBackupVersionState } from '@/api/generated/models/document
                     [attr.data-testid]="'remote-link-' + source.backupSourceId"
                   >
                     Open in {{ kindLabel(source.targetKind) }}{{ accountSuffix(source) }}
-                    <ng-icon hlm name="lucideExternalLink" size="xs" class="shrink-0" />
+                    <ng-icon name="lucideExternalLink" class="text-[length:--spacing(3)] shrink-0" />
                   </a>
                 }
               </div>
@@ -147,7 +146,7 @@ import type { DocumentBackupVersionState } from '@/api/generated/models/document
                 class="flex items-start gap-2 rounded-md border border-destructive/50 p-3 text-sm text-destructive"
                 [attr.data-testid]="'version-failure-' + source.backupSourceId"
               >
-                <ng-icon hlm name="lucideTriangleAlert" size="sm" class="mt-0.5 shrink-0" />
+                <ng-icon name="lucideTriangleAlert" class="text-[length:--spacing(4)] mt-0.5 shrink-0" />
                 <span class="break-words">
                   @if (version.lastWrittenAt) {
                     The last run failed to update the copy of version

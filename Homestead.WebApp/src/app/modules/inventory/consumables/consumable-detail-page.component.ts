@@ -29,7 +29,6 @@ import {
   lucideArchiveRestore,
   lucideTrash2,
 } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmLabel } from '@/shared/components/spartan/label';
@@ -74,7 +73,6 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
   imports: [
     RouterLink,
     NgIcon,
-    HlmIconImports,
     HlmButton,
     HlmInput,
     HlmLabel,
@@ -126,7 +124,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
               <app-item-status-badge [status]="s.status" [note]="s.statusNote" />
               @if (s.isLow) {
                 <span [class]="lowStockBadgeClass">
-                  <ng-icon hlm name="lucideTriangleAlert" size="xs" />
+                  <ng-icon name="lucideTriangleAlert" class="text-[length:--spacing(3)]" />
                   Low
                 </span>
               }
@@ -171,32 +169,32 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
           </div>
           <div class="flex items-center gap-2">
             <button hlmBtn variant="outline" size="sm" (click)="openEdit(s)">
-              <ng-icon hlm name="lucidePencil" size="sm" />
+              <ng-icon name="lucidePencil" class="text-[length:--spacing(4)]" />
               Edit
             </button>
             @if (s.status === 'Active') {
               <button hlmBtn variant="outline" size="sm" (click)="openCollapse()">
-                <ng-icon hlm name="lucideBoxes" size="sm" />
+                <ng-icon name="lucideBoxes" class="text-[length:--spacing(4)]" />
                 Collapse durables
               </button>
             }
             <button hlmBtn size="sm" (click)="openReceive()">
-              <ng-icon hlm name="lucidePlus" size="sm" />
+              <ng-icon name="lucidePlus" class="text-[length:--spacing(4)]" />
               Receive
             </button>
             <button hlmBtn variant="outline" size="icon-sm" [hlmDropdownMenuTrigger]="actionsMenu" aria-label="Consumable actions">
-              <ng-icon hlm name="lucideEllipsisVertical" size="sm" />
+              <ng-icon name="lucideEllipsisVertical" class="text-[length:--spacing(4)]" />
             </button>
             <ng-template #actionsMenu>
               <hlm-dropdown-menu class="w-44">
                 <hlm-dropdown-menu-group>
                   <button hlmDropdownMenuItem (triggered)="onArchiveRestore(s)" [disabled]="archiving()">
-                    <ng-icon hlm [name]="terminal() ? 'lucideArchiveRestore' : 'lucideArchive'" size="sm" />
+                    <ng-icon [name]="terminal() ? 'lucideArchiveRestore' : 'lucideArchive'" class="text-[length:--spacing(4)]" />
                     {{ terminal() ? 'Restore' : 'Archive' }}
                   </button>
                   <hlm-dropdown-menu-separator />
                   <button hlmDropdownMenuItem variant="destructive" (triggered)="onDeleteRequest()">
-                    <ng-icon hlm name="lucideTrash2" size="sm" />
+                    <ng-icon name="lucideTrash2" class="text-[length:--spacing(4)]" />
                     Delete
                   </button>
                 </hlm-dropdown-menu-group>
@@ -276,17 +274,17 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
                         <td hlmTd>
                           <span class="inline-flex items-center gap-1.5 text-sm">
                             @if (direction(m) === 'inflow') {
-                              <ng-icon hlm name="lucideArrowRight" size="xs" class="text-emerald-600" />
+                              <ng-icon name="lucideArrowRight" class="text-[length:--spacing(3)] text-emerald-600" />
                               <span>{{ m.toLabel ?? '—' }}</span>
                             } @else if (direction(m) === 'outflow') {
                               <span>{{ m.fromLabel ?? '—' }}</span>
-                              <ng-icon hlm name="lucideArrowRight" size="xs" class="text-destructive" />
+                              <ng-icon name="lucideArrowRight" class="text-[length:--spacing(3)] text-destructive" />
                             } @else if (direction(m) === 'transfer') {
                               <span>{{ m.fromLabel ?? '—' }}</span>
-                              <ng-icon hlm name="lucideArrowRight" size="xs" class="text-muted-foreground" />
+                              <ng-icon name="lucideArrowRight" class="text-[length:--spacing(3)] text-muted-foreground" />
                               <span>{{ m.toLabel ?? '—' }}</span>
                             } @else {
-                              <ng-icon hlm name="lucideMinus" size="xs" class="text-muted-foreground" />
+                              <ng-icon name="lucideMinus" class="text-[length:--spacing(3)] text-muted-foreground" />
                             }
                           </span>
                           @if (movementMeta(m); as meta) {
@@ -321,10 +319,10 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
               <div class="flex items-center justify-end gap-2">
                 <span class="text-xs text-muted-foreground">Page {{ page() }} of {{ totalPages() }}</span>
                 <button hlmBtn variant="outline" size="icon-sm" [disabled]="page() <= 1" (click)="prevPage()" aria-label="Previous page">
-                  <ng-icon hlm name="lucideChevronLeft" size="sm" />
+                  <ng-icon name="lucideChevronLeft" class="text-[length:--spacing(4)]" />
                 </button>
                 <button hlmBtn variant="outline" size="icon-sm" [disabled]="page() >= totalPages()" (click)="nextPage()" aria-label="Next page">
-                  <ng-icon hlm name="lucideChevronRight" size="sm" />
+                  <ng-icon name="lucideChevronRight" class="text-[length:--spacing(4)]" />
                 </button>
               </div>
             }
