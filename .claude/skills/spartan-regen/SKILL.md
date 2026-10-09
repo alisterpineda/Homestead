@@ -11,7 +11,8 @@ Project facts (also in `Homestead.WebApp/CLAUDE.md`):
 
 - Run every CLI command from `Homestead.WebApp/` via `npx ng g @spartan-ng/cli:<generator>` (Angular CLI workspace; bare `ng` is not on PATH).
 - `components.json`: `componentsPath` = `src/app/shared/components/spartan`, `importAlias` = `@/shared/components/spartan`. Confirm with `npx ng g @spartan-ng/cli:info --json`.
-- Vendored helm is 1.5.0-generated and the installed `@spartan-ng/cli`/`brain` are 1.5.0, so a regen today is same-version. Bump the packages first if you want newer templates.
+- Vendored helm is 1.6.3-generated and the installed `@spartan-ng/cli`/`brain` are 1.6.3, so a regen today is same-version. Bump the packages first if you want newer templates.
+- Before a version bump, scope the helm impact by diffing the published CLI tarballs (not the GitHub compare API — it silently caps at 300 files): `npm pack @spartan-ng/cli@<old> @spartan-ng/cli@<new>` into an empty scratch dir, extract each, then `diff -rq <old>/package/src/generators/ui <new>/package/src/generators/ui`. Changed `libs/<name>/files/` templates for installed components need that component regenerated; a changed `style-nova.css` (the class map applied to every helm file — `components.json` style is `nova`) or generator `.js` logic means a full regen. 1.5.0 → 1.6.3 touched only `dropdown-menu` (trigger + sub-trigger).
 - Never hand-edit files under `componentsPath` — work around helm bugs in consuming code or flag upstream.
 
 ## Re-installing a single component
@@ -37,10 +38,10 @@ names=$(ls src/app/shared/components/spartan/)
 rm -rf src/app/shared/components/spartan/*/
 # remove every "@/shared/components/spartan/*" alias from tsconfig.json (keep "@/*")
 npx ng g @spartan-ng/cli:ui utils </dev/null
-for c in $names; do [ "$c" = utils ] || npx ng g @spartan-ng/cli:ui "$c" </dev/null; done
+for c in $names; do case "$c" in utils|icon) ;; *) npx ng g @spartan-ng/cli:ui "$c" </dev/null ;; esac; done
 ```
 
-Then **immediately** restore the `icon` helm (next section) before building.
+Then **immediately** restore the `icon` helm (next section) before building. The regen re-adds every alias except `icon`'s; if `git diff tsconfig.json` shows only that alias missing, `git checkout HEAD -- tsconfig.json` restores it. A full regen on a clean tree is also the cheapest way to confirm the vendored helm has no local drift — the diff should contain only the upstream template changes.
 
 ## Known regen gotchas
 
@@ -55,7 +56,7 @@ A green `ng build` **and** a clean `healthcheck` are **not sufficient** — the 
 - **Date-picker `min`/`max` → `minDate`/`maxDate` (1.3.x).** Build error, so it's caught: rename bindings on every `<hlm-date-picker>` (8 component files). `hlm-calendar` still takes `min`/`max`.
 - **`HlmButton` via `hostDirectives` → runtime NG0309.** `hlmAlertDialogCancel`, `hlmAlertDialogAction`, `hlmInputGroupButton`, `hlmSidebarTrigger` bring `HlmButton` themselves (exposing `variant`/`size`). Adding `hlmBtn` alongside double-applies `BrnButton` → `NG0309 "matches multiple times"` at runtime only (build passes; only opening the dialog / self-QA catches it). Drop the redundant `hlmBtn`, pass `variant`/`size` as inputs. `hlmDialogClose`, `hlmSheetClose`, `hlmDialogTrigger`, `hlmAlertDialogTrigger`, `hlmPopoverTrigger`, `hlmDropdownMenuTrigger` do **not** bring it, so pairing those with `hlmBtn` stays correct. After a regen, `grep -r hostDirectives src/app/shared/components/spartan` and diff the set against this list.
 - **`HlmDatePickerConfig.parseDate` returns `T | null`** (not `undefined`); `dateChange` emits `T | null`. Handled in `shared/utils/date-picker-config.ts` — keep the `null` returns.
-- **Silent behavioural deltas to re-check** (no-ops as of 1.5.0): `hlm-sidebar.service` seeds open state from `HlmSidebarConfig.defaultOpen` (app never calls `provideHlmSidebarConfig`); date pickers' `align` input (default `'center'`) shadows any global `BrnPopoverConfig.align`; date-picker inputs stamp `aria-invalid`/`data-*` only when bound to an `NgControl` (this app binds signals, so nothing renders); `hlm-combobox-input` stamps `aria-label="Toggle options"`/`"Clear selection"`, which can make accessible-name selectors newly ambiguous in specs/E2E.
+- **Silent behavioural deltas to re-check** (no-ops as of 1.6.3): `hlm-sidebar.service` seeds open state from `HlmSidebarConfig.defaultOpen` (app never calls `provideHlmSidebarConfig`); date pickers' `align` input (default `'center'`) shadows any global `BrnPopoverConfig.align`; date-picker inputs stamp `aria-invalid`/`data-*` only when bound to an `NgControl` (this app binds signals, so nothing renders); `hlm-combobox-input` stamps `aria-label="Toggle options"`/`"Clear selection"`, which can make accessible-name selectors newly ambiguous in specs/E2E.
 
 ## Verification chain (after any regen)
 
