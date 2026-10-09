@@ -3,6 +3,10 @@ using Homestead.WebApi.Domain.Settings;
 using Homestead.WebApi.Infrastructure.TextExtraction;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
+using SkiaSharp;
+using UglyToad.PdfPig.Content;
+using UglyToad.PdfPig.Core;
+using UglyToad.PdfPig.Writer;
 
 namespace Homestead.WebApi.Tests.Unit.Documents.TextExtraction;
 
@@ -134,6 +138,73 @@ public class TesseractTextExtractionEngineTests : IDisposable
         Assert.Equal(1, metadata.PagesOcred);
         Assert.Null(metadata.RequestedEngineKey);
     }
+
+    [Fact]
+    public async Task ExtractTextAsync_PdfPageWithoutTextLayer_RendersPageToPngForOcr()
+    {
+        var (result, ocrInput) = await ExtractImageOnlyPdfAsync(_sut);
+
+        Assert.Equal("scanned text", result.Text);
+        Assert.NotNull(ocrInput);
+        Assert.True(IsPng(ocrInput));
+        // The embedded image must survive the render: at the default 300 DPI its centre, PDF point
+        // (150, 550) on the 842pt-tall page, lands at pixel (625, 1217).
+        using var rendered = SKBitmap.Decode(ocrInput);
+        Assert.Equal(SKColors.SteelBlue, rendered.GetPixel(625, 1217));
+    }
+
+    [Fact]
+    public async Task ExtractTextAsync_PdfPageWithoutTextLayer_RendersAtConfiguredDpi()
+    {
+        // 150, not the 300 default: PDFtoImage's own default is also 300, so only a non-default value
+        // shows the configured DPI is actually honoured.
+        var engine = EngineWith(new OcrEngineOptions { Dpi = 150 });
+
+        var (_, ocrInput) = await ExtractImageOnlyPdfAsync(engine);
+
+        // A4 is 595 x 842pt; at 150 DPI that's 1239.6 x 1754.2px.
+        using var rendered = SKBitmap.Decode(ocrInput);
+        Assert.InRange(rendered.Width, 1239, 1240);
+        Assert.InRange(rendered.Height, 1754, 1755);
+    }
+
+    // Runs the engine over a one-page image-only PDF and captures the bytes it handed to tesseract.
+    private async Task<(TextExtractionOutput Result, byte[]? OcrInput)> ExtractImageOnlyPdfAsync(
+        TesseractTextExtractionEngine engine)
+    {
+        File.WriteAllBytes(_tempFile, BuildImageOnlyPdf());
+        byte[]? ocrInput = null;
+        _runner.OcrAsync(Arg.Any<Stream>(), Arg.Any<TesseractRunOptions>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                using var copy = new MemoryStream();
+                call.Arg<Stream>().CopyTo(copy);
+                ocrInput = copy.ToArray();
+                return "scanned text";
+            });
+
+        var result = await engine.ExtractTextAsync(_tempFile, "application/pdf", CancellationToken.None);
+        return (result, ocrInput);
+    }
+
+    // A one-page A4 PDF whose only content is a SteelBlue PNG at PDF (50, 500)–(250, 600) — no text layer,
+    // so the engine must rasterize the page (PDFtoImage) and hand the render to tesseract.
+    private static byte[] BuildImageOnlyPdf()
+    {
+        using var bitmap = new SKBitmap(200, 100);
+        using (var canvas = new SKCanvas(bitmap))
+            canvas.Clear(SKColors.SteelBlue);
+        using var image = SKImage.FromBitmap(bitmap);
+        using var png = image.Encode(SKEncodedImageFormat.Png, 100);
+
+        var builder = new PdfDocumentBuilder();
+        var page = builder.AddPage(PageSize.A4);
+        page.AddPng(png.ToArray(), new PdfRectangle(50, 500, 250, 600));
+        return builder.Build();
+    }
+
+    private static bool IsPng(byte[] bytes) =>
+        bytes.Length >= 4 && bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47;
 
     [Fact]
     public void DefaultOptions_IsConfigured()
