@@ -1,6 +1,15 @@
 import { Component, computed } from '@angular/core';
 import { HlmCheckboxImports } from '@/shared/components/spartan/checkbox';
-import { type CellContext, type HeaderContext, injectFlexRenderContext } from '@tanstack/angular-table';
+import {
+  type CellContext,
+  type HeaderContext,
+  injectFlexRenderContext,
+  type RowData,
+  type rowSelectionFeature,
+} from '@tanstack/angular-table';
+
+/** The features these cells call into; every table that mounts them registers at least these. */
+type SelectionFeatures = { rowSelectionFeature: typeof rowSelectionFeature };
 
 // Both cells swallow click/enter at their host so interacting with the checkbox
 // never triggers the enclosing row's click handler — host templates don't need
@@ -16,14 +25,14 @@ import { type CellContext, type HeaderContext, injectFlexRenderContext } from '@
   template: `
     <hlm-checkbox
       [checked]="context.table.getIsAllRowsSelected()"
-      [indeterminate]="context.table.getIsSomeRowsSelected()"
+      [indeterminate]="context.table.getIsSomeRowsSelected() && !context.table.getIsAllRowsSelected()"
       (checkedChange)="context.table.toggleAllRowsSelected()"
       aria-label="Select all"
     />
   `,
 })
-export class TableHeadSelection<T> {
-  protected readonly context = injectFlexRenderContext<HeaderContext<T, unknown>>();
+export class TableHeadSelection<T extends RowData> {
+  protected readonly context = injectFlexRenderContext<HeaderContext<SelectionFeatures, T, unknown>>();
 }
 
 @Component({
@@ -38,13 +47,13 @@ export class TableHeadSelection<T> {
     <hlm-checkbox
       [checked]="context.row.getIsSelected()"
       [disabled]="!context.row.getCanSelect()"
-      (checkedChange)="context.row.getToggleSelectedHandler()($event)"
+      (checkedChange)="context.row.toggleSelected($event)"
       [aria-label]="selectLabel()"
     />
   `,
 })
-export class TableRowSelection<T> {
-  protected readonly context = injectFlexRenderContext<CellContext<T, unknown>>();
+export class TableRowSelection<T extends RowData> {
+  protected readonly context = injectFlexRenderContext<CellContext<SelectionFeatures, T, unknown>>();
   protected selectLabel = computed(() => {
     const original = this.context.row.original;
     if (original && typeof original === 'object' && 'name' in original) {

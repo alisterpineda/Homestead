@@ -45,11 +45,12 @@ import {
   type CellContext,
   type ColumnDef,
   type RowSelectionState,
-  createAngularTable,
   flexRenderComponent,
   FlexRenderDirective,
-  getCoreRowModel,
   injectFlexRenderContext,
+  injectTable,
+  rowSelectionFeature,
+  tableFeatures,
 } from '@tanstack/angular-table';
 import { TableHeadSelection, TableRowSelection } from '@/shared/components/table/selection-column';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
@@ -71,6 +72,11 @@ import { LinkedDocumentsDialogComponent } from '../transactions/linked-documents
 import type { AccountResponse } from '@/api/generated/models/account-response';
 import type { CommodityResponse } from '@/api/generated/models/commodity-response';
 import type { TransactionResponse } from '@/api/generated/models/transaction-response';
+
+const activityTableFeatures = tableFeatures({
+  rowSelectionFeature,
+});
+type ActivityTableFeatures = typeof activityTableFeatures;
 
 const PAGE_SIZE = 25;
 
@@ -110,7 +116,7 @@ interface ActivityRowViewModel {
   `,
 })
 class ActivityShapeCell {
-  protected readonly context = injectFlexRenderContext<CellContext<ActivityRowViewModel, unknown>>();
+  protected readonly context = injectFlexRenderContext<CellContext<ActivityTableFeatures, ActivityRowViewModel, unknown>>();
 }
 
 @Component({
@@ -130,7 +136,7 @@ class ActivityShapeCell {
   `,
 })
 class ActivityMemoCell {
-  protected readonly context = injectFlexRenderContext<CellContext<ActivityRowViewModel, unknown>>();
+  protected readonly context = injectFlexRenderContext<CellContext<ActivityTableFeatures, ActivityRowViewModel, unknown>>();
 }
 
 @Component({
@@ -146,7 +152,7 @@ class ActivityMemoCell {
   `,
 })
 class ActivityAmountCell {
-  protected readonly context = injectFlexRenderContext<CellContext<ActivityRowViewModel, unknown>>();
+  protected readonly context = injectFlexRenderContext<CellContext<ActivityTableFeatures, ActivityRowViewModel, unknown>>();
 }
 
 /** Callbacks the actions cell reaches through TanStack's table meta (precedent: AccountActionsCell). */
@@ -195,7 +201,7 @@ interface ActivityTableMeta {
   `,
 })
 class ActivityActionsCell {
-  private readonly ctx = injectFlexRenderContext<CellContext<ActivityRowViewModel, unknown>>();
+  private readonly ctx = injectFlexRenderContext<CellContext<ActivityTableFeatures, ActivityRowViewModel, unknown>>();
   protected get tx(): TransactionResponse { return this.ctx.row.original.tx; }
 
   protected onLinkedDocuments(): void {
@@ -328,7 +334,8 @@ class ActivityActionsCell {
                 (click)="onClick(row.original.tx)"
                 (keydown.enter)="onClick(row.original.tx)"
               >
-                @for (cell of row.getVisibleCells(); track cell.id) {
+                <!-- No columnVisibilityFeature here, so all cells render; switch to row.getVisibleCells() if columns become hideable. -->
+                @for (cell of row.getAllCells(); track cell.id) {
                   <!-- The select cell self-isolates its checkbox clicks; the td guard widens
                        the dead zone to the whole cell so near-misses don't open the editor. -->
                   <td
@@ -430,51 +437,45 @@ export class AccountActivityTabComponent {
     return txs.map(tx => this.toViewModel(tx, a));
   });
 
-  private readonly _columns: ColumnDef<ActivityRowViewModel>[] = [
+  private readonly _columns: ColumnDef<ActivityTableFeatures, ActivityRowViewModel>[] = [
     {
       id: 'select',
       header: () => flexRenderComponent(TableHeadSelection),
       cell: () => flexRenderComponent(TableRowSelection),
-      enableSorting: false,
     },
     {
       id: 'date',
       accessorFn: r => r.dateText,
       header: 'Date',
       cell: info => info.getValue<string>(),
-      enableSorting: false,
     },
     {
       id: 'type',
       header: 'Type',
       cell: () => flexRenderComponent(ActivityShapeCell),
-      enableSorting: false,
     },
     {
       id: 'memo',
       header: 'Memo',
       cell: () => flexRenderComponent(ActivityMemoCell),
-      enableSorting: false,
     },
     {
       id: 'amount',
       header: 'Amount',
       cell: () => flexRenderComponent(ActivityAmountCell),
-      enableSorting: false,
     },
     {
       id: 'actions',
       header: '',
       cell: () => flexRenderComponent(ActivityActionsCell),
-      enableSorting: false,
     },
   ];
 
-  protected readonly table = createAngularTable<ActivityRowViewModel>(() => ({
+  protected readonly table = injectTable(() => ({
+    features: activityTableFeatures,
     data: this.items(),
     columns: this._columns,
     getRowId: r => r.tx.id,
-    getCoreRowModel: getCoreRowModel(),
     // Opening balances delete through their dedicated editors; 'Other' shapes have no
     // generic delete path. Both stay un-selectable so bulk delete can't target them.
     enableRowSelection: row =>

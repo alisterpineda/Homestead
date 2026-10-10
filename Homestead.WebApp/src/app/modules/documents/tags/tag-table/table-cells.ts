@@ -2,6 +2,7 @@ import { Component, inject, LOCALE_ID } from '@angular/core';
 import { formatDate } from '@angular/common';
 import { type CellContext, injectFlexRenderContext } from '@tanstack/angular-table';
 import type { GetTagsResponse } from '@/api/generated/models/get-tags-response';
+import type { TagTableFeatures } from './tag-table.component';
 
 @Component({
   selector: 'app-tag-color-cell',
@@ -12,7 +13,7 @@ import type { GetTagsResponse } from '@/api/generated/models/get-tags-response';
   `,
 })
 export class TagColorCell {
-  protected readonly context = injectFlexRenderContext<CellContext<GetTagsResponse, unknown>>();
+  protected readonly context = injectFlexRenderContext<CellContext<TagTableFeatures, GetTagsResponse, unknown>>();
 }
 
 @Component({
@@ -25,7 +26,7 @@ export class TagColorCell {
   `,
 })
 export class TagNameCell {
-  protected readonly context = injectFlexRenderContext<CellContext<GetTagsResponse, unknown>>();
+  protected readonly context = injectFlexRenderContext<CellContext<TagTableFeatures, GetTagsResponse, unknown>>();
 
   get parentPrefix(): string {
     const path = this.context.row.original.path;
@@ -42,7 +43,7 @@ export class TagNameCell {
 })
 export class TagDateAddedCell {
   private locale = inject(LOCALE_ID);
-  protected readonly context = injectFlexRenderContext<CellContext<GetTagsResponse, unknown>>();
+  protected readonly context = injectFlexRenderContext<CellContext<TagTableFeatures, GetTagsResponse, unknown>>();
   get formatted(): string {
     return formatDate(this.context.row.original.createdAt!, 'mediumDate', this.locale);
   }
@@ -54,7 +55,7 @@ export class TagDateAddedCell {
 })
 export class TagModifiedCell {
   private locale = inject(LOCALE_ID);
-  protected readonly context = injectFlexRenderContext<CellContext<GetTagsResponse, unknown>>();
+  protected readonly context = injectFlexRenderContext<CellContext<TagTableFeatures, GetTagsResponse, unknown>>();
   get formatted(): string {
     return formatDate(this.context.row.original.updatedAt, 'mediumDate', this.locale);
   }

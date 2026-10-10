@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import type { VisibilityState } from '@tanstack/angular-table';
+import type { ColumnVisibilityState } from '@tanstack/angular-table';
 import { persistedSignal } from '../utils/persisted-signal';
 import type { NetWorthRange } from '@/api/generated/models/net-worth-range';
 
@@ -42,7 +42,7 @@ function isNetWorthRangePref(v: unknown): v is NetWorthRangePref {
   return true;
 }
 
-function isVisibilityState(v: unknown): v is VisibilityState {
+function isVisibilityState(v: unknown): v is ColumnVisibilityState {
   return typeof v === 'object' && v !== null && !Array.isArray(v) &&
     Object.values(v as Record<string, unknown>).every(val => typeof val === 'boolean');
 }
@@ -83,25 +83,25 @@ export class UserPreferencesService {
       v === null || v === 'table' || v === 'card',
   });
 
-  readonly documentColumnVisibility = persistedSignal<VisibilityState>({
+  readonly documentColumnVisibility = persistedSignal<ColumnVisibilityState>({
     key: 'homestead-document-columns',
     defaultValue: {},
     validate: isVisibilityState,
   });
 
-  readonly partyColumnVisibility = persistedSignal<VisibilityState>({
+  readonly partyColumnVisibility = persistedSignal<ColumnVisibilityState>({
     key: 'homestead-party-columns',
     defaultValue: {},
     validate: isVisibilityState,
   });
 
-  readonly tagColumnVisibility = persistedSignal<VisibilityState>({
+  readonly tagColumnVisibility = persistedSignal<ColumnVisibilityState>({
     key: 'homestead-tag-columns',
     defaultValue: {},
     validate: isVisibilityState,
   });
 
-  readonly inventoryTagColumnVisibility = persistedSignal<VisibilityState>({
+  readonly inventoryTagColumnVisibility = persistedSignal<ColumnVisibilityState>({
     key: 'homestead-inventory-tag-column-visibility',
     defaultValue: {},
     validate: isVisibilityState,

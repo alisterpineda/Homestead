@@ -4,12 +4,16 @@ import {
   type ColumnDef,
   type SortingState,
   type RowSelectionState,
-  type VisibilityState,
-  createAngularTable,
+  type ColumnVisibilityState,
+  columnResizingFeature,
+  columnSizingFeature,
+  columnVisibilityFeature,
   flexRenderComponent,
   FlexRenderDirective,
-  getCoreRowModel,
-  getSortedRowModel,
+  injectTable,
+  rowSelectionFeature,
+  rowSortingFeature,
+  tableFeatures,
 } from '@tanstack/angular-table';
 import type { GetPartiesResponse } from '@/api/generated/models/get-parties-response';
 import type { PartySortBy } from '@/api/generated/models/party-sort-by';
@@ -19,6 +23,15 @@ import { TableHeadSelection, TableRowSelection } from '@/shared/components/table
 import type { HideableColumn } from '../../list/document-table/document-table.component';
 import { PartyDateAddedCell, PartyModifiedCell } from './table-cells';
 import { escapeHtml } from '@/shared/utils';
+
+export const partyTableFeatures = tableFeatures({
+  rowSortingFeature,
+  rowSelectionFeature,
+  columnVisibilityFeature,
+  columnSizingFeature,
+  columnResizingFeature,
+});
+export type PartyTableFeatures = typeof partyTableFeatures;
 
 const COLUMN_ID_TO_SORT_KEY: Record<string, PartySortBy> = {
   name: 'Name',
@@ -37,7 +50,7 @@ export const HIDEABLE_COLUMNS: HideableColumn[] = [
   { id: 'updatedAt', label: 'Modified' },
 ];
 
-export const DEFAULT_COLUMN_VISIBILITY: VisibilityState = {
+export const DEFAULT_COLUMN_VISIBILITY: ColumnVisibilityState = {
   createdAt: false,
   updatedAt: false,
 };
@@ -123,7 +136,7 @@ export class PartyTableComponent {
   parties = input.required<GetPartiesResponse[]>();
   sortBy = input<PartySortBy | null | undefined>(null);
   sortDir = input<SortDirection | null | undefined>(null);
-  columnVisibility = input<VisibilityState>({});
+  columnVisibility = input<ColumnVisibilityState>({});
   selectedIds = input<Set<string>>();
 
   partySelect = output<string>();
@@ -132,9 +145,9 @@ export class PartyTableComponent {
 
   private readonly _sorting = signal<SortingState>([]);
   private readonly _rowSelection = signal<RowSelectionState>({});
-  private readonly _columnVisibility = signal<VisibilityState>({});
+  private readonly _columnVisibility = signal<ColumnVisibilityState>({});
 
-  private readonly _columns: ColumnDef<GetPartiesResponse>[] = [
+  private readonly _columns: ColumnDef<PartyTableFeatures, GetPartiesResponse>[] = [
     {
       id: 'select',
       header: () => flexRenderComponent(TableHeadSelection),
@@ -193,13 +206,12 @@ export class PartyTableComponent {
     },
   ];
 
-  protected readonly table = createAngularTable<GetPartiesResponse>(() => ({
+  protected readonly table = injectTable(() => ({
+    features: partyTableFeatures,
     data: this.parties(),
     columns: this._columns,
     getRowId: (row) => row.id,
     manualSorting: true,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
     enableRowSelection: true,
     enableColumnResizing: true,
     columnResizeMode: 'onChange',
@@ -234,10 +246,9 @@ export class PartyTableComponent {
   }));
 
   protected readonly columnSizeVars = computed(() => {
-    const sizing = this.table.getState().columnSizing;
-    const sizingInfo = this.table.getState().columnSizingInfo;
-    void sizing;
-    void sizingInfo;
+    // Read both to establish signal dependencies
+    this.table.atoms.columnSizing.get();
+    this.table.atoms.columnResizing.get();
 
     const headers = untracked(() => this.table.getFlatHeaders());
     const vars: Record<string, string> = {};
@@ -249,7 +260,7 @@ export class PartyTableComponent {
   });
 
   protected readonly isResizing = computed(
-    () => !!this.table.getState().columnSizingInfo.isResizingColumn,
+    () => !!this.table.atoms.columnResizing.get().isResizingColumn,
   );
 
   private readonly TH_CLASSES: Record<string, string> = {

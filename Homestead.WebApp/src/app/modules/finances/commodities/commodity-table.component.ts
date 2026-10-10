@@ -14,18 +14,28 @@ import {
   type ColumnDef,
   type Row,
   type SortingState,
-  createAngularTable,
+  createSortedRowModel,
   flexRenderComponent,
   FlexRenderDirective,
-  getCoreRowModel,
-  getSortedRowModel,
   injectFlexRenderContext,
+  injectTable,
+  rowSortingFeature,
+  sortFn_alphanumeric,
+  sortFn_text,
+  tableFeatures,
 } from '@tanstack/angular-table';
 import { SortHeaderButton } from '../../documents/list/document-table/sort-header-button';
 import { CommodityRowActionsComponent } from './commodity-row-actions.component';
 import { formatRelativeAge } from '@/shared/utils/relative-age';
 import { escapeHtml } from '@/shared/utils';
 import type { CommodityResponse } from '@/api/generated/models/commodity-response';
+
+const commodityTableFeatures = tableFeatures({
+  rowSortingFeature,
+  sortedRowModel: createSortedRowModel(),
+  sortFns: { alphanumeric: sortFn_alphanumeric, text: sortFn_text },
+});
+type CommodityTableFeatures = typeof commodityTableFeatures;
 
 export type CommoditySortBy =
   | 'symbol'
@@ -43,7 +53,9 @@ interface CommodityTableMeta {
   onDelete: (commodity: CommodityResponse) => void;
 }
 
-function bySymbol(a: Row<CommodityResponse>, b: Row<CommodityResponse>, primary: number): number {
+type CommodityRow = Row<CommodityTableFeatures, CommodityResponse>;
+
+function bySymbol(a: CommodityRow, b: CommodityRow, primary: number): number {
   return primary !== 0 ? primary : a.original.symbol.localeCompare(b.original.symbol);
 }
 
@@ -60,7 +72,7 @@ function bySymbol(a: Row<CommodityResponse>, b: Row<CommodityResponse>, primary:
   `,
 })
 export class CommodityNameCell {
-  private readonly ctx = injectFlexRenderContext<CellContext<CommodityResponse, unknown>>();
+  private readonly ctx = injectFlexRenderContext<CellContext<CommodityTableFeatures, CommodityResponse, unknown>>();
   protected get commodity(): CommodityResponse { return this.ctx.row.original; }
 }
 
@@ -75,7 +87,7 @@ export class CommodityNameCell {
   `,
 })
 export class CommodityKindCell {
-  private readonly ctx = injectFlexRenderContext<CellContext<CommodityResponse, unknown>>();
+  private readonly ctx = injectFlexRenderContext<CellContext<CommodityTableFeatures, CommodityResponse, unknown>>();
   protected get commodity(): CommodityResponse { return this.ctx.row.original; }
 }
 
@@ -92,7 +104,7 @@ export class CommodityKindCell {
   `,
 })
 export class CommodityExchangeCell {
-  private readonly ctx = injectFlexRenderContext<CellContext<CommodityResponse, unknown>>();
+  private readonly ctx = injectFlexRenderContext<CellContext<CommodityTableFeatures, CommodityResponse, unknown>>();
   protected get commodity(): CommodityResponse { return this.ctx.row.original; }
 }
 
@@ -102,7 +114,7 @@ export class CommodityExchangeCell {
   template: `<span class="text-muted-foreground">{{ formatted }}</span>`,
 })
 export class CommodityLatestPriceCell {
-  private readonly ctx = injectFlexRenderContext<CellContext<CommodityResponse, unknown>>();
+  private readonly ctx = injectFlexRenderContext<CellContext<CommodityTableFeatures, CommodityResponse, unknown>>();
   protected get formatted(): string {
     const c = this.ctx.row.original;
     if (c.kind === 'Currency') return '—';
@@ -125,7 +137,7 @@ export class CommodityLatestPriceCell {
   `,
 })
 export class CommodityActionsCell {
-  private readonly ctx = injectFlexRenderContext<CellContext<CommodityResponse, unknown>>();
+  private readonly ctx = injectFlexRenderContext<CellContext<CommodityTableFeatures, CommodityResponse, unknown>>();
   private get meta(): CommodityTableMeta { return this.ctx.table.options.meta as CommodityTableMeta; }
   protected get commodity(): CommodityResponse { return this.ctx.row.original; }
   protected onEdit(c: CommodityResponse): void { this.meta.onEdit(c); }
@@ -168,7 +180,8 @@ export class CommodityActionsCell {
                 class="cursor-pointer"
                 (click)="rowClick.emit(row.original)"
               >
-                @for (cell of row.getVisibleCells(); track cell.id) {
+                <!-- No columnVisibilityFeature here, so all cells render; switch to row.getVisibleCells() if columns become hideable. -->
+                @for (cell of row.getAllCells(); track cell.id) {
                   <td
                     hlmTd
                     [class]="getTdClass(cell.column.id)"
@@ -203,7 +216,7 @@ export class CommodityTableComponent {
     onDelete: (c) => this.delete.emit(c),
   };
 
-  private readonly _columns: ColumnDef<CommodityResponse>[] = [
+  private readonly _columns: ColumnDef<CommodityTableFeatures, CommodityResponse>[] = [
     {
       accessorKey: 'symbol',
       id: 'symbol',
@@ -215,7 +228,7 @@ export class CommodityTableComponent {
       id: 'kind',
       header: () => flexRenderComponent(SortHeaderButton, { inputs: { header: 'Kind' } }),
       cell: () => flexRenderComponent(CommodityKindCell),
-      sortingFn: (a, b) => bySymbol(a, b, a.original.kind.localeCompare(b.original.kind)),
+      sortFn: (a, b) => bySymbol(a, b, a.original.kind.localeCompare(b.original.kind)),
     },
     {
       id: 'exchange',
@@ -223,21 +236,21 @@ export class CommodityTableComponent {
       sortUndefined: 'last',
       header: () => flexRenderComponent(SortHeaderButton, { inputs: { header: 'Exchange' } }),
       cell: () => flexRenderComponent(CommodityExchangeCell),
-      sortingFn: (a, b) => bySymbol(a, b, (a.original.exchange ?? '').localeCompare(b.original.exchange ?? '')),
+      sortFn: (a, b) => bySymbol(a, b, (a.original.exchange ?? '').localeCompare(b.original.exchange ?? '')),
     },
     {
       accessorKey: 'name',
       id: 'name',
       header: () => flexRenderComponent(SortHeaderButton, { inputs: { header: 'Name' } }),
       cell: (info) => `<span class="text-muted-foreground">${escapeHtml(info.getValue<string>())}</span>`,
-      sortingFn: (a, b) => bySymbol(a, b, a.original.name.localeCompare(b.original.name)),
+      sortFn: (a, b) => bySymbol(a, b, a.original.name.localeCompare(b.original.name)),
     },
     {
       accessorKey: 'displayPrecision',
       id: 'displayPrecision',
       header: () => flexRenderComponent(SortHeaderButton, { inputs: { header: 'Display precision' } }),
       cell: (info) => `<span class="tabular-nums">${info.getValue<number>()}</span>`,
-      sortingFn: (a, b) => bySymbol(a, b, a.original.displayPrecision - b.original.displayPrecision),
+      sortFn: (a, b) => bySymbol(a, b, a.original.displayPrecision - b.original.displayPrecision),
     },
     {
       id: 'priceCount',
@@ -250,7 +263,7 @@ export class CommodityTableComponent {
           ? '<span class="text-muted-foreground">—</span>'
           : `<span class="tabular-nums">${value}</span>`;
       },
-      sortingFn: (a, b) => bySymbol(a, b, a.original.priceCount - b.original.priceCount),
+      sortFn: (a, b) => bySymbol(a, b, a.original.priceCount - b.original.priceCount),
     },
     {
       id: 'latestPriceAt',
@@ -258,7 +271,7 @@ export class CommodityTableComponent {
       sortUndefined: 'last',
       header: () => flexRenderComponent(SortHeaderButton, { inputs: { header: 'Latest price' } }),
       cell: () => flexRenderComponent(CommodityLatestPriceCell),
-      sortingFn: (a, b) => bySymbol(a, b, (a.original.latestPriceAt ?? '').localeCompare(b.original.latestPriceAt ?? '')),
+      sortFn: (a, b) => bySymbol(a, b, (a.original.latestPriceAt ?? '').localeCompare(b.original.latestPriceAt ?? '')),
     },
     {
       id: 'actions',
@@ -268,14 +281,13 @@ export class CommodityTableComponent {
     },
   ];
 
-  protected readonly table = createAngularTable<CommodityResponse>(() => ({
+  protected readonly table = injectTable(() => ({
+    features: commodityTableFeatures,
     data: this.commodities(),
     columns: this._columns,
     getRowId: (row) => row.id,
     enableSorting: true,
     enableSortingRemoval: false,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
     onSortingChange: (updater) => {
       const next = updater instanceof Function ? updater(this._sorting()) : updater;
       this._sorting.set(next);

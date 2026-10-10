@@ -3,6 +3,7 @@ import { formatDate } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { type CellContext, injectFlexRenderContext } from '@tanstack/angular-table';
 import type { GetInventoryTagsResponse } from '@/api/generated/models/get-inventory-tags-response';
+import type { InventoryTagTableFeatures } from './tag-table.component';
 
 @Component({
   selector: 'app-tag-color-cell',
@@ -13,7 +14,7 @@ import type { GetInventoryTagsResponse } from '@/api/generated/models/get-invent
   `,
 })
 export class TagColorCell {
-  protected readonly context = injectFlexRenderContext<CellContext<GetInventoryTagsResponse, unknown>>();
+  protected readonly context = injectFlexRenderContext<CellContext<InventoryTagTableFeatures, GetInventoryTagsResponse, unknown>>();
 }
 
 @Component({
@@ -34,7 +35,7 @@ export class TagColorCell {
   `,
 })
 export class TagNameCell {
-  protected readonly context = injectFlexRenderContext<CellContext<GetInventoryTagsResponse, unknown>>();
+  protected readonly context = injectFlexRenderContext<CellContext<InventoryTagTableFeatures, GetInventoryTagsResponse, unknown>>();
 
   get parentPrefix(): string {
     const path = this.context.row.original.path;
@@ -51,7 +52,7 @@ export class TagNameCell {
 })
 export class TagDateAddedCell {
   private locale = inject(LOCALE_ID);
-  protected readonly context = injectFlexRenderContext<CellContext<GetInventoryTagsResponse, unknown>>();
+  protected readonly context = injectFlexRenderContext<CellContext<InventoryTagTableFeatures, GetInventoryTagsResponse, unknown>>();
   get formatted(): string {
     return formatDate(this.context.row.original.createdAt!, 'mediumDate', this.locale);
   }
@@ -63,7 +64,7 @@ export class TagDateAddedCell {
 })
 export class TagModifiedCell {
   private locale = inject(LOCALE_ID);
-  protected readonly context = injectFlexRenderContext<CellContext<GetInventoryTagsResponse, unknown>>();
+  protected readonly context = injectFlexRenderContext<CellContext<InventoryTagTableFeatures, GetInventoryTagsResponse, unknown>>();
   get formatted(): string {
     return formatDate(this.context.row.original.updatedAt, 'mediumDate', this.locale);
   }

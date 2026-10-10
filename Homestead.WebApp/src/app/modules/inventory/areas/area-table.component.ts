@@ -13,15 +13,21 @@ import { HlmTableImports } from '@/shared/components/spartan/table';
 import {
   type CellContext,
   type ColumnDef,
-  createAngularTable,
   flexRenderComponent,
   FlexRenderDirective,
-  getCoreRowModel,
   injectFlexRenderContext,
+  injectTable,
+  rowSortingFeature,
+  tableFeatures,
 } from '@tanstack/angular-table';
 import { SortHeaderButton } from '../../documents/list/document-table/sort-header-button';
 import { AreaRowActionsComponent } from './area-row-actions.component';
 import type { AreaResponse } from '@/api/generated/models/area-response';
+
+const areaTableFeatures = tableFeatures({
+  rowSortingFeature,
+});
+type AreaTableFeatures = typeof areaTableFeatures;
 
 export type AreaSortId = 'name' | 'liveItemCount' | 'createdAt';
 export interface AreaSortState {
@@ -51,7 +57,7 @@ interface AreaTableMeta {
   `,
 })
 export class AreaNameCell {
-  private readonly ctx = injectFlexRenderContext<CellContext<AreaResponse, unknown>>();
+  private readonly ctx = injectFlexRenderContext<CellContext<AreaTableFeatures, AreaResponse, unknown>>();
   protected get area(): AreaResponse { return this.ctx.row.original; }
 }
 
@@ -62,7 +68,7 @@ export class AreaNameCell {
 })
 export class AreaCreatedCell {
   private readonly locale = inject(LOCALE_ID);
-  private readonly ctx = injectFlexRenderContext<CellContext<AreaResponse, unknown>>();
+  private readonly ctx = injectFlexRenderContext<CellContext<AreaTableFeatures, AreaResponse, unknown>>();
   protected get formatted(): string {
     const value = this.ctx.row.original.createdAt;
     return value ? formatDate(value, 'mediumDate', this.locale) : '—';
@@ -83,7 +89,7 @@ export class AreaCreatedCell {
   `,
 })
 export class AreaActionsCell {
-  private readonly ctx = injectFlexRenderContext<CellContext<AreaResponse, unknown>>();
+  private readonly ctx = injectFlexRenderContext<CellContext<AreaTableFeatures, AreaResponse, unknown>>();
   private get meta(): AreaTableMeta { return this.ctx.table.options.meta as AreaTableMeta; }
   protected get area(): AreaResponse { return this.ctx.row.original; }
   protected get hasChildren(): boolean { return this.meta.hasChildren(this.area); }
@@ -119,7 +125,8 @@ export class AreaActionsCell {
           <tbody hlmTBody>
             @for (row of table.getRowModel().rows; track row.id) {
               <tr hlmTr>
-                @for (cell of row.getVisibleCells(); track cell.id) {
+                <!-- No columnVisibilityFeature here, so all cells render; switch to row.getVisibleCells() if columns become hideable. -->
+                @for (cell of row.getAllCells(); track cell.id) {
                   <td hlmTd [class]="getTdClass(cell.column.id)">
                     <ng-container *flexRender="cell.column.columnDef.cell; props: cell.getContext(); let cellText">
                       <div [innerHTML]="cellText"></div>
@@ -156,7 +163,7 @@ export class AreaTableComponent {
     hasChildren: (a) => this.childParentIds().has(a.id),
   };
 
-  private readonly _columns = computed<ColumnDef<AreaResponse>[]>(() => [
+  private readonly _columns = computed<ColumnDef<AreaTableFeatures, AreaResponse>[]>(() => [
     {
       accessorKey: 'name',
       id: 'name',
@@ -183,14 +190,14 @@ export class AreaTableComponent {
     },
   ]);
 
-  protected readonly table = createAngularTable<AreaResponse>(() => ({
+  protected readonly table = injectTable(() => ({
+    features: areaTableFeatures,
     data: this.areas(),
     columns: this._columns(),
     getRowId: (row) => row.id,
     enableSorting: true,
     enableMultiSort: false,
     manualSorting: true,
-    getCoreRowModel: getCoreRowModel(),
     onSortingChange: (updater) => {
       const current = [this.sortState()];
       const next = updater instanceof Function ? updater(current) : updater;

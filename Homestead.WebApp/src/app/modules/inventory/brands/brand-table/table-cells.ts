@@ -4,6 +4,7 @@ import { RouterLink } from '@angular/router';
 import { type CellContext, injectFlexRenderContext } from '@tanstack/angular-table';
 import { BrandRowActionsComponent } from '../brand-row-actions/brand-row-actions.component';
 import type { BrandResponse } from '@/api/generated/models/brand-response';
+import type { BrandTableFeatures } from './brand-table.component';
 
 /** Table meta contract — the list page supplies the row-action handlers. */
 export interface BrandTableMeta {
@@ -26,7 +27,7 @@ export interface BrandTableMeta {
   `,
 })
 export class BrandNameCell {
-  private readonly ctx = injectFlexRenderContext<CellContext<BrandResponse, unknown>>();
+  private readonly ctx = injectFlexRenderContext<CellContext<BrandTableFeatures, BrandResponse, unknown>>();
   protected get brand(): BrandResponse { return this.ctx.row.original; }
 }
 
@@ -37,7 +38,7 @@ export class BrandNameCell {
 })
 export class BrandUpdatedCell {
   private readonly locale = inject(LOCALE_ID);
-  private readonly ctx = injectFlexRenderContext<CellContext<BrandResponse, unknown>>();
+  private readonly ctx = injectFlexRenderContext<CellContext<BrandTableFeatures, BrandResponse, unknown>>();
   protected get formatted(): string {
     const value = this.ctx.row.original.updatedAt;
     return value ? formatDate(value, 'mediumDate', this.locale) : '—';
@@ -58,7 +59,7 @@ export class BrandUpdatedCell {
   `,
 })
 export class BrandActionsCell {
-  private readonly ctx = injectFlexRenderContext<CellContext<BrandResponse, unknown>>();
+  private readonly ctx = injectFlexRenderContext<CellContext<BrandTableFeatures, BrandResponse, unknown>>();
   protected get meta(): BrandTableMeta { return this.ctx.table.options.meta as BrandTableMeta; }
   protected get brand(): BrandResponse { return this.ctx.row.original; }
 }

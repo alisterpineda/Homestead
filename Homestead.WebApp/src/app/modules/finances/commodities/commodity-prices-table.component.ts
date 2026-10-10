@@ -17,11 +17,13 @@ import {
   type ColumnDef,
   type RowSelectionState,
   type SortingState,
-  createAngularTable,
   flexRenderComponent,
   FlexRenderDirective,
-  getCoreRowModel,
   injectFlexRenderContext,
+  injectTable,
+  rowSelectionFeature,
+  rowSortingFeature,
+  tableFeatures,
 } from '@tanstack/angular-table';
 import { SortHeaderButton } from '../../documents/list/document-table/sort-header-button';
 import { TableHeadSelection, TableRowSelection } from '@/shared/components/table/selection-column';
@@ -29,6 +31,12 @@ import type { CommodityPriceResponse } from '@/api/generated/models/commodity-pr
 import type { CommodityPriceSource } from '@/api/generated/models/commodity-price-source';
 import type { CommodityPriceSortBy } from '@/api/generated/models/commodity-price-sort-by';
 import type { SortDirection } from '@/api/generated/models/sort-direction';
+
+const commodityPricesTableFeatures = tableFeatures({
+  rowSortingFeature,
+  rowSelectionFeature,
+});
+type CommodityPricesTableFeatures = typeof commodityPricesTableFeatures;
 
 const COLUMN_ID_TO_SORT_KEY: Record<string, CommodityPriceSortBy> = {
   priceAt: 'PriceAt',
@@ -59,7 +67,7 @@ interface PricesTableMeta {
   template: `<span class="tabular-nums">{{ formatted }}</span>`,
 })
 export class CommodityPriceWhenCell {
-  private readonly ctx = injectFlexRenderContext<CellContext<CommodityPriceResponse, unknown>>();
+  private readonly ctx = injectFlexRenderContext<CellContext<CommodityPricesTableFeatures, CommodityPriceResponse, unknown>>();
   protected get formatted(): string {
     const meta = this.ctx.table.options.meta as PricesTableMeta;
     return meta.formatPriceAt(this.ctx.row.original.priceAt);
@@ -72,7 +80,7 @@ export class CommodityPriceWhenCell {
   template: `<span>{{ symbol }}</span>`,
 })
 export class CommodityPriceQuoteCell {
-  private readonly ctx = injectFlexRenderContext<CellContext<CommodityPriceResponse, unknown>>();
+  private readonly ctx = injectFlexRenderContext<CellContext<CommodityPricesTableFeatures, CommodityPriceResponse, unknown>>();
   protected get symbol(): string {
     const meta = this.ctx.table.options.meta as PricesTableMeta;
     return meta.quoteSymbol(this.ctx.row.original.quoteCurrencyId);
@@ -85,7 +93,7 @@ export class CommodityPriceQuoteCell {
   template: `<span class="tabular-nums">{{ formatted }}</span>`,
 })
 export class CommodityPriceRateCell {
-  private readonly ctx = injectFlexRenderContext<CellContext<CommodityPriceResponse, unknown>>();
+  private readonly ctx = injectFlexRenderContext<CellContext<CommodityPricesTableFeatures, CommodityPriceResponse, unknown>>();
   protected get formatted(): string {
     const meta = this.ctx.table.options.meta as PricesTableMeta;
     return meta.formatRate(this.ctx.row.original);
@@ -127,7 +135,7 @@ export class CommodityPriceRateCell {
   `,
 })
 export class CommodityPriceSourceCell {
-  private readonly ctx = injectFlexRenderContext<CellContext<CommodityPriceResponse, unknown>>();
+  private readonly ctx = injectFlexRenderContext<CellContext<CommodityPricesTableFeatures, CommodityPriceResponse, unknown>>();
   protected get price(): CommodityPriceResponse { return this.ctx.row.original; }
   protected get isDisabled(): boolean {
     const meta = this.ctx.table.options.meta as PricesTableMeta;
@@ -172,7 +180,7 @@ export class CommodityPriceSourceCell {
   `,
 })
 export class CommodityPriceActionsCell {
-  private readonly ctx = injectFlexRenderContext<CellContext<CommodityPriceResponse, unknown>>();
+  private readonly ctx = injectFlexRenderContext<CellContext<CommodityPricesTableFeatures, CommodityPriceResponse, unknown>>();
   private get meta(): PricesTableMeta { return this.ctx.table.options.meta as PricesTableMeta; }
   protected get price(): CommodityPriceResponse { return this.ctx.row.original; }
   protected onEdit(): void { this.meta.onEdit(this.price); }
@@ -211,7 +219,8 @@ export class CommodityPriceActionsCell {
           <tbody hlmTBody>
             @for (row of table.getRowModel().rows; track row.id) {
               <tr hlmTr>
-                @for (cell of row.getVisibleCells(); track cell.id) {
+                <!-- No columnVisibilityFeature here, so all cells render; switch to row.getVisibleCells() if columns become hideable. -->
+                @for (cell of row.getAllCells(); track cell.id) {
                   <td hlmTd [class]="getTdClass(cell.column.id)">
                     <ng-container *flexRender="cell.column.columnDef.cell; props: cell.getContext(); let cellText">
                       <div [innerHTML]="cellText"></div>
@@ -253,7 +262,7 @@ export class CommodityPricesTableComponent {
     onDelete: (p) => this.delete.emit(p),
   };
 
-  private readonly _columns: ColumnDef<CommodityPriceResponse>[] = [
+  private readonly _columns: ColumnDef<CommodityPricesTableFeatures, CommodityPriceResponse>[] = [
     {
       id: 'select',
       header: () => flexRenderComponent(TableHeadSelection),
@@ -288,14 +297,14 @@ export class CommodityPricesTableComponent {
     },
   ];
 
-  protected readonly table = createAngularTable<CommodityPriceResponse>(() => ({
+  protected readonly table = injectTable(() => ({
+    features: commodityPricesTableFeatures,
     data: this.prices(),
     columns: this._columns,
     getRowId: (row) => row.id,
     manualSorting: true,
     enableSortingRemoval: false,
     enableRowSelection: (row) => row.original.source !== 'Transaction',
-    getCoreRowModel: getCoreRowModel(),
     onSortingChange: (updater) => {
       const next = updater instanceof Function ? updater(this._sorting()) : updater;
       this._sorting.set(next);

@@ -4,12 +4,16 @@ import {
   type ColumnDef,
   type SortingState,
   type RowSelectionState,
-  type VisibilityState,
-  createAngularTable,
+  type ColumnVisibilityState,
+  columnResizingFeature,
+  columnSizingFeature,
+  columnVisibilityFeature,
   flexRenderComponent,
   FlexRenderDirective,
-  getCoreRowModel,
-  getSortedRowModel,
+  injectTable,
+  rowSelectionFeature,
+  rowSortingFeature,
+  tableFeatures,
 } from '@tanstack/angular-table';
 import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-response';
 import type { DocumentSortBy } from '@/api/generated/models/document-sort-by';
@@ -32,6 +36,15 @@ const SORT_KEY_TO_COLUMN_ID: Record<string, string> = Object.fromEntries(
   Object.entries(COLUMN_ID_TO_SORT_KEY).map(([k, v]) => [v, k]),
 );
 
+export const documentTableFeatures = tableFeatures({
+  rowSortingFeature,
+  rowSelectionFeature,
+  columnVisibilityFeature,
+  columnSizingFeature,
+  columnResizingFeature,
+});
+export type DocumentTableFeatures = typeof documentTableFeatures;
+
 export interface HideableColumn {
   id: string;
   label: string;
@@ -47,7 +60,7 @@ export const HIDEABLE_COLUMNS: HideableColumn[] = [
   { id: 'documentDate', label: 'Document Date' },
 ];
 
-export const DEFAULT_COLUMN_VISIBILITY: VisibilityState = {
+export const DEFAULT_COLUMN_VISIBILITY: ColumnVisibilityState = {
   createdAt: false,
   updatedAt: false,
   documentDate: false,
@@ -134,7 +147,7 @@ export class DocumentTableComponent {
   documents = input.required<GetDocumentsResponse[]>();
   sortBy = input<DocumentSortBy | null | undefined>(null);
   sortDir = input<SortDirection | null | undefined>(null);
-  columnVisibility = input<VisibilityState>({});
+  columnVisibility = input<ColumnVisibilityState>({});
   selectedIds = input<Set<string>>();
 
   documentSelect = output<string>();
@@ -143,9 +156,9 @@ export class DocumentTableComponent {
 
   private readonly _sorting = signal<SortingState>([]);
   private readonly _rowSelection = signal<RowSelectionState>({});
-  private readonly _columnVisibility = signal<VisibilityState>({});
+  private readonly _columnVisibility = signal<ColumnVisibilityState>({});
 
-  private readonly _columns: ColumnDef<GetDocumentsResponse>[] = [
+  private readonly _columns: ColumnDef<DocumentTableFeatures, GetDocumentsResponse>[] = [
     {
       id: 'select',
       header: () => flexRenderComponent(TableHeadSelection),
@@ -224,13 +237,12 @@ export class DocumentTableComponent {
     },
   ];
 
-  protected readonly table = createAngularTable<GetDocumentsResponse>(() => ({
+  protected readonly table = injectTable(() => ({
+    features: documentTableFeatures,
     data: this.documents(),
     columns: this._columns,
     getRowId: (row) => row.id,
     manualSorting: true,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
     enableRowSelection: true,
     enableColumnResizing: true,
     columnResizeMode: 'onChange',
@@ -266,11 +278,9 @@ export class DocumentTableComponent {
 
   /** CSS variable map for column sizes — bound on the container so the CSS engine handles propagation. */
   protected readonly columnSizeVars = computed(() => {
-    const sizing = this.table.getState().columnSizing;
-    const sizingInfo = this.table.getState().columnSizingInfo;
     // Read both to establish signal dependencies
-    void sizing;
-    void sizingInfo;
+    this.table.atoms.columnSizing.get();
+    this.table.atoms.columnResizing.get();
 
     const headers = untracked(() => this.table.getFlatHeaders());
     const vars: Record<string, string> = {};
@@ -282,7 +292,7 @@ export class DocumentTableComponent {
   });
 
   protected readonly isResizing = computed(
-    () => !!this.table.getState().columnSizingInfo.isResizingColumn,
+    () => !!this.table.atoms.columnResizing.get().isResizingColumn,
   );
 
   private readonly TH_CLASSES: Record<string, string> = {

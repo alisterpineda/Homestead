@@ -18,7 +18,7 @@ import { EditPartySheetComponent } from './edit-party-sheet/edit-party-sheet.com
 import { PaginationComponent } from '@/shared/components/pagination/pagination.component';
 import { PartyListStateService } from './party-list-state.service';
 import { UserPreferencesService } from '@/shared/services/user-preferences.service';
-import type { VisibilityState } from '@tanstack/angular-table';
+import type { ColumnVisibilityState } from '@tanstack/angular-table';
 import { PartyApiService } from '@/api/services/party-api.service';
 import type { GetPartiesResponse } from '@/api/generated/models/get-parties-response';
 import type { PaginatedResponseOfGetPartiesResponse } from '@/api/generated/models/paginated-response-of-get-parties-response';
@@ -300,7 +300,7 @@ export class PartyListComponent {
   );
 
   // Column visibility
-  columnVisibility = signal<VisibilityState>({ ...DEFAULT_COLUMN_VISIBILITY });
+  columnVisibility = signal<ColumnVisibilityState>({ ...DEFAULT_COLUMN_VISIBILITY });
 
   // Sort state from query params
   sortBy = toSignal(

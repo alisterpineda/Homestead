@@ -22,6 +22,7 @@ import type { PayeeResponse } from '@/api/generated/models/payee-response';
 import type { PayeeSuggestionSource } from '@/api/generated/models/payee-suggestion-source';
 import type { AccountType } from '@/api/generated/models/account-type';
 import type { CategoryResponse } from '@/api/generated/models/category-response';
+import type { StatementLineTableFeatures } from './statement-import-review-page.component';
 
 /**
  * A category as carried on a line — id (picker key + commit payload), plus name/type for display. Sourced
@@ -160,7 +161,7 @@ export interface StatementLineTableMeta {
   `,
 })
 export class LineDateCell {
-  private readonly ctx = injectFlexRenderContext<CellContext<LineItemEdit, unknown>>();
+  private readonly ctx = injectFlexRenderContext<CellContext<StatementLineTableFeatures, LineItemEdit, unknown>>();
   protected get row(): LineItemEdit { return this.ctx.row.original; }
   protected get inputId(): string { return `import-line-date-${this.row.index}`; }
   private get meta(): StatementLineTableMeta { return this.ctx.table.options.meta as StatementLineTableMeta; }
@@ -186,7 +187,7 @@ export class LineDateCell {
   `,
 })
 export class LineDescriptionCell {
-  private readonly ctx = injectFlexRenderContext<CellContext<LineItemEdit, unknown>>();
+  private readonly ctx = injectFlexRenderContext<CellContext<StatementLineTableFeatures, LineItemEdit, unknown>>();
   protected get row(): LineItemEdit { return this.ctx.row.original; }
   private get meta(): StatementLineTableMeta { return this.ctx.table.options.meta as StatementLineTableMeta; }
 
@@ -215,7 +216,7 @@ export class LineDescriptionCell {
   `,
 })
 export class LineCategoryCell {
-  private readonly ctx = injectFlexRenderContext<CellContext<LineItemEdit, unknown>>();
+  private readonly ctx = injectFlexRenderContext<CellContext<StatementLineTableFeatures, LineItemEdit, unknown>>();
   protected get row(): LineItemEdit { return this.ctx.row.original; }
   protected get meta(): StatementLineTableMeta { return this.ctx.table.options.meta as StatementLineTableMeta; }
 
@@ -288,7 +289,7 @@ export class LineCategoryCell {
   `,
 })
 export class LinePayeeCell {
-  private readonly ctx = injectFlexRenderContext<CellContext<LineItemEdit, unknown>>();
+  private readonly ctx = injectFlexRenderContext<CellContext<StatementLineTableFeatures, LineItemEdit, unknown>>();
   protected get row(): LineItemEdit { return this.ctx.row.original; }
   private get meta(): StatementLineTableMeta { return this.ctx.table.options.meta as StatementLineTableMeta; }
 
@@ -384,7 +385,7 @@ export class LinePayeeCell {
   `,
 })
 export class LineAmountCell {
-  private readonly ctx = injectFlexRenderContext<CellContext<LineItemEdit, unknown>>();
+  private readonly ctx = injectFlexRenderContext<CellContext<StatementLineTableFeatures, LineItemEdit, unknown>>();
   protected get row(): LineItemEdit { return this.ctx.row.original; }
   protected get meta(): StatementLineTableMeta { return this.ctx.table.options.meta as StatementLineTableMeta; }
 
@@ -443,7 +444,7 @@ export class LineAmountCell {
   `,
 })
 export class LineActionsCell {
-  private readonly ctx = injectFlexRenderContext<CellContext<LineItemEdit, unknown>>();
+  private readonly ctx = injectFlexRenderContext<CellContext<StatementLineTableFeatures, LineItemEdit, unknown>>();
   protected get row(): LineItemEdit { return this.ctx.row.original; }
   private get meta(): StatementLineTableMeta { return this.ctx.table.options.meta as StatementLineTableMeta; }
 

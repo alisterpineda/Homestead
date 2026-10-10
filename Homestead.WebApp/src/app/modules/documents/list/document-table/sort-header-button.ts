@@ -2,7 +2,14 @@ import { Component, computed, input } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideArrowDown, lucideArrowUp, lucideArrowUpDown } from '@ng-icons/lucide';
 import { HlmButton } from '@/shared/components/spartan/button';
-import { type HeaderContext, injectFlexRenderContext } from '@tanstack/angular-table';
+import {
+  type HeaderContext,
+  injectFlexRenderContext,
+  type RowData,
+  type rowSortingFeature,
+} from '@tanstack/angular-table';
+
+type SortFeatures = { rowSortingFeature: typeof rowSortingFeature };
 
 @Component({
   selector: 'app-sort-header-button',
@@ -15,8 +22,8 @@ import { type HeaderContext, injectFlexRenderContext } from '@tanstack/angular-t
     </button>
   `,
 })
-export class SortHeaderButton<T> {
-  protected readonly context = injectFlexRenderContext<HeaderContext<T, unknown>>();
+export class SortHeaderButton<T extends RowData> {
+  protected readonly context = injectFlexRenderContext<HeaderContext<SortFeatures, T, unknown>>();
   public readonly header = input('');
   protected readonly label = computed(() => this.header() || this.context.column.id);
   protected sortIcon(): string {

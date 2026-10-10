@@ -19,7 +19,7 @@ import { DocumentsFilterPanelComponent } from './documents-filter-panel/document
 import type { FilterOption } from './documents-filter-panel/documents-filter-panel.component';
 import { DocumentTableComponent, HIDEABLE_COLUMNS, DEFAULT_COLUMN_VISIBILITY } from './document-table/document-table.component';
 import { DocumentCardGridComponent } from './document-card-grid/document-card-grid.component';
-import type { VisibilityState } from '@tanstack/angular-table';
+import type { ColumnVisibilityState } from '@tanstack/angular-table';
 import { PaginationComponent } from '@/shared/components/pagination/pagination.component';
 import { UploadManagerService } from '@/shared/services/upload-manager.service';
 import { handleFileInputChange, triggerDownload } from '@/shared/utils';
@@ -450,8 +450,8 @@ export class DocumentListComponent {
     { initialValue: this.route.snapshot.queryParamMap.get('search') ?? '' },
   );
 
-  // Column visibility (TanStack VisibilityState: { [columnId]: boolean })
-  columnVisibility = signal<VisibilityState>({ ...DEFAULT_COLUMN_VISIBILITY });
+  // Column visibility (TanStack ColumnVisibilityState: { [columnId]: boolean })
+  columnVisibility = signal<ColumnVisibilityState>({ ...DEFAULT_COLUMN_VISIBILITY });
 
   // Party filter
   partyFilterSearch = signal('');

@@ -10,14 +10,20 @@ import { HlmTableImports } from '@/shared/components/spartan/table';
 import {
   type ColumnDef,
   type SortingState,
-  createAngularTable,
   flexRenderComponent,
   FlexRenderDirective,
-  getCoreRowModel,
+  injectTable,
+  rowSortingFeature,
+  tableFeatures,
 } from '@tanstack/angular-table';
 import { SortHeaderButton } from '../../../documents/list/document-table/sort-header-button';
 import { BrandNameCell, BrandUpdatedCell, BrandActionsCell, type BrandTableMeta } from './table-cells';
 import type { BrandResponse } from '@/api/generated/models/brand-response';
+
+export const brandTableFeatures = tableFeatures({
+  rowSortingFeature,
+});
+export type BrandTableFeatures = typeof brandTableFeatures;
 
 /** Column id ⇆ server sort key. The backend takes name | items | updated. */
 const COLUMN_ID_TO_SORT_KEY: Record<string, string> = {
@@ -64,7 +70,8 @@ export interface BrandSortChange {
           <tbody hlmTBody>
             @for (row of table.getRowModel().rows; track row.id) {
               <tr hlmTr>
-                @for (cell of row.getVisibleCells(); track cell.id) {
+                <!-- No columnVisibilityFeature here, so all cells render; switch to row.getVisibleCells() if columns become hideable. -->
+                @for (cell of row.getAllCells(); track cell.id) {
                   <td hlmTd [class]="getTdClass(cell.column.id)">
                     <ng-container *flexRender="cell.column.columnDef.cell; props: cell.getContext(); let cellText">
                       <div [innerHTML]="cellText"></div>
@@ -97,7 +104,7 @@ export class BrandTableComponent {
     onDelete: (b) => this.delete.emit(b),
   };
 
-  private readonly _columns: ColumnDef<BrandResponse>[] = [
+  private readonly _columns: ColumnDef<BrandTableFeatures, BrandResponse>[] = [
     {
       accessorKey: 'name',
       id: 'name',
@@ -124,14 +131,14 @@ export class BrandTableComponent {
     },
   ];
 
-  protected readonly table = createAngularTable<BrandResponse>(() => ({
+  protected readonly table = injectTable(() => ({
+    features: brandTableFeatures,
     data: this.brands(),
     columns: this._columns,
     getRowId: (row) => row.id,
     enableSorting: true,
     enableMultiSort: false,
     manualSorting: true,
-    getCoreRowModel: getCoreRowModel(),
     onSortingChange: (updater) => {
       const next = updater instanceof Function ? updater(this._sorting()) : updater;
       this._sorting.set(next);

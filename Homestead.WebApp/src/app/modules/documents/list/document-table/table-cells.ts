@@ -6,6 +6,7 @@ import { TagBadgeComponent } from '@/shared/components/tag-badge/tag-badge.compo
 import { PartyBadgeComponent } from '../../parties/party-badge/party-badge.component';
 import { MatchSnippetComponent } from '../match-snippet/match-snippet.component';
 import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-response';
+import type { DocumentTableFeatures } from './document-table.component';
 
 @Component({
   selector: 'app-name-cell',
@@ -19,7 +20,7 @@ import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-
   `,
 })
 export class NameCell {
-  protected readonly context = injectFlexRenderContext<CellContext<GetDocumentsResponse, unknown>>();
+  protected readonly context = injectFlexRenderContext<CellContext<DocumentTableFeatures, GetDocumentsResponse, unknown>>();
   protected get doc(): GetDocumentsResponse {
     return this.context.row.original;
   }
@@ -37,7 +38,7 @@ export class NameCell {
   `,
 })
 export class TagsCell {
-  protected readonly context = injectFlexRenderContext<CellContext<GetDocumentsResponse, unknown>>();
+  protected readonly context = injectFlexRenderContext<CellContext<DocumentTableFeatures, GetDocumentsResponse, unknown>>();
 }
 
 @Component({
@@ -52,7 +53,7 @@ export class TagsCell {
   `,
 })
 export class PartiesCell {
-  protected readonly context = injectFlexRenderContext<CellContext<GetDocumentsResponse, unknown>>();
+  protected readonly context = injectFlexRenderContext<CellContext<DocumentTableFeatures, GetDocumentsResponse, unknown>>();
 }
 
 @Component({
@@ -60,7 +61,7 @@ export class PartiesCell {
   template: `<span class="text-muted-foreground">{{ formatted }}</span>`,
 })
 export class FileSizeCell {
-  protected readonly context = injectFlexRenderContext<CellContext<GetDocumentsResponse, unknown>>();
+  protected readonly context = injectFlexRenderContext<CellContext<DocumentTableFeatures, GetDocumentsResponse, unknown>>();
   get formatted(): string {
     return formatBytes(+this.context.row.original.fileSize);
   }
@@ -72,7 +73,7 @@ export class FileSizeCell {
 })
 export class DateAddedCell {
   private locale = inject(LOCALE_ID);
-  protected readonly context = injectFlexRenderContext<CellContext<GetDocumentsResponse, unknown>>();
+  protected readonly context = injectFlexRenderContext<CellContext<DocumentTableFeatures, GetDocumentsResponse, unknown>>();
   get formatted(): string {
     return formatDate(this.context.row.original.createdAt!, 'mediumDate', this.locale);
   }
@@ -84,7 +85,7 @@ export class DateAddedCell {
 })
 export class ModifiedCell {
   private locale = inject(LOCALE_ID);
-  protected readonly context = injectFlexRenderContext<CellContext<GetDocumentsResponse, unknown>>();
+  protected readonly context = injectFlexRenderContext<CellContext<DocumentTableFeatures, GetDocumentsResponse, unknown>>();
   get formatted(): string {
     return formatDate(this.context.row.original.updatedAt, 'mediumDate', this.locale);
   }
@@ -96,7 +97,7 @@ export class ModifiedCell {
 })
 export class DocumentDateCell {
   private locale = inject(LOCALE_ID);
-  protected readonly context = injectFlexRenderContext<CellContext<GetDocumentsResponse, unknown>>();
+  protected readonly context = injectFlexRenderContext<CellContext<DocumentTableFeatures, GetDocumentsResponse, unknown>>();
   get formatted(): string {
     const value = this.context.row.original.documentDate;
     return value ? formatDate(value, 'mediumDate', this.locale) : '\u2014';

@@ -16,12 +16,14 @@ import { HlmTableImports } from '@/shared/components/spartan/table';
 import {
   type CellContext,
   type ColumnDef,
-  type VisibilityState,
-  createAngularTable,
+  type ColumnVisibilityState,
+  columnVisibilityFeature,
   flexRenderComponent,
   FlexRenderDirective,
-  getCoreRowModel,
   injectFlexRenderContext,
+  injectTable,
+  rowSortingFeature,
+  tableFeatures,
 } from '@tanstack/angular-table';
 import { SortHeaderButton } from '../../documents/list/document-table/sort-header-button';
 import { InventoryRowActionsComponent } from './inventory-row-actions.component';
@@ -43,6 +45,12 @@ import {
   PATH_SEPARATOR_CLASSES,
   type LocationPathView,
 } from '../shared/location-path';
+
+const inventoryTableFeatures = tableFeatures({
+  rowSortingFeature,
+  columnVisibilityFeature,
+});
+type InventoryTableFeatures = typeof inventoryTableFeatures;
 
 export type { InventorySortId, InventorySortState } from './inventory-row';
 
@@ -107,7 +115,7 @@ interface InventoryTableMeta {
   `,
 })
 export class InventoryNameCell {
-  private readonly ctx = injectFlexRenderContext<CellContext<InventoryRow, unknown>>();
+  private readonly ctx = injectFlexRenderContext<CellContext<InventoryTableFeatures, InventoryRow, unknown>>();
   protected get row(): InventoryRow { return this.ctx.row.original; }
 }
 
@@ -137,7 +145,7 @@ export class InventoryNameCell {
   `,
 })
 export class InventoryOnHandCell {
-  private readonly ctx = injectFlexRenderContext<CellContext<InventoryRow, unknown>>();
+  private readonly ctx = injectFlexRenderContext<CellContext<InventoryTableFeatures, InventoryRow, unknown>>();
   protected readonly lowStockBadgeClass = LOW_STOCK_BADGE_CLASS;
   protected get row(): InventoryRow { return this.ctx.row.original; }
   protected get qty(): string { return formatQty(this.row.onHand ?? 0); }
@@ -150,7 +158,7 @@ export class InventoryOnHandCell {
 })
 export class InventoryDateCell {
   private readonly locale = inject(LOCALE_ID);
-  private readonly ctx = injectFlexRenderContext<CellContext<InventoryRow, string | null | undefined>>();
+  private readonly ctx = injectFlexRenderContext<CellContext<InventoryTableFeatures, InventoryRow, string | null | undefined>>();
   protected get formatted(): string {
     const value = this.ctx.getValue();
     return value ? formatDate(value, 'mediumDate', this.locale) : '—';
@@ -173,7 +181,7 @@ export class InventoryDateCell {
   `,
 })
 export class InventoryActionsCell {
-  private readonly ctx = injectFlexRenderContext<CellContext<InventoryRow, unknown>>();
+  private readonly ctx = injectFlexRenderContext<CellContext<InventoryTableFeatures, InventoryRow, unknown>>();
   protected get meta(): InventoryTableMeta { return this.ctx.table.options.meta as InventoryTableMeta; }
   protected get row(): InventoryRow { return this.ctx.row.original; }
 }
@@ -231,8 +239,8 @@ export class InventoryActionsCell {
 export class InventoryTableComponent {
   rows = input.required<InventoryRow[]>();
   sortState = input<InventorySortState>({ id: 'name', desc: false });
-  /** Per-column visibility (TanStack {@link VisibilityState}); default `{}` keeps every column shown. */
-  columnVisibility = input<VisibilityState>({});
+  /** Per-column visibility (TanStack {@link ColumnVisibilityState}); default `{}` keeps every column shown. */
+  columnVisibility = input<ColumnVisibilityState>({});
 
   open = output<InventoryRow>();
   edit = output<InventoryRow>();
@@ -253,13 +261,13 @@ export class InventoryTableComponent {
   // Mirror the columnVisibility input into TanStack's controlled state. Input → signal via an effect
   // (not read directly in the table options) so a parent change re-applies; onColumnVisibilityChange
   // keeps internal toggles (none today) from desyncing.
-  private readonly _columnVisibility = signal<VisibilityState>({});
+  private readonly _columnVisibility = signal<ColumnVisibilityState>({});
 
   constructor() {
     effect(() => this._columnVisibility.set(this.columnVisibility()));
   }
 
-  private readonly _columns = computed<ColumnDef<InventoryRow>[]>(() => [
+  private readonly _columns = computed<ColumnDef<InventoryTableFeatures, InventoryRow>[]>(() => [
     {
       accessorKey: 'name',
       id: 'name',
@@ -305,14 +313,14 @@ export class InventoryTableComponent {
     },
   ]);
 
-  protected readonly table = createAngularTable<InventoryRow>(() => ({
+  protected readonly table = injectTable(() => ({
+    features: inventoryTableFeatures,
     data: this.rows(),
     columns: this._columns(),
     getRowId: (row) => row.id,
     enableSorting: true,
     enableMultiSort: false,
     manualSorting: true,
-    getCoreRowModel: getCoreRowModel(),
     onSortingChange: (updater) => {
       const current = [this.sortState()];
       const next = updater instanceof Function ? updater(current) : updater;

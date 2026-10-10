@@ -13,11 +13,12 @@ import { HlmTableImports } from '@/shared/components/spartan/table';
 import {
   type CellContext,
   type ColumnDef,
-  createAngularTable,
   flexRenderComponent,
   FlexRenderDirective,
-  getCoreRowModel,
   injectFlexRenderContext,
+  injectTable,
+  rowSortingFeature,
+  tableFeatures,
 } from '@tanstack/angular-table';
 import { SortHeaderButton } from '../../documents/list/document-table/sort-header-button';
 import { AccountRowActionsComponent } from './account-row-actions.component';
@@ -27,6 +28,11 @@ import { UserPreferencesService } from '@/shared/services/user-preferences.servi
 import { escapeHtml } from '@/shared/utils';
 import type { AccountResponse } from '@/api/generated/models/account-response';
 import type { CommodityResponse } from '@/api/generated/models/commodity-response';
+
+const accountTableFeatures = tableFeatures({
+  rowSortingFeature,
+});
+type AccountTableFeatures = typeof accountTableFeatures;
 
 export type AccountSortId = 'name' | 'kind' | 'latestTransactionDate' | 'displayValue';
 export interface AccountSortState {
@@ -58,7 +64,7 @@ interface AccountTableMeta {
   `,
 })
 export class AccountNameCell {
-  private readonly ctx = injectFlexRenderContext<CellContext<AccountResponse, unknown>>();
+  private readonly ctx = injectFlexRenderContext<CellContext<AccountTableFeatures, AccountResponse, unknown>>();
   protected get account(): AccountResponse { return this.ctx.row.original; }
 }
 
@@ -69,7 +75,7 @@ export class AccountNameCell {
 })
 export class AccountLatestTxCell {
   private readonly locale = inject(LOCALE_ID);
-  private readonly ctx = injectFlexRenderContext<CellContext<AccountResponse, unknown>>();
+  private readonly ctx = injectFlexRenderContext<CellContext<AccountTableFeatures, AccountResponse, unknown>>();
   protected get formatted(): string {
     const value = this.ctx.row.original.latestTransactionDate;
     return value ? formatDate(value, 'mediumDate', this.locale) : '—';
@@ -90,7 +96,7 @@ export class AccountLatestTxCell {
   `,
 })
 export class AccountActionsCell {
-  private readonly ctx = injectFlexRenderContext<CellContext<AccountResponse, unknown>>();
+  private readonly ctx = injectFlexRenderContext<CellContext<AccountTableFeatures, AccountResponse, unknown>>();
   private get meta(): AccountTableMeta { return this.ctx.table.options.meta as AccountTableMeta; }
   protected get account(): AccountResponse { return this.ctx.row.original; }
   protected onEdit(a: AccountResponse): void { this.meta.onEdit(a); }
@@ -133,7 +139,8 @@ export class AccountActionsCell {
                 hlmTr
                 [class]="getRowClass(row.original)"
               >
-                @for (cell of row.getVisibleCells(); track cell.id) {
+                <!-- No columnVisibilityFeature here, so all cells render; switch to row.getVisibleCells() if columns become hideable. -->
+                @for (cell of row.getAllCells(); track cell.id) {
                   <td
                     hlmTd
                     [class]="getTdClass(cell.column.id)"
@@ -169,7 +176,7 @@ export class AccountTableComponent {
     onDelete: (a) => this.delete.emit(a),
   };
 
-  private readonly _columns = computed<ColumnDef<AccountResponse>[]>(() => {
+  private readonly _columns = computed<ColumnDef<AccountTableFeatures, AccountResponse>[]>(() => {
     const dc = this.displayCurrency();
     const masked = this.prefs.financesPrivacyMasked();
     return [
@@ -220,14 +227,14 @@ export class AccountTableComponent {
     ];
   });
 
-  protected readonly table = createAngularTable<AccountResponse>(() => ({
+  protected readonly table = injectTable(() => ({
+    features: accountTableFeatures,
     data: this.accounts(),
     columns: this._columns(),
     getRowId: (row) => row.id,
     enableSorting: true,
     enableMultiSort: false,
     manualSorting: true,
-    getCoreRowModel: getCoreRowModel(),
     onSortingChange: (updater) => {
       const current = [this.sortState()];
       const next = updater instanceof Function ? updater(current) : updater;

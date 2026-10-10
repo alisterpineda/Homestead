@@ -10,14 +10,20 @@ import { HlmTableImports } from '@/shared/components/spartan/table';
 import {
   type ColumnDef,
   type SortingState,
-  createAngularTable,
   flexRenderComponent,
   FlexRenderDirective,
-  getCoreRowModel,
+  injectTable,
+  rowSortingFeature,
+  tableFeatures,
 } from '@tanstack/angular-table';
 import { SortHeaderButton } from '../../../documents/list/document-table/sort-header-button';
 import { PayeeNameCell, PayeeUpdatedCell, PayeeActionsCell, type PayeeTableMeta } from './table-cells';
 import type { PayeeResponse } from '@/api/generated/models/payee-response';
+
+export const payeeTableFeatures = tableFeatures({
+  rowSortingFeature,
+});
+export type PayeeTableFeatures = typeof payeeTableFeatures;
 
 /** Column id ⇆ server sort key. The backend takes name | transactions | updated. */
 const COLUMN_ID_TO_SORT_KEY: Record<string, string> = {
@@ -64,7 +70,8 @@ export interface PayeeSortChange {
           <tbody hlmTBody>
             @for (row of table.getRowModel().rows; track row.id) {
               <tr hlmTr>
-                @for (cell of row.getVisibleCells(); track cell.id) {
+                <!-- No columnVisibilityFeature here, so all cells render; switch to row.getVisibleCells() if columns become hideable. -->
+                @for (cell of row.getAllCells(); track cell.id) {
                   <td hlmTd [class]="getTdClass(cell.column.id)">
                     <ng-container *flexRender="cell.column.columnDef.cell; props: cell.getContext(); let cellText">
                       <div [innerHTML]="cellText"></div>
@@ -97,7 +104,7 @@ export class PayeeTableComponent {
     onDelete: (p) => this.delete.emit(p),
   };
 
-  private readonly _columns: ColumnDef<PayeeResponse>[] = [
+  private readonly _columns: ColumnDef<PayeeTableFeatures, PayeeResponse>[] = [
     {
       accessorKey: 'name',
       id: 'name',
@@ -133,14 +140,14 @@ export class PayeeTableComponent {
     },
   ];
 
-  protected readonly table = createAngularTable<PayeeResponse>(() => ({
+  protected readonly table = injectTable(() => ({
+    features: payeeTableFeatures,
     data: this.payees(),
     columns: this._columns,
     getRowId: (row) => row.id,
     enableSorting: true,
     enableMultiSort: false,
     manualSorting: true,
-    getCoreRowModel: getCoreRowModel(),
     onSortingChange: (updater) => {
       const next = updater instanceof Function ? updater(this._sorting()) : updater;
       this._sorting.set(next);

@@ -48,7 +48,7 @@ import { sortRows, type InventoryRow, type InventorySortId, type InventorySortSt
 import { replace } from '@/shared/json-patch';
 import { trimToNull } from '@/shared/utils/trim-to-null';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
-import type { VisibilityState } from '@tanstack/angular-table';
+import type { ColumnVisibilityState } from '@tanstack/angular-table';
 import type { DurableResponse } from '@/api/generated/models/durable-response';
 import type { ConsumableResponse } from '@/api/generated/models/consumable-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
@@ -463,7 +463,7 @@ export class InventoryItemsViewComponent implements OnInit {
   /** Parent is mid-fetch (e.g. a container drill): show the spinner instead of "Nothing matches". */
   loading = input(false);
   /** Per-column visibility passed straight to the table/card grid — Browse hides Location. */
-  columnVisibility = input<VisibilityState>({});
+  columnVisibility = input<ColumnVisibilityState>({});
   /** Browse passes false — the drilled list inherits the pref but shows no second toggle. */
   showViewToggle = input(true);
 

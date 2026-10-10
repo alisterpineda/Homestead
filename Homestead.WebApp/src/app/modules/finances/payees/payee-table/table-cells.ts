@@ -3,6 +3,7 @@ import { formatDate } from '@angular/common';
 import { type CellContext, injectFlexRenderContext } from '@tanstack/angular-table';
 import { PayeeRowActionsComponent } from '../payee-row-actions/payee-row-actions.component';
 import type { PayeeResponse } from '@/api/generated/models/payee-response';
+import type { PayeeTableFeatures } from './payee-table.component';
 
 /** Table meta contract — the list page supplies the row-action handlers. */
 export interface PayeeTableMeta {
@@ -24,7 +25,7 @@ export interface PayeeTableMeta {
   `,
 })
 export class PayeeNameCell {
-  private readonly ctx = injectFlexRenderContext<CellContext<PayeeResponse, unknown>>();
+  private readonly ctx = injectFlexRenderContext<CellContext<PayeeTableFeatures, PayeeResponse, unknown>>();
   protected get payee(): PayeeResponse { return this.ctx.row.original; }
 }
 
@@ -35,7 +36,7 @@ export class PayeeNameCell {
 })
 export class PayeeUpdatedCell {
   private readonly locale = inject(LOCALE_ID);
-  private readonly ctx = injectFlexRenderContext<CellContext<PayeeResponse, unknown>>();
+  private readonly ctx = injectFlexRenderContext<CellContext<PayeeTableFeatures, PayeeResponse, unknown>>();
   protected get formatted(): string {
     const value = this.ctx.row.original.updatedAt;
     return value ? formatDate(value, 'mediumDate', this.locale) : '—';
@@ -56,7 +57,7 @@ export class PayeeUpdatedCell {
   `,
 })
 export class PayeeActionsCell {
-  private readonly ctx = injectFlexRenderContext<CellContext<PayeeResponse, unknown>>();
+  private readonly ctx = injectFlexRenderContext<CellContext<PayeeTableFeatures, PayeeResponse, unknown>>();
   protected get meta(): PayeeTableMeta { return this.ctx.table.options.meta as PayeeTableMeta; }
   protected get payee(): PayeeResponse { return this.ctx.row.original; }
 }

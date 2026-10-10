@@ -2,7 +2,7 @@ import { Component, ChangeDetectionStrategy, computed, input, output } from '@an
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideMapPin, lucideTriangleAlert } from '@ng-icons/lucide';
 import { HlmCardImports } from '@/shared/components/spartan/card';
-import type { VisibilityState } from '@tanstack/angular-table';
+import type { ColumnVisibilityState } from '@tanstack/angular-table';
 import { TagBadgeComponent } from '@/shared/components/tag-badge/tag-badge.component';
 import { formatRelativeAge } from '@/shared/utils/relative-age';
 import { InventoryRowActionsComponent } from './inventory-row-actions.component';
@@ -137,11 +137,11 @@ interface CardView {
 export class InventoryCardGridComponent {
   rows = input.required<InventoryRow[]>();
   /**
-   * Per-column visibility, shared verbatim with the table (TanStack {@link VisibilityState}) so one
+   * Per-column visibility, shared verbatim with the table (TanStack {@link ColumnVisibilityState}) so one
    * parent preference drives both renderers. Only `location` is meaningful on a card — the other
    * lines are intrinsic to the card's shape, not columns a user can turn off.
    */
-  columnVisibility = input<VisibilityState>({});
+  columnVisibility = input<ColumnVisibilityState>({});
 
   open = output<InventoryRow>();
   edit = output<InventoryRow>();
@@ -150,7 +150,7 @@ export class InventoryCardGridComponent {
   archiveRestore = output<InventoryRow>();
   delete = output<InventoryRow>();
 
-  /** Absent key = shown, matching TanStack's own default for an empty {@link VisibilityState}. */
+  /** Absent key = shown, matching TanStack's own default for an empty {@link ColumnVisibilityState}. */
   protected showLocation = computed(() => this.columnVisibility()['location'] !== false);
 
   /**

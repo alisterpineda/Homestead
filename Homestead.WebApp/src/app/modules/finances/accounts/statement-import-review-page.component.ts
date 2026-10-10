@@ -28,10 +28,13 @@ import {
 import {
   type ColumnDef,
   type RowSelectionState,
-  createAngularTable,
+  columnResizingFeature,
+  columnSizingFeature,
   flexRenderComponent,
   FlexRenderDirective,
-  getCoreRowModel,
+  injectTable,
+  rowSelectionFeature,
+  tableFeatures,
 } from '@tanstack/angular-table';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmButtonGroupImports } from '@/shared/components/spartan/button-group';
@@ -88,6 +91,13 @@ import type { FlowDirection } from '@/api/generated/models/flow-direction';
 import type { PayeeResponse } from '@/api/generated/models/payee-response';
 import type { CategoryResponse } from '@/api/generated/models/category-response';
 import type { StatementLineItemResponse } from '@/api/generated/models/statement-line-item-response';
+
+export const statementLineTableFeatures = tableFeatures({
+  rowSelectionFeature,
+  columnSizingFeature,
+  columnResizingFeature,
+});
+export type StatementLineTableFeatures = typeof statementLineTableFeatures;
 
 type Checksum =
   | { state: 'balanced' }
@@ -514,7 +524,8 @@ function sameCategory(a: LineCategory | null, b: LineCategory | null): boolean {
                             hlmTr
                             [class.opacity-50]="row.original.excluded"
                           >
-                            @for (cell of row.getVisibleCells(); track cell.id) {
+                            <!-- No columnVisibilityFeature here, so all cells render; switch to row.getVisibleCells() if columns become hideable. -->
+                            @for (cell of row.getAllCells(); track cell.id) {
                               <td
                                 hlmTd
                                 [class]="getTdClass(cell.column.id)"
@@ -925,12 +936,11 @@ export class StatementImportReviewPageComponent {
   // The sizes are measured in-browser against real statement data — each is the width at which that
   // column's typical value renders whole. minSize is a different thing: the floor below which a drag
   // would break the control (or, for date, the value itself).
-  private readonly _columns: ColumnDef<LineItemEdit>[] = [
+  private readonly _columns: ColumnDef<StatementLineTableFeatures, LineItemEdit>[] = [
     {
       id: 'select',
       header: () => flexRenderComponent(TableHeadSelection),
       cell: () => flexRenderComponent(TableRowSelection),
-      enableSorting: false,
       enableResizing: false,
       size: 36,
     },
@@ -938,7 +948,6 @@ export class StatementImportReviewPageComponent {
       id: 'date',
       header: 'Date',
       cell: () => flexRenderComponent(LineDateCell),
-      enableSorting: false,
       // Measured in-browser: the picker's furniture (16px cell padding + 16px input padding + the clear
       // and calendar buttons) eats 77px, so `Feb 29, 2024` needs 183px to render whole. That's a hard
       // floor, not a preference — a date clipped to `Feb 2` is indistinguishable from a different date,
@@ -951,7 +960,6 @@ export class StatementImportReviewPageComponent {
       id: 'payee',
       header: 'Payee',
       cell: () => flexRenderComponent(LinePayeeCell),
-      enableSorting: false,
       // minSize is the control's structural floor: 192px input-group (what the cell wrapper used to carry
       // as min-w-[12rem]) + 16px cell padding. size buys ~120px of name in the AI-ghost variant, which
       // packs ✨ + name + accept + dismiss into one button group. Payee names are unbounded, so this is a
@@ -963,7 +971,6 @@ export class StatementImportReviewPageComponent {
       id: 'category',
       header: 'Category',
       cell: () => flexRenderComponent(LineCategoryCell),
-      enableSorting: false,
       // 230 so the column's most common value — the `Uncategorised · Expense` default every un-touched
       // row shows — renders whole (it needs 227). Category names themselves are unbounded, so past that
       // default this is a budget, not a guarantee.
@@ -976,7 +983,6 @@ export class StatementImportReviewPageComponent {
       id: 'description',
       header: 'Description',
       cell: () => flexRenderComponent(LineDescriptionCell),
-      enableSorting: false,
       size: 190,
       minSize: 140,
     },
@@ -984,7 +990,6 @@ export class StatementImportReviewPageComponent {
       id: 'amount',
       header: 'Amount',
       cell: () => flexRenderComponent(LineAmountCell),
-      enableSorting: false,
       size: 100,
       minSize: 90,
     },
@@ -992,7 +997,6 @@ export class StatementImportReviewPageComponent {
       id: 'actions',
       header: '',
       cell: () => flexRenderComponent(LineActionsCell),
-      enableSorting: false,
       enableResizing: false,
       size: 44,
     },
@@ -1002,29 +1006,26 @@ export class StatementImportReviewPageComponent {
   // which also sidesteps any edit-vs-reorder hazard. Every row is selectable now (selection is transient
   // bulk-targeting, decoupled from the include/exclude axis and committability), so there's no
   // enableRowSelection gate — getCanSelect() defaults to true for every row.
-  protected readonly table = createAngularTable<LineItemEdit>(() => ({
+  protected readonly table = injectTable(() => ({
+    features: statementLineTableFeatures,
     data: this.visibleLineItems(),
     columns: this._columns,
     getRowId: (row) => String(row.index),
-    enableSorting: false,
     enableColumnResizing: true,
     columnResizeMode: 'onChange',
     columnResizeDirection: 'ltr',
     onRowSelectionChange: (updater) => {
       this.rowSelection.set(updater instanceof Function ? updater(this.rowSelection()) : updater);
     },
-    getCoreRowModel: getCoreRowModel(),
     state: { rowSelection: this.rowSelection() },
     meta: this._meta,
   }));
 
   /** CSS variable map for column sizes — bound on the container so the CSS engine handles propagation. */
   protected readonly columnSizeVars = computed(() => {
-    const sizing = this.table.getState().columnSizing;
-    const sizingInfo = this.table.getState().columnSizingInfo;
     // Read both to establish signal dependencies
-    void sizing;
-    void sizingInfo;
+    this.table.atoms.columnSizing.get();
+    this.table.atoms.columnResizing.get();
 
     const headers = untracked(() => this.table.getFlatHeaders());
     const vars: Record<string, string> = {};
@@ -1036,7 +1037,7 @@ export class StatementImportReviewPageComponent {
   });
 
   protected readonly isResizing = computed(
-    () => !!this.table.getState().columnSizingInfo.isResizingColumn,
+    () => !!this.table.atoms.columnResizing.get().isResizingColumn,
   );
 
   // Widths live in the column defs (authoritative under fixed layout) — these carry alignment only.

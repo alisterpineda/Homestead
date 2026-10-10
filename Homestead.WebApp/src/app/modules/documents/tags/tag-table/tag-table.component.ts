@@ -4,11 +4,16 @@ import {
   type ColumnDef,
   type SortingState,
   type RowSelectionState,
-  type VisibilityState,
-  createAngularTable,
+  type ColumnVisibilityState,
+  columnResizingFeature,
+  columnSizingFeature,
+  columnVisibilityFeature,
   flexRenderComponent,
   FlexRenderDirective,
-  getCoreRowModel,
+  injectTable,
+  rowSelectionFeature,
+  rowSortingFeature,
+  tableFeatures,
 } from '@tanstack/angular-table';
 import type { GetTagsResponse } from '@/api/generated/models/get-tags-response';
 import type { TagSortBy } from '@/api/generated/models/tag-sort-by';
@@ -18,6 +23,15 @@ import { TableHeadSelection, TableRowSelection } from '@/shared/components/table
 import type { HideableColumn } from '../../list/document-table/document-table.component';
 import { TagColorCell, TagNameCell, TagDateAddedCell, TagModifiedCell } from './table-cells';
 import { escapeHtml } from '@/shared/utils';
+
+export const tagTableFeatures = tableFeatures({
+  rowSortingFeature,
+  rowSelectionFeature,
+  columnVisibilityFeature,
+  columnSizingFeature,
+  columnResizingFeature,
+});
+export type TagTableFeatures = typeof tagTableFeatures;
 
 const COLUMN_ID_TO_SORT_KEY: Record<string, TagSortBy> = {
   name: 'Name',
@@ -38,7 +52,7 @@ export const HIDEABLE_COLUMNS: HideableColumn[] = [
   { id: 'updatedAt', label: 'Modified' },
 ];
 
-export const DEFAULT_COLUMN_VISIBILITY: VisibilityState = {
+export const DEFAULT_COLUMN_VISIBILITY: ColumnVisibilityState = {
   path: false,
   createdAt: false,
   updatedAt: false,
@@ -125,7 +139,7 @@ export class TagTableComponent {
   tags = input.required<GetTagsResponse[]>();
   sortBy = input<TagSortBy | null | undefined>(null);
   sortDir = input<SortDirection | null | undefined>(null);
-  columnVisibility = input<VisibilityState>({});
+  columnVisibility = input<ColumnVisibilityState>({});
   selectedIds = input<Set<string>>();
 
   tagSelect = output<string>();
@@ -134,9 +148,9 @@ export class TagTableComponent {
 
   private readonly _sorting = signal<SortingState>([]);
   private readonly _rowSelection = signal<RowSelectionState>({});
-  private readonly _columnVisibility = signal<VisibilityState>({});
+  private readonly _columnVisibility = signal<ColumnVisibilityState>({});
 
-  private readonly _columns: ColumnDef<GetTagsResponse>[] = [
+  private readonly _columns: ColumnDef<TagTableFeatures, GetTagsResponse>[] = [
     {
       id: 'select',
       header: () => flexRenderComponent(TableHeadSelection),
@@ -214,12 +228,12 @@ export class TagTableComponent {
     },
   ];
 
-  protected readonly table = createAngularTable<GetTagsResponse>(() => ({
+  protected readonly table = injectTable(() => ({
+    features: tagTableFeatures,
     data: this.tags(),
     columns: this._columns,
     getRowId: (row) => row.id,
     manualSorting: true,
-    getCoreRowModel: getCoreRowModel(),
     enableRowSelection: true,
     enableColumnResizing: true,
     columnResizeMode: 'onChange',
@@ -254,10 +268,9 @@ export class TagTableComponent {
   }));
 
   protected readonly columnSizeVars = computed(() => {
-    const sizing = this.table.getState().columnSizing;
-    const sizingInfo = this.table.getState().columnSizingInfo;
-    void sizing;
-    void sizingInfo;
+    // Read both to establish signal dependencies
+    this.table.atoms.columnSizing.get();
+    this.table.atoms.columnResizing.get();
 
     const headers = untracked(() => this.table.getFlatHeaders());
     const vars: Record<string, string> = {};
@@ -269,7 +282,7 @@ export class TagTableComponent {
   });
 
   protected readonly isResizing = computed(
-    () => !!this.table.getState().columnSizingInfo.isResizingColumn,
+    () => !!this.table.atoms.columnResizing.get().isResizingColumn,
   );
 
   private readonly TH_CLASSES: Record<string, string> = {

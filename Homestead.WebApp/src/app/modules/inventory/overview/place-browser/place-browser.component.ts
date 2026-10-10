@@ -18,7 +18,7 @@ import { CreateEntryDialogComponent } from '../../list/create-entry-dialog/creat
 import { InventoryItemsViewComponent } from '../../list/inventory-items-view.component';
 import { durableToRow, placeConsumableToRow, type InventoryRow } from '../../list/inventory-row';
 import type { ItemLocationValue } from '../../shared/location-picker/location-picker.component';
-import type { VisibilityState } from '@tanstack/angular-table';
+import type { ColumnVisibilityState } from '@tanstack/angular-table';
 import type { GetInventoryOverviewResponse } from '@/api/generated/models/get-inventory-overview-response';
 import type { PlaceContentsResponse } from '@/api/generated/models/place-contents-response';
 import type { DurableResponse } from '@/api/generated/models/durable-response';
@@ -266,7 +266,7 @@ export class PlaceBrowserComponent {
   protected readonly placeRefToLink = placeRefToLink;
 
   /** Hides the redundant Location column in the loose-contents table (every row resolves to this place). */
-  protected readonly hideLocationColumn: VisibilityState = { location: false };
+  protected readonly hideLocationColumn: ColumnVisibilityState = { location: false };
 
   /** Top-level areas only; nested areas surface by drilling into their parent. */
   protected rootAreas = computed(() =>

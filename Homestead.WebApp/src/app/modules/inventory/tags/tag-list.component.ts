@@ -18,7 +18,7 @@ import { EditTagSheetComponent } from './edit-tag-sheet/edit-tag-sheet.component
 import { PaginationComponent } from '@/shared/components/pagination/pagination.component';
 import { TagListStateService } from './tag-list-state.service';
 import { UserPreferencesService } from '@/shared/services/user-preferences.service';
-import type { VisibilityState } from '@tanstack/angular-table';
+import type { ColumnVisibilityState } from '@tanstack/angular-table';
 import { InventoryTagApiService } from '@/api/services/inventory-tag-api.service';
 import type { GetInventoryTagsResponse } from '@/api/generated/models/get-inventory-tags-response';
 import type { PaginatedResponseOfGetInventoryTagsResponse } from '@/api/generated/models/paginated-response-of-get-inventory-tags-response';
@@ -301,7 +301,7 @@ export class TagListComponent {
   );
 
   // Column visibility
-  columnVisibility = signal<VisibilityState>({ ...DEFAULT_COLUMN_VISIBILITY });
+  columnVisibility = signal<ColumnVisibilityState>({ ...DEFAULT_COLUMN_VISIBILITY });
 
   // Sort state from query params
   sortBy = toSignal(
