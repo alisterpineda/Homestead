@@ -1,4 +1,4 @@
-import { Component, computed, input } from '@angular/core';
+import { Component, computed, input, ChangeDetectionStrategy } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideArrowDown, lucideArrowUp, lucideArrowUpDown } from '@ng-icons/lucide';
 import { HlmButton } from '@/shared/components/spartan/button';
@@ -15,6 +15,7 @@ type SortFeatures = { rowSortingFeature: typeof rowSortingFeature };
   selector: 'app-sort-header-button',
   imports: [HlmButton, NgIcon],
   providers: [provideIcons({ lucideArrowDown, lucideArrowUp, lucideArrowUpDown })],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <button hlmBtn size="sm" variant="ghost" class="-ml-3" (click)="handleClick()">
       {{ label() }}

@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { provideHttpClient } from '@angular/common/http';
+import { HttpEventType, provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { toast } from '@spartan-ng/brain/sonner';
 import { UploadManagerService } from './upload-manager.service';
@@ -114,6 +114,19 @@ describe('UploadManagerService', () => {
       requests[1].flush({ jobId: 'job-b' });
       requests[2].flush({ jobId: 'job-c' });
       newRequests[0].flush({ jobId: 'job-d' });
+    });
+  });
+
+  describe('upload progress', () => {
+    it('should report the percentage uploaded while the upload is in flight', () => {
+      service.addFiles([createFile('test.pdf')]);
+
+      const req = httpTesting.expectOne('/api/v1/documents');
+      req.event({ type: HttpEventType.UploadProgress, loaded: 50, total: 100 });
+
+      const item = service.items()[0];
+      expect(item.status).toBe('uploading');
+      expect(item.progress).toBe(50);
     });
   });
 

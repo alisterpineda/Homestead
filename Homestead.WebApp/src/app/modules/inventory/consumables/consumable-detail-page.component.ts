@@ -159,7 +159,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
             }
             @if (s.tags?.length) {
               <div class="flex flex-wrap gap-1 pt-1">
-                @for (t of s.tags ?? []; track t.id) {
+                @for (t of s.tags; track t.id) {
                   <a [routerLink]="['/inventory/items']" [queryParams]="{ tagIds: t.id }">
                     <app-tag-badge [path]="t.path" [color]="t.effectiveColor" [compact]="true" />
                   </a>

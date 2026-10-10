@@ -1,6 +1,6 @@
 import { APP_INITIALIZER, ApplicationConfig, isDevMode, provideBrowserGlobalErrorListeners, provideZonelessChangeDetection } from '@angular/core';
 import { provideRouter, withComponentInputBinding } from '@angular/router';
-import { provideHttpClient, withInterceptors } from '@angular/common/http';
+import { provideHttpClient, withInterceptors, withXhr } from '@angular/common/http';
 import { provideServiceWorker } from '@angular/service-worker';
 import { provideNativeDateAdapter } from '@spartan-ng/brain/date-time';
 import { provideEchartsCore } from 'ngx-echarts';
@@ -21,7 +21,9 @@ export const appConfig: ApplicationConfig = {
     provideBrowserGlobalErrorListeners(),
     provideZonelessChangeDetection(),
     provideRouter(routes, withComponentInputBinding()),
-    provideHttpClient(withInterceptors([authInterceptor, errorInterceptor])),
+    // withXhr: Angular 22's default FetchBackend never emits upload progress, which the
+    // document upload bar depends on (UploadManagerService).
+    provideHttpClient(withXhr(), withInterceptors([authInterceptor, errorInterceptor])),
     provideNativeDateAdapter(),
     provideHlmDatePickerConfig<Date>({
       autoCloseOnSelect: true,

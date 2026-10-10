@@ -65,7 +65,7 @@ interface CardView {
             <div class="min-w-0 flex-1">
               <span class="block truncate text-sm font-medium">{{ row.name }}</span>
               @if (row.durable?.serial) {
-                <span class="block truncate text-xs text-muted-foreground">{{ row.durable?.serial }}</span>
+                <span class="block truncate text-xs text-muted-foreground">{{ row.durable.serial }}</span>
               }
             </div>
             <!-- Cards are not a dense column of rows, so the resting Active state stays unbadged.

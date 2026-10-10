@@ -1,4 +1,4 @@
-import { Component, inject, LOCALE_ID } from '@angular/core';
+import { Component, inject, LOCALE_ID, ChangeDetectionStrategy } from '@angular/core';
 import { formatDate } from '@angular/common';
 import { type CellContext, injectFlexRenderContext } from '@tanstack/angular-table';
 import type { GetPartiesResponse } from '@/api/generated/models/get-parties-response';
@@ -6,6 +6,7 @@ import type { PartyTableFeatures } from './party-table.component';
 
 @Component({
   selector: 'app-party-date-added-cell',
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `<span class="text-muted-foreground">{{ formatted }}</span>`,
 })
 export class PartyDateAddedCell {
@@ -18,6 +19,7 @@ export class PartyDateAddedCell {
 
 @Component({
   selector: 'app-party-modified-cell',
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `<span class="text-muted-foreground">{{ formatted }}</span>`,
 })
 export class PartyModifiedCell {

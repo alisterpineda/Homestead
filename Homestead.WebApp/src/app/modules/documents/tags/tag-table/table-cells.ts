@@ -1,4 +1,4 @@
-import { Component, inject, LOCALE_ID } from '@angular/core';
+import { Component, inject, LOCALE_ID, ChangeDetectionStrategy } from '@angular/core';
 import { formatDate } from '@angular/common';
 import { type CellContext, injectFlexRenderContext } from '@tanstack/angular-table';
 import type { GetTagsResponse } from '@/api/generated/models/get-tags-response';
@@ -6,6 +6,7 @@ import type { TagTableFeatures } from './tag-table.component';
 
 @Component({
   selector: 'app-tag-color-cell',
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (context.row.original.effectiveColor) {
       <span class="inline-block h-3 w-3 rounded-full align-middle" [style.background-color]="context.row.original.effectiveColor"></span>
@@ -18,6 +19,7 @@ export class TagColorCell {
 
 @Component({
   selector: 'app-tag-name-cell',
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (parentPrefix) {
       <span class="text-muted-foreground">{{ parentPrefix }} / </span>
@@ -39,6 +41,7 @@ export class TagNameCell {
 
 @Component({
   selector: 'app-tag-date-added-cell',
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `<span class="text-muted-foreground">{{ formatted }}</span>`,
 })
 export class TagDateAddedCell {
@@ -51,6 +54,7 @@ export class TagDateAddedCell {
 
 @Component({
   selector: 'app-tag-modified-cell',
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `<span class="text-muted-foreground">{{ formatted }}</span>`,
 })
 export class TagModifiedCell {

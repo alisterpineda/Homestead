@@ -29,6 +29,7 @@ export class NameCell {
 @Component({
   selector: 'app-tags-cell',
   imports: [TagBadgeComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="flex flex-wrap gap-1">
       @for (tag of context.row.original.tags; track tag.id) {
@@ -44,6 +45,7 @@ export class TagsCell {
 @Component({
   selector: 'app-parties-cell',
   imports: [PartyBadgeComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="flex flex-wrap gap-1">
       @for (party of context.row.original.parties; track party.id) {
@@ -58,6 +60,7 @@ export class PartiesCell {
 
 @Component({
   selector: 'app-file-size-cell',
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `<span class="text-muted-foreground">{{ formatted }}</span>`,
 })
 export class FileSizeCell {
@@ -69,6 +72,7 @@ export class FileSizeCell {
 
 @Component({
   selector: 'app-date-added-cell',
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `<span class="text-muted-foreground">{{ formatted }}</span>`,
 })
 export class DateAddedCell {
@@ -81,6 +85,7 @@ export class DateAddedCell {
 
 @Component({
   selector: 'app-modified-cell',
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `<span class="text-muted-foreground">{{ formatted }}</span>`,
 })
 export class ModifiedCell {
@@ -93,6 +98,7 @@ export class ModifiedCell {
 
 @Component({
   selector: 'app-document-date-cell',
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `<span class="text-muted-foreground">{{ formatted }}</span>`,
 })
 export class DocumentDateCell {

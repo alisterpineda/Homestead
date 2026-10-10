@@ -1,4 +1,4 @@
-import { Component, computed } from '@angular/core';
+import { Component, computed, ChangeDetectionStrategy } from '@angular/core';
 import { HlmCheckboxImports } from '@/shared/components/spartan/checkbox';
 import {
   type CellContext,
@@ -22,6 +22,7 @@ type SelectionFeatures = { rowSelectionFeature: typeof rowSelectionFeature };
     '(click)': '$event.stopPropagation()',
     '(keydown.enter)': '$event.stopPropagation()',
   },
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <hlm-checkbox
       [checked]="context.table.getIsAllRowsSelected()"
@@ -43,6 +44,7 @@ export class TableHeadSelection<T extends RowData> {
     '(click)': '$event.stopPropagation()',
     '(keydown.enter)': '$event.stopPropagation()',
   },
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <hlm-checkbox
       [checked]="context.row.getIsSelected()"

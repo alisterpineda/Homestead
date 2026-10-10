@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Homestead is a full-stack household-management application — document management plus personal-finance / net-worth tracking — with a .NET 10 backend API and Angular v21 frontend. It uses .NET Aspire for local orchestration of the WebApi, PostgreSQL, and Keycloak. OIDC is the only sign-in method — ASP.NET Core Identity has been removed; `AppUser` is a plain EF entity and authentication is cookie-based via `AddCookie()` with the OIDC handler bridging external sign-in. Any OIDC-compliant IdP works (Keycloak is used locally; Authentik / Auth0 / etc. work in production).
+Homestead is a full-stack household-management application — document management plus personal-finance / net-worth tracking — with a .NET 10 backend API and Angular v22 frontend. It uses .NET Aspire for local orchestration of the WebApi, PostgreSQL, and Keycloak. OIDC is the only sign-in method — ASP.NET Core Identity has been removed; `AppUser` is a plain EF entity and authentication is cookie-based via `AddCookie()` with the OIDC handler bridging external sign-in. Any OIDC-compliant IdP works (Keycloak is used locally; Authentik / Auth0 / etc. work in production).
 
 ## Project Structure
 
@@ -12,7 +12,7 @@ Homestead is a full-stack household-management application — document manageme
 |---|---|
 | `Homestead.AppHost/` | .NET Aspire orchestrator — runs the full stack (includes Keycloak for local OIDC testing) |
 | `Homestead.WebApi/` | .NET 10 backend API ([CLAUDE.md](Homestead.WebApi/CLAUDE.md)) |
-| `Homestead.WebApp/` | Angular v21 frontend with Spartan.NG ([CLAUDE.md](Homestead.WebApp/CLAUDE.md)) |
+| `Homestead.WebApp/` | Angular v22 frontend with Spartan.NG ([CLAUDE.md](Homestead.WebApp/CLAUDE.md)) |
 | `Homestead.ServiceDefaults/` | Shared Aspire config (OpenTelemetry, health checks, HTTP resilience) |
 
 ## Running the Full Stack

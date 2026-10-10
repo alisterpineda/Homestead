@@ -102,7 +102,7 @@ interface InventoryTableMeta {
         <app-item-status-badge [status]="row.status" [note]="row.statusNote" />
       </div>
       @if (row.durable?.serial) {
-        <span class="block truncate text-xs text-muted-foreground">{{ row.durable?.serial }}</span>
+        <span class="block truncate text-xs text-muted-foreground">{{ row.durable.serial }}</span>
       }
       @if (row.tags.length) {
         <div class="mt-1 flex flex-wrap gap-1">

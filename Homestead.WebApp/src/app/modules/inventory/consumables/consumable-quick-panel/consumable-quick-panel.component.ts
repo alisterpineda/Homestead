@@ -97,7 +97,7 @@ interface StepperPayload {
           <div class="flex-1 space-y-4 overflow-y-auto px-4 py-1">
             @if (s.tags?.length) {
               <div class="flex flex-wrap gap-1">
-                @for (t of s.tags ?? []; track t.id) {
+                @for (t of s.tags; track t.id) {
                   <a [routerLink]="['/inventory/items']" [queryParams]="{ tagIds: t.id }">
                     <app-tag-badge [path]="t.path" [color]="t.effectiveColor" [compact]="true" />
                   </a>

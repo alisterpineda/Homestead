@@ -7,7 +7,7 @@
       "moby": true
     },
     "ghcr.io/devcontainers/features/node:1": {
-      "version": "25"
+      "version": "24"
     },
     "ghcr.io/devcontainers/features/github-cli:1": {},
     "ghcr.io/microsoft/aspire-devcontainer-feature/aspire:2": {},

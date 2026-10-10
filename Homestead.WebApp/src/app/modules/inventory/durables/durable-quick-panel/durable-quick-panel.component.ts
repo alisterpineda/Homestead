@@ -80,7 +80,7 @@ type InlineForm = 'move' | 'lent' | null;
           <div class="flex-1 space-y-4 overflow-y-auto px-4 py-1">
             @if (it.tags?.length) {
               <div class="flex flex-wrap gap-1">
-                @for (t of it.tags ?? []; track t.id) {
+                @for (t of it.tags; track t.id) {
                   <a [routerLink]="['/inventory/items']" [queryParams]="{ tagIds: t.id }">
                     <app-tag-badge [path]="t.path" [color]="t.effectiveColor" [compact]="true" />
                   </a>

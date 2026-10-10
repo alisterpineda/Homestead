@@ -1,4 +1,4 @@
-import { Component, inject, LOCALE_ID } from '@angular/core';
+import { Component, inject, LOCALE_ID, ChangeDetectionStrategy } from '@angular/core';
 import { formatDate } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { type CellContext, injectFlexRenderContext } from '@tanstack/angular-table';
@@ -7,6 +7,7 @@ import type { InventoryTagTableFeatures } from './tag-table.component';
 
 @Component({
   selector: 'app-tag-color-cell',
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (context.row.original.effectiveColor) {
       <span class="inline-block h-3 w-3 rounded-full align-middle" [style.background-color]="context.row.original.effectiveColor"></span>
@@ -20,6 +21,7 @@ export class TagColorCell {
 @Component({
   selector: 'app-tag-name-cell',
   imports: [RouterLink],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <a
       [routerLink]="['/inventory/items']"
@@ -48,6 +50,7 @@ export class TagNameCell {
 
 @Component({
   selector: 'app-tag-date-added-cell',
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `<span class="text-muted-foreground">{{ formatted }}</span>`,
 })
 export class TagDateAddedCell {
@@ -60,6 +63,7 @@ export class TagDateAddedCell {
 
 @Component({
   selector: 'app-tag-modified-cell',
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `<span class="text-muted-foreground">{{ formatted }}</span>`,
 })
 export class TagModifiedCell {
