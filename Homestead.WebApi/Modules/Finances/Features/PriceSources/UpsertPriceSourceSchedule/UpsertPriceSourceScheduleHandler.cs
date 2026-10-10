@@ -1,3 +1,4 @@
+using FluentValidation;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Finances;
@@ -5,19 +6,20 @@ using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Modules.Finances.Processing;
 using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Persistence;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Finances.Features.PriceSources.UpsertPriceSourceSchedule;
 
 public class UpsertPriceSourceScheduleHandler(
     AppDbContext db,
     ICurrentUserAccessor currentUser,
-    IPriceSourceScheduleStore scheduleStore)
-    : IRequestHandler<UpsertPriceSourceScheduleCommand, UpsertPriceSourceScheduleResponse>
+    IPriceSourceScheduleStore scheduleStore,
+    IValidator<UpsertPriceSourceScheduleCommand> validator)
 {
     public async Task<UpsertPriceSourceScheduleResponse> Handle(
         UpsertPriceSourceScheduleCommand request, CancellationToken ct)
     {
+        await validator.ValidateAndThrowAsync(request, ct);
+
         request.Source.RequireExternal("scheduled");
 
         var now = DateTimeOffset.UtcNow;

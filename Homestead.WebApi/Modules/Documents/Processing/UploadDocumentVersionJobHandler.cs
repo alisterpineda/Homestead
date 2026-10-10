@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Modules.Documents.Processing.Commands;
@@ -8,7 +9,6 @@ using Homestead.WebApi.Processing;
 using Homestead.WebApi.Infrastructure.Storage;
 using Homestead.WebApi.Infrastructure.TextExtraction;
 using Homestead.WebApi.Infrastructure.Thumbnails;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -22,7 +22,8 @@ public class UploadDocumentVersionJobHandler(
     ThumbnailService thumbnailService,
     TextExtractionHelper textExtractionHelper,
     ITextExtractionEngineResolver engineResolver,
-    ISender sender) : IJobHandler
+    IUnitOfWork unitOfWork,
+    IAddDocumentVersionHandler addDocumentVersion) : IJobHandler
 {
     public ProcessingJobType Type => ProcessingJobType.UploadDocumentVersion;
 
@@ -97,22 +98,23 @@ public class UploadDocumentVersionJobHandler(
                 filePlaced = true;
             }
 
-            // Persist the new version in one unit of work.
+            // Persist the new version in one unit of work, attributed to the job's creator.
+            var command = new AddDocumentVersionCommand
+            {
+                DocumentId = payload.DocumentId,
+                ContentType = payload.ContentType,
+                FileSize = payload.FileSize,
+                FileHash = fileHash,
+                FileExtension = payload.FileExtension,
+                Label = payload.Label,
+                ExtractedText = extractedText,
+                TextExtractionMetadata = textExtractionMetadata
+            };
             AddDocumentVersionResult result;
             try
             {
-                result = await sender.Send(new AddDocumentVersionCommand
-                {
-                    DocumentId = payload.DocumentId,
-                    ContentType = payload.ContentType,
-                    FileSize = payload.FileSize,
-                    FileHash = fileHash,
-                    FileExtension = payload.FileExtension,
-                    Label = payload.Label,
-                    ExtractedText = extractedText,
-                    TextExtractionMetadata = textExtractionMetadata,
-                    ActorUserId = job.CreatedByUserId
-                }, ct);
+                unitOfWork.SetActor(job.CreatedByUserId);
+                result = await unitOfWork.ExecuteInTransactionAsync(() => addDocumentVersion.Handle(command, ct), ct);
             }
             catch
             {

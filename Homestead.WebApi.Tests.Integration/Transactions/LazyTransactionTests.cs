@@ -1,7 +1,8 @@
+using System.Net.Http.Json;
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Modules.Admin.Features.Schedules.DeleteProcessingSchedule;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Tests.Integration.Infrastructure;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 using static Homestead.WebApi.Tests.Integration.Infrastructure.TransactionRollbackProbes;
 
@@ -24,12 +25,9 @@ public class LazyTransactionTests(PostgresFixture fixture) : IntegrationTestBase
         // The probe bulk-updates the group name (no manual transaction call), stages a tracked write, then
         // throws. CommandWriteCommandInterceptor makes the bulk update atomic by construction, so it must
         // roll back with the failed command.
-        using (var scope = CreateScope())
-        {
-            var sender = scope.ServiceProvider.GetRequiredService<ISender>();
-            await Assert.ThrowsAsync<InvalidOperationException>(() =>
-                sender.Send(new ExecuteUpdateRollbackProbeCommand(groupId, "Mutated Name"), CT));
-        }
+        var response = await CreateAnonymousClient().PostAsJsonAsync(
+            ExecuteUpdateRollbackRoute, new ExecuteUpdateRollbackProbeCommand(groupId, "Mutated Name"), CT);
+        Assert.Equal(ProbeFailedStatusCode, (int)response.StatusCode);
 
         using (var scope = CreateScope())
         {
@@ -47,13 +45,15 @@ public class LazyTransactionTests(PostgresFixture fixture) : IntegrationTestBase
     public async Task DeleteProcessingSchedule_RemovesRow_OnSuccess()
     {
         // Behavior-preservation check: the single ExecuteDelete still deletes on the happy path. The
-        // interceptor opens the command tx as the delete reaches the DB and the pipeline commits it.
+        // interceptor opens the command tx as the delete reaches the DB and the unit of work commits it.
         var scheduleId = await SeedScheduleAsync();
 
         using (var scope = CreateScope())
         {
-            var sender = scope.ServiceProvider.GetRequiredService<ISender>();
-            var deleted = await sender.Send(new DeleteProcessingScheduleCommand(scheduleId), CT);
+            var handler = scope.ServiceProvider.GetRequiredService<DeleteProcessingScheduleHandler>();
+            var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+            var deleted = await unitOfWork.ExecuteInTransactionAsync(
+                () => handler.Handle(new DeleteProcessingScheduleCommand(scheduleId), CT), CT);
             Assert.True(deleted);
         }
 

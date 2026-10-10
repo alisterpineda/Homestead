@@ -1,5 +1,4 @@
 using Homestead.WebApi.Authentication;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Finances.Features.OpeningBalances.CreateOpeningBalance;
 
@@ -8,10 +7,10 @@ public static class CreateOpeningBalanceEndpoint
     public static void Map(RouteGroupBuilder group)
     {
         group.MapPost("/{accountId:guid}/opening-balances",
-            async (Guid accountId, CreateOpeningBalanceCommand body, ISender sender, CancellationToken ct) =>
+            async (Guid accountId, CreateOpeningBalanceCommand body, CreateOpeningBalanceHandler handler, CancellationToken ct) =>
         {
             var request = body with { AccountId = accountId };
-            var response = await sender.Send(request, ct);
+            var response = await handler.Handle(request, ct);
             return Results.Created(
                 $"/api/v1/finances/accounts/{accountId}/opening-balances/{response.CommodityId}",
                 response);

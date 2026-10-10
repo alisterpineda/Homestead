@@ -1,7 +1,7 @@
+using FluentValidation;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Persistence;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Transactions.Trades.PatchTrade;
 
@@ -9,11 +9,13 @@ public class PatchTradeHandler(
     AppDbContext db,
     ITradeService trades,
     IBalanceEntryReconciler reconciler,
-    IUnitOfWork unitOfWork)
-    : IRequestHandler<PatchTradeCommand, TransactionResponse>
+    IUnitOfWork unitOfWork,
+    IValidator<PatchTradeCommand> validator)
 {
     public async Task<TransactionResponse> Handle(PatchTradeCommand request, CancellationToken ct)
     {
+        await validator.ValidateAndThrowAsync(request, ct);
+
         var result = await trades.UpdateAsync(
             request.TransactionId,
             new UpdateTradeRequest(

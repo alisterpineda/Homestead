@@ -2,7 +2,6 @@ using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Modules.Inventory.Services;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Areas.DeleteArea;
@@ -12,7 +11,6 @@ public class DeleteAreaHandler(
     IAuditContext audit,
     IUnitOfWork unitOfWork,
     IInventoryPlacementService placementService)
-    : IRequestHandler<DeleteAreaCommand, bool>
 {
     public async Task<bool> Handle(DeleteAreaCommand request, CancellationToken ct)
     {

@@ -1,5 +1,4 @@
 using Homestead.WebApi.Authentication;
-using MediatR;
 using Microsoft.AspNetCore.JsonPatch.SystemTextJson;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Commodities.PatchCommodity;
@@ -10,14 +9,14 @@ public static class PatchCommodityEndpoint
     {
         group.MapPatch("/{id:guid}", async (Guid id,
             JsonPatchDocument<PatchCommodityModel> patchDoc,
-            ISender sender, CancellationToken ct) =>
+            PatchCommodityHandler handler, CancellationToken ct) =>
         {
             var command = new PatchCommodityCommand
             {
                 Id = id,
                 PatchDocument = patchDoc
             };
-            return Results.Ok(await sender.Send(command, ct));
+            return Results.Ok(await handler.Handle(command, ct));
         })
         .WithName("PatchCommodity")
         .Accepts<JsonPatchDocument<PatchCommodityModel>>("application/json-patch+json")

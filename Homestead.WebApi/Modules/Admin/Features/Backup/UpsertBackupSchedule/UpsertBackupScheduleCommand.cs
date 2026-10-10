@@ -1,8 +1,6 @@
-using Homestead.WebApi.Common;
-
 namespace Homestead.WebApi.Modules.Admin.Features.Backup.UpsertBackupSchedule;
 
-public record UpsertBackupScheduleCommand : ICommand<UpsertBackupScheduleResponse>
+public record UpsertBackupScheduleCommand
 {
     public required Guid BackupSourceId { get; init; }
     public required string CronExpression { get; init; }

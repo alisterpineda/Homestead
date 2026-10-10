@@ -1,3 +1,4 @@
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Modules.Finances.PriceProviders;
@@ -6,7 +7,6 @@ using Homestead.WebApi.Modules.Finances.Processing.Commands;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Processing;
 using Homestead.WebApi.Tests.Integration.Infrastructure;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -141,10 +141,11 @@ public class CommodityPriceImportPipelineTests : IntegrationTestBase
 
         using (var scope = CreateScope())
         {
-            // Send via ISender so the full MediatR pipeline runs and UnitOfWorkBehavior commits — the handler
-            // has no explicit SaveChanges, so a direct call would persist nothing.
-            var sender = scope.ServiceProvider.GetRequiredService<ISender>();
-            await sender.Send(new ApplyCommodityPriceObservationsCommand
+            // Run inside the unit of work, as the import job does, so the transaction commits — the handler
+            // has no explicit SaveChanges, so a bare call would persist nothing.
+            var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+            var handler = scope.ServiceProvider.GetRequiredService<IApplyCommodityPriceObservationsHandler>();
+            var command = new ApplyCommodityPriceObservationsCommand
             {
                 Source = CommodityPriceSource.BankOfCanada,
                 Observations = new[]
@@ -152,6 +153,11 @@ public class CommodityPriceImportPipelineTests : IntegrationTestBase
                     new PriceObservation(usdId, cadId, at, 1.36m),
                     new PriceObservation(usdId, cadId, at, 1.40m), // duplicate instant, different rate
                 },
+            };
+            await unitOfWork.ExecuteInTransactionAsync(async () =>
+            {
+                await handler.Handle(command, CT);
+                return true;
             }, CT);
             // No Assert.ThrowsAsync: the assertion is that this does NOT throw a unique-violation.
         }

@@ -1,3 +1,4 @@
+using FluentValidation;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
@@ -5,7 +6,6 @@ using Homestead.WebApi.Domain.Inventory;
 using Homestead.WebApi.Modules.Inventory.Features.Durables;
 using Homestead.WebApi.Modules.Inventory.Services;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Consumables.TrackDurable;
@@ -16,11 +16,13 @@ public class TrackDurableHandler(
     ICurrentUserAccessor currentUser,
     IAuditContext audit,
     IItemLocationResolver locationResolver,
-    IUnitOfWork unitOfWork)
-    : IRequestHandler<TrackDurableCommand, TrackDurableResponse>
+    IUnitOfWork unitOfWork,
+    IValidator<TrackDurableCommand> validator)
 {
     public async Task<TrackDurableResponse> Handle(TrackDurableCommand request, CancellationToken ct)
     {
+        await validator.ValidateAndThrowAsync(request, ct);
+
         var body = request.Body;
         var now = DateTimeOffset.UtcNow;
 

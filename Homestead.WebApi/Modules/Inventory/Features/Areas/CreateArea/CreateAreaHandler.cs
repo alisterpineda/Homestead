@@ -1,17 +1,18 @@
+using FluentValidation;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Inventory;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Areas.CreateArea;
 
-public class CreateAreaHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork)
-    : IRequestHandler<CreateAreaCommand, AreaResponse>
+public class CreateAreaHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork, IValidator<CreateAreaCommand> validator)
 {
     public async Task<AreaResponse> Handle(CreateAreaCommand request, CancellationToken ct)
     {
+        await validator.ValidateAndThrowAsync(request, ct);
+
         // A new area can't yet have descendants, so no cycle is possible — only existence matters.
         // BusinessRuleException (400) for a bad reference, matching PatchArea and the item handlers.
         string? parentAreaName = null;

@@ -1,7 +1,6 @@
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Infrastructure.Backup;
 using Homestead.WebApi.Infrastructure.Backup.GoogleDrive;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Admin.Features.Backup.ValidateBackupTargetConnection;
 
@@ -36,7 +35,6 @@ public class ValidateBackupTargetConnectionHandler(
     GoogleDriveTokenManager tokenManager,
     IBackupTargetRootProvisioner rootProvisioner,
     ILogger<ValidateBackupTargetConnectionHandler> logger)
-    : IRequestHandler<ValidateBackupTargetConnectionCommand, ValidateBackupTargetConnectionResponse>
 {
     public async Task<ValidateBackupTargetConnectionResponse> Handle(
         ValidateBackupTargetConnectionCommand request, CancellationToken ct)

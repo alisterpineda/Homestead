@@ -1,4 +1,3 @@
-using MediatR;
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Infrastructure.Storage;
 using Homestead.WebApi.Persistence;
@@ -8,7 +7,6 @@ using Microsoft.Extensions.Options;
 namespace Homestead.WebApi.Modules.Documents.Features.Documents.GetDocumentFile;
 
 public class GetDocumentFileHandler(AppDbContext db, IOptions<FileStorageOptions> storage)
-    : IRequestHandler<GetDocumentFileQuery, IResult>
 {
     public async Task<IResult> Handle(GetDocumentFileQuery request, CancellationToken ct)
     {

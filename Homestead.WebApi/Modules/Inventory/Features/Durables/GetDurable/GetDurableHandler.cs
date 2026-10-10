@@ -1,13 +1,11 @@
 using Homestead.WebApi.Domain.Inventory;
 using Homestead.WebApi.Modules.Inventory.Services;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Durables.GetDurable;
 
 public class GetDurableHandler(AppDbContext db, IItemLocationResolver locationResolver)
-    : IRequestHandler<GetDurableQuery, DurableResponse?>
 {
     public async Task<DurableResponse?> Handle(GetDurableQuery request, CancellationToken ct)
     {

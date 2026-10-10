@@ -1,19 +1,21 @@
+using FluentValidation;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Groups;
 using Homestead.WebApi.Common.Auditing;
-using MediatR;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Admin.Features.Groups.CreateGroup;
 
 public class CreateGroupHandler(
-    AppDbContext db, ICurrentUserAccessor currentUser, IAuditContext audit, IUnitOfWork unitOfWork)
-    : IRequestHandler<CreateGroupCommand, GroupResponse>
+    AppDbContext db, ICurrentUserAccessor currentUser, IAuditContext audit, IUnitOfWork unitOfWork,
+    IValidator<CreateGroupCommand> validator)
 {
     public async Task<GroupResponse> Handle(CreateGroupCommand request, CancellationToken ct)
     {
+        await validator.ValidateAndThrowAsync(request, ct);
+
         var nameExists = await db.Groups
             .AnyAsync(g => g.Name == request.Name.Trim(), ct);
 

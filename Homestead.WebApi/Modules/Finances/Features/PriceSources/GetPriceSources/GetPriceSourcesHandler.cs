@@ -1,13 +1,11 @@
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Modules.Finances.PriceProviders;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Features.PriceSources.GetPriceSources;
 
 public class GetPriceSourcesHandler(AppDbContext db, IPriceSourceRegistry registry)
-    : IRequestHandler<GetPriceSourcesQuery, GetPriceSourcesResponse>
 {
     public async Task<GetPriceSourcesResponse> Handle(GetPriceSourcesQuery request, CancellationToken ct)
     {

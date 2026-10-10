@@ -1,10 +1,10 @@
 using System.Text.Json;
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Modules.Documents.Processing.Commands;
 using Homestead.WebApi.Modules.Documents.Services;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Processing;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Documents.Processing;
@@ -13,7 +13,8 @@ public class ClassifyDocumentJobHandler(
     AppDbContext db,
     IDocumentClassifier classifier,
     IProcessingNotifier notifier,
-    ISender sender) : IJobHandler
+    IUnitOfWork unitOfWork,
+    IApplyClassificationHandler applyClassification) : IJobHandler
 {
     public ProcessingJobType Type => ProcessingJobType.ClassifyDocument;
 
@@ -63,14 +64,17 @@ public class ClassifyDocumentJobHandler(
         var output = await classifier.ClassifyAsync(
             payload.DocumentId, documentName, payload.Scope, ct);
 
-        // Dispatch the thinned command carrying the precomputed result — the handler only persists.
-        var result = await sender.Send(new ApplyClassificationCommand
+        // Run the thinned command carrying the precomputed result in one transaction — the handler only
+        // persists. The actor is set first so every flush inside it is attributed to the job's creator.
+        var command = new ApplyClassificationCommand
         {
             DocumentId = payload.DocumentId,
             Classification = output?.Classification,
             Scope = payload.Scope,
             ActorUserId = job.CreatedByUserId
-        }, ct);
+        };
+        unitOfWork.SetActor(job.CreatedByUserId);
+        var result = await unitOfWork.ExecuteInTransactionAsync(() => applyClassification.Handle(command, ct), ct);
 
         if (job.ParentJobId is null)
         {

@@ -1,5 +1,3 @@
-using MediatR;
-
 namespace Homestead.WebApi.Modules.Admin.Features.Backup.DeleteBackupSource;
 
 public static class DeleteBackupSourceEndpoint
@@ -7,9 +5,9 @@ public static class DeleteBackupSourceEndpoint
     public static void Map(RouteGroupBuilder group)
     {
         group.MapDelete("/sources/{id:guid}", async (
-            Guid id, bool? cancelRun, ISender sender, CancellationToken ct) =>
+            Guid id, bool? cancelRun, DeleteBackupSourceHandler handler, CancellationToken ct) =>
         {
-            await sender.Send(new DeleteBackupSourceCommand(id, cancelRun ?? false), ct);
+            await handler.Handle(new DeleteBackupSourceCommand(id, cancelRun ?? false), ct);
             return Results.NoContent();
         })
         .WithName("DeleteBackupSource")

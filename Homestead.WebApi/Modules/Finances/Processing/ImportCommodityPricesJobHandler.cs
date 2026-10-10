@@ -1,11 +1,11 @@
 using System.Text.Json;
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Modules.Finances.PriceProviders;
 using Homestead.WebApi.Modules.Finances.Processing.Commands;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Processing;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Processing;
@@ -13,7 +13,8 @@ namespace Homestead.WebApi.Modules.Finances.Processing;
 public class ImportCommodityPricesJobHandler(
     AppDbContext db,
     IPriceSourceRegistry sources,
-    ISender sender,
+    IUnitOfWork unitOfWork,
+    IApplyCommodityPriceObservationsHandler applyObservations,
     ILogger<ImportCommodityPricesJobHandler> logger) : IJobHandler
 {
     private const int MaxErrorLength = 4096;
@@ -105,14 +106,19 @@ public class ImportCommodityPricesJobHandler(
 
         // Fold the DB write + audit into the unit-of-work chokepoint. Runs in this job's DI scope, so the
         // command handler shares the same scoped AppDbContext (and the settings entity loaded above), and
-        // the UnitOfWorkBehavior commits once after the command. Scheduled imports stay system-attributed;
+        // the transaction commits once after the command. Scheduled imports stay system-attributed;
         // manual runs are attributed to the initiating user.
-        await sender.Send(new ApplyCommodityPriceObservationsCommand
+        var command = new ApplyCommodityPriceObservationsCommand
         {
             Source = payload.Source,
             Observations = result.Observations,
             Warning = result.Warning,
-            ActorUserId = job.ScheduleId is null ? job.CreatedByUserId : null,
+        };
+        unitOfWork.SetActor(job.ScheduleId is null ? job.CreatedByUserId : null);
+        await unitOfWork.ExecuteInTransactionAsync(async () =>
+        {
+            await applyObservations.Handle(command, ct);
+            return true;
         }, ct);
     }
 

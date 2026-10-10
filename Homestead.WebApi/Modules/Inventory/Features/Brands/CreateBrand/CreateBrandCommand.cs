@@ -1,5 +1,3 @@
-using Homestead.WebApi.Common;
-
 namespace Homestead.WebApi.Modules.Inventory.Features.Brands.CreateBrand;
 
 /// <summary>
@@ -7,7 +5,7 @@ namespace Homestead.WebApi.Modules.Inventory.Features.Brands.CreateBrand;
 /// the existing row rather than creating a duplicate (canonicalisation via entry-time dedup + the
 /// unique index on <c>lower(Name)</c>). Modelled on Documents' Tag resolve-or-create.
 /// </summary>
-public record CreateBrandCommand : ICommand<BrandResponse>
+public record CreateBrandCommand
 {
     public required string Name { get; init; }
 }

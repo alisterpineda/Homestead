@@ -1,6 +1,5 @@
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Modules.Documents.Features.Suggestions;
-using MediatR;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Homestead.WebApi.Modules.Documents.Features.Versions;
@@ -8,7 +7,6 @@ using Homestead.WebApi.Modules.Documents.Features.Versions;
 namespace Homestead.WebApi.Modules.Documents.Features.Documents.GetDocument;
 
 public class GetDocumentHandler(AppDbContext db)
-    : IRequestHandler<GetDocumentQuery, GetDocumentResponse?>
 {
     public async Task<GetDocumentResponse?> Handle(GetDocumentQuery request, CancellationToken ct)
     {

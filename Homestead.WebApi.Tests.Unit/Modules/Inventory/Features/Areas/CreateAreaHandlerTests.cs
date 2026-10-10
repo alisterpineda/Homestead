@@ -1,3 +1,4 @@
+using FluentValidation;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Inventory;
@@ -20,7 +21,7 @@ public class CreateAreaHandlerTests : IDisposable
         _unitOfWork = Substitute.For<IUnitOfWork>();
         _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
             .Returns(ci => _db.SaveChangesAsync(ci.Arg<CancellationToken>()));
-        _sut = new CreateAreaHandler(_db, _audit, _unitOfWork);
+        _sut = new CreateAreaHandler(_db, _audit, _unitOfWork, new CreateAreaCommandValidator());
     }
 
     public void Dispose() => _db.Dispose();
@@ -64,5 +65,12 @@ public class CreateAreaHandlerTests : IDisposable
             _sut.Handle(new CreateAreaCommand { Name = "Orphan", ParentAreaId = Guid.NewGuid() }, Ct));
 
         Assert.Empty(_db.Areas);
+    }
+
+    [Fact]
+    public async Task Handle_BlankName_ThrowsValidationException()
+    {
+        await Assert.ThrowsAsync<ValidationException>(() =>
+            _sut.Handle(new CreateAreaCommand { Name = "   " }, Ct));
     }
 }

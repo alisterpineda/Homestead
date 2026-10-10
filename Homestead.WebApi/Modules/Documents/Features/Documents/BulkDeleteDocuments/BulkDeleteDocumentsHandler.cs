@@ -2,7 +2,6 @@ using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
-using MediatR;
 using Homestead.WebApi.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
@@ -12,7 +11,6 @@ namespace Homestead.WebApi.Modules.Documents.Features.Documents.BulkDeleteDocume
 public class BulkDeleteDocumentsHandler(AppDbContext db, ICurrentUserAccessor currentUser,
     IAuditContext audit, IAuthorizationService authService, IHttpContextAccessor httpContext,
     IUnitOfWork unitOfWork)
-    : IRequestHandler<BulkDeleteDocumentsCommand, BulkDeleteDocumentsResponse>
 {
     public async Task<BulkDeleteDocumentsResponse> Handle(BulkDeleteDocumentsCommand request, CancellationToken ct)
     {

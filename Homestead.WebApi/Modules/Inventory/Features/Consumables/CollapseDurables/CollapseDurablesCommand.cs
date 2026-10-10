@@ -1,5 +1,3 @@
-using Homestead.WebApi.Common;
-
 namespace Homestead.WebApi.Modules.Inventory.Features.Consumables.CollapseDurables;
 
 /// <summary>
@@ -22,7 +20,7 @@ public record CollapseDurablesRequest
     public string? Note { get; init; }
 }
 
-public record CollapseDurablesCommand : ICommand<ConsumableDetailResponse>
+public record CollapseDurablesCommand
 {
     public Guid ConsumableId { get; init; }
     public required CollapseDurablesRequest Body { get; init; }

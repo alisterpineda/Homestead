@@ -1,3 +1,4 @@
+using FluentValidation;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
@@ -85,7 +86,8 @@ public class CommitStatementImportHandlerTests : IAsyncLifetime
             _db, counterparts, new TransactionValidator(_db), Substitute.For<IAuditContext>());
 
         _sut = new CommitStatementImportHandler(
-            _db, _currentUser, _balanceEntries, _flows, _reconciler, _payeeMappings, _unitOfWork);
+            _db, _currentUser, _balanceEntries, _flows, _reconciler, _payeeMappings, _unitOfWork,
+            new CommitStatementImportCommandValidator());
     }
 
     public ValueTask DisposeAsync()
@@ -368,7 +370,8 @@ public class CommitStatementImportHandlerTests : IAsyncLifetime
                 },
                 Array.Empty<TouchedPair>()));
         var sut = new CommitStatementImportHandler(
-            _db, _currentUser, _balanceEntries, flows, _reconciler, _payeeMappings, _unitOfWork);
+            _db, _currentUser, _balanceEntries, flows, _reconciler, _payeeMappings, _unitOfWork,
+            new CommitStatementImportCommandValidator());
         return (sut, flows);
     }
 
@@ -628,5 +631,14 @@ public class CommitStatementImportHandlerTests : IAsyncLifetime
         var expectedKey = PayeeDescriptionNormalizer.Normalize("SQ *BLUE BOTTLE")!;
         await _payeeMappings.Received(1).UpsertAsync(
             expectedKey, payee, "SQ *BLUE BOTTLE", documentId, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Commit_NegativeAssertedAmount_ThrowsValidationException()
+    {
+        var (job, _) = await SeedJobAsync();
+
+        await Assert.ThrowsAsync<ValidationException>(
+            () => _sut.Handle(Command(job.Id) with { AssertedAmount = -1m }, TestContext.Current.CancellationToken));
     }
 }

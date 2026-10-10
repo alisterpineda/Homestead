@@ -5,13 +5,11 @@ using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Modules.Finances.Processing;
 using Homestead.WebApi.Modules.Finances.Processing.Statements;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Imports.GetStatementImport;
 
 public class GetStatementImportHandler(AppDbContext db, ICurrentUserAccessor currentUser)
-    : IRequestHandler<GetStatementImportQuery, StatementImportResponse>
 {
     public async Task<StatementImportResponse> Handle(GetStatementImportQuery request, CancellationToken ct)
     {

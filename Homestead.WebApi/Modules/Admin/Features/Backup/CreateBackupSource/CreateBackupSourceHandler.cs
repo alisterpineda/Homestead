@@ -3,7 +3,6 @@ using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Backup;
 using Homestead.WebApi.Infrastructure.Backup;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Admin.Features.Backup.CreateBackupSource;
@@ -18,7 +17,6 @@ public class CreateBackupSourceHandler(
     IBackupTargetResolver resolver,
     IAuditContext audit,
     IUnitOfWork unitOfWork)
-    : IRequestHandler<CreateBackupSourceCommand, CreateBackupSourceResponse>
 {
     public async Task<CreateBackupSourceResponse> Handle(
         CreateBackupSourceCommand request, CancellationToken ct)

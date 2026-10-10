@@ -1,5 +1,6 @@
 using Asp.Versioning.Builder;
 using Homestead.WebApi.Authentication;
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Modules.Finances.Features.Accounts.CreateAccount;
 using Homestead.WebApi.Modules.Finances.Features.Accounts.DeleteAccount;
 using Homestead.WebApi.Modules.Finances.Features.Accounts.GetAccount;
@@ -79,7 +80,8 @@ public static class FinancesModule
             .HasApiVersion(1, 0)
             .WithGroupName("v1")
             .WithTags("Finances")
-            .RequireAuthorization(AuthPolicies.ActiveUser);
+            .RequireAuthorization(AuthPolicies.ActiveUser)
+            .WithCommandTransaction();
 
         var accounts = v1.MapGroup("/accounts");
         GetAccountsEndpoint.Map(accounts);

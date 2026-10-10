@@ -10,8 +10,9 @@ namespace Homestead.WebApi.Modules.Finances.Services;
 /// auditing each as Updated. Prior-running is computed from raw <c>Quantity</c> in the asserted
 /// commodity — no display-currency conversion at reconciliation time.
 ///
-/// The reconciler does NOT call <c>SaveChangesAsync</c>; the <c>UnitOfWorkBehavior</c> flushes
-/// the audit entries and split modifications at the end of the request.
+/// The reconciler does NOT call <c>SaveChangesAsync</c>; the enclosing command transaction
+/// (<c>CommandTransactionFilter</c> via <c>IUnitOfWork.ExecuteInTransactionAsync</c>) flushes the
+/// audit entries and split modifications at the end of the request.
 /// </summary>
 public interface IBalanceEntryReconciler
 {

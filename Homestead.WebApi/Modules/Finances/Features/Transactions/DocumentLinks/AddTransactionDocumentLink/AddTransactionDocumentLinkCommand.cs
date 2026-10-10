@@ -1,8 +1,6 @@
-using Homestead.WebApi.Common;
-
 namespace Homestead.WebApi.Modules.Finances.Features.Transactions.DocumentLinks.AddTransactionDocumentLink;
 
-public record AddTransactionDocumentLinkCommand : ICommand<TransactionDocumentLinkResponse>
+public record AddTransactionDocumentLinkCommand
 {
     public required Guid TransactionId { get; init; }
     public required Guid DocumentId { get; init; }

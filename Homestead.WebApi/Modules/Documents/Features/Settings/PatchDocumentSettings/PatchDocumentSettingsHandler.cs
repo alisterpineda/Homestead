@@ -6,7 +6,6 @@ using Homestead.WebApi.Domain.Auditing;
 using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Settings;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.AspNetCore.JsonPatch.SystemTextJson;
 using Microsoft.EntityFrameworkCore;
 
@@ -17,7 +16,6 @@ public class PatchDocumentSettingsHandler(
     ICurrentUserAccessor currentUser,
     IAuditContext audit,
     IUnitOfWork unitOfWork)
-    : IRequestHandler<PatchDocumentSettingsCommand, DocumentSettingsResponse>
 {
     public async Task<DocumentSettingsResponse> Handle(
         PatchDocumentSettingsCommand command, CancellationToken ct)

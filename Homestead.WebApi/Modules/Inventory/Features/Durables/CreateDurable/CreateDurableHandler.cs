@@ -1,10 +1,10 @@
+using FluentValidation;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Inventory;
 using Homestead.WebApi.Modules.Inventory.Services;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Durables.CreateDurable;
@@ -15,11 +15,13 @@ public class CreateDurableHandler(
     IAuditContext audit,
     IItemLocationResolver locationResolver,
     IInventoryTagPathResolver tagResolver,
-    IUnitOfWork unitOfWork)
-    : IRequestHandler<CreateDurableCommand, DurableResponse>
+    IUnitOfWork unitOfWork,
+    IValidator<CreateDurableCommand> validator)
 {
     public async Task<DurableResponse> Handle(CreateDurableCommand request, CancellationToken ct)
     {
+        await validator.ValidateAndThrowAsync(request, ct);
+
         if (request.AreaId is { } areaId)
         {
             var areaExists = await db.Areas.AnyAsync(a => a.Id == areaId, ct);

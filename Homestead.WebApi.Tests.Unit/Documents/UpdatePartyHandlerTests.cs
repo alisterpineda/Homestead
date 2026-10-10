@@ -1,3 +1,4 @@
+using FluentValidation;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Domain.Auditing.Snapshots;
@@ -27,7 +28,8 @@ public class UpdatePartyHandlerTests : IDisposable
         _unitOfWork = Substitute.For<IUnitOfWork>();
         _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
             .Returns(ci => _db.SaveChangesAsync(ci.Arg<CancellationToken>()));
-        _sut = new UpdatePartyHandler(_db, accessService, _audit, currentUser, _unitOfWork);
+        _sut = new UpdatePartyHandler(_db, accessService, _audit, currentUser, _unitOfWork,
+            new UpdatePartyCommandValidator());
     }
 
     public void Dispose() => _db.Dispose();
@@ -109,5 +111,14 @@ public class UpdatePartyHandlerTests : IDisposable
 
         // Track is always called before mutations; diff computation is deferred
         _audit.Received(1).Track<PartySnapshot, Party>(Arg.Any<Party>(), "Party", party.Id, Arg.Any<Guid?>());
+    }
+
+    [Fact]
+    public async Task Handle_BlankName_ThrowsValidationException()
+    {
+        var request = new UpdatePartyCommand { Id = Guid.NewGuid(), Name = "" };
+
+        await Assert.ThrowsAsync<ValidationException>(
+            () => _sut.Handle(request, TestContext.Current.CancellationToken));
     }
 }

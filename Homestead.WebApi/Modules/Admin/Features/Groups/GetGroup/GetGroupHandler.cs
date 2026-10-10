@@ -1,11 +1,9 @@
-using MediatR;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Admin.Features.Groups.GetGroup;
 
 public class GetGroupHandler(AppDbContext db)
-    : IRequestHandler<GetGroupQuery, GroupDetailResponse?>
 {
     public async Task<GroupDetailResponse?> Handle(GetGroupQuery request, CancellationToken ct)
     {

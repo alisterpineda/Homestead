@@ -1,5 +1,3 @@
-using Homestead.WebApi.Common;
-
 namespace Homestead.WebApi.Modules.Inventory.Features.Consumables.TransferStock;
 
 /// <summary>Body of a transfer: moves stock between two locations as one movement (nets to zero).</summary>
@@ -14,7 +12,7 @@ public record TransferStockRequest
     public string? Note { get; init; }
 }
 
-public record TransferStockCommand : ICommand<ConsumableDetailResponse>
+public record TransferStockCommand
 {
     public Guid ConsumableId { get; init; }
     public required TransferStockRequest Body { get; init; }

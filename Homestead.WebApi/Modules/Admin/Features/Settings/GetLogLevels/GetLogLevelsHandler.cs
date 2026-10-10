@@ -1,10 +1,8 @@
 using Homestead.WebApi.Common.Logging;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Admin.Features.Settings.GetLogLevels;
 
 public class GetLogLevelsHandler(ILogLevelInspector inspector)
-    : IRequestHandler<GetLogLevelsQuery, LogLevelsResponse>
 {
     public Task<LogLevelsResponse> Handle(GetLogLevelsQuery request, CancellationToken ct)
     {

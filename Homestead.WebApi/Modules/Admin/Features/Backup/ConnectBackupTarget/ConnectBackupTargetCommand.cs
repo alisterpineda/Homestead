@@ -1,8 +1,6 @@
-using Homestead.WebApi.Common;
-
 namespace Homestead.WebApi.Modules.Admin.Features.Backup.ConnectBackupTarget;
 
-public record ConnectBackupTargetCommand(string TargetKey) : ICommand<ConnectBackupTargetResponse>;
+public record ConnectBackupTargetCommand(string TargetKey);
 
 /// <param name="UserCode">The short code the admin types at <paramref name="VerificationUrl"/>.</param>
 /// <param name="PollToken">

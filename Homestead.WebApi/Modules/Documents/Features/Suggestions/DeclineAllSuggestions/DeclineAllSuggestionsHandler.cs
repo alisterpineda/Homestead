@@ -4,13 +4,11 @@ using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Modules.Documents.Services;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Documents.Features.Suggestions.DeclineAllSuggestions;
 
 public class DeclineAllSuggestionsHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork)
-    : IRequestHandler<DeclineAllSuggestionsCommand>
 {
     public async Task Handle(DeclineAllSuggestionsCommand request, CancellationToken ct)
     {

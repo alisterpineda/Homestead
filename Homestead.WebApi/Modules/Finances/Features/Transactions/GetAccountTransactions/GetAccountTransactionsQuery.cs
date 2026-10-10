@@ -1,10 +1,9 @@
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Modules.Finances.Features.Transactions;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Transactions.GetAccountTransactions;
 
-public record GetAccountTransactionsQuery : PaginatedRequest, IRequest<PaginatedResponse<TransactionResponse>>
+public record GetAccountTransactionsQuery : PaginatedRequest
 {
     /// <summary>Set by the endpoint from the route parameter — not part of the query string surface.</summary>
     public Guid AccountId { get; init; }

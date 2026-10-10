@@ -2,7 +2,6 @@ using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Imports.RollbackStatementImport;
@@ -22,7 +21,6 @@ public class RollbackStatementImportHandler(
     IBalanceEntryReconciler reconciler,
     IPayeeMappingService payeeMappings,
     IUnitOfWork unitOfWork)
-    : IRequestHandler<RollbackStatementImportCommand, RollbackStatementImportResponse>
 {
     public async Task<RollbackStatementImportResponse> Handle(
         RollbackStatementImportCommand request, CancellationToken ct)

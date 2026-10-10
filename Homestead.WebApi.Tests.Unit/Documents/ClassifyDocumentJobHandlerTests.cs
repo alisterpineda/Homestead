@@ -1,12 +1,12 @@
 using System.Net;
 using System.Text.Json;
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Modules.Documents.Processing;
 using Homestead.WebApi.Modules.Documents.Processing.Commands;
 using Homestead.WebApi.Modules.Documents.Services;
 using Homestead.WebApi.Processing;
-using MediatR;
 using NSubstitute;
 
 namespace Homestead.WebApi.Tests.Unit.Documents;
@@ -15,7 +15,10 @@ public class ClassifyDocumentJobHandlerTests : IDisposable
 {
     private readonly TestAppDbContext _db;
     private readonly IDocumentClassifier _classifier;
-    private readonly ISender _sender;
+    private readonly IUnitOfWork _unitOfWork;
+    private bool _inTransaction;
+    private bool _handledInTransaction;
+    private readonly IApplyClassificationHandler _applyClassification;
     private readonly IProcessingNotifier _notifier;
     private readonly ClassifyDocumentJobHandler _sut;
 
@@ -34,11 +37,23 @@ public class ClassifyDocumentJobHandlerTests : IDisposable
         _db.SaveChanges();
 
         _classifier = Substitute.For<IDocumentClassifier>();
-        _sender = Substitute.For<ISender>();
-        _sender.Send(Arg.Any<ApplyClassificationCommand>(), Arg.Any<CancellationToken>())
+        _applyClassification = Substitute.For<IApplyClassificationHandler>();
+        _applyClassification.Handle(Arg.Any<ApplyClassificationCommand>(), Arg.Any<CancellationToken>())
             .Returns(new ApplyClassificationResult(DocumentName));
+        // Run the work handed to the transaction, so the command handler is reached through it, and record
+        // whether the command handler ran while that work was in progress.
+        _unitOfWork = Substitute.For<IUnitOfWork>();
+        _unitOfWork.ExecuteInTransactionAsync(Arg.Any<Func<Task<ApplyClassificationResult>>>(), Arg.Any<CancellationToken>())
+            .Returns(async call =>
+            {
+                _inTransaction = true;
+                try { return await call.Arg<Func<Task<ApplyClassificationResult>>>()(); }
+                finally { _inTransaction = false; }
+            });
+        _applyClassification.When(x => x.Handle(Arg.Any<ApplyClassificationCommand>(), Arg.Any<CancellationToken>()))
+            .Do(_ => _handledInTransaction = _inTransaction);
         _notifier = Substitute.For<IProcessingNotifier>();
-        _sut = new ClassifyDocumentJobHandler(_db, _classifier, _notifier, _sender);
+        _sut = new ClassifyDocumentJobHandler(_db, _classifier, _notifier, _unitOfWork, _applyClassification);
     }
 
     public void Dispose()
@@ -89,7 +104,7 @@ public class ClassifyDocumentJobHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task HandleAsync_SendsApplyClassificationCommand_WithPrecomputedResult_AndActorFromJob()
+    public async Task HandleAsync_AppliesClassificationCommand_WithPrecomputedResult_AndActorFromJob()
     {
         var ct = TestContext.Current.CancellationToken;
         var classification = new ClassificationResult([], [], "summary", DocumentName);
@@ -99,7 +114,7 @@ public class ClassifyDocumentJobHandlerTests : IDisposable
         var job = CreateJob();
         await _sut.HandleAsync(job, ct);
 
-        await _sender.Received(1).Send(
+        await _applyClassification.Received(1).Handle(
             Arg.Is<ApplyClassificationCommand>(c =>
                 c.DocumentId == _documentId
                 && c.Classification == classification
@@ -108,7 +123,26 @@ public class ClassifyDocumentJobHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task HandleAsync_NoClassificationProduced_SendsCommandWithNullClassification()
+    public async Task HandleAsync_ClassifiesFirst_ThenSetsActorFromJob_ThenAppliesInsideTheTransaction()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var job = CreateJob();
+
+        await _sut.HandleAsync(job, ct);
+
+        // The slow AI call holds no transaction. The actor is set before the transaction opens, so any
+        // flush inside the command is attributed to whoever enqueued the job; the command runs inside it.
+        Received.InOrder(() =>
+        {
+            _classifier.ClassifyAsync(_documentId, DocumentName, ClassificationScope.All, ct);
+            _unitOfWork.SetActor(job.CreatedByUserId);
+            _unitOfWork.ExecuteInTransactionAsync(Arg.Any<Func<Task<ApplyClassificationResult>>>(), ct);
+        });
+        Assert.True(_handledInTransaction);
+    }
+
+    [Fact]
+    public async Task HandleAsync_NoClassificationProduced_AppliesCommandWithNullClassification()
     {
         var ct = TestContext.Current.CancellationToken;
         // Default substitute returns null output (AI unconfigured / nothing produced).
@@ -116,7 +150,7 @@ public class ClassifyDocumentJobHandlerTests : IDisposable
 
         await _sut.HandleAsync(job, ct);
 
-        await _sender.Received(1).Send(
+        await _applyClassification.Received(1).Handle(
             Arg.Is<ApplyClassificationCommand>(c =>
                 c.DocumentId == _documentId
                 && c.Classification == null),
@@ -133,7 +167,7 @@ public class ClassifyDocumentJobHandlerTests : IDisposable
 
         await _classifier.Received(1).ClassifyAsync(
             _documentId, DocumentName, ClassificationScope.Summary, ct);
-        await _sender.Received(1).Send(
+        await _applyClassification.Received(1).Handle(
             Arg.Is<ApplyClassificationCommand>(c => c.Scope == ClassificationScope.Summary), ct);
     }
 
@@ -141,7 +175,7 @@ public class ClassifyDocumentJobHandlerTests : IDisposable
     public async Task HandleAsync_SendsNotification_WhenNoParentJob_UsesResultName()
     {
         var ct = TestContext.Current.CancellationToken;
-        _sender.Send(Arg.Any<ApplyClassificationCommand>(), ct)
+        _applyClassification.Handle(Arg.Any<ApplyClassificationCommand>(), ct)
             .Returns(new ApplyClassificationResult("AI Suggested Name"));
 
         var job = CreateJob();
@@ -168,7 +202,7 @@ public class ClassifyDocumentJobHandlerTests : IDisposable
         await _sut.HandleAsync(job, ct);
 
         // Still applies the classification...
-        await _sender.Received(1).Send(Arg.Any<ApplyClassificationCommand>(), ct);
+        await _applyClassification.Received(1).Handle(Arg.Any<ApplyClassificationCommand>(), ct);
         // ...but leaves notification to the parent's progress updates.
         await _notifier.DidNotReceive().NotifyJobStatusAsync(
             Arg.Any<Guid>(), Arg.Any<ProcessingJobStatus>(),
@@ -210,7 +244,7 @@ public class ClassifyDocumentJobHandlerTests : IDisposable
     public async Task HandleAsync_CommandThrows_Propagates()
     {
         var ct = TestContext.Current.CancellationToken;
-        _sender.Send(Arg.Any<ApplyClassificationCommand>(), ct)
+        _applyClassification.Handle(Arg.Any<ApplyClassificationCommand>(), ct)
             .Returns<ApplyClassificationResult>(_ => throw new InvalidOperationException("apply failed."));
 
         var job = CreateJob();

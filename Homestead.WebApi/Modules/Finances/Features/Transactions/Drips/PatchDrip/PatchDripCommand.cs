@@ -1,8 +1,6 @@
-using Homestead.WebApi.Common;
-
 namespace Homestead.WebApi.Modules.Finances.Features.Transactions.Drips.PatchDrip;
 
-public record PatchDripCommand : ICommand<TransactionResponse>
+public record PatchDripCommand
 {
     public Guid TransactionId { get; init; }
     public required Guid AccountId { get; init; }

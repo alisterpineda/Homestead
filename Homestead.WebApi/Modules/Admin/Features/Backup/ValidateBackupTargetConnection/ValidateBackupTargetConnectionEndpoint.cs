@@ -1,5 +1,3 @@
-using MediatR;
-
 namespace Homestead.WebApi.Modules.Admin.Features.Backup.ValidateBackupTargetConnection;
 
 public static class ValidateBackupTargetConnectionEndpoint
@@ -7,9 +5,9 @@ public static class ValidateBackupTargetConnectionEndpoint
     public static void Map(RouteGroupBuilder group)
     {
         group.MapPost("/targets/{key}/validate", async (
-            string key, ISender sender, CancellationToken ct) =>
+            string key, ValidateBackupTargetConnectionHandler handler, CancellationToken ct) =>
         {
-            var response = await sender.Send(new ValidateBackupTargetConnectionCommand(key), ct);
+            var response = await handler.Handle(new ValidateBackupTargetConnectionCommand(key), ct);
             return Results.Ok(response);
         })
         .WithName("ValidateBackupTargetConnection")

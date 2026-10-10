@@ -2,7 +2,6 @@ using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Common.Auditing;
-using MediatR;
 using Homestead.WebApi.Persistence;
 using Microsoft.AspNetCore.JsonPatch.SystemTextJson;
 using Microsoft.EntityFrameworkCore;
@@ -11,7 +10,6 @@ namespace Homestead.WebApi.Modules.Documents.Features.Versions.PatchDocumentVers
 
 public class PatchDocumentVersionHandler(AppDbContext db,
     IAuditContext audit, IUnitOfWork unitOfWork)
-    : IRequestHandler<PatchDocumentVersionCommand, PatchDocumentVersionResponse>
 {
     public async Task<PatchDocumentVersionResponse> Handle(PatchDocumentVersionCommand request, CancellationToken ct)
     {

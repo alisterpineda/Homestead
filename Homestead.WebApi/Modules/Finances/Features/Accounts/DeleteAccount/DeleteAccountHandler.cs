@@ -2,13 +2,11 @@ using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Accounts.DeleteAccount;
 
 public class DeleteAccountHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork)
-    : IRequestHandler<DeleteAccountCommand, bool>
 {
     public async Task<bool> Handle(DeleteAccountCommand request, CancellationToken ct)
     {

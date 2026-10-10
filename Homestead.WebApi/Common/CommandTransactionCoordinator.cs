@@ -33,9 +33,9 @@ public class CommandTransactionCoordinator
 
     /// <summary>
     /// JOIN-or-begin entry: returns <c>true</c> if a transaction is already open on this scope (a nested
-    /// <c>ISender.Send</c> joins it — the caller should just run the work and return); otherwise marks a
+    /// <c>ExecuteInTransactionAsync</c> joins it — the caller should just run the work and return); otherwise marks a
     /// command scope active, increments the depth, and returns <c>false</c> (this frame owns the boundary).
-    /// A nested send joins only when a transaction is already open — preserving the exact lazy join/depth
+    /// A nested call joins only when a transaction is already open — preserving the exact lazy join/depth
     /// semantics.
     /// </summary>
     public bool TryBeginScope(DatabaseFacade db)

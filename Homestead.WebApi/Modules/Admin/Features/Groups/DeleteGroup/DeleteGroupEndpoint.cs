@@ -1,5 +1,3 @@
-using MediatR;
-
 namespace Homestead.WebApi.Modules.Admin.Features.Groups.DeleteGroup;
 
 public static class DeleteGroupEndpoint
@@ -7,9 +5,9 @@ public static class DeleteGroupEndpoint
     public static void Map(RouteGroupBuilder group)
     {
         group.MapDelete("/{id:guid}", async (Guid id,
-            ISender sender, CancellationToken ct) =>
+            DeleteGroupHandler handler, CancellationToken ct) =>
         {
-            await sender.Send(new DeleteGroupCommand(id), ct);
+            await handler.Handle(new DeleteGroupCommand(id), ct);
             return Results.NoContent();
         })
         .WithName("DeleteGroup")

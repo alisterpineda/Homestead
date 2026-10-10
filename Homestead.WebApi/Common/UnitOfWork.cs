@@ -17,7 +17,7 @@ public class UnitOfWork(
 
     public async Task<T> ExecuteInTransactionAsync<T>(Func<Task<T>> work, CancellationToken cancellationToken)
     {
-        // JOIN: a nested ISender.Send inside an already-open ambient transaction joins it and returns.
+        // JOIN: a nested call inside an already-open ambient transaction joins it and returns.
         // The outermost frame owns commit + hook draining. No depth/scope mutation on the join path.
         if (coordinator.TryBeginScope(db.Database))
             return await work();
@@ -63,7 +63,7 @@ public class UnitOfWork(
     {
         // Idempotent: nothing tracked + no pending audit => true no-op, and (critically) opens no tx.
         // The audit flush below adds rows to the change tracker, so this guard is what makes a second
-        // SaveChangesAsync (e.g. from the behavior) a true no-op.
+        // SaveChangesAsync (e.g. the final flush in ExecuteInTransactionAsync) a true no-op.
         if (!auditContext.HasEntries && !db.ChangeTracker.HasChanges())
             return 0;
 
@@ -72,8 +72,8 @@ public class UnitOfWork(
         // safety net for the bypass paths and is idempotent, so it harmlessly no-ops when re-entered here.
         await coordinator.EnsureStartedAsync(db.Database, cancellationToken);
 
-        // Flush batched audit through the existing actor-threading seam. The actor is the request's
-        // explicit ActorUserId when supplied (internal jobs), otherwise the signed-in user.
+        // Flush batched audit through the existing actor-threading seam. The actor is the one set via
+        // SetActor (job handlers), otherwise the signed-in user.
         var actor = _actorOverride ?? currentUser.UserId;
         auditContext.FlushTo(auditLogger.ForUser(actor));
 

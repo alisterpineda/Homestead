@@ -1,5 +1,4 @@
 using Homestead.WebApi.Domain.Finances;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Finances.Features.PriceSources.PatchPriceSource;
 
@@ -13,9 +12,9 @@ public static class PatchPriceSourceEndpoint
     public static void Map(RouteGroupBuilder group)
     {
         group.MapPatch("/{source}", async (CommodityPriceSource source, PatchPriceSourceBody body,
-            ISender sender, CancellationToken ct) =>
+            PatchPriceSourceHandler handler, CancellationToken ct) =>
         {
-            var response = await sender.Send(new PatchPriceSourceCommand
+            var response = await handler.Handle(new PatchPriceSourceCommand
             {
                 Source = source,
                 PairAllowList = body.PairAllowList,

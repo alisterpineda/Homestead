@@ -1,5 +1,3 @@
-using MediatR;
-
 namespace Homestead.WebApi.Modules.Finances.Features.Categories.GetCategories;
 
 public static class GetCategoriesEndpoint
@@ -7,9 +5,9 @@ public static class GetCategoriesEndpoint
     public static void Map(RouteGroupBuilder group)
     {
         group.MapGet("", async ([AsParameters] GetCategoriesQuery request,
-            ISender sender, CancellationToken ct) =>
+            GetCategoriesHandler handler, CancellationToken ct) =>
         {
-            return Results.Ok(await sender.Send(request, ct));
+            return Results.Ok(await handler.Handle(request, ct));
         })
         .WithName("GetCategories")
         .Produces<IReadOnlyList<CategoryResponse>>();

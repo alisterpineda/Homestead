@@ -1,7 +1,7 @@
+using FluentValidation;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Persistence;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Transactions.Transfers.PatchTransfer;
 
@@ -9,11 +9,13 @@ public class PatchTransferHandler(
     AppDbContext db,
     ITransferService transfers,
     IBalanceEntryReconciler reconciler,
-    IUnitOfWork unitOfWork)
-    : IRequestHandler<PatchTransferCommand, TransactionResponse>
+    IUnitOfWork unitOfWork,
+    IValidator<PatchTransferCommand> validator)
 {
     public async Task<TransactionResponse> Handle(PatchTransferCommand request, CancellationToken ct)
     {
+        await validator.ValidateAndThrowAsync(request, ct);
+
         var result = await transfers.UpdateAsync(
             request.TransactionId,
             new UpdateTransferRequest(

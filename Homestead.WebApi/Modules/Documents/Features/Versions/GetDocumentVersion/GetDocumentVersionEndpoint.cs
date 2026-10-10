@@ -1,4 +1,4 @@
-using MediatR;
+using Homestead.WebApi.Authorization;
 
 namespace Homestead.WebApi.Modules.Documents.Features.Versions.GetDocumentVersion;
 
@@ -7,13 +7,14 @@ public static class GetDocumentVersionEndpoint
     public static void Map(RouteGroupBuilder group)
     {
         group.MapGet("/{id:guid}", async (Guid documentId, Guid id,
-            ISender sender, CancellationToken ct) =>
+            GetDocumentVersionHandler handler, CancellationToken ct) =>
         {
             var request = new GetDocumentVersionQuery(documentId, id);
-            var response = await sender.Send(request, ct);
+            var response = await handler.Handle(request, ct);
             return response is not null ? Results.Ok(response) : Results.NotFound();
         })
         .WithName("GetDocumentVersion")
-        .Produces<GetDocumentVersionResponse>();
+        .Produces<GetDocumentVersionResponse>()
+        .RequireDocumentAuthorization(DocumentOperations.Read);
     }
 }

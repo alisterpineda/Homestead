@@ -1,7 +1,6 @@
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
-using MediatR;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -9,7 +8,6 @@ namespace Homestead.WebApi.Modules.Documents.Features.Parties.BulkDeleteParties;
 
 public class BulkDeletePartiesHandler(AppDbContext db, IDocumentQueryService accessService, IAuditContext audit,
     IUnitOfWork unitOfWork)
-    : IRequestHandler<BulkDeletePartiesCommand, BulkDeletePartiesResponse>
 {
     public async Task<BulkDeletePartiesResponse> Handle(BulkDeletePartiesCommand request, CancellationToken ct)
     {

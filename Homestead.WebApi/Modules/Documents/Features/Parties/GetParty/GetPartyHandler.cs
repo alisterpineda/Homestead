@@ -1,11 +1,9 @@
-using MediatR;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Documents.Features.Parties.GetParty;
 
 public class GetPartyHandler(AppDbContext db)
-    : IRequestHandler<GetPartyQuery, GetPartyResponse?>
 {
     public async Task<GetPartyResponse?> Handle(GetPartyQuery request, CancellationToken ct)
     {

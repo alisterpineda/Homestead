@@ -1,13 +1,11 @@
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Brands.MergeBrand;
 
 public class MergeBrandHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork)
-    : IRequestHandler<MergeBrandCommand, BrandResponse>
 {
     public async Task<BrandResponse> Handle(MergeBrandCommand request, CancellationToken ct)
     {

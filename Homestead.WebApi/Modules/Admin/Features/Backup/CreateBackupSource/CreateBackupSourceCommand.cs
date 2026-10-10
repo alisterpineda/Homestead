@@ -1,8 +1,6 @@
-using Homestead.WebApi.Common;
-
 namespace Homestead.WebApi.Modules.Admin.Features.Backup.CreateBackupSource;
 
-public record CreateBackupSourceCommand : ICommand<CreateBackupSourceResponse>
+public record CreateBackupSourceCommand
 {
     /// <summary>An <c>IBackupSourceDescriptor.Key</c> from the catalog.</summary>
     public required string SourceKind { get; init; }

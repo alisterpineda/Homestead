@@ -1,3 +1,4 @@
+using FluentValidation;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Groups;
@@ -22,7 +23,7 @@ public class AddGroupMemberHandlerTests : IDisposable
         _unitOfWork = Substitute.For<IUnitOfWork>();
         _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
             .Returns(ci => _db.SaveChangesAsync(ci.Arg<CancellationToken>()));
-        _sut = new AddGroupMemberHandler(_db, _audit, _unitOfWork);
+        _sut = new AddGroupMemberHandler(_db, _audit, _unitOfWork, new AddGroupMemberCommandValidator());
     }
 
     public void Dispose() => _db.Dispose();
@@ -53,5 +54,17 @@ public class AddGroupMemberHandlerTests : IDisposable
 
         _audit.Received(1).TrackScalar("Group", groupId, "MemberAdded",
             Arg.Any<string?>(), Arg.Any<string?>());
+    }
+
+    [Fact]
+    public async Task Handle_EmptyUserId_ThrowsValidationException()
+    {
+        var command = new AddGroupMemberCommand
+        {
+            GroupId = Guid.NewGuid(),
+            Request = new AddGroupMemberRequest { UserId = Guid.Empty, AccessLevel = GroupAccessLevel.Editor }
+        };
+
+        await Assert.ThrowsAsync<ValidationException>(() => _sut.Handle(command, TestContext.Current.CancellationToken));
     }
 }

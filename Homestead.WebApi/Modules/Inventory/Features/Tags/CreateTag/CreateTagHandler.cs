@@ -2,13 +2,11 @@ using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Modules.Inventory.Services;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Tags.CreateTag;
 
 public class CreateTagHandler(
     IInventoryTagPathResolver tagPathResolver, ICurrentUserAccessor currentUser, IAuditContext audit, IUnitOfWork unitOfWork)
-    : IRequestHandler<CreateInventoryTagCommand, CreateInventoryTagResponse>
 {
     public async Task<CreateInventoryTagResponse> Handle(CreateInventoryTagCommand request, CancellationToken ct)
     {

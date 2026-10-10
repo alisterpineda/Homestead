@@ -1,8 +1,6 @@
-using Homestead.WebApi.Common;
-
 namespace Homestead.WebApi.Modules.Finances.Features.Transactions.Drips.CreateDrip;
 
-public record CreateDripCommand : ICommand<TransactionResponse>
+public record CreateDripCommand
 {
     public required Guid AccountId { get; init; }
     public required Guid SecurityId { get; init; }

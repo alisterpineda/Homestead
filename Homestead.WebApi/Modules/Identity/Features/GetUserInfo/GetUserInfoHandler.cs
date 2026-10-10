@@ -1,11 +1,9 @@
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Identity.Features.GetUserInfo;
 
 public class GetUserInfoHandler(AppDbContext db)
-    : IRequestHandler<GetUserInfoQuery, GetUserInfoResponse?>
 {
     public async Task<GetUserInfoResponse?> Handle(GetUserInfoQuery request, CancellationToken ct)
     {

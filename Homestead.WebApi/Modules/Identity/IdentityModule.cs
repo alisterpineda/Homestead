@@ -1,3 +1,4 @@
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Modules.Identity.Features.GetUserInfo;
 using Homestead.WebApi.Modules.Identity.Features.OidcCallback;
 using Homestead.WebApi.Modules.Identity.Features.OidcLogin;
@@ -9,7 +10,8 @@ public static class IdentityModule
 {
     public static WebApplication MapIdentityEndpoints(this WebApplication app)
     {
-        var group = app.MapGroup("/api/auth").WithTags("Identity");
+        var group = app.MapGroup("/api/auth").WithTags("Identity")
+            .WithCommandTransaction();
 
         GetUserInfoEndpoint.Map(group);
         OidcLoginEndpoint.Map(group);

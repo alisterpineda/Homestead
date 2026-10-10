@@ -2,12 +2,10 @@ using Homestead.WebApi.Modules.Documents.Services;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Documents.Features.Tags.CreateTag;
 
 public class CreateTagHandler(ITagPathResolver tagPathResolver, ICurrentUserAccessor currentUser, IAuditContext audit, IUnitOfWork unitOfWork)
-    : IRequestHandler<CreateTagCommand, CreateTagResponse>
 {
     public async Task<CreateTagResponse> Handle(CreateTagCommand request, CancellationToken ct)
     {

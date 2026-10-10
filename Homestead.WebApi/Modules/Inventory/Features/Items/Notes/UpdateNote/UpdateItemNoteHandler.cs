@@ -1,10 +1,10 @@
+using FluentValidation;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Inventory;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Items.Notes.UpdateNote;
@@ -13,11 +13,13 @@ public class UpdateItemNoteHandler(
     AppDbContext db,
     ICurrentUserAccessor currentUser,
     IAuditContext audit,
-    IUnitOfWork unitOfWork)
-    : IRequestHandler<UpdateItemNoteCommand, ItemNoteResponse>
+    IUnitOfWork unitOfWork,
+    IValidator<UpdateItemNoteCommand> validator)
 {
     public async Task<ItemNoteResponse> Handle(UpdateItemNoteCommand request, CancellationToken ct)
     {
+        await validator.ValidateAndThrowAsync(request, ct);
+
         // Scoped to the route's item so a note id can't be edited through another item's URL.
         var note = await db.ItemNotes.FirstOrDefaultAsync(
             n => n.Id == request.NoteId && n.ItemId == request.ItemId, ct);

@@ -1,9 +1,8 @@
-using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Finances;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Imports.CommitStatementImport;
 
-public record CommitStatementImportCommand : ICommand<CommitStatementImportResponse>
+public record CommitStatementImportCommand
 {
     public Guid JobId { get; init; }
 

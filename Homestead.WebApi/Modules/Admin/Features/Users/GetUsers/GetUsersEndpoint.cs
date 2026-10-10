@@ -1,5 +1,4 @@
 using Homestead.WebApi.Common;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Admin.Features.Users.GetUsers;
 
@@ -8,9 +7,9 @@ public static class GetUsersEndpoint
     public static void Map(RouteGroupBuilder group)
     {
         group.MapGet("/", async ([AsParameters] GetUsersQuery request,
-            ISender sender, CancellationToken ct) =>
+            GetUsersHandler handler, CancellationToken ct) =>
         {
-            var response = await sender.Send(request, ct);
+            var response = await handler.Handle(request, ct);
             return Results.Ok(response);
         })
         .WithName("GetUsers")

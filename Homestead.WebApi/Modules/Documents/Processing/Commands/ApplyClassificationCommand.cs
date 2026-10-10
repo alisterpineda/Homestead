@@ -1,10 +1,8 @@
-using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Modules.Documents.Services;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Documents.Processing.Commands;
@@ -16,7 +14,7 @@ namespace Homestead.WebApi.Modules.Documents.Processing.Commands;
 /// command transaction for the minimum time. No document-authorization marker — authorization happened
 /// at enqueue.
 /// </summary>
-public record ApplyClassificationCommand : ICommand<ApplyClassificationResult>, IActorAttributed
+public record ApplyClassificationCommand
 {
     public required Guid DocumentId { get; init; }
 
@@ -24,14 +22,20 @@ public record ApplyClassificationCommand : ICommand<ApplyClassificationResult>, 
     public ClassificationResult? Classification { get; init; }
 
     public ClassificationScope Scope { get; init; } = ClassificationScope.All;
+
+    /// <summary>The user the AI summary is attributed to. Audit attribution is set separately on the unit of work.</summary>
     public Guid? ActorUserId { get; init; }
 }
 
 public record ApplyClassificationResult(string DocumentName);
 
+public interface IApplyClassificationHandler
+{
+    Task<ApplyClassificationResult> Handle(ApplyClassificationCommand request, CancellationToken ct);
+}
+
 public class ApplyClassificationHandler(
-    AppDbContext db, IDocumentClassifier classifier, IAuditContext audit)
-    : IRequestHandler<ApplyClassificationCommand, ApplyClassificationResult>
+    AppDbContext db, IDocumentClassifier classifier, IAuditContext audit) : IApplyClassificationHandler
 {
     public async Task<ApplyClassificationResult> Handle(ApplyClassificationCommand request, CancellationToken ct)
     {

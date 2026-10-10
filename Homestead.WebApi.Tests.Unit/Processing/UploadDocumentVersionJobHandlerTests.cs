@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Modules.Documents.Processing;
@@ -10,7 +11,6 @@ using Homestead.WebApi.Infrastructure.Storage;
 using Homestead.WebApi.Infrastructure.TextExtraction;
 using Homestead.WebApi.Tests.Unit.Documents.TextExtraction;
 using Homestead.WebApi.Infrastructure.Thumbnails;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -25,7 +25,10 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
     private readonly ITextExtractionEngine _textExtractionEngine;
     private readonly IProcessingNotifier _notifier;
     private readonly ThumbnailService _thumbnailService;
-    private readonly ISender _sender;
+    private readonly IUnitOfWork _unitOfWork;
+    private bool _inTransaction;
+    private bool _handledInTransaction;
+    private readonly IAddDocumentVersionHandler _addDocumentVersion;
     private readonly UploadDocumentVersionJobHandler _handler;
 
     public UploadDocumentVersionJobHandlerTests()
@@ -53,13 +56,27 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
             Substitute.For<ILogger<ThumbnailService>>());
         var textExtractionHelper = TestTextExtraction.Helper(_textExtractionEngine);
 
-        _sender = Substitute.For<ISender>();
-        _sender.Send(Arg.Any<AddDocumentVersionCommand>(), Arg.Any<CancellationToken>())
+        _addDocumentVersion = Substitute.For<IAddDocumentVersionHandler>();
+        _addDocumentVersion.Handle(Arg.Any<AddDocumentVersionCommand>(), Arg.Any<CancellationToken>())
             .Returns(_ => new AddDocumentVersionResult(Guid.NewGuid(), "Existing Document"));
+
+        // Run the work handed to the transaction, so the command handler is reached through it, and record
+        // whether the command handler ran while that work was in progress.
+        _unitOfWork = Substitute.For<IUnitOfWork>();
+        _unitOfWork.ExecuteInTransactionAsync(Arg.Any<Func<Task<AddDocumentVersionResult>>>(), Arg.Any<CancellationToken>())
+            .Returns(async call =>
+            {
+                _inTransaction = true;
+                try { return await call.Arg<Func<Task<AddDocumentVersionResult>>>()(); }
+                finally { _inTransaction = false; }
+            });
+        _addDocumentVersion.When(x => x.Handle(Arg.Any<AddDocumentVersionCommand>(), Arg.Any<CancellationToken>()))
+            .Do(_ => _handledInTransaction = _inTransaction);
 
         _handler = new UploadDocumentVersionJobHandler(
             _db, storage, logger,
-            _notifier, _thumbnailService, textExtractionHelper, TestTextExtraction.Resolver(), _sender);
+            _notifier, _thumbnailService, textExtractionHelper, TestTextExtraction.Resolver(),
+            _unitOfWork, _addDocumentVersion);
     }
 
     public void Dispose()
@@ -112,7 +129,7 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
         => Convert.ToHexString(SHA256.HashData(content)).ToLowerInvariant();
 
     [Fact]
-    public async Task HandleAsync_SendsAddDocumentVersionCommand_WithCorrectFields()
+    public async Task HandleAsync_AppliesAddDocumentVersionCommand_WithCorrectFields()
     {
         var ct = TestContext.Current.CancellationToken;
         var doc = SeedDocument();
@@ -124,14 +141,36 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
 
         await _handler.HandleAsync(job, ct);
 
-        await _sender.Received(1).Send(
+        await _addDocumentVersion.Received(1).Handle(
             Arg.Is<AddDocumentVersionCommand>(c =>
                 c.DocumentId == doc.Id &&
                 c.ExtractedText == "extracted text" &&
                 c.FileHash == HashOf(content) &&
-                c.Label == "v2" &&
-                c.ActorUserId == job.CreatedByUserId),
+                c.Label == "v2"),
             ct);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ExtractsFirst_ThenSetsActorFromJob_ThenPersistsInsideTheTransaction()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var doc = SeedDocument();
+        var (job, _) = CreateVersionUploadJob(doc.Id);
+
+        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
+            .Returns(TestTextExtraction.Output("text"));
+
+        await _handler.HandleAsync(job, ct);
+
+        // Extraction holds no transaction. The actor is set before the transaction opens, so the audit
+        // entry is attributed to whoever enqueued the job; the command runs inside the transaction.
+        Received.InOrder(() =>
+        {
+            _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct);
+            _unitOfWork.SetActor(job.CreatedByUserId);
+            _unitOfWork.ExecuteInTransactionAsync(Arg.Any<Func<Task<AddDocumentVersionResult>>>(), ct);
+        });
+        Assert.True(_handledInTransaction);
     }
 
     [Fact]
@@ -144,7 +183,7 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
         _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
             .Returns(TestTextExtraction.Output("text"));
 
-        _sender.Send(Arg.Any<AddDocumentVersionCommand>(), Arg.Any<CancellationToken>())
+        _addDocumentVersion.Handle(Arg.Any<AddDocumentVersionCommand>(), Arg.Any<CancellationToken>())
             .Returns(_ => new AddDocumentVersionResult(Guid.NewGuid(), "Stored Doc Name"));
 
         await _handler.HandleAsync(job, ct);
@@ -161,7 +200,7 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task HandleAsync_DocumentNotFound_Throws_AndDoesNotSend()
+    public async Task HandleAsync_DocumentNotFound_Throws_AndDoesNotPersist()
     {
         var ct = TestContext.Current.CancellationToken;
         var (job, _) = CreateVersionUploadJob(Guid.NewGuid());
@@ -169,7 +208,7 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => _handler.HandleAsync(job, ct));
 
-        await _sender.DidNotReceive().Send(
+        await _addDocumentVersion.DidNotReceive().Handle(
             Arg.Any<AddDocumentVersionCommand>(), Arg.Any<CancellationToken>());
     }
 
@@ -185,7 +224,7 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
 
         await _handler.HandleAsync(job, ct);
 
-        await _sender.Received(1).Send(
+        await _addDocumentVersion.Received(1).Handle(
             Arg.Is<AddDocumentVersionCommand>(c => c.ExtractedText == null), ct);
     }
 
@@ -219,7 +258,7 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
         _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
             .Returns(TestTextExtraction.Output("text"));
 
-        _sender.Send(Arg.Any<AddDocumentVersionCommand>(), Arg.Any<CancellationToken>())
+        _unitOfWork.ExecuteInTransactionAsync(Arg.Any<Func<Task<AddDocumentVersionResult>>>(), Arg.Any<CancellationToken>())
             .Returns<Task<AddDocumentVersionResult>>(_ => throw new Exception("commit failed"));
 
         await Assert.ThrowsAsync<Exception>(() => _handler.HandleAsync(job, ct));
@@ -230,7 +269,7 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task HandleAsync_DuplicateHash_Throws_AndDoesNotSend()
+    public async Task HandleAsync_DuplicateHash_Throws_AndDoesNotPersist()
     {
         var ct = TestContext.Current.CancellationToken;
         var doc = SeedDocument();
@@ -251,7 +290,7 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
         Assert.False(ex.IsTrashed);
         Assert.Equal("false", ex.ErrorData["isTrashed"]);
 
-        await _sender.DidNotReceive().Send(
+        await _addDocumentVersion.DidNotReceive().Handle(
             Arg.Any<AddDocumentVersionCommand>(), Arg.Any<CancellationToken>());
     }
 

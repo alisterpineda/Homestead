@@ -1,5 +1,4 @@
 using Homestead.WebApi.Authentication;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Finances.Features.OpeningBalances.PatchOpeningBalance;
 
@@ -9,10 +8,10 @@ public static class PatchOpeningBalanceEndpoint
     {
         group.MapPatch("/{accountId:guid}/opening-balances/{commodityId:guid}",
             async (Guid accountId, Guid commodityId, PatchOpeningBalanceCommand body,
-                ISender sender, CancellationToken ct) =>
+                PatchOpeningBalanceHandler handler, CancellationToken ct) =>
         {
             var request = body with { AccountId = accountId, CommodityId = commodityId };
-            var response = await sender.Send(request, ct);
+            var response = await handler.Handle(request, ct);
             return Results.Ok(response);
         })
         .WithName("PatchOpeningBalance")

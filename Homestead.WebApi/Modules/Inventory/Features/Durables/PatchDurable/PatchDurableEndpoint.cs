@@ -1,5 +1,4 @@
 using Homestead.WebApi.Authentication;
-using MediatR;
 using Microsoft.AspNetCore.JsonPatch.SystemTextJson;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Durables.PatchDurable;
@@ -10,14 +9,14 @@ public static class PatchDurableEndpoint
     {
         group.MapPatch("/{id:guid}", async (Guid id,
             JsonPatchDocument<PatchDurableModel> patchDoc,
-            ISender sender, CancellationToken ct) =>
+            PatchDurableHandler handler, CancellationToken ct) =>
         {
             var command = new PatchDurableCommand
             {
                 Id = id,
                 PatchDocument = patchDoc
             };
-            return Results.Ok(await sender.Send(command, ct));
+            return Results.Ok(await handler.Handle(command, ct));
         })
         .WithName("PatchDurable")
         .Accepts<JsonPatchDocument<PatchDurableModel>>("application/json-patch+json")

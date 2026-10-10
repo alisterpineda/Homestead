@@ -1,3 +1,4 @@
+using FluentValidation;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Finances;
@@ -6,7 +7,6 @@ using Homestead.WebApi.Modules.Finances.Processing;
 using Homestead.WebApi.Modules.Finances.Processing.Statements;
 using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Imports.CommitStatementImport;
@@ -18,12 +18,14 @@ public class CommitStatementImportHandler(
     IFlowService flows,
     IBalanceEntryReconciler reconciler,
     IPayeeMappingService payeeMappings,
-    IUnitOfWork unitOfWork)
-    : IRequestHandler<CommitStatementImportCommand, CommitStatementImportResponse>
+    IUnitOfWork unitOfWork,
+    IValidator<CommitStatementImportCommand> validator)
 {
     public async Task<CommitStatementImportResponse> Handle(
         CommitStatementImportCommand request, CancellationToken ct)
     {
+        await validator.ValidateAndThrowAsync(request, ct);
+
         var job = await db.ProcessingJobs
             .AsNoTracking()
             .FirstOrDefaultAsync(j => j.Id == request.JobId, ct);

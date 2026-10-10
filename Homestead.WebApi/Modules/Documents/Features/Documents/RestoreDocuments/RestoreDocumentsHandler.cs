@@ -2,7 +2,6 @@ using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Documents.Features.Documents.RestoreDocuments;
@@ -10,7 +9,6 @@ namespace Homestead.WebApi.Modules.Documents.Features.Documents.RestoreDocuments
 public class RestoreDocumentsHandler(
     IAuditContext audit, IDocumentQueryService accessService,
     ICurrentUserAccessor currentUser, IUnitOfWork unitOfWork)
-    : IRequestHandler<RestoreDocumentsCommand, RestoreDocumentsResponse>
 {
     public async Task<RestoreDocumentsResponse> Handle(RestoreDocumentsCommand request, CancellationToken ct)
     {

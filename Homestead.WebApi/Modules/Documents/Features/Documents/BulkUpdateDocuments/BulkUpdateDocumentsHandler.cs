@@ -3,7 +3,6 @@ using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Authorization;
-using MediatR;
 using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Persistence;
@@ -14,7 +13,6 @@ namespace Homestead.WebApi.Modules.Documents.Features.Documents.BulkUpdateDocume
 public class BulkUpdateDocumentsHandler(AppDbContext db,
     IAuditContext audit, IUnitOfWork unitOfWork, IDocumentMetadataService metadataService,
     IDocumentQueryService queryService, ICurrentUserAccessor currentUser)
-    : IRequestHandler<BulkUpdateDocumentsCommand, BulkUpdateDocumentsResponse>
 {
     public async Task<BulkUpdateDocumentsResponse> Handle(BulkUpdateDocumentsCommand request, CancellationToken ct)
     {

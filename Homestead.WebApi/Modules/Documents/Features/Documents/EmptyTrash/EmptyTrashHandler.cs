@@ -3,7 +3,6 @@ using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Infrastructure.Storage;
-using MediatR;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -13,7 +12,6 @@ namespace Homestead.WebApi.Modules.Documents.Features.Documents.EmptyTrash;
 public class EmptyTrashHandler(AppDbContext db, IOptions<FileStorageOptions> storage,
     IAuditContext audit, IUnitOfWork unitOfWork, IDocumentQueryService accessService,
     ILogger<EmptyTrashHandler> logger)
-    : IRequestHandler<EmptyTrashCommand, EmptyTrashResponse>
 {
     public async Task<EmptyTrashResponse> Handle(EmptyTrashCommand request, CancellationToken ct)
     {

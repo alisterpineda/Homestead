@@ -1,8 +1,6 @@
-using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Documents.Processing.Commands;
@@ -12,7 +10,7 @@ namespace Homestead.WebApi.Modules.Documents.Processing.Commands;
 /// from the HTTP <c>CreateDocumentVersionCommand</c>, which stages the file and enqueues the job that
 /// ultimately sends this. No document-authorization marker — authorization happened at enqueue.
 /// </summary>
-public record AddDocumentVersionCommand : ICommand<AddDocumentVersionResult>, IActorAttributed
+public record AddDocumentVersionCommand
 {
     public required Guid DocumentId { get; init; }
     public required string ContentType { get; init; }
@@ -24,14 +22,16 @@ public record AddDocumentVersionCommand : ICommand<AddDocumentVersionResult>, IA
 
     /// <summary>Serialized TextExtractionMetadata describing how ExtractedText was produced.</summary>
     public string? TextExtractionMetadata { get; init; }
-
-    public Guid? ActorUserId { get; init; }
 }
 
 public record AddDocumentVersionResult(Guid VersionId, string DocumentName);
 
-public class AddDocumentVersionHandler(AppDbContext db, IAuditContext audit)
-    : IRequestHandler<AddDocumentVersionCommand, AddDocumentVersionResult>
+public interface IAddDocumentVersionHandler
+{
+    Task<AddDocumentVersionResult> Handle(AddDocumentVersionCommand request, CancellationToken ct);
+}
+
+public class AddDocumentVersionHandler(AppDbContext db, IAuditContext audit) : IAddDocumentVersionHandler
 {
     public async Task<AddDocumentVersionResult> Handle(AddDocumentVersionCommand request, CancellationToken ct)
     {
@@ -63,7 +63,7 @@ public class AddDocumentVersionHandler(AppDbContext db, IAuditContext audit)
         db.DocumentVersions.Add(version);
         audit.Created("DocumentVersion", version.Id, parentEntityId: request.DocumentId);
 
-        // The UnitOfWorkBehavior commits; the DB trigger refreshes the parent document's SearchVector
+        // The job handler's unit of work commits; the DB trigger refreshes the parent document's SearchVector
         // with the new latest version's extracted text.
         return new AddDocumentVersionResult(version.Id, documentName);
     }

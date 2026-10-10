@@ -1,3 +1,4 @@
+using FluentValidation;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
@@ -26,7 +27,7 @@ public class PatchPayeeHandlerTests : IAsyncLifetime
         _unitOfWork = Substitute.For<IUnitOfWork>();
         _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
             .Returns(ci => _db.SaveChangesAsync(ci.Arg<CancellationToken>()));
-        _sut = new PatchPayeeHandler(_db, _currentUser, _audit, _unitOfWork);
+        _sut = new PatchPayeeHandler(_db, _currentUser, _audit, _unitOfWork, new PatchPayeeCommandValidator());
         return ValueTask.CompletedTask;
     }
 
@@ -178,5 +179,14 @@ public class PatchPayeeHandlerTests : IAsyncLifetime
         var resp = await _sut.Handle(Command(payee, name: "Costco Wholesale"), Ct);
 
         Assert.Equal(2, resp.TransactionCount);
+    }
+
+    [Fact]
+    public async Task Handle_BlankName_ThrowsValidationException()
+    {
+        var payee = await AddPayeeAsync("Costco");
+
+        await Assert.ThrowsAsync<ValidationException>(() =>
+            _sut.Handle(new PatchPayeeCommand { Id = payee.Id, Name = "   " }, Ct));
     }
 }

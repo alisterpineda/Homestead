@@ -1,3 +1,4 @@
+using FluentValidation;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
@@ -27,7 +28,7 @@ public class CreateDurableHandlerTests : IDisposable
         _unitOfWork = Substitute.For<IUnitOfWork>();
         _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
             .Returns(ci => _db.SaveChangesAsync(ci.Arg<CancellationToken>()));
-        _sut = new CreateDurableHandler(_db, _currentUser, _audit, new ItemLocationResolver(_db), new InventoryTagPathResolver(_db), _unitOfWork);
+        _sut = new CreateDurableHandler(_db, _currentUser, _audit, new ItemLocationResolver(_db), new InventoryTagPathResolver(_db), _unitOfWork, new CreateDurableCommandValidator());
     }
 
     private async Task<Item> AddContainerAsync(Guid? areaId = null, bool isContainer = true)
@@ -114,7 +115,7 @@ public class CreateDurableHandlerTests : IDisposable
     [Fact]
     public async Task Handle_WithValueButNoCurrency_Throws()
     {
-        await Assert.ThrowsAsync<BusinessRuleException>(() =>
+        await Assert.ThrowsAsync<ValidationException>(() =>
             _sut.Handle(new CreateDurableCommand { Name = "Drill", Value = 100m }, Ct));
     }
 
@@ -145,7 +146,7 @@ public class CreateDurableHandlerTests : IDisposable
     [Fact]
     public async Task Handle_WithAcquisitionCostButNoCurrency_Throws()
     {
-        await Assert.ThrowsAsync<BusinessRuleException>(() =>
+        await Assert.ThrowsAsync<ValidationException>(() =>
             _sut.Handle(new CreateDurableCommand { Name = "Drill", AcquisitionCost = 189m }, Ct));
     }
 
@@ -372,5 +373,12 @@ public class CreateDurableHandlerTests : IDisposable
 
         await Assert.ThrowsAsync<BusinessRuleException>(() =>
             _sut.Handle(new CreateDurableCommand { Name = "Wrench", ParentItemId = consumable.Id }, Ct));
+    }
+
+    [Fact]
+    public async Task Handle_BlankName_ThrowsValidationException()
+    {
+        await Assert.ThrowsAsync<ValidationException>(() =>
+            _sut.Handle(new CreateDurableCommand { Name = "   " }, Ct));
     }
 }

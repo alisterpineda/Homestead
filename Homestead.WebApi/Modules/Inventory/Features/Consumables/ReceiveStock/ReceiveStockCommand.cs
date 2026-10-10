@@ -1,5 +1,3 @@
-using Homestead.WebApi.Common;
-
 namespace Homestead.WebApi.Modules.Inventory.Features.Consumables.ReceiveStock;
 
 /// <summary>Body of a receive (inflow): adds stock into one location, optionally with a unit cost.</summary>
@@ -17,7 +15,7 @@ public record ReceiveStockRequest
     public string? Source { get; init; }
 }
 
-public record ReceiveStockCommand : ICommand<ConsumableDetailResponse>
+public record ReceiveStockCommand
 {
     public Guid ConsumableId { get; init; }
     public required ReceiveStockRequest Body { get; init; }

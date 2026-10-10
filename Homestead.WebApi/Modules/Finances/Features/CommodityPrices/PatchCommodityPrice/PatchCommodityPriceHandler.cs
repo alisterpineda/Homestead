@@ -4,7 +4,6 @@ using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Features.CommodityPrices.PatchCommodityPrice;
@@ -14,7 +13,6 @@ public class PatchCommodityPriceHandler(
     IAuditContext audit,
     ICurrentUserAccessor currentUser,
     IUnitOfWork unitOfWork)
-    : IRequestHandler<PatchCommodityPriceCommand, CommodityPriceResponse>
 {
     public async Task<CommodityPriceResponse> Handle(
         PatchCommodityPriceCommand request, CancellationToken ct)

@@ -1,3 +1,4 @@
+using FluentValidation;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
@@ -24,7 +25,7 @@ public class UpdateItemNoteHandlerTests : IDisposable
         var unitOfWork = Substitute.For<IUnitOfWork>();
         unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
             .Returns(ci => _db.SaveChangesAsync(ci.Arg<CancellationToken>()));
-        _sut = new UpdateItemNoteHandler(_db, currentUser, _audit, unitOfWork);
+        _sut = new UpdateItemNoteHandler(_db, currentUser, _audit, unitOfWork, new UpdateItemNoteCommandValidator());
     }
 
     public void Dispose() => _db.Dispose();
@@ -132,5 +133,14 @@ public class UpdateItemNoteHandlerTests : IDisposable
         }, Ct);
 
         Assert.Equal(itemUpdatedAt, (await _db.Items.FindAsync([item.Id], Ct))!.UpdatedAt);
+    }
+
+    [Fact]
+    public async Task Handle_BlankBody_ThrowsValidationException()
+    {
+        await Assert.ThrowsAsync<ValidationException>(() => _sut.Handle(new UpdateItemNoteCommand
+        {
+            ItemId = Guid.NewGuid(), NoteId = Guid.NewGuid(), OccurredAt = DateTimeOffset.UtcNow.AddDays(-1), Body = "   ",
+        }, Ct));
     }
 }

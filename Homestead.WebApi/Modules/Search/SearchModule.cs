@@ -1,5 +1,6 @@
 using Asp.Versioning.Builder;
 using Homestead.WebApi.Authentication;
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Modules.Search.Features.UniversalSearch;
 
 namespace Homestead.WebApi.Modules.Search;
@@ -13,7 +14,8 @@ public static class SearchModule
             .HasApiVersion(1, 0)
             .WithGroupName("v1")
             .WithTags("Search")
-            .RequireAuthorization(AuthPolicies.ActiveUser);
+            .RequireAuthorization(AuthPolicies.ActiveUser)
+            .WithCommandTransaction();
 
         UniversalSearchEndpoint.Map(v1);
 

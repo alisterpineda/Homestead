@@ -1,9 +1,9 @@
+using FluentValidation;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Persistence;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Payees.CreatePayee;
 
@@ -11,11 +11,13 @@ public class CreatePayeeHandler(
     AppDbContext db,
     ICurrentUserAccessor currentUser,
     IAuditContext audit,
-    IUnitOfWork unitOfWork)
-    : IRequestHandler<CreatePayeeCommand, PayeeResponse>
+    IUnitOfWork unitOfWork,
+    IValidator<CreatePayeeCommand> validator)
 {
     public async Task<PayeeResponse> Handle(CreatePayeeCommand request, CancellationToken ct)
     {
+        await validator.ValidateAndThrowAsync(request, ct);
+
         var name = request.Name.Trim();
 
         Account? defaultCategory = null;

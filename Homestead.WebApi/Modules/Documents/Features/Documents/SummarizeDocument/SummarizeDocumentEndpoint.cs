@@ -1,5 +1,5 @@
 using Homestead.WebApi.Authentication;
-using MediatR;
+using Homestead.WebApi.Authorization;
 
 namespace Homestead.WebApi.Modules.Documents.Features.Documents.SummarizeDocument;
 
@@ -11,9 +11,9 @@ public static class SummarizeDocumentEndpoint
     public static void Map(RouteGroupBuilder group)
     {
         group.MapPost("/{documentId:guid}/summarize", async (Guid documentId,
-            SummarizeDocumentBody? body, ISender sender, CancellationToken ct) =>
+            SummarizeDocumentBody? body, SummarizeDocumentHandler handler, CancellationToken ct) =>
         {
-            var response = await sender.Send(new SummarizeDocumentCommand
+            var response = await handler.Handle(new SummarizeDocumentCommand
             {
                 DocumentId = documentId
             }, ct);
@@ -21,6 +21,7 @@ public static class SummarizeDocumentEndpoint
         })
         .WithName("SummarizeDocument")
         .Produces<SummarizeDocumentResponse>(StatusCodes.Status200OK)
-        .RequireAuthorization(AuthPolicies.RequireContributor);
+        .RequireAuthorization(AuthPolicies.RequireContributor)
+        .RequireDocumentAuthorization(DocumentOperations.Write);
     }
 }

@@ -1,10 +1,10 @@
+using FluentValidation;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Accounts.CreateAccount;
@@ -15,11 +15,13 @@ public class CreateAccountHandler(
     IAuditContext audit,
     IOpeningBalanceService openingBalances,
     IValuationService valuations,
-    IUnitOfWork unitOfWork)
-    : IRequestHandler<CreateAccountCommand, AccountResponse>
+    IUnitOfWork unitOfWork,
+    IValidator<CreateAccountCommand> validator)
 {
     public async Task<AccountResponse> Handle(CreateAccountCommand request, CancellationToken ct)
     {
+        await validator.ValidateAndThrowAsync(request, ct);
+
         var reportingCurrency = await db.Commodities
             .FirstOrDefaultAsync(c => c.Id == request.ReportingCurrencyId, ct);
         if (reportingCurrency is null)

@@ -1,7 +1,7 @@
+using FluentValidation;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Persistence;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Transactions.Dividends.PatchDividend;
 
@@ -9,11 +9,13 @@ public class PatchDividendHandler(
     AppDbContext db,
     IDividendService dividends,
     IBalanceEntryReconciler reconciler,
-    IUnitOfWork unitOfWork)
-    : IRequestHandler<PatchDividendCommand, TransactionResponse>
+    IUnitOfWork unitOfWork,
+    IValidator<PatchDividendCommand> validator)
 {
     public async Task<TransactionResponse> Handle(PatchDividendCommand request, CancellationToken ct)
     {
+        await validator.ValidateAndThrowAsync(request, ct);
+
         var result = await dividends.UpdateAsync(
             request.TransactionId,
             new UpdateDividendRequest(

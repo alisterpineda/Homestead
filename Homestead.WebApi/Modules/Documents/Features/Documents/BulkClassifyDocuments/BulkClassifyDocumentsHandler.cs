@@ -6,7 +6,6 @@ using Homestead.WebApi.Modules.Documents.Processing;
 using Homestead.WebApi.Modules.Documents.Services;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Processing;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Documents.Features.Documents.BulkClassifyDocuments;
@@ -16,7 +15,6 @@ public class BulkClassifyDocumentsHandler(
     ICurrentUserAccessor currentUser,
     IDocumentQueryService queryService,
     IJobQueue jobQueue)
-    : IRequestHandler<BulkClassifyDocumentsCommand, BulkClassifyDocumentsResponse>
 {
     public async Task<BulkClassifyDocumentsResponse> Handle(BulkClassifyDocumentsCommand request, CancellationToken ct)
     {

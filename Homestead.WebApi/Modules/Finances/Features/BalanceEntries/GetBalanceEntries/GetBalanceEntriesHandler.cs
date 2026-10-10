@@ -1,13 +1,11 @@
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Features.BalanceEntries.GetBalanceEntries;
 
 public class GetBalanceEntriesHandler(AppDbContext db)
-    : IRequestHandler<GetBalanceEntriesQuery, IReadOnlyList<BalanceEntryResponse>>
 {
     public async Task<IReadOnlyList<BalanceEntryResponse>> Handle(
         GetBalanceEntriesQuery request, CancellationToken ct)

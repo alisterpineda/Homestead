@@ -1,8 +1,6 @@
-using Homestead.WebApi.Common;
-
 namespace Homestead.WebApi.Modules.Finances.Features.Commodities.CreateCommodity;
 
-public record CreateCommodityCommand : ICommand<CommodityResponse>
+public record CreateCommodityCommand
 {
     public required string Symbol { get; init; }
     public required string Exchange { get; init; }

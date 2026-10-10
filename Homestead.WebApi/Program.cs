@@ -10,9 +10,11 @@ using Homestead.WebApi.Modules.Identity;
 using Homestead.WebApi.Modules.Documents;
 using Homestead.WebApi.Modules.Documents.Backup;
 using Homestead.WebApi.Modules.Documents.Features.Search;
+using Homestead.WebApi.Modules.Documents.Processing.Commands;
 using Homestead.WebApi.Modules.Documents.Services;
 using Homestead.WebApi.Modules.Finances;
 using Homestead.WebApi.Modules.Finances.PriceProviders;
+using Homestead.WebApi.Modules.Finances.Processing.Commands;
 using Homestead.WebApi.Modules.Finances.Processing.Statements;
 using Homestead.WebApi.Modules.Finances.Seeding;
 using Homestead.WebApi.Modules.Finances.Services;
@@ -189,6 +191,12 @@ builder.Services.AddScoped<ISearchSource, InventorySearchSource>();
 builder.Services.AddScoped<ISearchSource, DocumentSearchSource>();
 builder.Services.AddScoped<IDocumentMetadataService, DocumentMetadataService>();
 builder.Services.AddScoped<IDocumentClassifier, DocumentClassifier>();
+// Internal commands the Documents job handlers run inside an explicit unit of work. Registered behind
+// interfaces so the job-handler unit tests can substitute them.
+builder.Services.AddScoped<ICreateDocumentFromUploadHandler, CreateDocumentFromUploadHandler>();
+builder.Services.AddScoped<IAddDocumentVersionHandler, AddDocumentVersionHandler>();
+builder.Services.AddScoped<IApplyClassificationHandler, ApplyClassificationHandler>();
+builder.Services.AddScoped<IReprocessVersionTextHandler, ReprocessVersionTextHandler>();
 builder.Services.AddScoped<ITransactionValidator, TransactionValidator>();
 builder.Services.AddScoped<ISystemAccountProvider, SystemAccountProvider>();
 builder.Services.AddScoped<ILinkedPriceManager, LinkedPriceManager>();
@@ -207,20 +215,11 @@ builder.Services.AddScoped<IBalanceEntryService, BalanceEntryService>();
 builder.Services.AddScoped<IValuationService, ValuationService>();
 builder.Services.AddScoped<IPriceSourceScheduleStore, PriceSourceScheduleStore>();
 builder.Services.AddScoped<IStatementExtractionService, StatementExtractionService>();
+builder.Services.AddScoped<IApplyCommodityPriceObservationsHandler, ApplyCommodityPriceObservationsHandler>();
 builder.Services.AddScoped<StatementMappingBuilder>();
 builder.Services.AddExceptionHandler<DomainExceptionHandler>();
 builder.Services.AddProblemDetails();
-builder.Services.AddMediatR(cfg =>
-{
-    cfg.RegisterServicesFromAssemblyContaining<Program>();
-    cfg.Lifetime = ServiceLifetime.Scoped;
-    // Order is outer→inner. UnitOfWork is registered last (innermost) so it owns the transaction
-    // boundary around the handler alone: authorization + validation run OUTSIDE the transaction, so a
-    // rejected request fails fast without opening (and rolling back) a transaction.
-    cfg.AddOpenBehavior(typeof(AuthorizationBehavior<,>));
-    cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));
-    cfg.AddOpenBehavior(typeof(UnitOfWorkBehavior<,>));
-});
+builder.Services.AddHandlers();
 builder.Services.AddValidatorsFromAssemblyContaining<Program>(ServiceLifetime.Scoped);
 builder.Services.AddProcessing(builder.Configuration);
 builder.Services.AddBackup(builder.Configuration);

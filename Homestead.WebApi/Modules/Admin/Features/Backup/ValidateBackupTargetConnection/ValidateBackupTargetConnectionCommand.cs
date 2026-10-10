@@ -1,9 +1,6 @@
-using Homestead.WebApi.Common;
-
 namespace Homestead.WebApi.Modules.Admin.Features.Backup.ValidateBackupTargetConnection;
 
-public record ValidateBackupTargetConnectionCommand(string TargetKey)
-    : ICommand<ValidateBackupTargetConnectionResponse>;
+public record ValidateBackupTargetConnectionCommand(string TargetKey);
 
 /// <param name="StorageLimitBytes">Null means unlimited — not zero.</param>
 public record ValidateBackupTargetConnectionResponse

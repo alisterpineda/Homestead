@@ -1,5 +1,3 @@
-using MediatR;
-
 namespace Homestead.WebApi.Modules.Search.Features.UniversalSearch;
 
 public static class UniversalSearchEndpoint
@@ -7,9 +5,9 @@ public static class UniversalSearchEndpoint
     public static void Map(RouteGroupBuilder group)
     {
         group.MapGet("", async ([AsParameters] UniversalSearchQuery query,
-            ISender sender, CancellationToken ct) =>
+            UniversalSearchHandler handler, CancellationToken ct) =>
         {
-            return Results.Ok(await sender.Send(query, ct));
+            return Results.Ok(await handler.Handle(query, ct));
         })
         .WithName("UniversalSearch")
         .Produces<SearchResponse>();

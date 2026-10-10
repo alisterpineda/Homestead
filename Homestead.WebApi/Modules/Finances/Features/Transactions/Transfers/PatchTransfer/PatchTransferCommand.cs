@@ -1,8 +1,6 @@
-using Homestead.WebApi.Common;
-
 namespace Homestead.WebApi.Modules.Finances.Features.Transactions.Transfers.PatchTransfer;
 
-public record PatchTransferCommand : ICommand<TransactionResponse>
+public record PatchTransferCommand
 {
     public Guid TransactionId { get; init; }
     public required Guid SourceAccountId { get; init; }

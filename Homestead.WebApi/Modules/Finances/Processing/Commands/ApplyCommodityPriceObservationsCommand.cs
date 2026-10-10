@@ -1,10 +1,8 @@
 using System.Globalization;
-using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Modules.Finances.PriceProviders;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Processing.Commands;
@@ -14,21 +12,24 @@ namespace Homestead.WebApi.Modules.Finances.Processing.Commands;
 /// that upserts provider price observations and stamps the source's last-import status in one unit of
 /// work. Mirrors the Documents job-fold: <see cref="ImportCommodityPricesJobHandler"/> keeps the provider
 /// HTTP IO and hands the in-memory observations here so the DB write + audit run through the single
-/// persistence/audit chokepoint. No explicit save — the behavior commits.
+/// persistence/audit chokepoint. No explicit save — the job handler's unit of work commits.
 /// </summary>
-public record ApplyCommodityPriceObservationsCommand : IRequest, ICommand, IActorAttributed
+public record ApplyCommodityPriceObservationsCommand
 {
     public required CommodityPriceSource Source { get; init; }
     public required IReadOnlyList<PriceObservation> Observations { get; init; }
 
     /// <summary>Provider partial-success warning; null on full success. Clamped to the column bound when stamped.</summary>
     public string? Warning { get; init; }
+}
 
-    public Guid? ActorUserId { get; init; }
+public interface IApplyCommodityPriceObservationsHandler
+{
+    Task Handle(ApplyCommodityPriceObservationsCommand request, CancellationToken ct);
 }
 
 public class ApplyCommodityPriceObservationsHandler(AppDbContext db, IAuditContext audit)
-    : IRequestHandler<ApplyCommodityPriceObservationsCommand>
+    : IApplyCommodityPriceObservationsHandler
 {
     // Bound for LastImportMessage — enforced here so the persistence seam owns the cap rather than
     // trusting every caller to pre-truncate.
@@ -105,8 +106,8 @@ public class ApplyCommodityPriceObservationsHandler(AppDbContext db, IAuditConte
         settings.LastImportMessage = Truncate(request.Warning);
         settings.UpdatedAt = now;
 
-        // No explicit save — UnitOfWorkBehavior commits (and flushes audit, attributed to ActorUserId)
-        // after this handler returns.
+        // No explicit save — the job handler's unit of work commits (and flushes audit, attributed to the
+        // actor it set) after this handler returns.
     }
 
     private static string? Truncate(string? message) =>

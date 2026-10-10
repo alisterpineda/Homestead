@@ -1,8 +1,6 @@
-using Homestead.WebApi.Common;
-
 namespace Homestead.WebApi.Modules.Finances.Features.Imports.RollbackStatementImport;
 
-public record RollbackStatementImportCommand : ICommand<RollbackStatementImportResponse>
+public record RollbackStatementImportCommand
 {
     public required Guid DocumentId { get; init; }
 }

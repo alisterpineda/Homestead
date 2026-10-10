@@ -5,7 +5,6 @@ using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Inventory;
 using Homestead.WebApi.Modules.Inventory.Services;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Durables.PatchDurable;
@@ -17,7 +16,6 @@ public class PatchDurableHandler(
     IItemLocationResolver locationResolver,
     IInventoryTagPathResolver tagResolver,
     IUnitOfWork unitOfWork)
-    : IRequestHandler<PatchDurableCommand, DurableResponse>
 {
     public async Task<DurableResponse> Handle(PatchDurableCommand request, CancellationToken ct)
     {

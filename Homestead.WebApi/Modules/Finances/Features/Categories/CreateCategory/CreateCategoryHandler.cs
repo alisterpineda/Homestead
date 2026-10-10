@@ -1,3 +1,4 @@
+using FluentValidation;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
@@ -5,7 +6,6 @@ using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Modules.Finances.Features.Settings;
 using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Categories.CreateCategory;
@@ -15,11 +15,13 @@ public class CreateCategoryHandler(
     ICurrentUserAccessor currentUser,
     IAuditContext audit,
     ICategoryPathResolver pathResolver,
-    IUnitOfWork unitOfWork)
-    : IRequestHandler<CreateCategoryCommand, CategoryResponse>
+    IUnitOfWork unitOfWork,
+    IValidator<CreateCategoryCommand> validator)
 {
     public async Task<CategoryResponse> Handle(CreateCategoryCommand request, CancellationToken ct)
     {
+        await validator.ValidateAndThrowAsync(request, ct);
+
         var name = request.Name.Trim();
 
         if (request.ParentId is Guid parentId)

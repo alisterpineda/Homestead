@@ -1,14 +1,12 @@
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Inventory;
-using MediatR;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Tags.BulkDeleteTags;
 
 public class BulkDeleteTagsHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork)
-    : IRequestHandler<BulkDeleteInventoryTagsCommand, BulkDeleteInventoryTagsResponse>
 {
     public async Task<BulkDeleteInventoryTagsResponse> Handle(BulkDeleteInventoryTagsCommand request, CancellationToken ct)
     {

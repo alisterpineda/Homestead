@@ -1,5 +1,4 @@
 using Homestead.WebApi.Authentication;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Transactions.DocumentLinks.AddTransactionDocumentLink;
 
@@ -9,9 +8,9 @@ public static class AddTransactionDocumentLinkEndpoint
     {
         group.MapPost("/{transactionId:guid}/documents", async (
             Guid transactionId, AddTransactionDocumentLinkRequest body,
-            ISender sender, CancellationToken ct) =>
+            AddTransactionDocumentLinkHandler handler, CancellationToken ct) =>
         {
-            var response = await sender.Send(new AddTransactionDocumentLinkCommand
+            var response = await handler.Handle(new AddTransactionDocumentLinkCommand
             {
                 TransactionId = transactionId,
                 DocumentId = body.DocumentId,

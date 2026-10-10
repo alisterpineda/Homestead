@@ -2,13 +2,11 @@ using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Inventory;
 using Homestead.WebApi.Modules.Inventory.Services;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Consumables.GetConsumableMovements;
 
 public class GetConsumableMovementsHandler(AppDbContext db, IItemLocationResolver locationResolver)
-    : IRequestHandler<GetConsumableMovementsQuery, PaginatedResponse<StockMovementResponse>?>
 {
     public async Task<PaginatedResponse<StockMovementResponse>?> Handle(
         GetConsumableMovementsQuery request, CancellationToken ct)

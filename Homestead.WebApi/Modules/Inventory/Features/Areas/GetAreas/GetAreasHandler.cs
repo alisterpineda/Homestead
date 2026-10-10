@@ -2,13 +2,11 @@ using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Inventory;
 using Homestead.WebApi.Modules.Inventory.Services;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Areas.GetAreas;
 
 public class GetAreasHandler(AppDbContext db, IInventoryPlacementService placementService)
-    : IRequestHandler<GetAreasQuery, PaginatedResponse<AreaResponse>>
 {
     public async Task<PaginatedResponse<AreaResponse>> Handle(
         GetAreasQuery request, CancellationToken ct)

@@ -5,7 +5,6 @@ using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Accounts.PatchAccount;
@@ -16,7 +15,6 @@ public class PatchAccountHandler(
     ICurrentUserAccessor currentUser,
     IValuationService valuations,
     IUnitOfWork unitOfWork)
-    : IRequestHandler<PatchAccountCommand, AccountResponse>
 {
     public async Task<AccountResponse> Handle(PatchAccountCommand request, CancellationToken ct)
     {

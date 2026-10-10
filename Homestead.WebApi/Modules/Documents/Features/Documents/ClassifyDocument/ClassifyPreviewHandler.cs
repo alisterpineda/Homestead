@@ -1,13 +1,11 @@
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Modules.Documents.Services;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Documents.Features.Documents.ClassifyDocument;
 
 public class ClassifyPreviewHandler(AppDbContext db, IDocumentClassifier classifier)
-    : IRequestHandler<ClassifyPreviewQuery, ClassifyPreviewResponse>
 {
     public async Task<ClassifyPreviewResponse> Handle(ClassifyPreviewQuery request, CancellationToken ct)
     {

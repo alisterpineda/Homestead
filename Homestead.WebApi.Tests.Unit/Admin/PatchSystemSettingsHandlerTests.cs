@@ -1,3 +1,4 @@
+using FluentValidation;
 using System.Text.Json;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Common.Settings;
@@ -38,7 +39,7 @@ public class PatchSystemSettingsHandlerTests : IDisposable
             .Do(ci => ci.Arg<Func<CancellationToken, Task>>()(CancellationToken.None).GetAwaiter().GetResult());
         _notifier = Substitute.For<ISettingsChangeNotifier>();
         _notifier.NotifyAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(Task.CompletedTask);
-        _sut = new PatchSystemSettingsHandler(_db, _currentUser, _audit, _unitOfWork, _notifier);
+        _sut = new PatchSystemSettingsHandler(_db, _currentUser, _audit, _unitOfWork, _notifier, new PatchSystemSettingsCommandValidator());
     }
 
     public void Dispose()
@@ -215,5 +216,16 @@ public class PatchSystemSettingsHandlerTests : IDisposable
         Assert.NotNull(response.LogLevelOverrides);
         Assert.Empty(response.LogLevelOverrides);
         await _notifier.Received(1).NotifyAsync(AppSetting.SystemModule, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_OutOfRangeLogLevel_ThrowsValidationException()
+    {
+        var request = new PatchSystemSettingsCommand
+        {
+            LogLevelOverrides = new Dictionary<string, LogLevel> { ["Microsoft"] = (LogLevel)42 }
+        };
+
+        await Assert.ThrowsAsync<ValidationException>(() => _sut.Handle(request, TestContext.Current.CancellationToken));
     }
 }

@@ -1,7 +1,6 @@
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
-using MediatR;
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Infrastructure.Storage;
@@ -15,7 +14,6 @@ namespace Homestead.WebApi.Modules.Documents.Features.Documents.CreateDocument;
 
 public class CreateDocumentHandler(IOptions<FileStorageOptions> storage, ICurrentUserAccessor currentUser, IJobQueue jobQueue,
     AppDbContext db, IDocumentQueryService accessService)
-    : IRequestHandler<CreateDocumentCommand, CreateDocumentResponse>
 {
     public async Task<CreateDocumentResponse> Handle(CreateDocumentCommand request, CancellationToken ct)
     {

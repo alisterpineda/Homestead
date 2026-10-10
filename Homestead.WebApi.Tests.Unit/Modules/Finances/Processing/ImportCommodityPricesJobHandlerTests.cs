@@ -1,3 +1,4 @@
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Modules.Finances.PriceProviders;
@@ -6,7 +7,6 @@ using Homestead.WebApi.Modules.Finances.Processing.Commands;
 using System.Net;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Processing;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
@@ -18,7 +18,10 @@ public class ImportCommodityPricesJobHandlerTests : IDisposable
     private readonly TestAppDbContext _db;
     private readonly IPriceProvider _provider;
     private readonly StubPriceSourceRegistry _sources;
-    private readonly ISender _sender;
+    private readonly IUnitOfWork _unitOfWork;
+    private bool _inTransaction;
+    private bool _handledInTransaction;
+    private readonly IApplyCommodityPriceObservationsHandler _applyObservations;
     private readonly ImportCommodityPricesJobHandler _sut;
 
     private readonly Commodity _cad;
@@ -35,10 +38,23 @@ public class ImportCommodityPricesJobHandlerTests : IDisposable
         _sources = new StubPriceSourceRegistry();
         _sources.Providers[CommodityPriceSource.BankOfCanada] = _provider;
 
-        _sender = Substitute.For<ISender>();
+        _applyObservations = Substitute.For<IApplyCommodityPriceObservationsHandler>();
+
+        // Run the work handed to the transaction, so the command handler is reached through it, and record
+        // whether the command handler ran while that work was in progress.
+        _unitOfWork = Substitute.For<IUnitOfWork>();
+        _unitOfWork.ExecuteInTransactionAsync(Arg.Any<Func<Task<bool>>>(), Arg.Any<CancellationToken>())
+            .Returns(async call =>
+            {
+                _inTransaction = true;
+                try { return await call.Arg<Func<Task<bool>>>()(); }
+                finally { _inTransaction = false; }
+            });
+        _applyObservations.When(x => x.Handle(Arg.Any<ApplyCommodityPriceObservationsCommand>(), Arg.Any<CancellationToken>()))
+            .Do(_ => _handledInTransaction = _inTransaction);
 
         _sut = new ImportCommodityPricesJobHandler(
-            _db, _sources, _sender, NullLogger<ImportCommodityPricesJobHandler>.Instance);
+            _db, _sources, _unitOfWork, _applyObservations, NullLogger<ImportCommodityPricesJobHandler>.Instance);
 
         _cad = new Commodity { Id = Guid.NewGuid(), Symbol = "CAD", Name = "Canadian Dollar", Kind = CommodityKind.Currency };
         _usd = new Commodity { Id = Guid.NewGuid(), Symbol = "USD", Name = "US Dollar", Kind = CommodityKind.Currency };
@@ -205,7 +221,7 @@ public class ImportCommodityPricesJobHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task Import_SendsApplyObservationsCommand_WithProviderObservations()
+    public async Task Import_AppliesObservationsCommand_WithProviderObservations()
     {
         // The DB upsert + audit moved into ApplyCommodityPriceObservationsHandler (tested separately).
         // The job handler's responsibility is to hand the provider's observations off via the command.
@@ -226,7 +242,7 @@ public class ImportCommodityPricesJobHandlerTests : IDisposable
             userId: Guid.NewGuid());
         await _sut.HandleAsync(job, ct);
 
-        await _sender.Received(1).Send(
+        await _applyObservations.Received(1).Handle(
             Arg.Is<ApplyCommodityPriceObservationsCommand>(c =>
                 c.Source == CommodityPriceSource.BankOfCanada
                 && c.Observations.Count == 2
@@ -235,7 +251,7 @@ public class ImportCommodityPricesJobHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task RunNow_SendsCommandAttributedToCreatingUser()
+    public async Task RunNow_SetsActorToCreatingUser_ThenAppliesInsideTheTransaction()
     {
         var ct = TestContext.Current.CancellationToken;
         await SeedHeldUsdAccountAsync();
@@ -253,14 +269,19 @@ public class ImportCommodityPricesJobHandlerTests : IDisposable
 
         await _sut.HandleAsync(job, ct);
 
-        // Manual runs are attributed to the initiating user via the command's ActorUserId.
-        await _sender.Received(1).Send(
-            Arg.Is<ApplyCommodityPriceObservationsCommand>(c => c.ActorUserId == creator),
-            Arg.Any<CancellationToken>());
+        // Manual runs are attributed to the initiating user. The provider call holds no transaction; the
+        // actor is set before the transaction opens and the command runs inside it.
+        Received.InOrder(() =>
+        {
+            _provider.ImportAsync(Arg.Any<PriceImportRequest>(), ct);
+            _unitOfWork.SetActor(creator);
+            _unitOfWork.ExecuteInTransactionAsync(Arg.Any<Func<Task<bool>>>(), ct);
+        });
+        Assert.True(_handledInTransaction);
     }
 
     [Fact]
-    public async Task ScheduledRun_SendsCommandWithNoActor()
+    public async Task ScheduledRun_SetsNoActor_ThenAppliesInsideTheTransaction()
     {
         var ct = TestContext.Current.CancellationToken;
         await SeedHeldUsdAccountAsync();
@@ -277,14 +298,18 @@ public class ImportCommodityPricesJobHandlerTests : IDisposable
 
         await _sut.HandleAsync(job, ct);
 
-        // Scheduled imports stay system-attributed (null actor).
-        await _sender.Received(1).Send(
-            Arg.Is<ApplyCommodityPriceObservationsCommand>(c => c.ActorUserId == null),
-            Arg.Any<CancellationToken>());
+        // Scheduled imports stay system-attributed (null actor), even though the job has a creator.
+        Received.InOrder(() =>
+        {
+            _unitOfWork.SetActor(null);
+            _unitOfWork.ExecuteInTransactionAsync(Arg.Any<Func<Task<bool>>>(), ct);
+        });
+        Assert.True(_handledInTransaction);
+        _unitOfWork.DidNotReceive().SetActor(Arg.Is<Guid?>(id => id != null));
     }
 
     [Fact]
-    public async Task SuccessResult_SendsCommandWithNullWarning()
+    public async Task SuccessResult_AppliesCommandWithNullWarning()
     {
         var ct = TestContext.Current.CancellationToken;
         await SeedHeldUsdAccountAsync();
@@ -295,8 +320,8 @@ public class ImportCommodityPricesJobHandlerTests : IDisposable
         var job = MakeJob(new ImportCommodityPricesPayload(CommodityPriceSource.BankOfCanada));
         await _sut.HandleAsync(job, ct);
 
-        // The command is sent even with zero observations so the status stamp always runs.
-        await _sender.Received(1).Send(
+        // The command runs even with zero observations so the status stamp always runs.
+        await _applyObservations.Received(1).Handle(
             Arg.Is<ApplyCommodityPriceObservationsCommand>(c => c.Warning == null),
             Arg.Any<CancellationToken>());
     }
@@ -453,7 +478,7 @@ public class ImportCommodityPricesJobHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task PartialSuccess_SendsCommandWithWarning()
+    public async Task PartialSuccess_AppliesCommandWithWarning()
     {
         var ct = TestContext.Current.CancellationToken;
         await SeedHeldUsdAccountAsync();
@@ -467,7 +492,7 @@ public class ImportCommodityPricesJobHandlerTests : IDisposable
         var job = MakeJob(new ImportCommodityPricesPayload(CommodityPriceSource.BankOfCanada));
         await _sut.HandleAsync(job, ct);
 
-        await _sender.Received(1).Send(
+        await _applyObservations.Received(1).Handle(
             Arg.Is<ApplyCommodityPriceObservationsCommand>(c =>
                 c.Warning == "Throttled by upstream after 5 calls."
                 && c.Observations.Count == 1),

@@ -1,6 +1,5 @@
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
-using MediatR;
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Infrastructure.Storage;
 using Homestead.WebApi.Persistence;
@@ -12,7 +11,6 @@ namespace Homestead.WebApi.Modules.Documents.Features.Versions.DeleteDocumentVer
 public class DeleteDocumentVersionHandler(AppDbContext db, IOptions<FileStorageOptions> storage,
     IAuditContext audit, IUnitOfWork unitOfWork,
     ILogger<DeleteDocumentVersionHandler> logger)
-    : IRequestHandler<DeleteDocumentVersionCommand, bool>
 {
     public async Task<bool> Handle(DeleteDocumentVersionCommand request, CancellationToken ct)
     {

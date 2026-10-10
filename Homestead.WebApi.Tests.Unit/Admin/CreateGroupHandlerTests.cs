@@ -1,3 +1,4 @@
+using FluentValidation;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Modules.Admin.Features.Groups.CreateGroup;
@@ -24,7 +25,7 @@ public class CreateGroupHandlerTests : IDisposable
         _unitOfWork = Substitute.For<IUnitOfWork>();
         _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
             .Returns(ci => _db.SaveChangesAsync(ci.Arg<CancellationToken>()));
-        _sut = new CreateGroupHandler(_db, _currentUser, _audit, _unitOfWork);
+        _sut = new CreateGroupHandler(_db, _currentUser, _audit, _unitOfWork, new CreateGroupCommandValidator());
     }
 
     public void Dispose() => _db.Dispose();
@@ -37,5 +38,12 @@ public class CreateGroupHandlerTests : IDisposable
         var response = await _sut.Handle(request, CancellationToken.None);
 
         _audit.Received(1).Created("Group", response.Id, Arg.Any<Guid?>());
+    }
+
+    [Fact]
+    public async Task Handle_BlankName_ThrowsValidationException()
+    {
+        await Assert.ThrowsAsync<ValidationException>(() =>
+            _sut.Handle(new CreateGroupCommand { Name = "   " }, CancellationToken.None));
     }
 }

@@ -1,10 +1,9 @@
-using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Modules.Finances.Features.Transactions;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Transactions.Flows.CreateFlow;
 
-public record CreateFlowCommand : ICommand<TransactionResponse>
+public record CreateFlowCommand
 {
     public required FlowDirection Direction { get; init; }
     public required Guid AccountId { get; init; }

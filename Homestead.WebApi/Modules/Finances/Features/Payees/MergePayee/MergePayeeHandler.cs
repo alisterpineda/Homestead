@@ -2,13 +2,11 @@ using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Payees.MergePayee;
 
 public class MergePayeeHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork)
-    : IRequestHandler<MergePayeeCommand, PayeeResponse>
 {
     public async Task<PayeeResponse> Handle(MergePayeeCommand request, CancellationToken ct)
     {

@@ -1,6 +1,5 @@
 using System.Text.Json;
 using Homestead.WebApi.Common;
-using MediatR;
 using Homestead.WebApi.Domain.Auditing;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -8,7 +7,6 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Modules.Documents.Features.Activity.GetActivity;
 
 public class GetActivityHandler(AppDbContext db)
-    : IRequestHandler<GetActivityQuery, PaginatedResponse<GetActivityResponse>>
 {
     private static readonly Dictionary<string, string> FieldDisplayNames = new()
     {

@@ -1,5 +1,3 @@
-using MediatR;
-
 namespace Homestead.WebApi.Modules.Finances.Features.Commodities.GetCommodity;
 
-public record GetCommodityQuery(Guid Id) : IRequest<CommodityResponse?>;
+public record GetCommodityQuery(Guid Id);

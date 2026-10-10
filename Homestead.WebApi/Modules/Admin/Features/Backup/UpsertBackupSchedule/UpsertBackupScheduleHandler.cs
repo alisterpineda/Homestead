@@ -1,10 +1,10 @@
+using FluentValidation;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Infrastructure.Backup;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Admin.Features.Backup.UpsertBackupSchedule;
@@ -21,8 +21,8 @@ public class UpsertBackupScheduleHandler(
     IBackupTargetGate gate,
     ICurrentUserAccessor currentUser,
     IAuditContext audit,
-    IUnitOfWork unitOfWork)
-    : IRequestHandler<UpsertBackupScheduleCommand, UpsertBackupScheduleResponse>
+    IUnitOfWork unitOfWork,
+    IValidator<UpsertBackupScheduleCommand> validator)
 {
     /// <summary>
     /// How a schedule reads in the audit log. The cron and its enabled flag live on the
@@ -39,6 +39,8 @@ public class UpsertBackupScheduleHandler(
     public async Task<UpsertBackupScheduleResponse> Handle(
         UpsertBackupScheduleCommand request, CancellationToken ct)
     {
+        await validator.ValidateAndThrowAsync(request, ct);
+
         var source = await db.BackupSources
             .FirstOrDefaultAsync(s => s.Id == request.BackupSourceId, ct)
             ?? throw new EntityNotFoundException("Backup source not found.");

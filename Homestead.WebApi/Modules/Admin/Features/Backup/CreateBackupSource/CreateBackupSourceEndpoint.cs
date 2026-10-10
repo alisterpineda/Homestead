@@ -1,5 +1,3 @@
-using MediatR;
-
 namespace Homestead.WebApi.Modules.Admin.Features.Backup.CreateBackupSource;
 
 public static class CreateBackupSourceEndpoint
@@ -13,9 +11,9 @@ public static class CreateBackupSourceEndpoint
     public static void Map(RouteGroupBuilder group)
     {
         group.MapPost("/sources", async (
-            CreateBackupSourceBody body, ISender sender, CancellationToken ct) =>
+            CreateBackupSourceBody body, CreateBackupSourceHandler handler, CancellationToken ct) =>
         {
-            var response = await sender.Send(new CreateBackupSourceCommand
+            var response = await handler.Handle(new CreateBackupSourceCommand
             {
                 SourceKind = body.SourceKind,
                 TargetKey = body.TargetKey,

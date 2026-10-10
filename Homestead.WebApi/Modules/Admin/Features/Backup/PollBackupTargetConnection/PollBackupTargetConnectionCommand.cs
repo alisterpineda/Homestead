@@ -1,9 +1,6 @@
-using Homestead.WebApi.Common;
-
 namespace Homestead.WebApi.Modules.Admin.Features.Backup.PollBackupTargetConnection;
 
-public record PollBackupTargetConnectionCommand(string TargetKey, string PollToken)
-    : ICommand<PollBackupTargetConnectionResponse>;
+public record PollBackupTargetConnectionCommand(string TargetKey, string PollToken);
 
 public enum BackupConnectStatus
 {

@@ -1,14 +1,12 @@
 using System.Diagnostics;
 using Homestead.WebApi.Infrastructure.Ai;
-using MediatR;
 using Microsoft.Extensions.AI;
 
 namespace Homestead.WebApi.Modules.Admin.Features.Ai.TestAiConnection;
 
 // Live probe of one configured AI provider: sends a one-token "ping" and reports reachability.
-// Writes nothing — see TestAiConnectionCommand for why this is IRequest, not ICommand.
+// Writes nothing — see TestAiConnectionCommand for why that matters.
 public class TestAiConnectionHandler(IAiProviderResolver providerResolver)
-    : IRequestHandler<TestAiConnectionCommand, TestAiConnectionResponse>
 {
     // Generous on purpose: the real classification path (AiClassificationService) passes the job's token
     // straight to GetResponseAsync with no cap, so a slow-but-working self-hosted model can take far longer

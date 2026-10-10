@@ -1,4 +1,3 @@
-using MediatR;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Infrastructure.Storage;
 using Homestead.WebApi.Infrastructure.Thumbnails;
@@ -11,7 +10,6 @@ public class GetDocumentThumbnailHandler(
     AppDbContext db,
     IOptions<FileStorageOptions> storage,
     ThumbnailService thumbnailService)
-    : IRequestHandler<GetDocumentThumbnailQuery, IResult>
 {
     public async Task<IResult> Handle(GetDocumentThumbnailQuery request, CancellationToken ct)
     {

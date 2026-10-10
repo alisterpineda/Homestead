@@ -3,7 +3,6 @@ using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Infrastructure.Storage;
-using MediatR;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -13,7 +12,6 @@ namespace Homestead.WebApi.Modules.Documents.Features.Documents.PermanentlyDelet
 public class PermanentlyDeleteDocumentsHandler(AppDbContext db, IOptions<FileStorageOptions> storage,
     IAuditContext audit, IUnitOfWork unitOfWork, IDocumentQueryService accessService,
     ILogger<PermanentlyDeleteDocumentsHandler> logger)
-    : IRequestHandler<PermanentlyDeleteDocumentsCommand, PermanentlyDeleteDocumentsResponse>
 {
     public async Task<PermanentlyDeleteDocumentsResponse> Handle(PermanentlyDeleteDocumentsCommand request, CancellationToken ct)
     {

@@ -1,5 +1,4 @@
 using Homestead.WebApi.Authentication;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Categories.CreateCategory;
 
@@ -7,9 +6,9 @@ public static class CreateCategoryEndpoint
 {
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapPost("", async (CreateCategoryCommand request, ISender sender, CancellationToken ct) =>
+        group.MapPost("", async (CreateCategoryCommand request, CreateCategoryHandler handler, CancellationToken ct) =>
         {
-            var response = await sender.Send(request, ct);
+            var response = await handler.Handle(request, ct);
             return Results.Created($"/api/v1/finances/categories/{response.Id}", response);
         })
         .WithName("CreateCategory")

@@ -7,7 +7,6 @@ using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Domain.Settings;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Settings.PatchFinanceSettings;
@@ -17,7 +16,6 @@ public class PatchFinanceSettingsHandler(
     ICurrentUserAccessor currentUser,
     IAuditContext audit,
     IUnitOfWork unitOfWork)
-    : IRequestHandler<PatchFinanceSettingsCommand, FinanceSettingsResponse>
 {
     public async Task<FinanceSettingsResponse> Handle(
         PatchFinanceSettingsCommand command, CancellationToken ct)

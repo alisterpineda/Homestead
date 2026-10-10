@@ -1,10 +1,9 @@
 using Homestead.WebApi.Common;
-using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Consumables.GetConsumables;
 
-public record GetConsumablesQuery : PaginatedRequest, IRequest<PaginatedResponse<ConsumableResponse>>
+public record GetConsumablesQuery : PaginatedRequest
 {
     /// <summary>Include archived consumables. Default false.</summary>
     public bool? IncludeInactive { get; init; }

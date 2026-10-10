@@ -1,3 +1,4 @@
+using FluentValidation;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Finances;
@@ -26,7 +27,8 @@ public class UpsertPriceSourceScheduleHandlerTests : IDisposable
     [Fact]
     public async Task SystemSource_Throws_BusinessRuleException()
     {
-        var sut = new UpsertPriceSourceScheduleHandler(_db, _currentUser, new PriceSourceScheduleStore(_db));
+        var sut = new UpsertPriceSourceScheduleHandler(
+            _db, _currentUser, new PriceSourceScheduleStore(_db), new UpsertPriceSourceScheduleCommandValidator());
         await Assert.ThrowsAsync<BusinessRuleException>(() => sut.Handle(
             new UpsertPriceSourceScheduleCommand
             {
@@ -44,7 +46,8 @@ public class UpsertPriceSourceScheduleHandlerTests : IDisposable
         // The handler now only stages Remove + Add; the command pipeline's transaction commits. These
         // unit tests bypass the pipeline, so save explicitly after each Handle to mirror that commit —
         // each call is a separate command (and therefore a separate transaction) in production.
-        var sut = new UpsertPriceSourceScheduleHandler(_db, _currentUser, new PriceSourceScheduleStore(_db));
+        var sut = new UpsertPriceSourceScheduleHandler(
+            _db, _currentUser, new PriceSourceScheduleStore(_db), new UpsertPriceSourceScheduleCommandValidator());
         var first = await sut.Handle(new UpsertPriceSourceScheduleCommand
         {
             Source = CommodityPriceSource.BankOfCanada,
@@ -76,7 +79,8 @@ public class UpsertPriceSourceScheduleHandlerTests : IDisposable
         var ct = TestContext.Current.CancellationToken;
         var userId = Guid.NewGuid();
         _currentUser.UserId.Returns(userId);
-        var sut = new UpsertPriceSourceScheduleHandler(_db, _currentUser, new PriceSourceScheduleStore(_db));
+        var sut = new UpsertPriceSourceScheduleHandler(
+            _db, _currentUser, new PriceSourceScheduleStore(_db), new UpsertPriceSourceScheduleCommandValidator());
         var response = await sut.Handle(new UpsertPriceSourceScheduleCommand
         {
             Source = CommodityPriceSource.BankOfCanada,
@@ -88,5 +92,19 @@ public class UpsertPriceSourceScheduleHandlerTests : IDisposable
 
         var schedule = _db.ProcessingSchedules.Single(s => s.Id == response.Id);
         Assert.Equal(userId, schedule.CreatedByUserId);
+    }
+
+    [Fact]
+    public async Task InvalidCronExpression_Throws_ValidationException()
+    {
+        var sut = new UpsertPriceSourceScheduleHandler(
+            _db, _currentUser, new PriceSourceScheduleStore(_db), new UpsertPriceSourceScheduleCommandValidator());
+        await Assert.ThrowsAsync<ValidationException>(() => sut.Handle(
+            new UpsertPriceSourceScheduleCommand
+            {
+                Source = CommodityPriceSource.BankOfCanada,
+                CronExpression = "not a cron",
+            },
+            TestContext.Current.CancellationToken));
     }
 }

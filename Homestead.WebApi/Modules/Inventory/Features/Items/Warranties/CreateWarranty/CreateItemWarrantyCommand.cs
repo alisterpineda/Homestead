@@ -1,9 +1,7 @@
-using Homestead.WebApi.Common;
-
 namespace Homestead.WebApi.Modules.Inventory.Features.Items.Warranties.CreateWarranty;
 
 /// <summary>All three fields are optional — an empty body creates a lifetime manufacturer warranty.</summary>
-public record CreateItemWarrantyCommand : ICommand<ItemWarrantyResponse>
+public record CreateItemWarrantyCommand
 {
     /// <summary>The owning item, taken from the route by the endpoint (never from the body).</summary>
     internal Guid ItemId { get; init; }

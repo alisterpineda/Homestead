@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Modules.Documents.Processing.Commands;
@@ -9,7 +10,6 @@ using Homestead.WebApi.Infrastructure.Ai;
 using Homestead.WebApi.Infrastructure.Storage;
 using Homestead.WebApi.Infrastructure.TextExtraction;
 using Homestead.WebApi.Infrastructure.Thumbnails;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -26,7 +26,8 @@ public class UploadDocumentJobHandler(
     ThumbnailService thumbnailService,
     TextExtractionHelper textExtractionHelper,
     ITextExtractionEngineResolver engineResolver,
-    ISender sender) : IJobHandler
+    IUnitOfWork unitOfWork,
+    ICreateDocumentFromUploadHandler createDocument) : IJobHandler
 {
     public ProcessingJobType Type => ProcessingJobType.UploadDocument;
 
@@ -126,24 +127,27 @@ public class UploadDocumentJobHandler(
                 logger.LogWarning(ex, "Auto-classification failed during upload {UploadId}", payload.UploadId);
             }
 
-            // Persist document + first version (+ folded classification) in one unit of work.
+            // Persist document + first version (+ folded classification) in one unit of work, attributed
+            // to the uploader.
+            var command = new CreateDocumentFromUploadCommand
+            {
+                Name = documentName,
+                GroupId = payload.GroupId,
+                ContentType = payload.ContentType,
+                FileSize = payload.FileSize,
+                FileHash = fileHash,
+                FileExtension = payload.FileExtension,
+                Label = payload.Label,
+                ExtractedText = extractedText,
+                TextExtractionMetadata = textExtractionMetadata,
+                Classification = classification,
+                ActorUserId = job.CreatedByUserId
+            };
             CreateDocumentFromUploadResult result;
             try
             {
-                result = await sender.Send(new CreateDocumentFromUploadCommand
-                {
-                    Name = documentName,
-                    GroupId = payload.GroupId,
-                    ContentType = payload.ContentType,
-                    FileSize = payload.FileSize,
-                    FileHash = fileHash,
-                    FileExtension = payload.FileExtension,
-                    Label = payload.Label,
-                    ExtractedText = extractedText,
-                    TextExtractionMetadata = textExtractionMetadata,
-                    Classification = classification,
-                    ActorUserId = job.CreatedByUserId
-                }, ct);
+                unitOfWork.SetActor(job.CreatedByUserId);
+                result = await unitOfWork.ExecuteInTransactionAsync(() => createDocument.Handle(command, ct), ct);
             }
             catch
             {

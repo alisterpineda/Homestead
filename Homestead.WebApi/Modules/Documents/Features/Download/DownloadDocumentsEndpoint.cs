@@ -1,5 +1,4 @@
 using Homestead.WebApi.Authentication;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Documents.Features.Download;
 
@@ -7,9 +6,9 @@ public static class DownloadDocumentsEndpoint
 {
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapPost("/", async (DownloadDocumentsCommand request, ISender sender, CancellationToken ct) =>
+        group.MapPost("/", async (DownloadDocumentsCommand request, DownloadDocumentsHandler handler, CancellationToken ct) =>
         {
-            var response = await sender.Send(request, ct);
+            var response = await handler.Handle(request, ct);
             return Results.Accepted(null, response);
         })
         .WithName("DownloadDocuments")

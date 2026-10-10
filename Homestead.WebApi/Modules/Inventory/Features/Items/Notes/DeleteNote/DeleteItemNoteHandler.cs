@@ -1,13 +1,11 @@
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Items.Notes.DeleteNote;
 
 public class DeleteItemNoteHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork)
-    : IRequestHandler<DeleteItemNoteCommand, bool>
 {
     public async Task<bool> Handle(DeleteItemNoteCommand request, CancellationToken ct)
     {

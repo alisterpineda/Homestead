@@ -1,5 +1,4 @@
 using Homestead.WebApi.Authentication;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Commodities.DeleteCommodity;
 
@@ -7,9 +6,9 @@ public static class DeleteCommodityEndpoint
 {
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapDelete("/{id:guid}", async (Guid id, ISender sender, CancellationToken ct) =>
+        group.MapDelete("/{id:guid}", async (Guid id, DeleteCommodityHandler handler, CancellationToken ct) =>
         {
-            var deleted = await sender.Send(new DeleteCommodityCommand(id), ct);
+            var deleted = await handler.Handle(new DeleteCommodityCommand(id), ct);
             return deleted ? Results.NoContent() : Results.NotFound();
         })
         .WithName("DeleteCommodity")

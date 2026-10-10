@@ -2,14 +2,12 @@ using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Modules.Admin.Features.Backup.UpsertBackupSchedule;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Admin.Features.Backup.DeleteBackupSchedule;
 
 /// <summary>Drops one pairing's recurring run, leaving it manual-only.</summary>
 public class DeleteBackupScheduleHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork)
-    : IRequestHandler<DeleteBackupScheduleCommand, bool>
 {
     public async Task<bool> Handle(DeleteBackupScheduleCommand request, CancellationToken ct)
     {

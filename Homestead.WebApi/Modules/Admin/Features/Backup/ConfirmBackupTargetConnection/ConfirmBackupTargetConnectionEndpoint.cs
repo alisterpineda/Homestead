@@ -1,5 +1,3 @@
-using MediatR;
-
 namespace Homestead.WebApi.Modules.Admin.Features.Backup.ConfirmBackupTargetConnection;
 
 public static class ConfirmBackupTargetConnectionEndpoint
@@ -9,9 +7,9 @@ public static class ConfirmBackupTargetConnectionEndpoint
     public static void Map(RouteGroupBuilder group)
     {
         group.MapPost("/targets/{key}/connect/confirm", async (
-            string key, ConfirmBackupTargetConnectionBody body, ISender sender, CancellationToken ct) =>
+            string key, ConfirmBackupTargetConnectionBody body, ConfirmBackupTargetConnectionHandler handler, CancellationToken ct) =>
         {
-            var response = await sender.Send(
+            var response = await handler.Handle(
                 new ConfirmBackupTargetConnectionCommand(key, body.PendingToken), ct);
 
             return Results.Ok(response);

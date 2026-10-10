@@ -1,3 +1,4 @@
+using FluentValidation;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Inventory;
@@ -20,7 +21,7 @@ public class CreateBrandHandlerTests : IDisposable
         _unitOfWork = Substitute.For<IUnitOfWork>();
         _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
             .Returns(ci => _db.SaveChangesAsync(ci.Arg<CancellationToken>()));
-        _sut = new CreateBrandHandler(_db, _audit, _unitOfWork);
+        _sut = new CreateBrandHandler(_db, _audit, _unitOfWork, new CreateBrandCommandValidator());
     }
 
     public void Dispose() => _db.Dispose();
@@ -92,5 +93,12 @@ public class CreateBrandHandlerTests : IDisposable
         await _sut.Handle(new CreateBrandCommand { Name = "apple" }, Ct);
 
         _audit.DidNotReceive().Created("Brand", Arg.Any<Guid>(), Arg.Any<Guid?>());
+    }
+
+    [Fact]
+    public async Task Handle_BlankName_ThrowsValidationException()
+    {
+        await Assert.ThrowsAsync<ValidationException>(() =>
+            _sut.Handle(new CreateBrandCommand { Name = "   " }, Ct));
     }
 }

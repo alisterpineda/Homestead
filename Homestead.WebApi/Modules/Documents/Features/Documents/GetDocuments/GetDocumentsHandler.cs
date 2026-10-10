@@ -1,7 +1,6 @@
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Documents;
-using MediatR;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Infrastructure.Thumbnails;
 using Microsoft.EntityFrameworkCore;
@@ -9,7 +8,6 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Modules.Documents.Features.Documents.GetDocuments;
 
 public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessService)
-    : IRequestHandler<GetDocumentsQuery, GetDocumentsResult>
 {
     private const string TsLanguage = "english";
     // word_similarity finds the best-matching continuous extent of trigrams within the

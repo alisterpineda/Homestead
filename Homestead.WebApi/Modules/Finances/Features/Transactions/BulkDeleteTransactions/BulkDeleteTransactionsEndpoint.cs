@@ -1,6 +1,5 @@
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Transactions.BulkDeleteTransactions;
 
@@ -9,13 +8,13 @@ public static class BulkDeleteTransactionsEndpoint
     public static void Map(RouteGroupBuilder group)
     {
         group.MapPost("/bulk-delete", async (
-            BulkDeleteTransactionsCommand request, ISender sender, CancellationToken ct) =>
+            BulkDeleteTransactionsCommand request, BulkDeleteTransactionsHandler handler, CancellationToken ct) =>
         {
             if (request.Ids.Count == 0)
                 return ProblemDetailsFactory.BusinessRuleResult(
                     "At least one transaction ID must be provided.");
 
-            var response = await sender.Send(request, ct);
+            var response = await handler.Handle(request, ct);
             return Results.Ok(response);
         })
         .WithName("BulkDeleteTransactions")

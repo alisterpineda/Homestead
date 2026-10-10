@@ -1,5 +1,3 @@
-using Homestead.WebApi.Common;
-
 namespace Homestead.WebApi.Modules.Inventory.Features.Consumables.TrackDurable;
 
 /// <summary>
@@ -24,7 +22,7 @@ public record TrackDurableRequest
     public string? Note { get; init; }
 }
 
-public record TrackDurableCommand : ICommand<TrackDurableResponse>
+public record TrackDurableCommand
 {
     public Guid ConsumableId { get; init; }
     public required TrackDurableRequest Body { get; init; }

@@ -1,9 +1,8 @@
-using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Finances;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Transactions.Trades.PatchTrade;
 
-public record PatchTradeCommand : ICommand<TransactionResponse>
+public record PatchTradeCommand
 {
     public Guid TransactionId { get; init; }
     public required Guid AccountId { get; init; }

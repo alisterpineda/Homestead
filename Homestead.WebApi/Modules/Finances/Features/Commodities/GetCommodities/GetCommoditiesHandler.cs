@@ -1,13 +1,11 @@
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Search;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Commodities.GetCommodities;
 
 public class GetCommoditiesHandler(AppDbContext db)
-    : IRequestHandler<GetCommoditiesQuery, PaginatedResponse<CommodityResponse>>
 {
     public async Task<PaginatedResponse<CommodityResponse>> Handle(
         GetCommoditiesQuery request, CancellationToken ct)

@@ -4,7 +4,6 @@ using Homestead.WebApi.Modules.Inventory.Features.Durables;
 using Homestead.WebApi.Modules.Inventory.Features.Consumables;
 using Homestead.WebApi.Modules.Inventory.Services;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Places.GetPlaceContents;
@@ -13,7 +12,6 @@ public class GetPlaceContentsHandler(
     AppDbContext db,
     IInventoryPlacementService placementService,
     IItemLocationResolver locationResolver)
-    : IRequestHandler<GetPlaceContentsQuery, PlaceContentsResponse>
 {
     private const int PreviewNameCount = 3;
 

@@ -1,5 +1,3 @@
-using MediatR;
-
 namespace Homestead.WebApi.Modules.Admin.Features.Backup.UpsertBackupSchedule;
 
 public static class UpsertBackupScheduleEndpoint
@@ -14,9 +12,9 @@ public static class UpsertBackupScheduleEndpoint
     public static void Map(RouteGroupBuilder group)
     {
         group.MapPut("/sources/{id:guid}/schedule", async (
-            Guid id, UpsertBackupScheduleBody body, ISender sender, CancellationToken ct) =>
+            Guid id, UpsertBackupScheduleBody body, UpsertBackupScheduleHandler handler, CancellationToken ct) =>
         {
-            var response = await sender.Send(new UpsertBackupScheduleCommand
+            var response = await handler.Handle(new UpsertBackupScheduleCommand
             {
                 BackupSourceId = id,
                 CronExpression = body.CronExpression,

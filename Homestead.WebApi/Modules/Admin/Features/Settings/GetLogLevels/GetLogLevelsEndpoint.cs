@@ -1,5 +1,3 @@
-using MediatR;
-
 namespace Homestead.WebApi.Modules.Admin.Features.Settings.GetLogLevels;
 
 public static class GetLogLevelsEndpoint
@@ -8,9 +6,9 @@ public static class GetLogLevelsEndpoint
     {
         // Single endpoint: the rule table is always returned; Resolved is populated when ?category= is
         // supplied. Keeps the generated client to one method.
-        group.MapGet("/log-levels", async (string? category, ISender sender, CancellationToken ct) =>
+        group.MapGet("/log-levels", async (string? category, GetLogLevelsHandler handler, CancellationToken ct) =>
         {
-            return Results.Ok(await sender.Send(new GetLogLevelsQuery(category), ct));
+            return Results.Ok(await handler.Handle(new GetLogLevelsQuery(category), ct));
         })
         .WithName("GetLogLevels")
         .Produces<LogLevelsResponse>();

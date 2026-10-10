@@ -1,5 +1,4 @@
 using Homestead.WebApi.Authentication;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Categories.PatchCategory;
 
@@ -8,10 +7,10 @@ public static class PatchCategoryEndpoint
     public static void Map(RouteGroupBuilder group)
     {
         group.MapPatch("/{id:guid}",
-            async (Guid id, PatchCategoryCommand body, ISender sender, CancellationToken ct) =>
+            async (Guid id, PatchCategoryCommand body, PatchCategoryHandler handler, CancellationToken ct) =>
         {
             var request = body with { Id = id };
-            return Results.Ok(await sender.Send(request, ct));
+            return Results.Ok(await handler.Handle(request, ct));
         })
         .WithName("PatchCategory")
         .Produces<CategoryResponse>()

@@ -1,13 +1,11 @@
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Payees.GetPayees;
 
 public class GetPayeesHandler(AppDbContext db)
-    : IRequestHandler<GetPayeesQuery, PaginatedResponse<PayeeResponse>>
 {
     public async Task<PaginatedResponse<PayeeResponse>> Handle(
         GetPayeesQuery request, CancellationToken ct)

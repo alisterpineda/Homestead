@@ -1,5 +1,3 @@
-using MediatR;
-
 namespace Homestead.WebApi.Modules.Inventory.Features.Durables.GetDurable;
 
 public static class GetDurableEndpoint
@@ -8,10 +6,10 @@ public static class GetDurableEndpoint
     {
         group.MapGet("/{id:guid}", async (
             [AsParameters] GetDurableQuery request,
-            ISender sender,
+            GetDurableHandler handler,
             CancellationToken ct) =>
         {
-            var response = await sender.Send(request, ct);
+            var response = await handler.Handle(request, ct);
             return response is not null ? Results.Ok(response) : Results.NotFound();
         })
         .WithName("GetDurable")

@@ -1,8 +1,6 @@
-using Homestead.WebApi.Common;
-
 namespace Homestead.WebApi.Modules.Admin.Features.Backup.PatchBackupSource;
 
-public record PatchBackupSourceCommand : ICommand<PatchBackupSourceResponse>
+public record PatchBackupSourceCommand
 {
     public required Guid Id { get; init; }
 

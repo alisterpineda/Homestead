@@ -1,6 +1,5 @@
 using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Features.OpeningBalances.GetOpeningBalance;
@@ -8,7 +7,6 @@ namespace Homestead.WebApi.Modules.Finances.Features.OpeningBalances.GetOpeningB
 public class GetOpeningBalanceHandler(
     AppDbContext db,
     ISystemAccountProvider systemAccounts)
-    : IRequestHandler<GetOpeningBalanceQuery, OpeningBalanceResponse?>
 {
     public async Task<OpeningBalanceResponse?> Handle(GetOpeningBalanceQuery request, CancellationToken ct)
     {

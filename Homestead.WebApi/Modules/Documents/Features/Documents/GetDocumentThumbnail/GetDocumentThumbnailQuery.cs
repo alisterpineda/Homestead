@@ -1,11 +1,3 @@
-using Homestead.WebApi.Authorization;
-using MediatR;
-using Microsoft.AspNetCore.Authorization.Infrastructure;
-
 namespace Homestead.WebApi.Modules.Documents.Features.Documents.GetDocumentThumbnail;
 
-public record GetDocumentThumbnailQuery(Guid Id, Guid? VersionId) : IRequest<IResult>, IRequireDocumentAuthorization
-{
-    Guid IRequireDocumentAuthorization.DocumentId => Id;
-    public OperationAuthorizationRequirement RequiredOperation => DocumentOperations.Read;
-}
+public record GetDocumentThumbnailQuery(Guid Id, Guid? VersionId);

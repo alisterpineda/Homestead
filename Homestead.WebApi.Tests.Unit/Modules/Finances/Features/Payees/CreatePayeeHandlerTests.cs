@@ -1,3 +1,4 @@
+using FluentValidation;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
@@ -25,7 +26,7 @@ public class CreatePayeeHandlerTests : IDisposable
         _unitOfWork = Substitute.For<IUnitOfWork>();
         _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
             .Returns(ci => _db.SaveChangesAsync(ci.Arg<CancellationToken>()));
-        _sut = new CreatePayeeHandler(_db, _currentUser, _audit, _unitOfWork);
+        _sut = new CreatePayeeHandler(_db, _currentUser, _audit, _unitOfWork, new CreatePayeeCommandValidator());
     }
 
     public void Dispose() => _db.Dispose();
@@ -141,5 +142,12 @@ public class CreatePayeeHandlerTests : IDisposable
 
         await Assert.ThrowsAsync<BusinessRuleException>(() =>
             _sut.Handle(new CreatePayeeCommand { Name = "Costco", DefaultCategoryId = system.Id }, Ct));
+    }
+
+    [Fact]
+    public async Task Handle_BlankName_ThrowsValidationException()
+    {
+        await Assert.ThrowsAsync<ValidationException>(() =>
+            _sut.Handle(new CreatePayeeCommand { Name = "   " }, Ct));
     }
 }

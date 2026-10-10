@@ -1,5 +1,4 @@
 using Homestead.WebApi.Authentication;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Payees.DeletePayee;
 
@@ -7,9 +6,9 @@ public static class DeletePayeeEndpoint
 {
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapDelete("/{id:guid}", async (Guid id, ISender sender, CancellationToken ct) =>
+        group.MapDelete("/{id:guid}", async (Guid id, DeletePayeeHandler handler, CancellationToken ct) =>
         {
-            var deleted = await sender.Send(new DeletePayeeCommand(id), ct);
+            var deleted = await handler.Handle(new DeletePayeeCommand(id), ct);
             return deleted ? Results.NoContent() : Results.NotFound();
         })
         .WithName("DeletePayee")

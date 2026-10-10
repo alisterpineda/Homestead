@@ -1,5 +1,4 @@
 using Homestead.WebApi.Authentication;
-using MediatR;
 using Microsoft.AspNetCore.JsonPatch.SystemTextJson;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Brands.PatchBrand;
@@ -10,14 +9,14 @@ public static class PatchBrandEndpoint
     {
         group.MapPatch("/{id:guid}", async (Guid id,
             JsonPatchDocument<PatchBrandModel> patchDoc,
-            ISender sender, CancellationToken ct) =>
+            PatchBrandHandler handler, CancellationToken ct) =>
         {
             var command = new PatchBrandCommand
             {
                 Id = id,
                 PatchDocument = patchDoc
             };
-            return Results.Ok(await sender.Send(command, ct));
+            return Results.Ok(await handler.Handle(command, ct));
         })
         .WithName("PatchBrand")
         .Accepts<JsonPatchDocument<PatchBrandModel>>("application/json-patch+json")

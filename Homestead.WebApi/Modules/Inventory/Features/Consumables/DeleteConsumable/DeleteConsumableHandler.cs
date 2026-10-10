@@ -2,13 +2,11 @@ using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Inventory;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Consumables.DeleteConsumable;
 
 public class DeleteConsumableHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork)
-    : IRequestHandler<DeleteConsumableCommand, bool>
 {
     public async Task<bool> Handle(DeleteConsumableCommand request, CancellationToken ct)
     {

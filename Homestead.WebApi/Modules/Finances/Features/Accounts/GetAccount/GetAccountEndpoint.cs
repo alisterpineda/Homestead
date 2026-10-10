@@ -1,5 +1,3 @@
-using MediatR;
-
 namespace Homestead.WebApi.Modules.Finances.Features.Accounts.GetAccount;
 
 public static class GetAccountEndpoint
@@ -8,10 +6,10 @@ public static class GetAccountEndpoint
     {
         group.MapGet("/{id:guid}", async (
             [AsParameters] GetAccountQuery request,
-            ISender sender,
+            GetAccountHandler handler,
             CancellationToken ct) =>
         {
-            var response = await sender.Send(request, ct);
+            var response = await handler.Handle(request, ct);
             return response is not null ? Results.Ok(response) : Results.NotFound();
         })
         .WithName("GetAccount")

@@ -1,3 +1,4 @@
+using FluentValidation;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
@@ -5,7 +6,6 @@ using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Categories.PatchCategory;
@@ -15,11 +15,13 @@ public class PatchCategoryHandler(
     ICurrentUserAccessor currentUser,
     IAuditContext audit,
     ICategoryPathResolver pathResolver,
-    IUnitOfWork unitOfWork)
-    : IRequestHandler<PatchCategoryCommand, CategoryResponse>
+    IUnitOfWork unitOfWork,
+    IValidator<PatchCategoryCommand> validator)
 {
     public async Task<CategoryResponse> Handle(PatchCategoryCommand request, CancellationToken ct)
     {
+        await validator.ValidateAndThrowAsync(request, ct);
+
         var category = await db.Accounts.FirstOrDefaultAsync(a => a.Id == request.Id, ct);
 
         // Not a category → not found on this surface (consistent with the account CRUD hiding categories).

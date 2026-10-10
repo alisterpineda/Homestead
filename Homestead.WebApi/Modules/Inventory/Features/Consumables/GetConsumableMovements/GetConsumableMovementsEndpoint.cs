@@ -1,5 +1,4 @@
 using Homestead.WebApi.Common;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Consumables.GetConsumableMovements;
 
@@ -8,7 +7,7 @@ public static class GetConsumableMovementsEndpoint
     public static void Map(RouteGroupBuilder group)
     {
         group.MapGet("/{id:guid}/movements", async (Guid id,
-            [AsParameters] PaginatedRequest paging, ISender sender, CancellationToken ct) =>
+            [AsParameters] PaginatedRequest paging, GetConsumableMovementsHandler handler, CancellationToken ct) =>
         {
             var query = new GetConsumableMovementsQuery
             {
@@ -16,7 +15,7 @@ public static class GetConsumableMovementsEndpoint
                 Page = paging.Page,
                 PageSize = paging.PageSize,
             };
-            var response = await sender.Send(query, ct);
+            var response = await handler.Handle(query, ct);
             return response is null ? Results.NotFound() : Results.Ok(response);
         })
         .WithName("GetConsumableMovements")

@@ -1,5 +1,4 @@
 using Homestead.WebApi.Common;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Processing.Features.GetProcessingJobs;
 
@@ -8,9 +7,9 @@ public static class GetProcessingJobsEndpoint
     public static void Map(RouteGroupBuilder group)
     {
         group.MapGet("/", async ([AsParameters] GetProcessingJobsQuery request,
-            ISender sender, CancellationToken ct) =>
+            GetProcessingJobsHandler handler, CancellationToken ct) =>
         {
-            var response = await sender.Send(request, ct);
+            var response = await handler.Handle(request, ct);
             return Results.Ok(response);
         })
         .WithName("GetProcessingJobs")

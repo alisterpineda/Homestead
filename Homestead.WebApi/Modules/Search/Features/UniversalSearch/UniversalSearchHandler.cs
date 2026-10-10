@@ -1,10 +1,8 @@
 using Homestead.WebApi.Common.Search;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Search.Features.UniversalSearch;
 
 public class UniversalSearchHandler(IEnumerable<ISearchSource> sources, ILogger<UniversalSearchHandler> logger)
-    : IRequestHandler<UniversalSearchQuery, SearchResponse>
 {
     private const int MinQueryLength = 2;
     private const int DefaultLimit = 6;

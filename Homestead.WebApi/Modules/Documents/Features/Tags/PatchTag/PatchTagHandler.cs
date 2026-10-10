@@ -4,7 +4,6 @@ using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Common.Auditing;
-using MediatR;
 using Homestead.WebApi.Persistence;
 using Microsoft.AspNetCore.JsonPatch.SystemTextJson;
 using Microsoft.EntityFrameworkCore;
@@ -13,7 +12,6 @@ namespace Homestead.WebApi.Modules.Documents.Features.Tags.PatchTag;
 
 public class PatchTagHandler(AppDbContext db, IDocumentQueryService accessService, IAuditContext audit,
     ICurrentUserAccessor currentUser, IUnitOfWork unitOfWork)
-    : IRequestHandler<PatchTagCommand, PatchTagResponse>
 {
     public async Task<PatchTagResponse> Handle(PatchTagCommand request, CancellationToken ct)
     {

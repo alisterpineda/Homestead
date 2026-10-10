@@ -1,17 +1,19 @@
+using FluentValidation;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Modules.Finances.Services;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Transactions.Dividends.CreateDividend;
 
 public class CreateDividendHandler(
     IDividendService dividends,
     IBalanceEntryReconciler reconciler,
-    IUnitOfWork unitOfWork)
-    : IRequestHandler<CreateDividendCommand, TransactionResponse>
+    IUnitOfWork unitOfWork,
+    IValidator<CreateDividendCommand> validator)
 {
     public async Task<TransactionResponse> Handle(CreateDividendCommand request, CancellationToken ct)
     {
+        await validator.ValidateAndThrowAsync(request, ct);
+
         var result = await dividends.CreateAsync(
             new CreateDividendRequest(
                 request.AccountId,

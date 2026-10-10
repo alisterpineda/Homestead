@@ -1,5 +1,3 @@
-using MediatR;
-
 namespace Homestead.WebApi.Modules.Admin.Features.Groups.CreateGroup;
 
 public static class CreateGroupEndpoint
@@ -7,9 +5,9 @@ public static class CreateGroupEndpoint
     public static void Map(RouteGroupBuilder group)
     {
         group.MapPost("/", async (CreateGroupCommand request,
-            ISender sender, CancellationToken ct) =>
+            CreateGroupHandler handler, CancellationToken ct) =>
         {
-            var response = await sender.Send(request, ct);
+            var response = await handler.Handle(request, ct);
             return Results.Created($"/api/v1/admin/groups/{response.Id}", response);
         })
         .WithName("CreateGroup")

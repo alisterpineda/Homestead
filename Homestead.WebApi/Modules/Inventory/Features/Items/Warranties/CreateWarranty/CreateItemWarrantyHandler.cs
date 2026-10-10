@@ -1,9 +1,9 @@
+using FluentValidation;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Inventory;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Items.Warranties.CreateWarranty;
@@ -13,11 +13,13 @@ public class CreateItemWarrantyHandler(
     ICurrentUserAccessor currentUser,
     IAuditContext audit,
     IUnitOfWork unitOfWork,
-    TimeProvider timeProvider)
-    : IRequestHandler<CreateItemWarrantyCommand, ItemWarrantyResponse>
+    TimeProvider timeProvider,
+    IValidator<CreateItemWarrantyCommand> validator)
 {
     public async Task<ItemWarrantyResponse> Handle(CreateItemWarrantyCommand request, CancellationToken ct)
     {
+        await validator.ValidateAndThrowAsync(request, ct);
+
         var item = await db.Items.AsNoTracking()
             .Where(i => i.Id == request.ItemId)
             .Select(i => new { i.Id, i.Fungibility })

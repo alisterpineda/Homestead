@@ -1,15 +1,13 @@
-using MediatR;
-
 namespace Homestead.WebApi.Modules.Documents.Features.Parties.GetParty;
 
 public static class GetPartyEndpoint
 {
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapGet("/{id:guid}", async (Guid id, ISender sender, CancellationToken ct) =>
+        group.MapGet("/{id:guid}", async (Guid id, GetPartyHandler handler, CancellationToken ct) =>
         {
             var request = new GetPartyQuery(id);
-            var response = await sender.Send(request, ct);
+            var response = await handler.Handle(request, ct);
             return response is not null ? Results.Ok(response) : Results.NotFound();
         })
         .WithName("GetParty")

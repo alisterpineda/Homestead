@@ -1,17 +1,19 @@
+using FluentValidation;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Modules.Finances.Services;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Transactions.Transfers.CreateTransfer;
 
 public class CreateTransferHandler(
     ITransferService transfers,
     IBalanceEntryReconciler reconciler,
-    IUnitOfWork unitOfWork)
-    : IRequestHandler<CreateTransferCommand, TransactionResponse>
+    IUnitOfWork unitOfWork,
+    IValidator<CreateTransferCommand> validator)
 {
     public async Task<TransactionResponse> Handle(CreateTransferCommand request, CancellationToken ct)
     {
+        await validator.ValidateAndThrowAsync(request, ct);
+
         var result = await transfers.CreateAsync(
             new CreateTransferRequest(
                 request.SourceAccountId,

@@ -1,8 +1,6 @@
-using Homestead.WebApi.Common;
-
 namespace Homestead.WebApi.Modules.Finances.Features.Transactions.Dividends.PatchDividend;
 
-public record PatchDividendCommand : ICommand<TransactionResponse>
+public record PatchDividendCommand
 {
     public Guid TransactionId { get; init; }
     public required Guid AccountId { get; init; }

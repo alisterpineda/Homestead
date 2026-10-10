@@ -1,8 +1,6 @@
-using Homestead.WebApi.Common;
-
 namespace Homestead.WebApi.Modules.Admin.Features.Settings.PatchSystemSettings;
 
-public record PatchSystemSettingsCommand : ICommand<SystemSettingsResponse>
+public record PatchSystemSettingsCommand
 {
     /// <summary>
     /// New log-level overrides. Null means "not provided — leave the stored set unchanged". A provided map

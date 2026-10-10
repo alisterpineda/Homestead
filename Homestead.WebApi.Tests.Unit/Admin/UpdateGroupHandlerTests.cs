@@ -1,3 +1,4 @@
+using FluentValidation;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Auditing.Snapshots;
@@ -25,7 +26,7 @@ public class UpdateGroupHandlerTests : IDisposable
             .Returns(ci => _db.SaveChangesAsync(ci.Arg<CancellationToken>()));
         var currentUser = Substitute.For<ICurrentUserAccessor>();
         currentUser.UserId.Returns(Guid.NewGuid());
-        _sut = new UpdateGroupHandler(_db, _audit, currentUser, _unitOfWork);
+        _sut = new UpdateGroupHandler(_db, _audit, currentUser, _unitOfWork, new UpdateGroupCommandValidator());
     }
 
     public void Dispose() => _db.Dispose();
@@ -103,5 +104,17 @@ public class UpdateGroupHandlerTests : IDisposable
 
         // Track is always called before mutations; diff computation is deferred
         _audit.Received(1).Track<GroupSnapshot, Group>(Arg.Any<Group>(), "Group", group.Id, Arg.Any<Guid?>());
+    }
+
+    [Fact]
+    public async Task Handle_BlankName_ThrowsValidationException()
+    {
+        var command = new UpdateGroupCommand
+        {
+            Id = Guid.NewGuid(),
+            Request = new UpdateGroupRequest { Name = "   " }
+        };
+
+        await Assert.ThrowsAsync<ValidationException>(() => _sut.Handle(command, TestContext.Current.CancellationToken));
     }
 }

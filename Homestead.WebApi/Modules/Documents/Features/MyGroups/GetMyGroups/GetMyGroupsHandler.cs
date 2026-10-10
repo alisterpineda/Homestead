@@ -1,12 +1,10 @@
 using Homestead.WebApi.Authentication;
-using MediatR;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Documents.Features.MyGroups.GetMyGroups;
 
 public class GetMyGroupsHandler(AppDbContext db, ICurrentUserAccessor currentUser)
-    : IRequestHandler<GetMyGroupsQuery, IReadOnlyList<GetMyGroupsResponse>>
 {
     public async Task<IReadOnlyList<GetMyGroupsResponse>> Handle(
         GetMyGroupsQuery request, CancellationToken ct)

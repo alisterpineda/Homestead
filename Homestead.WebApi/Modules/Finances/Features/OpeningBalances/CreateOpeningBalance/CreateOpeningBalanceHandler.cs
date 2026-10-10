@@ -1,6 +1,6 @@
+using FluentValidation;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Modules.Finances.Services;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Finances.Features.OpeningBalances.CreateOpeningBalance;
 
@@ -8,11 +8,13 @@ public class CreateOpeningBalanceHandler(
     IOpeningBalanceService openingBalances,
     IBalanceEntryReconciler reconciler,
     ISystemAccountProvider systemAccounts,
-    IUnitOfWork unitOfWork)
-    : IRequestHandler<CreateOpeningBalanceCommand, OpeningBalanceResponse>
+    IUnitOfWork unitOfWork,
+    IValidator<CreateOpeningBalanceCommand> validator)
 {
     public async Task<OpeningBalanceResponse> Handle(CreateOpeningBalanceCommand request, CancellationToken ct)
     {
+        await validator.ValidateAndThrowAsync(request, ct);
+
         var result = await openingBalances.CreateAsync(
             new CreateOpeningBalanceRequest(
                 request.AccountId, request.CommodityId, request.Quantity,

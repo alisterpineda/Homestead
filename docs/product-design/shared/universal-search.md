@@ -5,7 +5,7 @@ shell header (and ⌘K / Ctrl+K from anywhere) that searches across modules and 
 result. Consult this before adding a new searchable module or changing palette behaviour.
 
 This is product/UX design — *what* the palette does and the seam that keeps it extensible.
-Implementation plumbing (the `ISearchSource` contract, the MediatR handler, the Spartan `command`
+Implementation plumbing (the `ISearchSource` contract, the handler, the Spartan `command`
 primitive, the presenter registry) lives in the `Homestead.WebApi/CLAUDE.md` and
 `Homestead.WebApp/CLAUDE.md` conventions.
 

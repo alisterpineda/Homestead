@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Modules.Documents.Processing;
@@ -7,7 +8,6 @@ using Homestead.WebApi.Processing;
 using Homestead.WebApi.Infrastructure.Storage;
 using Homestead.WebApi.Infrastructure.TextExtraction;
 using Homestead.WebApi.Tests.Unit.Documents.TextExtraction;
-using MediatR;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 
@@ -19,7 +19,10 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
     private readonly string _mediaPath;
     private readonly ITextExtractionEngine _textExtractionEngine;
     private readonly IProcessingNotifier _notifier;
-    private readonly ISender _sender;
+    private readonly IUnitOfWork _unitOfWork;
+    private bool _inTransaction;
+    private bool _handledInTransaction;
+    private readonly IReprocessVersionTextHandler _reprocessVersionText;
     private readonly ReprocessDocumentVersionJobHandler _handler;
 
     public ReprocessDocumentVersionJobHandlerTests()
@@ -39,13 +42,26 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
 
         var textExtractionHelper = TestTextExtraction.Helper(_textExtractionEngine);
 
-        _sender = Substitute.For<ISender>();
-        _sender.Send(Arg.Any<ReprocessVersionTextCommand>(), Arg.Any<CancellationToken>())
+        _reprocessVersionText = Substitute.For<IReprocessVersionTextHandler>();
+        _reprocessVersionText.Handle(Arg.Any<ReprocessVersionTextCommand>(), Arg.Any<CancellationToken>())
             .Returns(_ => new ReprocessVersionTextResult("Test Document"));
+
+        // Run the work handed to the transaction, so the command handler is reached through it, and record
+        // whether the command handler ran while that work was in progress.
+        _unitOfWork = Substitute.For<IUnitOfWork>();
+        _unitOfWork.ExecuteInTransactionAsync(Arg.Any<Func<Task<ReprocessVersionTextResult>>>(), Arg.Any<CancellationToken>())
+            .Returns(async call =>
+            {
+                _inTransaction = true;
+                try { return await call.Arg<Func<Task<ReprocessVersionTextResult>>>()(); }
+                finally { _inTransaction = false; }
+            });
+        _reprocessVersionText.When(x => x.Handle(Arg.Any<ReprocessVersionTextCommand>(), Arg.Any<CancellationToken>()))
+            .Do(_ => _handledInTransaction = _inTransaction);
 
         _handler = new ReprocessDocumentVersionJobHandler(
             _db, storage,
-            _notifier, textExtractionHelper, _sender);
+            _notifier, textExtractionHelper, _unitOfWork, _reprocessVersionText);
     }
 
     public void Dispose()
@@ -111,7 +127,7 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task HandleAsync_SendsReprocessVersionTextCommand_WithCorrectFields()
+    public async Task HandleAsync_AppliesReprocessVersionTextCommand_WithCorrectFields()
     {
         var ct = TestContext.Current.CancellationToken;
         var (doc, version) = SeedDocumentWithVersion("old text");
@@ -122,13 +138,35 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
 
         await _handler.HandleAsync(job, ct);
 
-        await _sender.Received(1).Send(
+        await _reprocessVersionText.Received(1).Handle(
             Arg.Is<ReprocessVersionTextCommand>(c =>
                 c.DocumentId == doc.Id &&
                 c.VersionId == version.Id &&
-                c.ExtractedText == "new extracted text" &&
-                c.ActorUserId == job.CreatedByUserId),
+                c.ExtractedText == "new extracted text"),
             ct);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ExtractsFirst_ThenSetsActorFromJob_ThenPersistsInsideTheTransaction()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (doc, version) = SeedDocumentWithVersion();
+        var job = CreateJob(doc.Id, version.Id);
+
+        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
+            .Returns(TestTextExtraction.Output("text"));
+
+        await _handler.HandleAsync(job, ct);
+
+        // Extraction holds no transaction. The actor is set before the transaction opens, so the audit
+        // entry is attributed to whoever enqueued the job; the command runs inside the transaction.
+        Received.InOrder(() =>
+        {
+            _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct);
+            _unitOfWork.SetActor(job.CreatedByUserId);
+            _unitOfWork.ExecuteInTransactionAsync(Arg.Any<Func<Task<ReprocessVersionTextResult>>>(), ct);
+        });
+        Assert.True(_handledInTransaction);
     }
 
     [Fact]
@@ -141,7 +179,7 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
         _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
             .Returns(TestTextExtraction.Output("text"));
 
-        _sender.Send(Arg.Any<ReprocessVersionTextCommand>(), Arg.Any<CancellationToken>())
+        _reprocessVersionText.Handle(Arg.Any<ReprocessVersionTextCommand>(), Arg.Any<CancellationToken>())
             .Returns(_ => new ReprocessVersionTextResult("Stored Doc Name"));
 
         await _handler.HandleAsync(job, ct);
@@ -171,7 +209,7 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
         await _handler.HandleAsync(job, ct);
 
         // Still persists, just no individual notification for the child job.
-        await _sender.Received(1).Send(Arg.Any<ReprocessVersionTextCommand>(), ct);
+        await _reprocessVersionText.Received(1).Handle(Arg.Any<ReprocessVersionTextCommand>(), ct);
         await _notifier.DidNotReceive().NotifyJobStatusAsync(
             Arg.Any<Guid>(), Arg.Any<ProcessingJobStatus>(),
             Arg.Any<ProcessingEntityType?>(), Arg.Any<Guid?>(),
@@ -182,7 +220,7 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task HandleAsync_ThrowsWhenVersionNotFound_AndDoesNotSend()
+    public async Task HandleAsync_ThrowsWhenVersionNotFound_AndDoesNotPersist()
     {
         var ct = TestContext.Current.CancellationToken;
         var job = CreateJob(Guid.NewGuid(), Guid.NewGuid());
@@ -190,12 +228,12 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => _handler.HandleAsync(job, ct));
 
-        await _sender.DidNotReceive().Send(
+        await _reprocessVersionText.DidNotReceive().Handle(
             Arg.Any<ReprocessVersionTextCommand>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task HandleAsync_TextExtractionFails_Throws_AndDoesNotSend()
+    public async Task HandleAsync_TextExtractionFails_Throws_AndDoesNotPersist()
     {
         var ct = TestContext.Current.CancellationToken;
         var (doc, version) = SeedDocumentWithVersion("existing text");
@@ -207,7 +245,7 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
         await Assert.ThrowsAsync<TextExtractionFailedException>(
             () => _handler.HandleAsync(job, ct));
 
-        await _sender.DidNotReceive().Send(
+        await _reprocessVersionText.DidNotReceive().Handle(
             Arg.Any<ReprocessVersionTextCommand>(), Arg.Any<CancellationToken>());
     }
 
@@ -229,7 +267,7 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task HandleAsync_UnsupportedContentType_SendsNullExtractedText()
+    public async Task HandleAsync_UnsupportedContentType_PersistsNullExtractedText()
     {
         var ct = TestContext.Current.CancellationToken;
         // text/plain has no keyed extractor → extraction yields null but succeeds (non-fatal).
@@ -238,7 +276,7 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
 
         await _handler.HandleAsync(job, ct);
 
-        await _sender.Received(1).Send(
+        await _reprocessVersionText.Received(1).Handle(
             Arg.Is<ReprocessVersionTextCommand>(c => c.ExtractedText == null), ct);
     }
 }

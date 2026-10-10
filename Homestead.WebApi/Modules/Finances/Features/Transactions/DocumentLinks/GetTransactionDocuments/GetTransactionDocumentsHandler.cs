@@ -1,13 +1,11 @@
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Transactions.DocumentLinks.GetTransactionDocuments;
 
 public class GetTransactionDocumentsHandler(AppDbContext db, IDocumentQueryService documentQuery)
-    : IRequestHandler<GetTransactionDocumentsQuery, IReadOnlyList<TransactionDocumentLinkResponse>>
 {
     public async Task<IReadOnlyList<TransactionDocumentLinkResponse>> Handle(
         GetTransactionDocumentsQuery request, CancellationToken ct)

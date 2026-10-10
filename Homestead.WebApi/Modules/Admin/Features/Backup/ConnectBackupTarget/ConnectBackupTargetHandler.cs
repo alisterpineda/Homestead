@@ -1,7 +1,6 @@
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Infrastructure.Backup;
 using Homestead.WebApi.Infrastructure.Backup.GoogleDrive;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Admin.Features.Backup.ConnectBackupTarget;
 
@@ -21,7 +20,6 @@ public class ConnectBackupTargetHandler(
     IBackupTargetOptionsAccessor options,
     IGoogleOAuthClient oauth,
     IGoogleDriveConnectTokenProtector protector)
-    : IRequestHandler<ConnectBackupTargetCommand, ConnectBackupTargetResponse>
 {
     public async Task<ConnectBackupTargetResponse> Handle(
         ConnectBackupTargetCommand request, CancellationToken ct)

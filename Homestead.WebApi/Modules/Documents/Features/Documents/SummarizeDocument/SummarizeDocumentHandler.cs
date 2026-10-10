@@ -5,7 +5,6 @@ using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Modules.Documents.Services;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Documents.Features.Documents.SummarizeDocument;
@@ -16,7 +15,6 @@ public class SummarizeDocumentHandler(
     IAuditContext audit,
     IUnitOfWork unitOfWork,
     ICurrentUserAccessor currentUser)
-    : IRequestHandler<SummarizeDocumentCommand, SummarizeDocumentResponse>
 {
     public async Task<SummarizeDocumentResponse> Handle(SummarizeDocumentCommand request, CancellationToken ct)
     {
@@ -24,7 +22,7 @@ public class SummarizeDocumentHandler(
             .FirstOrDefaultAsync(d => d.Id == request.DocumentId, ct)
             ?? throw new EntityNotFoundException("Document not found.");
 
-        // Track for the activity stream (matches PatchDocument); flushed by UnitOfWorkBehavior.
+        // Track for the activity stream (matches PatchDocument); flushed when CommandTransactionFilter commits.
         audit.Track<DocumentSnapshot, Document>(document, "Document", document.Id);
 
         // This summarize command is synchronous; never attach the page image (image-carrying classification

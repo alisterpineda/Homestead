@@ -1,12 +1,10 @@
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Brands.GetBrands;
 
 public class GetBrandsHandler(AppDbContext db)
-    : IRequestHandler<GetBrandsQuery, PaginatedResponse<BrandResponse>>
 {
     public async Task<PaginatedResponse<BrandResponse>> Handle(
         GetBrandsQuery request, CancellationToken ct)

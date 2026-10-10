@@ -1,5 +1,3 @@
-using MediatR;
-
 namespace Homestead.WebApi.Modules.Admin.Features.Backup.GetDocumentBackupState;
 
 public static class GetDocumentBackupStateEndpoint
@@ -9,9 +7,9 @@ public static class GetDocumentBackupStateEndpoint
         // No per-endpoint authorization: the backup group already carries RequireAdmin, and adding a
         // second policy here would make the module's one invariant look optional.
         group.MapGet("/documents/{documentId:guid}", async (
-            Guid documentId, ISender sender, CancellationToken ct) =>
+            Guid documentId, GetDocumentBackupStateHandler handler, CancellationToken ct) =>
         {
-            var response = await sender.Send(new GetDocumentBackupStateQuery(documentId), ct);
+            var response = await handler.Handle(new GetDocumentBackupStateQuery(documentId), ct);
             return response is not null ? Results.Ok(response) : Results.NotFound();
         })
         .WithName("GetDocumentBackupState")

@@ -1,3 +1,4 @@
+using FluentValidation;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
@@ -26,7 +27,7 @@ public class CreateConsumableHandlerTests : IDisposable
         _unitOfWork = Substitute.For<IUnitOfWork>();
         _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
             .Returns(ci => _db.SaveChangesAsync(ci.Arg<CancellationToken>()));
-        _sut = new CreateConsumableHandler(_db, currentUser, _audit, _stock, new InventoryTagPathResolver(_db), _unitOfWork);
+        _sut = new CreateConsumableHandler(_db, currentUser, _audit, _stock, new InventoryTagPathResolver(_db), _unitOfWork, new CreateConsumableCommandValidator());
     }
 
     public void Dispose() => _db.Dispose();
@@ -92,5 +93,12 @@ public class CreateConsumableHandlerTests : IDisposable
         // The response .Tags projection is populated with the leaf.
         Assert.Single(result.Tags);
         Assert.Equal("hardware/fasteners", result.Tags[0].Path);
+    }
+
+    [Fact]
+    public async Task Handle_BlankName_ThrowsValidationException()
+    {
+        await Assert.ThrowsAsync<ValidationException>(() =>
+            _sut.Handle(new CreateConsumableCommand { Name = "   " }, Ct));
     }
 }

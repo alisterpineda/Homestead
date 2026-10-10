@@ -1,6 +1,5 @@
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
-using MediatR;
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Infrastructure.Storage;
@@ -17,7 +16,6 @@ public class CreateDocumentVersionHandler(
     IOptions<FileStorageOptions> storage,
     ICurrentUserAccessor currentUser,
     IJobQueue jobQueue)
-    : IRequestHandler<CreateDocumentVersionCommand, CreateDocumentVersionResponse>
 {
     public async Task<CreateDocumentVersionResponse> Handle(CreateDocumentVersionCommand request, CancellationToken ct)
     {

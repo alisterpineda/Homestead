@@ -1,8 +1,6 @@
-using Homestead.WebApi.Common;
-
 namespace Homestead.WebApi.Modules.Finances.Features.Payees.CreatePayee;
 
-public record CreatePayeeCommand : ICommand<PayeeResponse>
+public record CreatePayeeCommand
 {
     public required string Name { get; init; }
 

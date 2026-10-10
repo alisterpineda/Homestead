@@ -1,7 +1,7 @@
+using FluentValidation;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
-using MediatR;
 using Homestead.WebApi.Domain.Parties;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -9,11 +9,12 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Modules.Documents.Features.Parties.CreateParty;
 
 public class CreatePartyHandler(AppDbContext db, ICurrentUserAccessor currentUser, IAuditContext audit,
-    IUnitOfWork unitOfWork)
-    : IRequestHandler<CreatePartyCommand, CreatePartyResponse>
+    IUnitOfWork unitOfWork, IValidator<CreatePartyCommand> validator)
 {
     public async Task<CreatePartyResponse> Handle(CreatePartyCommand request, CancellationToken ct)
     {
+        await validator.ValidateAndThrowAsync(request, ct);
+
         var name = request.Name.Trim();
 
         var nameExists = await db.Parties.AnyAsync(p => p.Name == name, ct);

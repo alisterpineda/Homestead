@@ -1,5 +1,4 @@
 using Homestead.WebApi.Common;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Items.GetItemActivity;
 
@@ -7,7 +6,7 @@ namespace Homestead.WebApi.Modules.Inventory.Features.Items.GetItemActivity;
 /// Pages an item's activity feed — its audit-log projection interleaved with its notes, newest-first
 /// by effective date — for either kind of item. Null only when the item is missing.
 /// </summary>
-public record GetItemActivityQuery : PaginatedRequest, IRequest<PaginatedResponse<GetItemActivityResponse>?>
+public record GetItemActivityQuery : PaginatedRequest
 {
     public Guid Id { get; init; }
 }

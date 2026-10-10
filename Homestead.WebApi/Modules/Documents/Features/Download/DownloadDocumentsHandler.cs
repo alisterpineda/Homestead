@@ -5,7 +5,6 @@ using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Modules.Documents.Processing;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Processing;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Documents.Features.Download;
@@ -14,7 +13,7 @@ public class DownloadDocumentsHandler(
     AppDbContext db,
     ICurrentUserAccessor currentUser,
     IDocumentQueryService accessService,
-    IJobQueue jobQueue) : IRequestHandler<DownloadDocumentsCommand, DownloadDocumentsResponse>
+    IJobQueue jobQueue)
 {
     public async Task<DownloadDocumentsResponse> Handle(DownloadDocumentsCommand request, CancellationToken ct)
     {

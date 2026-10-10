@@ -1,3 +1,4 @@
+using FluentValidation;
 using Homestead.WebApi.Domain.Parties;
 using Homestead.WebApi.Modules.Documents.Features.Parties.GetPartiesByIds;
 
@@ -11,7 +12,7 @@ public class GetPartiesByIdsHandlerTests : IDisposable
     public GetPartiesByIdsHandlerTests()
     {
         _db = TestAppDbContext.Create();
-        _sut = new GetPartiesByIdsHandler(_db);
+        _sut = new GetPartiesByIdsHandler(_db, new GetPartiesByIdsQueryValidator());
     }
 
     public void Dispose() => _db.Dispose();
@@ -68,16 +69,10 @@ public class GetPartiesByIdsHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task Handle_EmptyIdList_ReturnsEmptyList()
+    public async Task Handle_EmptyIdList_ThrowsValidationException()
     {
-        var ct = TestContext.Current.CancellationToken;
-        _db.Parties.Add(new Party { Name = "Alpha" });
-        await _db.SaveChangesAsync(ct);
-
-        var result = await _sut.Handle(
+        await Assert.ThrowsAsync<ValidationException>(() => _sut.Handle(
             new GetPartiesByIdsQuery(Array.Empty<Guid>()),
-            ct);
-
-        Assert.Empty(result);
+            TestContext.Current.CancellationToken));
     }
 }

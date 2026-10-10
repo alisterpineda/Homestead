@@ -1,5 +1,5 @@
 using Homestead.WebApi.Authentication;
-using MediatR;
+using Homestead.WebApi.Authorization;
 using Microsoft.AspNetCore.JsonPatch.SystemTextJson;
 
 namespace Homestead.WebApi.Modules.Documents.Features.Documents.PatchDocument;
@@ -10,18 +10,19 @@ public static class PatchDocumentEndpoint
     {
         group.MapPatch("/{id:guid}", async (Guid id,
             JsonPatchDocument<PatchDocumentModel> patchDoc,
-            ISender sender, CancellationToken ct) =>
+            PatchDocumentHandler handler, CancellationToken ct) =>
         {
             var command = new PatchDocumentCommand
             {
                 Id = id,
                 PatchDocument = patchDoc
             };
-            return Results.Ok(await sender.Send(command, ct));
+            return Results.Ok(await handler.Handle(command, ct));
         })
         .WithName("PatchDocument")
         .Accepts<JsonPatchDocument<PatchDocumentModel>>("application/json-patch+json")
         .Produces<PatchDocumentResponse>()
-        .RequireAuthorization(AuthPolicies.RequireContributor);
+        .RequireAuthorization(AuthPolicies.RequireContributor)
+        .RequireDocumentAuthorization(DocumentOperations.Write, routeParameter: "id");
     }
 }

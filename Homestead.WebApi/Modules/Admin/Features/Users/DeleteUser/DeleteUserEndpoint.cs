@@ -1,5 +1,4 @@
 using Homestead.WebApi.Modules.Admin.Features.Users.BulkDeleteUsers;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Admin.Features.Users.DeleteUser;
 
@@ -7,10 +6,10 @@ public static class DeleteUserEndpoint
 {
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapDelete("/{id:guid}", async (Guid id, ISender sender, CancellationToken ct) =>
+        group.MapDelete("/{id:guid}", async (Guid id, BulkDeleteUsersHandler handler, CancellationToken ct) =>
         {
             var request = new BulkDeleteUsersCommand([id]);
-            var response = await sender.Send(request, ct);
+            var response = await handler.Handle(request, ct);
             return response.DeletedCount > 0 ? Results.NoContent() : Results.NotFound();
         })
         .WithName("DeleteUser")

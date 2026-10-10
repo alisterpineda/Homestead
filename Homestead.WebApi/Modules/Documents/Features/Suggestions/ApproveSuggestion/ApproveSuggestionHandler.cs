@@ -1,13 +1,11 @@
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Documents.Features.Suggestions.ApproveSuggestion;
 
 public class ApproveSuggestionHandler(AppDbContext db, IUnitOfWork unitOfWork)
-    : IRequestHandler<ApproveSuggestionCommand>
 {
     public async Task Handle(ApproveSuggestionCommand request, CancellationToken ct)
     {

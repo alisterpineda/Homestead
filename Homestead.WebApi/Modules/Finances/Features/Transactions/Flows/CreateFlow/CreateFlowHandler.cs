@@ -1,7 +1,7 @@
+using FluentValidation;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Persistence;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Transactions.Flows.CreateFlow;
 
@@ -10,11 +10,13 @@ public class CreateFlowHandler(
     IFlowService flows,
     IBalanceEntryReconciler reconciler,
     ICategoryPathResolver pathResolver,
-    IUnitOfWork unitOfWork)
-    : IRequestHandler<CreateFlowCommand, TransactionResponse>
+    IUnitOfWork unitOfWork,
+    IValidator<CreateFlowCommand> validator)
 {
     public async Task<TransactionResponse> Handle(CreateFlowCommand request, CancellationToken ct)
     {
+        await validator.ValidateAndThrowAsync(request, ct);
+
         var result = await flows.CreateAsync(
             new CreateFlowRequest(
                 request.Direction,

@@ -1,7 +1,6 @@
 using Homestead.WebApi.Domain.Backup;
 using Homestead.WebApi.Infrastructure.Backup;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Admin.Features.Backup.GetBackupTargets;
@@ -18,7 +17,6 @@ public class GetBackupTargetsHandler(
     IBackupTargetOptionsAccessor options,
     IBackupSourceCatalog catalog,
     IBackupRunHistory runHistory)
-    : IRequestHandler<GetBackupTargetsQuery, GetBackupTargetsResponse>
 {
     public async Task<GetBackupTargetsResponse> Handle(
         GetBackupTargetsQuery request, CancellationToken ct)

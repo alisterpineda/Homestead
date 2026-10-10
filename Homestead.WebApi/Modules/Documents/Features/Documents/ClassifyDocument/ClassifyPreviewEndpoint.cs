@@ -1,6 +1,6 @@
 using Homestead.WebApi.Authentication;
+using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Domain.Documents;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Documents.Features.Documents.ClassifyDocument;
 
@@ -11,9 +11,9 @@ public static class ClassifyPreviewEndpoint
     public static void Map(RouteGroupBuilder group)
     {
         group.MapPost("/{documentId:guid}/classify-preview", async (Guid documentId,
-            ClassifyDocumentBody? body, ISender sender, CancellationToken ct) =>
+            ClassifyDocumentBody? body, ClassifyPreviewHandler handler, CancellationToken ct) =>
         {
-            var response = await sender.Send(new ClassifyPreviewQuery
+            var response = await handler.Handle(new ClassifyPreviewQuery
             {
                 DocumentId = documentId,
                 Fields = body?.Fields
@@ -22,6 +22,7 @@ public static class ClassifyPreviewEndpoint
         })
         .WithName("ClassifyPreview")
         .Produces<ClassifyPreviewResponse>(StatusCodes.Status200OK)
-        .RequireAuthorization(AuthPolicies.RequireContributor);
+        .RequireAuthorization(AuthPolicies.RequireContributor)
+        .RequireDocumentAuthorization(DocumentOperations.Write);
     }
 }

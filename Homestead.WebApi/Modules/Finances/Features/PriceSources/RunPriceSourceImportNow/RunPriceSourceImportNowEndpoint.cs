@@ -1,5 +1,4 @@
 using Homestead.WebApi.Domain.Finances;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Finances.Features.PriceSources.RunPriceSourceImportNow;
 
@@ -16,9 +15,9 @@ public static class RunPriceSourceImportNowEndpoint
     {
         group.MapPost("/{source}/runs",
             async (CommodityPriceSource source, RunNowBody? body,
-                ISender sender, CancellationToken ct) =>
+                RunPriceSourceImportNowHandler handler, CancellationToken ct) =>
         {
-            var response = await sender.Send(new RunPriceSourceImportNowCommand
+            var response = await handler.Handle(new RunPriceSourceImportNowCommand
             {
                 Source = source,
                 FromAt = body?.FromAt,

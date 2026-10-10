@@ -1,4 +1,3 @@
-using Homestead.WebApi.Common;
 using Homestead.WebApi.Modules.Inventory.Features.Consumables;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Consumables.CreateConsumable;
@@ -10,7 +9,7 @@ namespace Homestead.WebApi.Modules.Inventory.Features.Consumables.CreateConsumab
 /// location (exactly one of <see cref="InitialAreaId"/> / <see cref="InitialContainerItemId"/>) seeds
 /// that quantity at creation time, received in the same transaction as a real inflow movement.
 /// </summary>
-public record CreateConsumableCommand : ICommand<ConsumableResponse>
+public record CreateConsumableCommand
 {
     public required string Name { get; init; }
 

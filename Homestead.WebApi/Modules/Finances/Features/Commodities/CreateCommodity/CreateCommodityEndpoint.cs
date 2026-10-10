@@ -1,5 +1,4 @@
 using Homestead.WebApi.Authentication;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Commodities.CreateCommodity;
 
@@ -7,9 +6,9 @@ public static class CreateCommodityEndpoint
 {
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapPost("", async (CreateCommodityCommand request, ISender sender, CancellationToken ct) =>
+        group.MapPost("", async (CreateCommodityCommand request, CreateCommodityHandler handler, CancellationToken ct) =>
         {
-            var response = await sender.Send(request, ct);
+            var response = await handler.Handle(request, ct);
             return Results.Created($"/api/v1/finances/commodities/{response.Id}", response);
         })
         .WithName("CreateCommodity")

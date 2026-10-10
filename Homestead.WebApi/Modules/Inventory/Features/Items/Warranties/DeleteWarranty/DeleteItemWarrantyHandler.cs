@@ -1,13 +1,11 @@
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Items.Warranties.DeleteWarranty;
 
 public class DeleteItemWarrantyHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork)
-    : IRequestHandler<DeleteItemWarrantyCommand, bool>
 {
     public async Task<bool> Handle(DeleteItemWarrantyCommand request, CancellationToken ct)
     {

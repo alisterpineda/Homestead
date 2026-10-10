@@ -8,7 +8,6 @@ using Homestead.WebApi.Modules.Finances.Processing;
 using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Processing;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Imports.InitiateStatementImport;
@@ -19,7 +18,6 @@ public class InitiateStatementImportHandler(
     IDocumentQueryService documentQuery,
     IJobQueue jobQueue,
     ILogger<InitiateStatementImportHandler> logger)
-    : IRequestHandler<InitiateStatementImportCommand, InitiateStatementImportResponse>
 {
     public async Task<InitiateStatementImportResponse> Handle(
         InitiateStatementImportCommand request, CancellationToken ct)

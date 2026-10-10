@@ -1,6 +1,6 @@
+using FluentValidation;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
-using MediatR;
 using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Modules.Documents.Processing;
 using Homestead.WebApi.Infrastructure.TextExtraction;
@@ -15,11 +15,13 @@ public class ReprocessDocumentVersionHandler(
     AppDbContext db,
     ICurrentUserAccessor currentUser,
     ITextExtractionEngineResolver engineResolver,
-    IJobQueue jobQueue)
-    : IRequestHandler<ReprocessDocumentVersionCommand, ReprocessDocumentVersionResponse>
+    IJobQueue jobQueue,
+    IValidator<ReprocessDocumentVersionCommand> validator)
 {
     public async Task<ReprocessDocumentVersionResponse> Handle(ReprocessDocumentVersionCommand request, CancellationToken ct)
     {
+        await validator.ValidateAndThrowAsync(request, ct);
+
         var documentExists = await db.Documents.AnyAsync(d => d.Id == request.DocumentId, ct);
         if (!documentExists)
             throw new EntityNotFoundException("Document not found.");

@@ -1,10 +1,9 @@
 using Homestead.WebApi.Common;
-using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Durables.GetDurables;
 
-public record GetDurablesQuery : PaginatedRequest, IRequest<PaginatedResponse<DurableResponse>>
+public record GetDurablesQuery : PaginatedRequest
 {
     /// <summary>
     /// Restrict to items whose <b>resolved</b> area is this area or any of its descendants. Resolved,

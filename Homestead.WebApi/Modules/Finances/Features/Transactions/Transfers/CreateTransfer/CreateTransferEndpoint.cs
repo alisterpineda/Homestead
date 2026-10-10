@@ -1,5 +1,4 @@
 using Homestead.WebApi.Authentication;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Transactions.Transfers.CreateTransfer;
 
@@ -8,9 +7,9 @@ public static class CreateTransferEndpoint
     public static void Map(RouteGroupBuilder group)
     {
         group.MapPost("",
-            async (CreateTransferCommand body, ISender sender, CancellationToken ct) =>
+            async (CreateTransferCommand body, CreateTransferHandler handler, CancellationToken ct) =>
         {
-            var response = await sender.Send(body, ct);
+            var response = await handler.Handle(body, ct);
             return Results.Created(
                 $"/api/v1/finances/transactions/{response.Id}",
                 response);

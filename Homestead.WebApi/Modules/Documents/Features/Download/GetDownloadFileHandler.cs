@@ -2,7 +2,6 @@ using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Infrastructure.Storage;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -11,7 +10,7 @@ namespace Homestead.WebApi.Modules.Documents.Features.Download;
 public class GetDownloadFileHandler(
     AppDbContext db,
     IOptions<FileStorageOptions> storage,
-    ICurrentUserAccessor currentUser) : IRequestHandler<GetDownloadFileQuery, IResult>
+    ICurrentUserAccessor currentUser)
 {
     public async Task<IResult> Handle(GetDownloadFileQuery request, CancellationToken ct)
     {

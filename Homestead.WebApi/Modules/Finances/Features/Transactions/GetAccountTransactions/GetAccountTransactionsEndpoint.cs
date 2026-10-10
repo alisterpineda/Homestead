@@ -1,6 +1,5 @@
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Transactions.GetAccountTransactions;
 
@@ -10,7 +9,7 @@ public static class GetAccountTransactionsEndpoint
     {
         group.MapGet("/{accountId:guid}/transactions",
             async (Guid accountId, [AsParameters] GetAccountTransactionsParameters parameters,
-                ISender sender, CancellationToken ct) =>
+                GetAccountTransactionsHandler handler, CancellationToken ct) =>
         {
             var query = new GetAccountTransactionsQuery
             {
@@ -21,7 +20,7 @@ public static class GetAccountTransactionsEndpoint
                 Page = parameters.Page,
                 PageSize = parameters.PageSize,
             };
-            var response = await sender.Send(query, ct);
+            var response = await handler.Handle(query, ct);
             return Results.Ok(response);
         })
         .WithName("GetAccountTransactions")

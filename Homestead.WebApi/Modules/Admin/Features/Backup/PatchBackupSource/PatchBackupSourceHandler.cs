@@ -2,7 +2,6 @@ using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Admin.Features.Backup.PatchBackupSource;
@@ -11,7 +10,6 @@ namespace Homestead.WebApi.Modules.Admin.Features.Backup.PatchBackupSource;
 /// Updates one pairing's operator state: enable/suspend, and acknowledge the bulk-delete breaker latch.
 /// </summary>
 public class PatchBackupSourceHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork)
-    : IRequestHandler<PatchBackupSourceCommand, PatchBackupSourceResponse>
 {
     public async Task<PatchBackupSourceResponse> Handle(
         PatchBackupSourceCommand request, CancellationToken ct)

@@ -4,7 +4,6 @@ using Homestead.WebApi.Domain.Auditing;
 using Homestead.WebApi.Infrastructure.Backup;
 using Homestead.WebApi.Infrastructure.Backup.GoogleDrive;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Admin.Features.Backup.ConfirmBackupTargetConnection;
@@ -57,7 +56,6 @@ public class ConfirmBackupTargetConnectionHandler(
     IAuditContext audit,
     IUnitOfWork unitOfWork,
     ILogger<ConfirmBackupTargetConnectionHandler> logger)
-    : IRequestHandler<ConfirmBackupTargetConnectionCommand, ConfirmBackupTargetConnectionResponse>
 {
     public async Task<ConfirmBackupTargetConnectionResponse> Handle(
         ConfirmBackupTargetConnectionCommand request, CancellationToken ct)

@@ -1,4 +1,3 @@
-using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Inventory;
 using Microsoft.AspNetCore.JsonPatch.SystemTextJson;
 
@@ -39,7 +38,7 @@ public class PatchDurableModel
     public List<string> Tags { get; set; } = [];
 }
 
-public record PatchDurableCommand : ICommand<DurableResponse>
+public record PatchDurableCommand
 {
     public Guid Id { get; init; }
     public required JsonPatchDocument<PatchDurableModel> PatchDocument { get; init; }

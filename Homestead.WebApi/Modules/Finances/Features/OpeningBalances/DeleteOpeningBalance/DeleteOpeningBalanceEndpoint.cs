@@ -1,5 +1,4 @@
 using Homestead.WebApi.Authentication;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Finances.Features.OpeningBalances.DeleteOpeningBalance;
 
@@ -8,9 +7,9 @@ public static class DeleteOpeningBalanceEndpoint
     public static void Map(RouteGroupBuilder group)
     {
         group.MapDelete("/{accountId:guid}/opening-balances/{commodityId:guid}",
-            async (Guid accountId, Guid commodityId, ISender sender, CancellationToken ct) =>
+            async (Guid accountId, Guid commodityId, DeleteOpeningBalanceHandler handler, CancellationToken ct) =>
         {
-            var deleted = await sender.Send(new DeleteOpeningBalanceCommand
+            var deleted = await handler.Handle(new DeleteOpeningBalanceCommand
             {
                 AccountId = accountId,
                 CommodityId = commodityId,

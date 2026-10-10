@@ -62,7 +62,7 @@ public class CreateDocumentFromUploadHandlerTests : IDisposable
         };
 
         var result = await _sut.Handle(command, ct);
-        await _db.SaveChangesAsync(ct); // UnitOfWorkBehavior performs this commit in production
+        await _db.SaveChangesAsync(ct); // the job handler's unit of work performs this commit in production
 
         Assert.Equal("AI Title", result.Name);
 

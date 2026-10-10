@@ -1,9 +1,8 @@
-using Homestead.WebApi.Common;
 using Homestead.WebApi.Modules.Finances.Features.Transactions;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Transactions.Flows.PatchFlow;
 
-public record PatchFlowCommand : ICommand<TransactionResponse>
+public record PatchFlowCommand
 {
     public Guid TransactionId { get; init; }
     public required Guid AccountId { get; init; }

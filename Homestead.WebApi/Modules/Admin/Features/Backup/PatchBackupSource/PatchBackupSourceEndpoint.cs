@@ -1,5 +1,3 @@
-using MediatR;
-
 namespace Homestead.WebApi.Modules.Admin.Features.Backup.PatchBackupSource;
 
 public static class PatchBackupSourceEndpoint
@@ -13,9 +11,9 @@ public static class PatchBackupSourceEndpoint
     public static void Map(RouteGroupBuilder group)
     {
         group.MapPatch("/sources/{id:guid}", async (
-            Guid id, PatchBackupSourceBody body, ISender sender, CancellationToken ct) =>
+            Guid id, PatchBackupSourceBody body, PatchBackupSourceHandler handler, CancellationToken ct) =>
         {
-            var response = await sender.Send(new PatchBackupSourceCommand
+            var response = await handler.Handle(new PatchBackupSourceCommand
             {
                 Id = id,
                 IsEnabled = body.IsEnabled,

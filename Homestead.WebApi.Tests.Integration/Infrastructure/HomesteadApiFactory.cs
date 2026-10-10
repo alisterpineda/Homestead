@@ -6,7 +6,6 @@ using Homestead.WebApi.Modules.Finances.PriceProviders;
 using Homestead.WebApi.Modules.Finances.PriceProviders.BankOfCanada;
 using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Processing;
-using MediatR;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
@@ -145,25 +144,15 @@ public class HomesteadApiFactory : WebApplicationFactory<Program>
             // Register test-only force-login endpoint for inactive user authentication
             services.AddSingleton<IStartupFilter, TestForceLoginStartupFilter>();
 
-            // Register test-only probe handlers used by the rollback/atomicity suites (TransactionRollbackTests,
-            // LazyTransactionTests, AtomicityByConstructionTests). The MediatR open behaviors
-            // (Authorization → Validation → UnitOfWork) are registered as open generics, so they wrap these
-            // requests automatically — each probe runs inside the real command transaction.
-            services.AddTransient<
-                IRequestHandler<TransactionRollbackProbes.AuditedRollbackProbeCommand, Unit>,
-                TransactionRollbackProbes.AuditedRollbackProbeHandler>();
-            services.AddTransient<
-                IRequestHandler<TransactionRollbackProbes.EnqueueRollbackProbeCommand, Unit>,
-                TransactionRollbackProbes.EnqueueRollbackProbeHandler>();
-            services.AddTransient<
-                IRequestHandler<TransactionRollbackProbes.ExecuteUpdateRollbackProbeCommand, Unit>,
-                TransactionRollbackProbes.ExecuteUpdateRollbackProbeHandler>();
-            services.AddTransient<
-                IRequestHandler<TransactionRollbackProbes.ExecuteDeleteNoEnsureRollbackProbeCommand, Unit>,
-                TransactionRollbackProbes.ExecuteDeleteNoEnsureRollbackProbeHandler>();
-            services.AddTransient<
-                IRequestHandler<TransactionRollbackProbes.DirectSaveChangesNoEnsureRollbackProbeCommand, Unit>,
-                TransactionRollbackProbes.DirectSaveChangesNoEnsureRollbackProbeHandler>();
+            // Test-only probe handlers + endpoints used by the rollback/atomicity suites (TransactionRollbackTests,
+            // LazyTransactionTests, AtomicityByConstructionTests). The endpoints sit on a
+            // .WithCommandTransaction() group, so each probe request runs inside the real command transaction.
+            services.AddScoped<TransactionRollbackProbes.AuditedRollbackProbeHandler>();
+            services.AddScoped<TransactionRollbackProbes.EnqueueRollbackProbeHandler>();
+            services.AddScoped<TransactionRollbackProbes.ExecuteUpdateRollbackProbeHandler>();
+            services.AddScoped<TransactionRollbackProbes.ExecuteDeleteNoEnsureRollbackProbeHandler>();
+            services.AddScoped<TransactionRollbackProbes.DirectSaveChangesNoEnsureRollbackProbeHandler>();
+            services.AddSingleton<IStartupFilter, TransactionProbeStartupFilter>();
 
             // The NoOp job type runs the test handler instead: same no-op by default, but driveable into
             // failing, retrying, and blocking, so the processor's retry and lease paths have a real job

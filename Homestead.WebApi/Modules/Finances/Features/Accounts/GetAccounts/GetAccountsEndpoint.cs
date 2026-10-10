@@ -1,5 +1,4 @@
 using Homestead.WebApi.Common;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Accounts.GetAccounts;
 
@@ -8,9 +7,9 @@ public static class GetAccountsEndpoint
     public static void Map(RouteGroupBuilder group)
     {
         group.MapGet("", async ([AsParameters] GetAccountsQuery request,
-            ISender sender, CancellationToken ct) =>
+            GetAccountsHandler handler, CancellationToken ct) =>
         {
-            return Results.Ok(await sender.Send(request, ct));
+            return Results.Ok(await handler.Handle(request, ct));
         })
         .WithName("GetAccounts")
         .Produces<PaginatedResponse<AccountResponse>>();

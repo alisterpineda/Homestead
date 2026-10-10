@@ -1,3 +1,4 @@
+using FluentValidation;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Groups;
@@ -22,7 +23,7 @@ public class UpdateGroupMemberHandlerTests : IDisposable
         _unitOfWork = Substitute.For<IUnitOfWork>();
         _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
             .Returns(ci => _db.SaveChangesAsync(ci.Arg<CancellationToken>()));
-        _sut = new UpdateGroupMemberHandler(_db, _audit, _unitOfWork);
+        _sut = new UpdateGroupMemberHandler(_db, _audit, _unitOfWork, new UpdateGroupMemberCommandValidator());
     }
 
     public void Dispose() => _db.Dispose();
@@ -201,5 +202,18 @@ public class UpdateGroupMemberHandlerTests : IDisposable
         var result = await _sut.Handle(command, TestContext.Current.CancellationToken);
 
         Assert.Equal(GroupAccessLevel.Owner, result.AccessLevel);
+    }
+
+    [Fact]
+    public async Task Handle_UndefinedAccessLevel_ThrowsValidationException()
+    {
+        var command = new UpdateGroupMemberCommand
+        {
+            GroupId = Guid.NewGuid(),
+            UserId = Guid.NewGuid(),
+            Request = new UpdateGroupMemberRequest { AccessLevel = (GroupAccessLevel)42 }
+        };
+
+        await Assert.ThrowsAsync<ValidationException>(() => _sut.Handle(command, TestContext.Current.CancellationToken));
     }
 }

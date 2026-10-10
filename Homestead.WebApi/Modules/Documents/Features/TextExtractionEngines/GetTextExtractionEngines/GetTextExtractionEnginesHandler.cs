@@ -1,6 +1,5 @@
 using Homestead.WebApi.Domain.Settings;
 using Homestead.WebApi.Infrastructure.TextExtraction;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Documents.Features.TextExtractionEngines.GetTextExtractionEngines;
 
@@ -9,7 +8,6 @@ namespace Homestead.WebApi.Modules.Documents.Features.TextExtractionEngines.GetT
 public class GetTextExtractionEnginesHandler(
     IEnumerable<ITextExtractionEngine> engines,
     ITextExtractionEngineResolver resolver)
-    : IRequestHandler<GetTextExtractionEnginesQuery, List<TextExtractionEngineResponse>>
 {
     public Task<List<TextExtractionEngineResponse>> Handle(
         GetTextExtractionEnginesQuery request, CancellationToken ct)

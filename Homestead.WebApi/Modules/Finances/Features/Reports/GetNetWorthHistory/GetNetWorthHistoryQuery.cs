@@ -1,8 +1,6 @@
-using MediatR;
-
 namespace Homestead.WebApi.Modules.Finances.Features.Reports.GetNetWorthHistory;
 
-public record GetNetWorthHistoryQuery : IRequest<GetNetWorthHistoryResponse>
+public record GetNetWorthHistoryQuery
 {
     public NetWorthRange Range { get; init; } = NetWorthRange.All;
 

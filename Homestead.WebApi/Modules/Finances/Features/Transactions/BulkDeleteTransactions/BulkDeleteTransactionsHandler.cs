@@ -2,7 +2,6 @@ using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Transactions.BulkDeleteTransactions;
@@ -23,7 +22,6 @@ public class BulkDeleteTransactionsHandler(
     IDripService drips,
     IBalanceEntryReconciler reconciler,
     IUnitOfWork unitOfWork)
-    : IRequestHandler<BulkDeleteTransactionsCommand, BulkDeleteTransactionsResponse>
 {
     public async Task<BulkDeleteTransactionsResponse> Handle(
         BulkDeleteTransactionsCommand request, CancellationToken ct)

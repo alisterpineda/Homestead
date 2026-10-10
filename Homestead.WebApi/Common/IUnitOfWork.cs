@@ -9,8 +9,9 @@ namespace Homestead.WebApi.Common;
 /// <remarks>
 /// <para>
 /// <see cref="ExecuteInTransactionAsync{T}"/> wraps a command's handler in a single database
-/// transaction that commits exactly once at the end of the pipeline (driven by
-/// <see cref="UnitOfWorkBehavior{TRequest,TResponse}"/>). Any failure rolls everything back.
+/// transaction that commits exactly once at the end of the request (driven by
+/// <see cref="CommandTransactionFilter"/> for mutating HTTP verbs, and called directly by job handlers).
+/// Any failure rolls everything back.
 /// </para>
 /// <para>
 /// <see cref="SaveChangesAsync"/> is the only place persistence and audit are flushed together, so it
@@ -25,8 +26,8 @@ public interface IUnitOfWork
     /// <summary>
     /// Runs <paramref name="work"/> inside a single database transaction, flushes persistence and audit
     /// with <see cref="SaveChangesAsync"/>, commits once, then drains <see cref="OnAfterCommit"/> hooks
-    /// <em>outside</em> the transaction. If a transaction is already open on this scope (a nested command
-    /// dispatched through <c>ISender</c>), it joins the ambient transaction instead of opening a new one —
+    /// <em>outside</em> the transaction. If a transaction is already open on this scope (a nested call
+    /// inside an outer command frame), it joins the ambient transaction instead of opening a new one —
     /// the outermost command owns the commit and hook draining.
     /// </summary>
     Task<T> ExecuteInTransactionAsync<T>(Func<Task<T>> work, CancellationToken cancellationToken);
@@ -67,8 +68,9 @@ public interface IUnitOfWork
 
     /// <summary>
     /// Sets the actor audit entries are attributed to for this scope, overriding the ambient signed-in
-    /// user. Set by <see cref="UnitOfWorkBehavior{TRequest,TResponse}"/> from an
-    /// <see cref="IActorAttributed"/> request; a null value falls back to the current user.
+    /// user. Job handlers call it with <c>job.CreatedByUserId</c> before running an internal command in
+    /// <see cref="ExecuteInTransactionAsync{T}"/>, so background work is attributed to whoever enqueued it;
+    /// a null value falls back to the current user.
     /// </summary>
     void SetActor(Guid? actorUserId);
 }

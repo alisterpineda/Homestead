@@ -1,4 +1,3 @@
-using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Inventory;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Durables.CreateDurable;
@@ -8,7 +7,7 @@ namespace Homestead.WebApi.Modules.Inventory.Features.Durables.CreateDurable;
 /// <c>Status = Active</c>. Location is at most one of <see cref="AreaId"/> / <see cref="ParentItemId"/>;
 /// <see cref="Compartment"/> is only meaningful inside a container.
 /// </summary>
-public record CreateDurableCommand : ICommand<DurableResponse>
+public record CreateDurableCommand
 {
     public required string Name { get; init; }
     public Guid? AreaId { get; init; }

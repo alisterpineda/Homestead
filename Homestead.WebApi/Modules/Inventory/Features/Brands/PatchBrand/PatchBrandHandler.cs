@@ -3,13 +3,11 @@ using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Inventory;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Brands.PatchBrand;
 
 public class PatchBrandHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork)
-    : IRequestHandler<PatchBrandCommand, BrandResponse>
 {
     public async Task<BrandResponse> Handle(PatchBrandCommand request, CancellationToken ct)
     {

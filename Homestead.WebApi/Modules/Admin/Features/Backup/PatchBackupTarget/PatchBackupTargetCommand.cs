@@ -1,8 +1,6 @@
-using Homestead.WebApi.Common;
-
 namespace Homestead.WebApi.Modules.Admin.Features.Backup.PatchBackupTarget;
 
-public record PatchBackupTargetCommand : ICommand<PatchBackupTargetResponse>
+public record PatchBackupTargetCommand
 {
     public required string TargetKey { get; init; }
     public bool? IsEnabled { get; init; }

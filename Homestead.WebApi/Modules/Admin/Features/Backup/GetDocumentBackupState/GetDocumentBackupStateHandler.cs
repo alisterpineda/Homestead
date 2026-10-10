@@ -2,7 +2,6 @@ using Homestead.WebApi.Domain.Backup;
 using Homestead.WebApi.Infrastructure.Backup;
 using Homestead.WebApi.Modules.Documents.Backup;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Admin.Features.Backup.GetDocumentBackupState;
@@ -30,7 +29,6 @@ public class GetDocumentBackupStateHandler(
     IBackupTargetGate gate,
     IBackupSourceCatalog catalog,
     IBackupRunHistory runHistory)
-    : IRequestHandler<GetDocumentBackupStateQuery, GetDocumentBackupStateResponse?>
 {
     public async Task<GetDocumentBackupStateResponse?> Handle(
         GetDocumentBackupStateQuery request, CancellationToken ct)

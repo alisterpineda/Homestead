@@ -1,10 +1,10 @@
+using FluentValidation;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Inventory;
 using Homestead.WebApi.Modules.Inventory.Services;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Consumables.CreateConsumable;
@@ -15,11 +15,13 @@ public class CreateConsumableHandler(
     IAuditContext audit,
     IStockService stock,
     IInventoryTagPathResolver tagResolver,
-    IUnitOfWork unitOfWork)
-    : IRequestHandler<CreateConsumableCommand, ConsumableResponse>
+    IUnitOfWork unitOfWork,
+    IValidator<CreateConsumableCommand> validator)
 {
     public async Task<ConsumableResponse> Handle(CreateConsumableCommand request, CancellationToken ct)
     {
+        await validator.ValidateAndThrowAsync(request, ct);
+
         if (request.BrandId is { } brandId)
         {
             var brandExists = await db.Brands.AnyAsync(b => b.Id == brandId, ct);

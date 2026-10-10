@@ -1,7 +1,8 @@
+using System.Net.Http.Json;
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Modules.Admin.Features.Groups.DeleteGroup;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Tests.Integration.Infrastructure;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 using static Homestead.WebApi.Tests.Integration.Infrastructure.TransactionRollbackProbes;
 
@@ -26,12 +27,9 @@ public class AtomicityByConstructionTests(PostgresFixture fixture) : Integration
         var adminClient = await CreateAdminClientAsync();
         var groupId = await CreateGroupAsync(adminClient, "Original Name");
 
-        using (var scope = CreateScope())
-        {
-            var sender = scope.ServiceProvider.GetRequiredService<ISender>();
-            await Assert.ThrowsAsync<InvalidOperationException>(() =>
-                sender.Send(new ExecuteUpdateRollbackProbeCommand(groupId, "Mutated Name"), CT));
-        }
+        var response = await CreateAnonymousClient().PostAsJsonAsync(
+            ExecuteUpdateRollbackRoute, new ExecuteUpdateRollbackProbeCommand(groupId, "Mutated Name"), CT);
+        Assert.Equal(ProbeFailedStatusCode, (int)response.StatusCode);
 
         using (var scope = CreateScope())
         {
@@ -47,12 +45,9 @@ public class AtomicityByConstructionTests(PostgresFixture fixture) : Integration
         var adminClient = await CreateAdminClientAsync();
         var groupId = await CreateGroupAsync(adminClient, "Survives Rollback");
 
-        using (var scope = CreateScope())
-        {
-            var sender = scope.ServiceProvider.GetRequiredService<ISender>();
-            await Assert.ThrowsAsync<InvalidOperationException>(() =>
-                sender.Send(new ExecuteDeleteNoEnsureRollbackProbeCommand(groupId), CT));
-        }
+        var response = await CreateAnonymousClient().PostAsJsonAsync(
+            ExecuteDeleteNoEnsureRollbackRoute, new ExecuteDeleteNoEnsureRollbackProbeCommand(groupId), CT);
+        Assert.Equal(ProbeFailedStatusCode, (int)response.StatusCode);
 
         using (var scope = CreateScope())
         {
@@ -67,12 +62,9 @@ public class AtomicityByConstructionTests(PostgresFixture fixture) : Integration
     {
         var entityId = Guid.NewGuid();
 
-        using (var scope = CreateScope())
-        {
-            var sender = scope.ServiceProvider.GetRequiredService<ISender>();
-            await Assert.ThrowsAsync<InvalidOperationException>(() =>
-                sender.Send(new DirectSaveChangesNoEnsureRollbackProbeCommand(entityId), CT));
-        }
+        var response = await CreateAnonymousClient().PostAsJsonAsync(
+            DirectSaveChangesNoEnsureRollbackRoute, new DirectSaveChangesNoEnsureRollbackProbeCommand(entityId), CT);
+        Assert.Equal(ProbeFailedStatusCode, (int)response.StatusCode);
 
         using (var scope = CreateScope())
         {
@@ -92,8 +84,10 @@ public class AtomicityByConstructionTests(PostgresFixture fixture) : Integration
         // flush. On the happy path the interceptor-opened command tx commits both.
         using (var scope = CreateScope())
         {
-            var sender = scope.ServiceProvider.GetRequiredService<ISender>();
-            var deleted = await sender.Send(new DeleteGroupCommand(groupId), CT);
+            var handler = scope.ServiceProvider.GetRequiredService<DeleteGroupHandler>();
+            var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+            var deleted = await unitOfWork.ExecuteInTransactionAsync(
+                () => handler.Handle(new DeleteGroupCommand(groupId), CT), CT);
             Assert.True(deleted);
         }
 
@@ -110,7 +104,7 @@ public class AtomicityByConstructionTests(PostgresFixture fixture) : Integration
         var adminClient = await CreateAdminClientAsync();
         var groupId = await CreateGroupAsync(adminClient, "Original Name");
 
-        // A bulk write run in a plain scope (no ISender → no command scope) mirrors the JobRunner
+        // A bulk write run in a plain scope (no command transaction) mirrors the JobRunner
         // background path: the interceptor stays a no-op (no command tx is opened), so the write autocommits.
         using var scope = CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();

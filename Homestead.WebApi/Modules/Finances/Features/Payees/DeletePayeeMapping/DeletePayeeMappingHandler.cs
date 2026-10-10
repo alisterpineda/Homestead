@@ -1,7 +1,6 @@
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Payees.DeletePayeeMapping;
@@ -11,7 +10,6 @@ namespace Homestead.WebApi.Modules.Finances.Features.Payees.DeletePayeeMapping;
 /// machine-written learning path, an explicit human delete IS audited.
 /// </summary>
 public class DeletePayeeMappingHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork)
-    : IRequestHandler<DeletePayeeMappingCommand, bool>
 {
     public async Task<bool> Handle(DeletePayeeMappingCommand request, CancellationToken ct)
     {

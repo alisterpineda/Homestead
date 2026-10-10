@@ -3,7 +3,6 @@ using Homestead.WebApi.Modules.Inventory.Features.Consumables;
 using Homestead.WebApi.Modules.Inventory.Features.Durables;
 using Homestead.WebApi.Modules.Inventory.Services;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Overview.GetInventoryOverview;
@@ -11,7 +10,6 @@ namespace Homestead.WebApi.Modules.Inventory.Features.Overview.GetInventoryOverv
 public class GetInventoryOverviewHandler(
     AppDbContext db, IInventoryPlacementService placementService, IItemLocationResolver locationResolver,
     TimeProvider timeProvider)
-    : IRequestHandler<GetInventoryOverviewQuery, GetInventoryOverviewResponse>
 {
     private const int PreviewCount = 5;
     private const int RecentCount = 10;

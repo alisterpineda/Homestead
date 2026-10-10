@@ -182,7 +182,6 @@ export type { NetWorthGranularity } from './models/net-worth-granularity';
 export type { NetWorthHistoryPoint } from './models/net-worth-history-point';
 export type { NetWorthRange } from './models/net-worth-range';
 export type { OpeningBalanceResponse } from './models/opening-balance-response';
-export type { OperationAuthorizationRequirement } from './models/operation-authorization-requirement';
 export type { PaginatedResponseOfAccountResponse } from './models/paginated-response-of-account-response';
 export type { PaginatedResponseOfAreaResponse } from './models/paginated-response-of-area-response';
 export type { PaginatedResponseOfBrandResponse } from './models/paginated-response-of-brand-response';

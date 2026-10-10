@@ -2,7 +2,6 @@ using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Backup;
 using Homestead.WebApi.Infrastructure.Backup;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Admin.Features.Backup.PatchBackupTarget;
@@ -18,7 +17,6 @@ namespace Homestead.WebApi.Modules.Admin.Features.Backup.PatchBackupTarget;
 /// </remarks>
 public class PatchBackupTargetHandler(
     AppDbContext db, IBackupTargetResolver resolver, IUnitOfWork unitOfWork)
-    : IRequestHandler<PatchBackupTargetCommand, PatchBackupTargetResponse>
 {
     public async Task<PatchBackupTargetResponse> Handle(
         PatchBackupTargetCommand request, CancellationToken ct)

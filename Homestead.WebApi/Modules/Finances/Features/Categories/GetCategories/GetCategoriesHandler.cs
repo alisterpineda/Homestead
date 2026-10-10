@@ -1,12 +1,10 @@
 using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Categories.GetCategories;
 
 public class GetCategoriesHandler(AppDbContext db, ICategoryPathResolver pathResolver)
-    : IRequestHandler<GetCategoriesQuery, IReadOnlyList<CategoryResponse>>
 {
     public async Task<IReadOnlyList<CategoryResponse>> Handle(GetCategoriesQuery request, CancellationToken ct)
     {

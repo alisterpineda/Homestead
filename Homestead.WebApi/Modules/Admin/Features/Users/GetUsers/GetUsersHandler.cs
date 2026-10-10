@@ -1,12 +1,10 @@
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Admin.Features.Users.GetUsers;
 
 public class GetUsersHandler(AppDbContext db)
-    : IRequestHandler<GetUsersQuery, PaginatedResponse<UserResponse>>
 {
     public async Task<PaginatedResponse<UserResponse>> Handle(
         GetUsersQuery request, CancellationToken ct)

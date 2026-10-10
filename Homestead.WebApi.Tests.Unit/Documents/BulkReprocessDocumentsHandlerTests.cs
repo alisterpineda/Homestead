@@ -1,3 +1,4 @@
+using FluentValidation;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
@@ -34,7 +35,8 @@ public class BulkReprocessDocumentsHandlerTests : IDisposable
             .Returns(_ => Guid.NewGuid());
 
         _resolver = new TextExtractionEngineResolver(TestTextExtraction.Engines(), defaultEngineKey: null);
-        _sut = new BulkReprocessDocumentsHandler(_db, _currentUser, _queryService, _resolver, _jobQueue);
+        _sut = new BulkReprocessDocumentsHandler(_db, _currentUser, _queryService, _resolver, _jobQueue,
+            new BulkReprocessDocumentsCommandValidator(TestTextExtraction.Engines()));
     }
 
     public void Dispose() => _db.Dispose();
@@ -198,5 +200,15 @@ public class BulkReprocessDocumentsHandlerTests : IDisposable
             () => _sut.Handle(
                 new BulkReprocessDocumentsCommand([docId]),
                 CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Handle_UnknownEngineKey_ThrowsValidationException()
+    {
+        var (docId, _) = SeedDocument();
+
+        await Assert.ThrowsAsync<ValidationException>(() => _sut.Handle(
+            new BulkReprocessDocumentsCommand([docId], EngineKey: "no-such-engine"),
+            TestContext.Current.CancellationToken));
     }
 }

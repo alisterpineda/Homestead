@@ -1,21 +1,22 @@
+using FluentValidation;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Parties;
 using Homestead.WebApi.Common.Auditing;
-using MediatR;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Documents.Features.Parties.UpdateParty;
 
 public class UpdatePartyHandler(AppDbContext db, IDocumentQueryService accessService, IAuditContext audit,
-    ICurrentUserAccessor currentUser, IUnitOfWork unitOfWork)
-    : IRequestHandler<UpdatePartyCommand, UpdatePartyResponse?>
+    ICurrentUserAccessor currentUser, IUnitOfWork unitOfWork, IValidator<UpdatePartyCommand> validator)
 {
     public async Task<UpdatePartyResponse?> Handle(UpdatePartyCommand request, CancellationToken ct)
     {
+        await validator.ValidateAndThrowAsync(request, ct);
+
         var party = await db.Parties
             .FirstOrDefaultAsync(p => p.Id == request.Id, ct);
 

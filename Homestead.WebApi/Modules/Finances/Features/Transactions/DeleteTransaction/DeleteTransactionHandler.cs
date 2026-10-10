@@ -2,7 +2,6 @@ using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Transactions.DeleteTransaction;
@@ -13,9 +12,8 @@ public class DeleteTransactionHandler(
     IBalanceEntryService balanceEntries,
     IBalanceEntryReconciler reconciler,
     IUnitOfWork unitOfWork)
-    : IRequestHandler<DeleteTransactionCommand, Unit>
 {
-    public async Task<Unit> Handle(DeleteTransactionCommand request, CancellationToken ct)
+    public async Task Handle(DeleteTransactionCommand request, CancellationToken ct)
     {
         // Project just the discriminator: the shape services re-load the
         // tracked entity themselves, so we only need enough to dispatch.
@@ -42,7 +40,5 @@ public class DeleteTransactionHandler(
         await unitOfWork.SaveChangesAsync(ct);
 
         await reconciler.ReconcileAsync(touched, ct);
-
-        return Unit.Value;
     }
 }

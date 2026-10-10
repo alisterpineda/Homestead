@@ -1,5 +1,4 @@
 using Homestead.WebApi.Authentication;
-using MediatR;
 using Microsoft.AspNetCore.JsonPatch.SystemTextJson;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Accounts.PatchAccount;
@@ -10,14 +9,14 @@ public static class PatchAccountEndpoint
     {
         group.MapPatch("/{id:guid}", async (Guid id,
             JsonPatchDocument<PatchAccountModel> patchDoc,
-            ISender sender, CancellationToken ct) =>
+            PatchAccountHandler handler, CancellationToken ct) =>
         {
             var command = new PatchAccountCommand
             {
                 Id = id,
                 PatchDocument = patchDoc
             };
-            return Results.Ok(await sender.Send(command, ct));
+            return Results.Ok(await handler.Handle(command, ct));
         })
         .WithName("PatchAccount")
         .Accepts<JsonPatchDocument<PatchAccountModel>>("application/json-patch+json")

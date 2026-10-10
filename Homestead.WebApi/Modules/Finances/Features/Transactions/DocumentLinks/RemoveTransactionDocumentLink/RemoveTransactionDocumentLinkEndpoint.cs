@@ -1,5 +1,4 @@
 using Homestead.WebApi.Authentication;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Transactions.DocumentLinks.RemoveTransactionDocumentLink;
 
@@ -8,9 +7,9 @@ public static class RemoveTransactionDocumentLinkEndpoint
     public static void Map(RouteGroupBuilder group)
     {
         group.MapDelete("/{transactionId:guid}/documents/{documentId:guid}", async (
-            Guid transactionId, Guid documentId, ISender sender, CancellationToken ct) =>
+            Guid transactionId, Guid documentId, RemoveTransactionDocumentLinkHandler handler, CancellationToken ct) =>
         {
-            await sender.Send(new RemoveTransactionDocumentLinkCommand
+            await handler.Handle(new RemoveTransactionDocumentLinkCommand
             {
                 TransactionId = transactionId,
                 DocumentId = documentId,

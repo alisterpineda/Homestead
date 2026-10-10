@@ -1,3 +1,4 @@
+using FluentValidation;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Domain.Processing;
@@ -6,7 +7,6 @@ using Homestead.WebApi.Infrastructure.TextExtraction;
 using Homestead.WebApi.Modules.Documents.Services;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Processing;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Documents.Features.Documents.BulkReprocessDocuments;
@@ -16,11 +16,13 @@ public class BulkReprocessDocumentsHandler(
     ICurrentUserAccessor currentUser,
     IDocumentQueryService queryService,
     ITextExtractionEngineResolver engineResolver,
-    IJobQueue jobQueue)
-    : IRequestHandler<BulkReprocessDocumentsCommand, BulkReprocessDocumentsResponse>
+    IJobQueue jobQueue,
+    IValidator<BulkReprocessDocumentsCommand> validator)
 {
     public async Task<BulkReprocessDocumentsResponse> Handle(BulkReprocessDocumentsCommand request, CancellationToken ct)
     {
+        await validator.ValidateAndThrowAsync(request, ct);
+
         // Resolved before the empty-batch shortcut, so an unusable explicit pick is rejected the same way
         // whether or not the ids matched anything. Otherwise the same bad engine key would 400 with one
         // real id and return 200 with none — the request is wrong either way.

@@ -1,3 +1,4 @@
+using FluentValidation;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using System.Text.Json;
@@ -7,7 +8,6 @@ using Homestead.WebApi.Domain.Auditing;
 using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Settings;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Admin.Features.Settings.PatchSystemSettings;
@@ -17,12 +17,14 @@ public class PatchSystemSettingsHandler(
     ICurrentUserAccessor currentUser,
     IAuditContext audit,
     IUnitOfWork unitOfWork,
-    ISettingsChangeNotifier settingsChangeNotifier)
-    : IRequestHandler<PatchSystemSettingsCommand, SystemSettingsResponse>
+    ISettingsChangeNotifier settingsChangeNotifier,
+    IValidator<PatchSystemSettingsCommand> validator)
 {
     public async Task<SystemSettingsResponse> Handle(
         PatchSystemSettingsCommand request, CancellationToken ct)
     {
+        await validator.ValidateAndThrowAsync(request, ct);
+
         var entity = await db.AppSettings.FirstOrDefaultAsync(s => s.Key == AppSetting.SystemModule, ct);
 
         var settings = entity is not null

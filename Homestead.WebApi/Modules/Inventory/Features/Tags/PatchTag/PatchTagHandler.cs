@@ -3,7 +3,6 @@ using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Inventory;
-using MediatR;
 using Homestead.WebApi.Persistence;
 using Microsoft.AspNetCore.JsonPatch.SystemTextJson;
 using Microsoft.EntityFrameworkCore;
@@ -12,7 +11,6 @@ namespace Homestead.WebApi.Modules.Inventory.Features.Tags.PatchTag;
 
 public class PatchTagHandler(AppDbContext db, IAuditContext audit,
     ICurrentUserAccessor currentUser, IUnitOfWork unitOfWork)
-    : IRequestHandler<PatchInventoryTagCommand, PatchInventoryTagResponse>
 {
     public async Task<PatchInventoryTagResponse> Handle(PatchInventoryTagCommand request, CancellationToken ct)
     {

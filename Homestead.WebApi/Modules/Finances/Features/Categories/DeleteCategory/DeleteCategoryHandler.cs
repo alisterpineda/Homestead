@@ -3,7 +3,6 @@ using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Categories.DeleteCategory;
@@ -16,7 +15,6 @@ public class DeleteCategoryHandler(
     IAuditContext audit,
     ISystemAccountProvider systemAccounts,
     IUnitOfWork unitOfWork)
-    : IRequestHandler<DeleteCategoryCommand, bool>
 {
     public async Task<bool> Handle(DeleteCategoryCommand request, CancellationToken ct)
     {

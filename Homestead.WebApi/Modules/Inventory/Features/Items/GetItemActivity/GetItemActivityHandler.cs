@@ -2,13 +2,11 @@ using System.Text.Json;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Auditing;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Items.GetItemActivity;
 
 public class GetItemActivityHandler(AppDbContext db)
-    : IRequestHandler<GetItemActivityQuery, PaginatedResponse<GetItemActivityResponse>?>
 {
     // The one item audit field → human label map (the durable-only projection it superseded is gone).
     // AreaId/ParentItemId both read as "location" (a move emits one or both) and Value/ValueCurrencyId

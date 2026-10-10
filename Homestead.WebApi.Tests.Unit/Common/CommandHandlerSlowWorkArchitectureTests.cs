@@ -1,15 +1,15 @@
 using System.Reflection;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Modules.Documents.Services;
-using MediatR;
 
 namespace Homestead.WebApi.Tests.Unit.Common;
 
 /// <summary>
 /// Defense-in-depth (NOT the fix itself) for the lazy-transaction mechanism. Because the command
 /// transaction is held while a handler runs, a handler that depends on a slow external service risks
-/// re-pinning a pooled connection across that slow work. These tests reflect over every
-/// <c>ICommand</c> handler in the WebApi assembly and fail if one takes a banned slow-work dependency.
+/// re-pinning a pooled connection across that slow work. These tests reflect over every command
+/// handler in the WebApi assembly (a <c>*Handler</c> class whose public <c>Handle(TRequest, CancellationToken)</c>
+/// takes a <c>*Command</c>) and fail if one takes a banned slow-work dependency.
 /// <para>
 /// The test sees the dependency <em>type</em>, not the method called — so it cannot tell whether a
 /// classifier is used for the fast <c>ApplyAsync</c> or the slow <c>ClassifyAsync</c>. That is why the
@@ -24,16 +24,29 @@ public class CommandHandlerSlowWorkArchitectureTests
     private static List<(Type Handler, Type RequestType)> CommandHandlers()
     {
         return WebApiAssembly.GetTypes()
-            .Where(t => t is { IsClass: true, IsAbstract: false })
-            .SelectMany(t => t.GetInterfaces()
-                .Where(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IRequestHandler<,>))
-                .Select(i => (Handler: t, RequestType: i.GetGenericArguments()[0])))
+            .Where(t => t is { IsClass: true, IsAbstract: false } && t.Name.EndsWith("Handler", StringComparison.Ordinal))
+            .SelectMany(t => t.GetMethods(BindingFlags.Public | BindingFlags.Instance)
+                .Where(m => m.Name == "Handle")
+                .Select(m => m.GetParameters())
+                .Where(p => p.Length == 2 && p[1].ParameterType == typeof(CancellationToken))
+                .Select(p => (Handler: t, RequestType: p[0].ParameterType)))
             // Only mutation handlers run inside ExecuteInTransactionAsync. Queries (ClassifyPreviewQuery,
-            // etc.) are plain IRequest<> — never ICommand — so they hold no transaction and are exempt.
+            // etc.) are named *Query and served by GET, so they hold no transaction and are exempt.
             // ClassifyPreviewHandler injects IDocumentClassifier but is a query, so it is intentionally
             // not in scope here (this is by design, not an oversight).
-            .Where(x => typeof(ICommand).IsAssignableFrom(x.RequestType))
+            .Where(x => x.RequestType.Name.EndsWith("Command", StringComparison.Ordinal))
             .ToList();
+    }
+
+    [Fact]
+    public void CommandHandlers_DiscoveryFindsTheCommandHandlers()
+    {
+        // The two guards below pass vacuously over an empty list, so pin the discovery itself.
+        var handlers = CommandHandlers().Select(x => x.Handler.Name).ToHashSet();
+
+        Assert.Contains("CreateGroupHandler", handlers);
+        Assert.Contains("ApplyClassificationHandler", handlers);
+        Assert.True(handlers.Count > 100, $"Expected > 100 command handlers, found {handlers.Count}.");
     }
 
     private static IEnumerable<Type> ConstructorParameterTypes(Type handler) =>
@@ -51,7 +64,7 @@ public class CommandHandlerSlowWorkArchitectureTests
             .ToList();
 
         Assert.True(violations.Count == 0,
-            "ICommand handlers must not inject a slow-work service (it would run inside the command " +
+            "Command handlers must not inject a slow-work service (it would run inside the command " +
             $"transaction, re-pinning a connection). Offenders: {string.Join(", ", violations)}");
     }
 
@@ -79,7 +92,7 @@ public class CommandHandlerSlowWorkArchitectureTests
             .ToList();
 
         Assert.True(violations.Count == 0,
-            "ICommand handlers (outside the allowlist) must not inject IDocumentClassifier — the slow " +
+            "Command handlers (outside the allowlist) must not inject IDocumentClassifier — the slow " +
             $"ClassifyAsync belongs in the job scope, not the command transaction. Offenders: {string.Join(", ", violations)}");
     }
 }

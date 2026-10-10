@@ -1,12 +1,10 @@
 using Homestead.WebApi.Infrastructure.Ai;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Admin.Features.Ai.GetAiStatus;
 
 // Pure read off the static provider registrations — no DB access. A query, not a command, so it never
 // opens the UnitOfWork transaction.
 public class GetAiStatusHandler(IEnumerable<IAiProvider> providers, IAiProviderResolver resolver)
-    : IRequestHandler<GetAiStatusQuery, List<AiProviderStatusResponse>>
 {
     public Task<List<AiProviderStatusResponse>> Handle(GetAiStatusQuery request, CancellationToken ct)
     {

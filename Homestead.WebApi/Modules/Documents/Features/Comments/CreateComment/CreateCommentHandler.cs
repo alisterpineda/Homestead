@@ -1,7 +1,7 @@
+using FluentValidation;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
-using MediatR;
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -12,11 +12,13 @@ public class CreateCommentHandler(
     AppDbContext db,
     ICurrentUserAccessor currentUser,
     IAuditContext audit,
-    IUnitOfWork unitOfWork)
-    : IRequestHandler<CreateCommentCommand, CreateCommentResponse>
+    IUnitOfWork unitOfWork,
+    IValidator<CreateCommentCommand> validator)
 {
     public async Task<CreateCommentResponse> Handle(CreateCommentCommand request, CancellationToken ct)
     {
+        await validator.ValidateAndThrowAsync(request, ct);
+
         var documentExists = await db.Documents.AnyAsync(d => d.Id == request.DocumentId, ct);
         if (!documentExists)
             throw new EntityNotFoundException("Document not found.");

@@ -4,7 +4,6 @@ using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Inventory;
 using Homestead.WebApi.Modules.Inventory.Services;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Areas.PatchArea;
@@ -14,7 +13,6 @@ public class PatchAreaHandler(
     IAuditContext audit,
     IUnitOfWork unitOfWork,
     IInventoryPlacementService placementService)
-    : IRequestHandler<PatchAreaCommand, AreaResponse>
 {
     public async Task<AreaResponse> Handle(PatchAreaCommand request, CancellationToken ct)
     {

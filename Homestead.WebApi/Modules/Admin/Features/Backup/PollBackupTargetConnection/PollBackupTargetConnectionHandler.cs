@@ -1,7 +1,6 @@
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Infrastructure.Backup;
 using Homestead.WebApi.Infrastructure.Backup.GoogleDrive;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Admin.Features.Backup.PollBackupTargetConnection;
 
@@ -54,7 +53,6 @@ public class PollBackupTargetConnectionHandler(
     IUnitOfWork unitOfWork,
     TimeProvider timeProvider,
     ILogger<PollBackupTargetConnectionHandler> logger)
-    : IRequestHandler<PollBackupTargetConnectionCommand, PollBackupTargetConnectionResponse>
 {
     /// <summary>How long the admin has to answer the account-mismatch prompt.</summary>
     private static readonly TimeSpan PendingGrantLifetime = TimeSpan.FromMinutes(10);

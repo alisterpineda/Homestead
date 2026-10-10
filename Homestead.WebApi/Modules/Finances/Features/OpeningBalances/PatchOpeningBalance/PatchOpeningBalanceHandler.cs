@@ -1,7 +1,7 @@
+using FluentValidation;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Features.OpeningBalances.PatchOpeningBalance;
@@ -11,11 +11,13 @@ public class PatchOpeningBalanceHandler(
     IOpeningBalanceService openingBalances,
     IBalanceEntryReconciler reconciler,
     ISystemAccountProvider systemAccounts,
-    IUnitOfWork unitOfWork)
-    : IRequestHandler<PatchOpeningBalanceCommand, OpeningBalanceResponse>
+    IUnitOfWork unitOfWork,
+    IValidator<PatchOpeningBalanceCommand> validator)
 {
     public async Task<OpeningBalanceResponse> Handle(PatchOpeningBalanceCommand request, CancellationToken ct)
     {
+        await validator.ValidateAndThrowAsync(request, ct);
+
         var existingTxnId = await db.OpeningBalancesFor(request.AccountId, request.CommodityId)
             .Select(t => (Guid?)t.Id)
             .FirstOrDefaultAsync(ct)

@@ -1,17 +1,19 @@
+using FluentValidation;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Modules.Finances.Services;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Transactions.Trades.CreateTrade;
 
 public class CreateTradeHandler(
     ITradeService trades,
     IBalanceEntryReconciler reconciler,
-    IUnitOfWork unitOfWork)
-    : IRequestHandler<CreateTradeCommand, TransactionResponse>
+    IUnitOfWork unitOfWork,
+    IValidator<CreateTradeCommand> validator)
 {
     public async Task<TransactionResponse> Handle(CreateTradeCommand request, CancellationToken ct)
     {
+        await validator.ValidateAndThrowAsync(request, ct);
+
         var result = await trades.CreateAsync(
             new CreateTradeRequest(
                 request.AccountId,

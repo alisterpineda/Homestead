@@ -1,5 +1,3 @@
-using MediatR;
-
 namespace Homestead.WebApi.Modules.Admin.Features.Backup.DeleteBackupSchedule;
 
 public static class DeleteBackupScheduleEndpoint
@@ -7,9 +5,9 @@ public static class DeleteBackupScheduleEndpoint
     public static void Map(RouteGroupBuilder group)
     {
         group.MapDelete("/sources/{id:guid}/schedule", async (
-            Guid id, ISender sender, CancellationToken ct) =>
+            Guid id, DeleteBackupScheduleHandler handler, CancellationToken ct) =>
         {
-            await sender.Send(new DeleteBackupScheduleCommand(id), ct);
+            await handler.Handle(new DeleteBackupScheduleCommand(id), ct);
             return Results.NoContent();
         })
         .WithName("DeleteBackupSchedule")

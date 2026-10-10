@@ -2,7 +2,6 @@ using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Admin.Features.Users.BulkDeleteUsers;
@@ -11,7 +10,6 @@ public class BulkDeleteUsersHandler(
     AppDbContext db,
     ICurrentUserAccessor currentUser,
     IAuditContext audit)
-    : IRequestHandler<BulkDeleteUsersCommand, BulkDeleteUsersResponse>
 {
     public async Task<BulkDeleteUsersResponse> Handle(BulkDeleteUsersCommand request, CancellationToken ct)
     {

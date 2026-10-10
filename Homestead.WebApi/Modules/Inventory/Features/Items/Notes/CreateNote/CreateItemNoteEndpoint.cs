@@ -1,5 +1,4 @@
 using Homestead.WebApi.Authentication;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Items.Notes.CreateNote;
 
@@ -10,10 +9,10 @@ public static class CreateItemNoteEndpoint
         // "activity/notes" rather than "notes": item responses already expose a `notes` property
         // (the Description field's column name), so the nested route avoids the overloaded word.
         group.MapPost("/{id:guid}/activity/notes", async (Guid id, CreateItemNoteCommand request,
-            ISender sender, CancellationToken ct) =>
+            CreateItemNoteHandler handler, CancellationToken ct) =>
         {
             var command = request with { ItemId = id };
-            var response = await sender.Send(command, ct);
+            var response = await handler.Handle(command, ct);
             return Results.Created($"/api/v1/inventory/items/{id}/activity/notes/{response.Id}", response);
         })
         .WithName("CreateItemNote")

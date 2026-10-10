@@ -4,7 +4,6 @@ using Homestead.WebApi.Domain.Auditing;
 using Homestead.WebApi.Infrastructure.Backup;
 using Homestead.WebApi.Infrastructure.Backup.GoogleDrive;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Admin.Features.Backup.DisconnectBackupTarget;
@@ -33,7 +32,6 @@ public class DisconnectBackupTargetHandler(
     GoogleDriveTokenManager tokenManager,
     IAuditContext audit,
     IUnitOfWork unitOfWork)
-    : IRequestHandler<DisconnectBackupTargetCommand, bool>
 {
     public async Task<bool> Handle(DisconnectBackupTargetCommand request, CancellationToken ct)
     {

@@ -1,9 +1,9 @@
+using FluentValidation;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Commodities.CreateCommodity;
@@ -12,11 +12,13 @@ public class CreateCommodityHandler(
     AppDbContext db,
     ICurrentUserAccessor currentUser,
     IAuditContext audit,
-    IUnitOfWork unitOfWork)
-    : IRequestHandler<CreateCommodityCommand, CommodityResponse>
+    IUnitOfWork unitOfWork,
+    IValidator<CreateCommodityCommand> validator)
 {
     public async Task<CommodityResponse> Handle(CreateCommodityCommand request, CancellationToken ct)
     {
+        await validator.ValidateAndThrowAsync(request, ct);
+
         var symbol = request.Symbol.Trim().ToUpperInvariant();
         var exchange = request.Exchange.Trim().ToUpperInvariant();
         var name = request.Name.Trim();

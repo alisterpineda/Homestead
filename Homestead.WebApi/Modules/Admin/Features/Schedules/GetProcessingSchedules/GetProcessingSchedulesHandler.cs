@@ -1,12 +1,10 @@
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Admin.Features.Schedules.GetProcessingSchedules;
 
 public class GetProcessingSchedulesHandler(AppDbContext db)
-    : IRequestHandler<GetProcessingSchedulesQuery, PaginatedResponse<GetProcessingSchedulesResponse>>
 {
     public async Task<PaginatedResponse<GetProcessingSchedulesResponse>> Handle(
         GetProcessingSchedulesQuery request, CancellationToken ct)

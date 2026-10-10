@@ -1,3 +1,4 @@
+using FluentValidation;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
@@ -5,7 +6,6 @@ using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Inventory;
 using Homestead.WebApi.Modules.Inventory.Services;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Consumables.CollapseDurables;
@@ -16,11 +16,13 @@ public class CollapseDurablesHandler(
     ICurrentUserAccessor currentUser,
     IAuditContext audit,
     IItemLocationResolver locationResolver,
-    IUnitOfWork unitOfWork)
-    : IRequestHandler<CollapseDurablesCommand, ConsumableDetailResponse>
+    IUnitOfWork unitOfWork,
+    IValidator<CollapseDurablesCommand> validator)
 {
     public async Task<ConsumableDetailResponse> Handle(CollapseDurablesCommand request, CancellationToken ct)
     {
+        await validator.ValidateAndThrowAsync(request, ct);
+
         var body = request.Body;
 
         // Every check runs before any mutation, so a rejected collapse leaves stock, the ledger, and

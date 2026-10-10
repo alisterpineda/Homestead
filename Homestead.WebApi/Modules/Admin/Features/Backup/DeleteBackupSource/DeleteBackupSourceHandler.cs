@@ -3,7 +3,6 @@ using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Infrastructure.Backup;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Admin.Features.Backup.DeleteBackupSource;
@@ -29,7 +28,6 @@ public class DeleteBackupSourceHandler(
     IBackupSourceCatalog catalog,
     IAuditContext audit,
     IUnitOfWork unitOfWork)
-    : IRequestHandler<DeleteBackupSourceCommand, bool>
 {
     public async Task<bool> Handle(DeleteBackupSourceCommand request, CancellationToken ct)
     {

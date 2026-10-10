@@ -1,4 +1,3 @@
-using Homestead.WebApi.Common;
 using Microsoft.AspNetCore.JsonPatch.SystemTextJson;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Tags.PatchTag;
@@ -11,7 +10,7 @@ public class PatchInventoryTagModel
     public string? Description { get; set; }
 }
 
-public record PatchInventoryTagCommand : ICommand<PatchInventoryTagResponse>
+public record PatchInventoryTagCommand
 {
     public Guid Id { get; init; }
     public required JsonPatchDocument<PatchInventoryTagModel> PatchDocument { get; init; }

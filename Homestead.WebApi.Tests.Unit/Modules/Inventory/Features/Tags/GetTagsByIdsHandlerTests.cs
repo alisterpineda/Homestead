@@ -1,3 +1,4 @@
+using FluentValidation;
 using Homestead.WebApi.Domain.Inventory;
 using Homestead.WebApi.Modules.Inventory.Features.Tags.GetTagsByIds;
 
@@ -11,7 +12,7 @@ public class GetTagsByIdsHandlerTests : IDisposable
     public GetTagsByIdsHandlerTests()
     {
         _db = TestAppDbContext.Create();
-        _sut = new GetTagsByIdsHandler(_db);
+        _sut = new GetTagsByIdsHandler(_db, new GetInventoryTagsByIdsQueryValidator());
     }
 
     public void Dispose() => _db.Dispose();
@@ -68,16 +69,10 @@ public class GetTagsByIdsHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task Handle_EmptyIdList_ReturnsEmptyList()
+    public async Task Handle_EmptyIdList_ThrowsValidationException()
     {
-        var ct = TestContext.Current.CancellationToken;
-        _db.InventoryTags.Add(new Tag { Name = "Alpha", Path = "Alpha" });
-        await _db.SaveChangesAsync(ct);
-
-        var result = await _sut.Handle(
+        await Assert.ThrowsAsync<ValidationException>(() => _sut.Handle(
             new GetInventoryTagsByIdsQuery(Array.Empty<Guid>()),
-            ct);
-
-        Assert.Empty(result);
+            TestContext.Current.CancellationToken));
     }
 }

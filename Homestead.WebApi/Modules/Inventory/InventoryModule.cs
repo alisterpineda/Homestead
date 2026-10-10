@@ -1,5 +1,6 @@
 using Asp.Versioning.Builder;
 using Homestead.WebApi.Authentication;
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Modules.Inventory.Features.Areas.CreateArea;
 using Homestead.WebApi.Modules.Inventory.Features.Areas.DeleteArea;
 using Homestead.WebApi.Modules.Inventory.Features.Areas.GetAreas;
@@ -55,7 +56,8 @@ public static class InventoryModule
             .HasApiVersion(1, 0)
             .WithGroupName("v1")
             .WithTags("Inventory")
-            .RequireAuthorization(AuthPolicies.ActiveUser);
+            .RequireAuthorization(AuthPolicies.ActiveUser)
+            .WithCommandTransaction();
 
         GetInventoryOverviewEndpoint.Map(v1);
 

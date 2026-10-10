@@ -1,11 +1,9 @@
-using MediatR;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Documents.Features.Versions.GetDocumentVersion;
 
 public class GetDocumentVersionHandler(AppDbContext db)
-    : IRequestHandler<GetDocumentVersionQuery, GetDocumentVersionResponse?>
 {
     public async Task<GetDocumentVersionResponse?> Handle(GetDocumentVersionQuery request, CancellationToken ct)
     {

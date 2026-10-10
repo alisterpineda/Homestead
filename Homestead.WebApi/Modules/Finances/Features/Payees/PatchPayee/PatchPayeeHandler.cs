@@ -1,10 +1,10 @@
+using FluentValidation;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Payees.PatchPayee;
@@ -13,11 +13,13 @@ public class PatchPayeeHandler(
     AppDbContext db,
     ICurrentUserAccessor currentUser,
     IAuditContext audit,
-    IUnitOfWork unitOfWork)
-    : IRequestHandler<PatchPayeeCommand, PayeeResponse>
+    IUnitOfWork unitOfWork,
+    IValidator<PatchPayeeCommand> validator)
 {
     public async Task<PayeeResponse> Handle(PatchPayeeCommand request, CancellationToken ct)
     {
+        await validator.ValidateAndThrowAsync(request, ct);
+
         var payee = await db.Payees.FirstOrDefaultAsync(p => p.Id == request.Id, ct)
             ?? throw new EntityNotFoundException("Payee not found.");
 

@@ -1,9 +1,8 @@
-using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Finances;
 
 namespace Homestead.WebApi.Modules.Finances.Features.PriceSources.UpsertPriceSourceSchedule;
 
-public record UpsertPriceSourceScheduleCommand : ICommand<UpsertPriceSourceScheduleResponse>
+public record UpsertPriceSourceScheduleCommand
 {
     public CommodityPriceSource Source { get; init; }
     public required string CronExpression { get; init; }

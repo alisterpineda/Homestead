@@ -2,13 +2,11 @@ using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Accounts.GetAccounts;
 
 public class GetAccountsHandler(AppDbContext db, IValuationService valuations)
-    : IRequestHandler<GetAccountsQuery, PaginatedResponse<AccountResponse>>
 {
     public async Task<PaginatedResponse<AccountResponse>> Handle(
         GetAccountsQuery request, CancellationToken ct)

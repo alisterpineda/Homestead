@@ -1,12 +1,10 @@
 using Homestead.WebApi.Domain.Inventory;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Items.Warranties.GetWarranties;
 
 public class GetItemWarrantiesHandler(AppDbContext db, TimeProvider timeProvider)
-    : IRequestHandler<GetItemWarrantiesQuery, IReadOnlyList<ItemWarrantyResponse>?>
 {
     public async Task<IReadOnlyList<ItemWarrantyResponse>?> Handle(
         GetItemWarrantiesQuery request, CancellationToken ct)

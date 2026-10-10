@@ -2,13 +2,11 @@ using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Accounts.GetPositions;
 
 public class GetPositionsHandler(AppDbContext db, IValuationService valuations)
-    : IRequestHandler<GetPositionsQuery, IReadOnlyList<PositionResponse>>
 {
     public async Task<IReadOnlyList<PositionResponse>> Handle(
         GetPositionsQuery request, CancellationToken ct)

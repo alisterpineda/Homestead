@@ -1,9 +1,8 @@
-using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Finances;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Transactions.Trades.CreateTrade;
 
-public record CreateTradeCommand : ICommand<TransactionResponse>
+public record CreateTradeCommand
 {
     public required Guid AccountId { get; init; }
     public required TradeSide Side { get; init; }

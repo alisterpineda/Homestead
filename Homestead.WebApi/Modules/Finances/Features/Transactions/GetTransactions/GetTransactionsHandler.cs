@@ -3,13 +3,11 @@ using Homestead.WebApi.Common.Search;
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Transactions.GetTransactions;
 
 public class GetTransactionsHandler(AppDbContext db, ICategoryPathResolver pathResolver)
-    : IRequestHandler<GetTransactionsQuery, PaginatedResponse<TransactionResponse>>
 {
     public async Task<PaginatedResponse<TransactionResponse>> Handle(
         GetTransactionsQuery request, CancellationToken ct)

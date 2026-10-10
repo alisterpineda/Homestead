@@ -1,9 +1,8 @@
 using Homestead.WebApi.Common;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Documents.Features.Tags.GetTags;
 
-public record GetTagsQuery : PaginatedRequest, IRequest<PaginatedResponse<GetTagsResponse>>
+public record GetTagsQuery : PaginatedRequest
 {
     public string? ParentPath { get; init; }
     public bool? IncludeChildren { get; init; }

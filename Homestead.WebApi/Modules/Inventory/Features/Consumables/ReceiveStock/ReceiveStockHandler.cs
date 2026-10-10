@@ -1,7 +1,6 @@
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Modules.Inventory.Services;
 using Homestead.WebApi.Persistence;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Consumables.ReceiveStock;
 
@@ -10,7 +9,6 @@ public class ReceiveStockHandler(
     IStockService stock,
     IItemLocationResolver locationResolver,
     IUnitOfWork unitOfWork)
-    : IRequestHandler<ReceiveStockCommand, ConsumableDetailResponse>
 {
     public async Task<ConsumableDetailResponse> Handle(ReceiveStockCommand request, CancellationToken ct)
     {

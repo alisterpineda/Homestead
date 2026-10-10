@@ -1,9 +1,8 @@
 using Homestead.WebApi.Common;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Payees.GetPayees;
 
-public record GetPayeesQuery : PaginatedRequest, IRequest<PaginatedResponse<PayeeResponse>>
+public record GetPayeesQuery : PaginatedRequest
 {
     /// <summary>Case-insensitive contains search on the payee name. Serves the picker's server-search.</summary>
     public string? Search { get; init; }

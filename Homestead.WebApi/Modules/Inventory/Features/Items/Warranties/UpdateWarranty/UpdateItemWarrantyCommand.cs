@@ -1,9 +1,7 @@
-using Homestead.WebApi.Common;
-
 namespace Homestead.WebApi.Modules.Inventory.Features.Items.Warranties.UpdateWarranty;
 
 /// <summary>Full replace of a warranty's three user-editable fields (PUT semantics, not a patch).</summary>
-public record UpdateItemWarrantyCommand : ICommand<ItemWarrantyResponse>
+public record UpdateItemWarrantyCommand
 {
     internal Guid ItemId { get; init; }
     internal Guid WarrantyId { get; init; }

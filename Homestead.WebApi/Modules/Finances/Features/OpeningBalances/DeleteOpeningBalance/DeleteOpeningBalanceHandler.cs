@@ -1,7 +1,6 @@
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Features.OpeningBalances.DeleteOpeningBalance;
@@ -11,7 +10,6 @@ public class DeleteOpeningBalanceHandler(
     IOpeningBalanceService openingBalances,
     IBalanceEntryReconciler reconciler,
     IUnitOfWork unitOfWork)
-    : IRequestHandler<DeleteOpeningBalanceCommand, bool>
 {
     public async Task<bool> Handle(DeleteOpeningBalanceCommand request, CancellationToken ct)
     {

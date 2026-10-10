@@ -1,5 +1,5 @@
 using Homestead.WebApi.Authentication;
-using MediatR;
+using Homestead.WebApi.Authorization;
 
 namespace Homestead.WebApi.Modules.Documents.Features.Versions.ReprocessDocumentVersion;
 
@@ -9,7 +9,7 @@ public static class ReprocessDocumentVersionEndpoint
     {
         group.MapPost("/{versionId:guid}/reprocess", async (Guid documentId, Guid versionId,
             ReprocessDocumentVersionBody? body,
-            ISender sender, CancellationToken ct) =>
+            ReprocessDocumentVersionHandler handler, CancellationToken ct) =>
         {
             var request = new ReprocessDocumentVersionCommand
             {
@@ -19,11 +19,12 @@ public static class ReprocessDocumentVersionEndpoint
                 // "use the configured default", not "no engine".
                 EngineKey = body?.EngineKey
             };
-            var response = await sender.Send(request, ct);
+            var response = await handler.Handle(request, ct);
             return Results.Accepted(null, response);
         })
         .WithName("ReprocessDocumentVersion")
         .Produces<ReprocessDocumentVersionResponse>(StatusCodes.Status202Accepted)
-        .RequireAuthorization(AuthPolicies.RequireContributor);
+        .RequireAuthorization(AuthPolicies.RequireContributor)
+        .RequireDocumentAuthorization(DocumentOperations.Write);
     }
 }

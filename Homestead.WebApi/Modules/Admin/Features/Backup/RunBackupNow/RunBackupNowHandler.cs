@@ -5,7 +5,6 @@ using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Infrastructure.Backup;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Processing;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Admin.Features.Backup.RunBackupNow;
@@ -26,7 +25,6 @@ public class RunBackupNowHandler(
     IBackupTargetGate gate,
     IJobQueue queue,
     ICurrentUserAccessor currentUser)
-    : IRequestHandler<RunBackupNowCommand, RunBackupNowResponse>
 {
     public async Task<RunBackupNowResponse> Handle(RunBackupNowCommand request, CancellationToken ct)
     {

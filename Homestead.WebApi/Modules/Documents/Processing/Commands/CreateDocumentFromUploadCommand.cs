@@ -1,9 +1,7 @@
-using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Modules.Documents.Services;
 using Homestead.WebApi.Persistence;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Documents.Processing.Commands;
 
@@ -14,7 +12,7 @@ namespace Homestead.WebApi.Modules.Documents.Processing.Commands;
 /// created with the AI name/tags/parties/summary already applied — yielding a single <c>Created</c> audit
 /// entry rather than a Created followed by a suppressed Updated.
 /// </summary>
-public record CreateDocumentFromUploadCommand : ICommand<CreateDocumentFromUploadResult>, IActorAttributed
+public record CreateDocumentFromUploadCommand
 {
     public required string Name { get; init; }
     public Guid? GroupId { get; init; }
@@ -31,14 +29,19 @@ public record CreateDocumentFromUploadCommand : ICommand<CreateDocumentFromUploa
     /// <summary>Optional AI classification produced in-memory during the job (null when auto-classify is off).</summary>
     public ClassificationResult? Classification { get; init; }
 
+    /// <summary>The uploading user: becomes the document's creator and owner. Audit attribution is set separately on the unit of work.</summary>
     public Guid? ActorUserId { get; init; }
 }
 
 public record CreateDocumentFromUploadResult(Guid DocumentId, string Name);
 
+public interface ICreateDocumentFromUploadHandler
+{
+    Task<CreateDocumentFromUploadResult> Handle(CreateDocumentFromUploadCommand request, CancellationToken ct);
+}
+
 public class CreateDocumentFromUploadHandler(
-    AppDbContext db, IDocumentClassifier classifier, IAuditContext audit)
-    : IRequestHandler<CreateDocumentFromUploadCommand, CreateDocumentFromUploadResult>
+    AppDbContext db, IDocumentClassifier classifier, IAuditContext audit) : ICreateDocumentFromUploadHandler
 {
     public async Task<CreateDocumentFromUploadResult> Handle(CreateDocumentFromUploadCommand request, CancellationToken ct)
     {
@@ -79,7 +82,7 @@ public class CreateDocumentFromUploadHandler(
 
         audit.Created("Document", document.Id);
 
-        // The UnitOfWorkBehavior commits once after this handler returns — a single Created row.
+        // The job handler's unit of work commits once after this handler returns — a single Created row.
         // SearchVector is maintained by DB triggers as document + version are inserted.
         return new CreateDocumentFromUploadResult(document.Id, document.Name);
     }

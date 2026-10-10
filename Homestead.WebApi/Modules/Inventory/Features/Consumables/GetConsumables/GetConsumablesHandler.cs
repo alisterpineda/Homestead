@@ -3,13 +3,11 @@ using Homestead.WebApi.Domain.Inventory;
 using Homestead.WebApi.Modules.Inventory.Features.Durables;
 using Homestead.WebApi.Modules.Inventory.Services;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Consumables.GetConsumables;
 
 public class GetConsumablesHandler(AppDbContext db, IItemLocationResolver locationResolver)
-    : IRequestHandler<GetConsumablesQuery, PaginatedResponse<ConsumableResponse>>
 {
     public async Task<PaginatedResponse<ConsumableResponse>> Handle(
         GetConsumablesQuery request, CancellationToken ct)

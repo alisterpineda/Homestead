@@ -1,12 +1,10 @@
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Admin.Features.Schedules.DeleteProcessingSchedule;
 
 public class DeleteProcessingScheduleHandler(AppDbContext db)
-    : IRequestHandler<DeleteProcessingScheduleCommand, bool>
 {
     public async Task<bool> Handle(DeleteProcessingScheduleCommand request, CancellationToken ct)
     {
@@ -25,4 +23,4 @@ public class DeleteProcessingScheduleHandler(AppDbContext db)
     }
 }
 
-public record DeleteProcessingScheduleCommand(Guid Id) : ICommand<bool>;
+public record DeleteProcessingScheduleCommand(Guid Id);

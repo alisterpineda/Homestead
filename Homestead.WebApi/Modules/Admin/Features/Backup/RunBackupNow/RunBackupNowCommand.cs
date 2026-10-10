@@ -1,8 +1,6 @@
-using Homestead.WebApi.Common;
-
 namespace Homestead.WebApi.Modules.Admin.Features.Backup.RunBackupNow;
 
-public record RunBackupNowCommand : ICommand<RunBackupNowResponse>
+public record RunBackupNowCommand
 {
     /// <summary>The <c>backup.sources</c> pairing to run.</summary>
     public required Guid BackupSourceId { get; init; }

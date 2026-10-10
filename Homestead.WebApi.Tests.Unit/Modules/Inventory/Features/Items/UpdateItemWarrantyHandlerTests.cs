@@ -1,3 +1,4 @@
+using FluentValidation;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
@@ -27,7 +28,7 @@ public class UpdateItemWarrantyHandlerTests : IDisposable
         var unitOfWork = Substitute.For<IUnitOfWork>();
         unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
             .Returns(ci => _db.SaveChangesAsync(ci.Arg<CancellationToken>()));
-        _sut = new UpdateItemWarrantyHandler(_db, currentUser, _audit, unitOfWork, new FakeTimeProvider(Now));
+        _sut = new UpdateItemWarrantyHandler(_db, currentUser, _audit, unitOfWork, new FakeTimeProvider(Now), new UpdateItemWarrantyCommandValidator());
     }
 
     public void Dispose() => _db.Dispose();
@@ -161,5 +162,14 @@ public class UpdateItemWarrantyHandlerTests : IDisposable
         }, Ct);
 
         Assert.Equal(itemUpdatedAt, (await _db.Items.FindAsync([item.Id], Ct))!.UpdatedAt);
+    }
+
+    [Fact]
+    public async Task Handle_NotesTooLong_ThrowsValidationException()
+    {
+        await Assert.ThrowsAsync<ValidationException>(() => _sut.Handle(new UpdateItemWarrantyCommand
+        {
+            ItemId = Guid.NewGuid(), WarrantyId = Guid.NewGuid(), Notes = new string('x', 501),
+        }, Ct));
     }
 }

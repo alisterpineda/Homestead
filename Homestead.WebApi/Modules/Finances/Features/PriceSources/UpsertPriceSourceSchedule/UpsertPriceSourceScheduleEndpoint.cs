@@ -1,5 +1,4 @@
 using Homestead.WebApi.Domain.Finances;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Finances.Features.PriceSources.UpsertPriceSourceSchedule;
 
@@ -16,9 +15,9 @@ public static class UpsertPriceSourceScheduleEndpoint
     {
         group.MapPut("/{source}/schedule",
             async (CommodityPriceSource source, UpsertPriceSourceScheduleBody body,
-                ISender sender, CancellationToken ct) =>
+                UpsertPriceSourceScheduleHandler handler, CancellationToken ct) =>
         {
-            var response = await sender.Send(new UpsertPriceSourceScheduleCommand
+            var response = await handler.Handle(new UpsertPriceSourceScheduleCommand
             {
                 Source = source,
                 CronExpression = body.CronExpression,

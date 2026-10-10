@@ -1,7 +1,3 @@
-using Homestead.WebApi.Authorization;
-using MediatR;
-using Homestead.WebApi.Common;
-using Microsoft.AspNetCore.Authorization.Infrastructure;
 using Microsoft.AspNetCore.JsonPatch.SystemTextJson;
 
 namespace Homestead.WebApi.Modules.Documents.Features.Documents.PatchDocument;
@@ -17,11 +13,8 @@ public class PatchDocumentModel
     public Guid? GroupId { get; set; }
 }
 
-public record PatchDocumentCommand : ICommand<PatchDocumentResponse>, IRequireDocumentAuthorization
+public record PatchDocumentCommand
 {
     public Guid Id { get; init; }
     public required JsonPatchDocument<PatchDocumentModel> PatchDocument { get; init; }
-
-    Guid IRequireDocumentAuthorization.DocumentId => Id;
-    public OperationAuthorizationRequirement RequiredOperation => DocumentOperations.Write;
 }

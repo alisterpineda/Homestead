@@ -1,5 +1,6 @@
 using Asp.Versioning.Builder;
 using Homestead.WebApi.Authentication;
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Modules.Admin.Features.Ai.GetAiStatus;
 using Homestead.WebApi.Modules.Admin.Features.Ai.TestAiConnection;
 using Homestead.WebApi.Modules.Admin.Features.Backup.ConfirmBackupTargetConnection;
@@ -47,7 +48,8 @@ public static class AdminModule
             .HasApiVersion(1, 0)
             .WithGroupName("v1")
             .WithTags("Admin")
-            .RequireAuthorization(AuthPolicies.RequireAdmin);
+            .RequireAuthorization(AuthPolicies.RequireAdmin)
+            .WithCommandTransaction();
 
         GetUsersEndpoint.Map(v1);
         CreateUserEndpoint.Map(v1);
@@ -59,7 +61,8 @@ public static class AdminModule
             .HasApiVersion(1, 0)
             .WithGroupName("v1")
             .WithTags("Admin")
-            .RequireAuthorization(AuthPolicies.RequireAdmin);
+            .RequireAuthorization(AuthPolicies.RequireAdmin)
+            .WithCommandTransaction();
 
         CreateGroupEndpoint.Map(groups);
         GetGroupsEndpoint.Map(groups);
@@ -74,7 +77,8 @@ public static class AdminModule
             .HasApiVersion(1, 0)
             .WithGroupName("v1")
             .WithTags("Admin")
-            .RequireAuthorization(AuthPolicies.RequireAdmin);
+            .RequireAuthorization(AuthPolicies.RequireAdmin)
+            .WithCommandTransaction();
 
         GetSystemSettingsEndpoint.Map(settings);
         PatchSystemSettingsEndpoint.Map(settings);
@@ -84,7 +88,8 @@ public static class AdminModule
             .HasApiVersion(1, 0)
             .WithGroupName("v1")
             .WithTags("Admin")
-            .RequireAuthorization(AuthPolicies.RequireAdmin);
+            .RequireAuthorization(AuthPolicies.RequireAdmin)
+            .WithCommandTransaction();
 
         GetProcessingSchedulesEndpoint.Map(schedules);
         CreateProcessingScheduleEndpoint.Map(schedules);
@@ -94,7 +99,8 @@ public static class AdminModule
             .HasApiVersion(1, 0)
             .WithGroupName("v1")
             .WithTags("Admin")
-            .RequireAuthorization(AuthPolicies.RequireAdmin);
+            .RequireAuthorization(AuthPolicies.RequireAdmin)
+            .WithCommandTransaction();
 
         GetAiStatusEndpoint.Map(ai);
         TestAiConnectionEndpoint.Map(ai);
@@ -103,7 +109,8 @@ public static class AdminModule
             .HasApiVersion(1, 0)
             .WithGroupName("v1")
             .WithTags("Admin")
-            .RequireAuthorization(AuthPolicies.RequireAdmin);
+            .RequireAuthorization(AuthPolicies.RequireAdmin)
+            .WithCommandTransaction();
 
         GetBackupTargetsEndpoint.Map(backup);
         GetDocumentBackupStateEndpoint.Map(backup);

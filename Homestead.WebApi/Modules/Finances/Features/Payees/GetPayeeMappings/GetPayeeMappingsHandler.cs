@@ -1,11 +1,9 @@
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Payees.GetPayeeMappings;
 
 public class GetPayeeMappingsHandler(AppDbContext db)
-    : IRequestHandler<GetPayeeMappingsQuery, IReadOnlyList<PayeeMappingResponse>>
 {
     public async Task<IReadOnlyList<PayeeMappingResponse>> Handle(
         GetPayeeMappingsQuery request, CancellationToken ct)

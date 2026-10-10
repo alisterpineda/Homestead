@@ -1,5 +1,4 @@
 using Homestead.WebApi.Authentication;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Payees.CreatePayee;
 
@@ -7,9 +6,9 @@ public static class CreatePayeeEndpoint
 {
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapPost("", async (CreatePayeeCommand request, ISender sender, CancellationToken ct) =>
+        group.MapPost("", async (CreatePayeeCommand request, CreatePayeeHandler handler, CancellationToken ct) =>
         {
-            var response = await sender.Send(request, ct);
+            var response = await handler.Handle(request, ct);
             return Results.Created($"/api/v1/finances/payees/{response.Id}", response);
         })
         .WithName("CreatePayee")

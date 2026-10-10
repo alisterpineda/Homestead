@@ -1,20 +1,22 @@
+using FluentValidation;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Groups;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Admin.Features.Groups.UpdateGroup;
 
 public class UpdateGroupHandler(
-    AppDbContext db, IAuditContext audit, ICurrentUserAccessor currentUser, IUnitOfWork unitOfWork)
-    : IRequestHandler<UpdateGroupCommand, GroupResponse>
+    AppDbContext db, IAuditContext audit, ICurrentUserAccessor currentUser, IUnitOfWork unitOfWork,
+    IValidator<UpdateGroupCommand> validator)
 {
     public async Task<GroupResponse> Handle(UpdateGroupCommand command, CancellationToken ct)
     {
+        await validator.ValidateAndThrowAsync(command, ct);
+
         var group = await db.Groups.FirstOrDefaultAsync(g => g.Id == command.Id, ct);
         if (group is null)
             throw new EntityNotFoundException("Group not found.");
@@ -66,7 +68,7 @@ public class UpdateGroupHandler(
     }
 }
 
-public record UpdateGroupCommand : ICommand<GroupResponse>
+public record UpdateGroupCommand
 {
     public Guid Id { get; init; }
     public required UpdateGroupRequest Request { get; init; }

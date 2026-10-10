@@ -1,4 +1,3 @@
-using MediatR;
 using Microsoft.AspNetCore.JsonPatch.SystemTextJson;
 
 namespace Homestead.WebApi.Modules.Documents.Features.Settings.PatchDocumentSettings;
@@ -9,10 +8,10 @@ public static class PatchDocumentSettingsEndpoint
     {
         group.MapPatch("", async (
             JsonPatchDocument<DocumentSettings> patchDoc,
-            ISender sender, CancellationToken ct) =>
+            PatchDocumentSettingsHandler handler, CancellationToken ct) =>
         {
             var command = new PatchDocumentSettingsCommand { PatchDocument = patchDoc };
-            return Results.Ok(await sender.Send(command, ct));
+            return Results.Ok(await handler.Handle(command, ct));
         })
         .WithName("PatchDocumentSettings")
         .Accepts<JsonPatchDocument<DocumentSettings>>("application/json-patch+json")

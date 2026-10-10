@@ -1,14 +1,12 @@
-using MediatR;
-
 namespace Homestead.WebApi.Modules.Inventory.Features.Overview.GetInventoryOverview;
 
 public static class GetInventoryOverviewEndpoint
 {
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapGet("/overview", async (ISender sender, CancellationToken ct) =>
+        group.MapGet("/overview", async (GetInventoryOverviewHandler handler, CancellationToken ct) =>
         {
-            return Results.Ok(await sender.Send(new GetInventoryOverviewQuery(), ct));
+            return Results.Ok(await handler.Handle(new GetInventoryOverviewQuery(), ct));
         })
         .WithName("GetInventoryOverview")
         .Produces<GetInventoryOverviewResponse>();

@@ -1,5 +1,4 @@
 using Homestead.WebApi.Common;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Items.GetItemActivity;
 
@@ -8,7 +7,7 @@ public static class GetItemActivityEndpoint
     public static void Map(RouteGroupBuilder group)
     {
         group.MapGet("/{id:guid}/activity", async (Guid id,
-            [AsParameters] PaginatedRequest paging, ISender sender, CancellationToken ct) =>
+            [AsParameters] PaginatedRequest paging, GetItemActivityHandler handler, CancellationToken ct) =>
         {
             var query = new GetItemActivityQuery
             {
@@ -16,7 +15,7 @@ public static class GetItemActivityEndpoint
                 Page = paging.Page,
                 PageSize = paging.PageSize,
             };
-            var response = await sender.Send(query, ct);
+            var response = await handler.Handle(query, ct);
             return response is null ? Results.NotFound() : Results.Ok(response);
         })
         .WithName("GetItemActivity")

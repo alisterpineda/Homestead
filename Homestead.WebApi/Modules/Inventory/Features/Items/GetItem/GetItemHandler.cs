@@ -3,7 +3,6 @@ using Homestead.WebApi.Modules.Inventory.Features.Consumables;
 using Homestead.WebApi.Modules.Inventory.Features.Durables;
 using Homestead.WebApi.Modules.Inventory.Services;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Items.GetItem;
@@ -13,7 +12,6 @@ namespace Homestead.WebApi.Modules.Inventory.Features.Items.GetItem;
 /// per-kind mapper/reader so the response shape exactly matches <c>GetDurable</c> / <c>GetConsumable</c>.
 /// </summary>
 public class GetItemHandler(AppDbContext db, IItemLocationResolver locationResolver)
-    : IRequestHandler<GetItemQuery, ItemDetailResponse?>
 {
     public async Task<ItemDetailResponse?> Handle(GetItemQuery request, CancellationToken ct)
     {

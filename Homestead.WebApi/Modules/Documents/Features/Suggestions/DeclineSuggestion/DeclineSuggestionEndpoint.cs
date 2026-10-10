@@ -1,5 +1,5 @@
 using Homestead.WebApi.Authentication;
-using MediatR;
+using Homestead.WebApi.Authorization;
 
 namespace Homestead.WebApi.Modules.Documents.Features.Suggestions.DeclineSuggestion;
 
@@ -8,9 +8,9 @@ public static class DeclineSuggestionEndpoint
     public static void Map(RouteGroupBuilder group)
     {
         group.MapPost("/{suggestionId:guid}/decline", async (Guid documentId, Guid suggestionId,
-            ISender sender, CancellationToken ct) =>
+            DeclineSuggestionHandler handler, CancellationToken ct) =>
         {
-            await sender.Send(new DeclineSuggestionCommand
+            await handler.Handle(new DeclineSuggestionCommand
             {
                 DocumentId = documentId,
                 SuggestionId = suggestionId
@@ -19,6 +19,7 @@ public static class DeclineSuggestionEndpoint
         })
         .WithName("DeclineSuggestion")
         .Produces(StatusCodes.Status204NoContent)
-        .RequireAuthorization(AuthPolicies.RequireContributor);
+        .RequireAuthorization(AuthPolicies.RequireContributor)
+        .RequireDocumentAuthorization(DocumentOperations.Write);
     }
 }

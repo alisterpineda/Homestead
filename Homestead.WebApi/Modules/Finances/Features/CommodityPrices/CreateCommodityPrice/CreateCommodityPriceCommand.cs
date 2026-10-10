@@ -1,8 +1,6 @@
-using Homestead.WebApi.Common;
-
 namespace Homestead.WebApi.Modules.Finances.Features.CommodityPrices.CreateCommodityPrice;
 
-public record CreateCommodityPriceCommand : ICommand<CommodityPriceResponse>
+public record CreateCommodityPriceCommand
 {
     public required Guid CommodityId { get; init; }
     public required Guid QuoteCurrencyId { get; init; }

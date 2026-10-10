@@ -1,4 +1,3 @@
-using Homestead.WebApi.Common;
 using Microsoft.AspNetCore.JsonPatch.SystemTextJson;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Commodities.PatchCommodity;
@@ -9,7 +8,7 @@ public class PatchCommodityModel
     public short DisplayPrecision { get; set; }
 }
 
-public record PatchCommodityCommand : ICommand<CommodityResponse>
+public record PatchCommodityCommand
 {
     public Guid Id { get; init; }
     public required JsonPatchDocument<PatchCommodityModel> PatchDocument { get; init; }

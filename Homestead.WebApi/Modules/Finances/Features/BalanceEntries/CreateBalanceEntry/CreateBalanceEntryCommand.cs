@@ -1,8 +1,6 @@
-using Homestead.WebApi.Common;
-
 namespace Homestead.WebApi.Modules.Finances.Features.BalanceEntries.CreateBalanceEntry;
 
-public record CreateBalanceEntryCommand : ICommand<BalanceEntryResponse>
+public record CreateBalanceEntryCommand
 {
     public Guid AccountId { get; init; }
     public required Guid CommodityId { get; init; }

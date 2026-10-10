@@ -1,9 +1,7 @@
-using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Documents.Processing.Commands;
@@ -13,7 +11,7 @@ namespace Homestead.WebApi.Modules.Documents.Processing.Commands;
 /// performs the (failure-prone) text extraction; this command only persists the result and audits the
 /// change. Distinct name from the HTTP <c>ReprocessDocumentVersionCommand</c> (which enqueues the job).
 /// </summary>
-public record ReprocessVersionTextCommand : ICommand<ReprocessVersionTextResult>, IActorAttributed
+public record ReprocessVersionTextCommand
 {
     public required Guid DocumentId { get; init; }
     public required Guid VersionId { get; init; }
@@ -21,14 +19,16 @@ public record ReprocessVersionTextCommand : ICommand<ReprocessVersionTextResult>
 
     /// <summary>Serialized TextExtractionMetadata describing how ExtractedText was produced.</summary>
     public required string? TextExtractionMetadata { get; init; }
-
-    public Guid? ActorUserId { get; init; }
 }
 
 public record ReprocessVersionTextResult(string DocumentName);
 
-public class ReprocessVersionTextHandler(AppDbContext db, IAuditContext audit)
-    : IRequestHandler<ReprocessVersionTextCommand, ReprocessVersionTextResult>
+public interface IReprocessVersionTextHandler
+{
+    Task<ReprocessVersionTextResult> Handle(ReprocessVersionTextCommand request, CancellationToken ct);
+}
+
+public class ReprocessVersionTextHandler(AppDbContext db, IAuditContext audit) : IReprocessVersionTextHandler
 {
     public async Task<ReprocessVersionTextResult> Handle(ReprocessVersionTextCommand request, CancellationToken ct)
     {
@@ -44,7 +44,7 @@ public class ReprocessVersionTextHandler(AppDbContext db, IAuditContext audit)
         version.ExtractedText = request.ExtractedText;
         version.TextExtractionMetadata = request.TextExtractionMetadata;
 
-        // The UnitOfWorkBehavior commits; the DB trigger refreshes the document's SearchVector.
+        // The job handler's unit of work commits; the DB trigger refreshes the document's SearchVector.
         return new ReprocessVersionTextResult(version.Document.Name);
     }
 }

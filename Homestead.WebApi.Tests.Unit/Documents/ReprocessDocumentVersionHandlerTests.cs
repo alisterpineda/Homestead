@@ -1,3 +1,4 @@
+using FluentValidation;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Documents;
@@ -32,7 +33,8 @@ public class ReprocessDocumentVersionHandlerTests : IDisposable
             .Returns(Guid.NewGuid());
 
         _resolver = new TextExtractionEngineResolver(TestTextExtraction.Engines(), defaultEngineKey: null);
-        _sut = new ReprocessDocumentVersionHandler(_db, _currentUser, _resolver, _jobQueue);
+        _sut = new ReprocessDocumentVersionHandler(_db, _currentUser, _resolver, _jobQueue,
+            new ReprocessDocumentVersionCommandValidator(TestTextExtraction.Engines()));
 
         SeedDocumentAndVersion();
     }
@@ -165,5 +167,19 @@ public class ReprocessDocumentVersionHandlerTests : IDisposable
 
         await _jobQueue.DidNotReceive().EnqueueAsync(
             Arg.Any<ProcessingJobType>(), Arg.Any<Action<EnqueueJobRequest>?>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_UnknownEngineKey_ThrowsValidationException()
+    {
+        var request = new ReprocessDocumentVersionCommand
+        {
+            DocumentId = _docId,
+            VersionId = _versionId,
+            EngineKey = "no-such-engine"
+        };
+
+        await Assert.ThrowsAsync<ValidationException>(
+            () => _sut.Handle(request, TestContext.Current.CancellationToken));
     }
 }

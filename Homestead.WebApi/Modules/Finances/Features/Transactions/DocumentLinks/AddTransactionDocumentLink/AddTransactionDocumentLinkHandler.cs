@@ -4,7 +4,6 @@ using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Transactions.DocumentLinks.AddTransactionDocumentLink;
@@ -15,7 +14,6 @@ public class AddTransactionDocumentLinkHandler(
     ICurrentUserAccessor currentUser,
     IAuditContext audit,
     IUnitOfWork unitOfWork)
-    : IRequestHandler<AddTransactionDocumentLinkCommand, TransactionDocumentLinkResponse>
 {
     public async Task<TransactionDocumentLinkResponse> Handle(
         AddTransactionDocumentLinkCommand request, CancellationToken ct)

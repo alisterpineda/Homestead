@@ -2,7 +2,6 @@ using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Transactions.DocumentLinks.RemoveTransactionDocumentLink;
@@ -11,9 +10,8 @@ public class RemoveTransactionDocumentLinkHandler(
     AppDbContext db,
     IAuditContext audit,
     IUnitOfWork unitOfWork)
-    : IRequestHandler<RemoveTransactionDocumentLinkCommand, Unit>
 {
-    public async Task<Unit> Handle(RemoveTransactionDocumentLinkCommand request, CancellationToken ct)
+    public async Task Handle(RemoveTransactionDocumentLinkCommand request, CancellationToken ct)
     {
         var link = await db.TransactionDocumentLinks
             .FirstOrDefaultAsync(l => l.AccountTransactionId == request.TransactionId
@@ -32,7 +30,5 @@ public class RemoveTransactionDocumentLinkHandler(
             TransactionDocumentLink.SyntheticId(request.TransactionId, request.DocumentId),
             parentEntityId: request.TransactionId);
         await unitOfWork.SaveChangesAsync(ct);
-
-        return Unit.Value;
     }
 }

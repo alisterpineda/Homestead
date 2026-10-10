@@ -1,3 +1,4 @@
+using FluentValidation;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
@@ -23,7 +24,7 @@ public class CreateItemNoteHandlerTests : IDisposable
         var unitOfWork = Substitute.For<IUnitOfWork>();
         unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
             .Returns(ci => _db.SaveChangesAsync(ci.Arg<CancellationToken>()));
-        _sut = new CreateItemNoteHandler(_db, currentUser, _audit, unitOfWork);
+        _sut = new CreateItemNoteHandler(_db, currentUser, _audit, unitOfWork, new CreateItemNoteCommandValidator());
     }
 
     public void Dispose() => _db.Dispose();
@@ -134,5 +135,14 @@ public class CreateItemNoteHandlerTests : IDisposable
 
         // A note is history about the item, not an edit of it — Browse recency is unaffected.
         Assert.Equal(itemUpdatedAt, (await _db.Items.FindAsync([item.Id], Ct))!.UpdatedAt);
+    }
+
+    [Fact]
+    public async Task Handle_BlankBody_ThrowsValidationException()
+    {
+        var item = await ItemNoteTestData.AddItemAsync(_db);
+
+        await Assert.ThrowsAsync<ValidationException>(() =>
+            _sut.Handle(new CreateItemNoteCommand { ItemId = item.Id, Body = "   " }, Ct));
     }
 }

@@ -1,10 +1,10 @@
+using FluentValidation;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Inventory;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Items.Warranties.UpdateWarranty;
@@ -14,11 +14,13 @@ public class UpdateItemWarrantyHandler(
     ICurrentUserAccessor currentUser,
     IAuditContext audit,
     IUnitOfWork unitOfWork,
-    TimeProvider timeProvider)
-    : IRequestHandler<UpdateItemWarrantyCommand, ItemWarrantyResponse>
+    TimeProvider timeProvider,
+    IValidator<UpdateItemWarrantyCommand> validator)
 {
     public async Task<ItemWarrantyResponse> Handle(UpdateItemWarrantyCommand request, CancellationToken ct)
     {
+        await validator.ValidateAndThrowAsync(request, ct);
+
         // Scoped to the route's item so a warranty id can't be edited through another item's URL.
         var warranty = await db.ItemWarranties.FirstOrDefaultAsync(
             w => w.Id == request.WarrantyId && w.ItemId == request.ItemId, ct);

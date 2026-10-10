@@ -3,13 +3,11 @@ using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Modules.Finances.Features.Settings;
 using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Reports.GetNetWorthHistory;
 
 public class GetNetWorthHistoryHandler(AppDbContext db, IValuationService valuations)
-    : IRequestHandler<GetNetWorthHistoryQuery, GetNetWorthHistoryResponse>
 {
     // Threshold below which "All" range stays daily; above, switches to monthly.
     private const int DailyAllRangeThresholdDays = 365;

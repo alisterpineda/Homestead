@@ -1,13 +1,11 @@
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
-using MediatR;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Documents.Features.Parties.GetParties;
 
 public class GetPartiesHandler(AppDbContext db, IDocumentQueryService accessService)
-    : IRequestHandler<GetPartiesQuery, PaginatedResponse<GetPartiesResponse>>
 {
     public async Task<PaginatedResponse<GetPartiesResponse>> Handle(
         GetPartiesQuery request, CancellationToken ct)

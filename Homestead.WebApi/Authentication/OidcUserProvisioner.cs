@@ -52,7 +52,7 @@ public class OidcUserProvisioner(
                 user.Role = AppRole.Contributor;
         }
 
-        // The callback endpoint that calls this isn't wrapped by UnitOfWorkBehavior, so save here.
+        // The callback is a GET, so CommandTransactionFilter runs it with no transaction; save here.
         await db.SaveChangesAsync(ct);
         return user;
     }

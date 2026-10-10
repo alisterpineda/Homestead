@@ -65,7 +65,7 @@ public class ApplyCommodityPriceObservationsHandlerTests : IDisposable
             },
         }, ct);
 
-        // The command handler does not save — the UnitOfWorkBehavior commits in production.
+        // The command handler does not save — the job handler's unit of work commits in production.
         await _db.SaveChangesAsync(ct);
 
         var prices = _db.CommodityPrices.Where(p => p.Source == CommodityPriceSource.BankOfCanada).ToList();

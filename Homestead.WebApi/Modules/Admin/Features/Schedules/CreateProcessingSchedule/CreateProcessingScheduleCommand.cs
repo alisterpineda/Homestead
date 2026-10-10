@@ -1,9 +1,8 @@
-using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Processing;
 
 namespace Homestead.WebApi.Modules.Admin.Features.Schedules.CreateProcessingSchedule;
 
-public record CreateProcessingScheduleCommand : ICommand<CreateProcessingScheduleResponse>
+public record CreateProcessingScheduleCommand
 {
     public required string Name { get; init; }
     public string? Description { get; init; }

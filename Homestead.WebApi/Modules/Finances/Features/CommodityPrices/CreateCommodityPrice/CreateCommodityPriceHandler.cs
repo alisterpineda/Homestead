@@ -1,9 +1,9 @@
+using FluentValidation;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Features.CommodityPrices.CreateCommodityPrice;
@@ -12,12 +12,14 @@ public class CreateCommodityPriceHandler(
     AppDbContext db,
     ICurrentUserAccessor currentUser,
     IAuditContext audit,
-    IUnitOfWork unitOfWork)
-    : IRequestHandler<CreateCommodityPriceCommand, CommodityPriceResponse>
+    IUnitOfWork unitOfWork,
+    IValidator<CreateCommodityPriceCommand> validator)
 {
     public async Task<CommodityPriceResponse> Handle(
         CreateCommodityPriceCommand request, CancellationToken ct)
     {
+        await validator.ValidateAndThrowAsync(request, ct);
+
         var commodities = await db.Commodities
             .AsNoTracking()
             .Where(c => c.Id == request.CommodityId || c.Id == request.QuoteCurrencyId)

@@ -1,12 +1,10 @@
 using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Accounts.GetAccount;
 
 public class GetAccountHandler(AppDbContext db, IValuationService valuations)
-    : IRequestHandler<GetAccountQuery, AccountResponse?>
 {
     public async Task<AccountResponse?> Handle(GetAccountQuery request, CancellationToken ct)
     {

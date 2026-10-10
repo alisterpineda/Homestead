@@ -1,5 +1,4 @@
 using Homestead.WebApi.Authentication;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Items.Notes.DeleteNote;
 
@@ -8,9 +7,9 @@ public static class DeleteItemNoteEndpoint
     public static void Map(RouteGroupBuilder group)
     {
         group.MapDelete("/{id:guid}/activity/notes/{noteId:guid}", async (Guid id, Guid noteId,
-            ISender sender, CancellationToken ct) =>
+            DeleteItemNoteHandler handler, CancellationToken ct) =>
         {
-            var deleted = await sender.Send(new DeleteItemNoteCommand(id, noteId), ct);
+            var deleted = await handler.Handle(new DeleteItemNoteCommand(id, noteId), ct);
             return deleted ? Results.NoContent() : Results.NotFound();
         })
         .WithName("DeleteItemNote")

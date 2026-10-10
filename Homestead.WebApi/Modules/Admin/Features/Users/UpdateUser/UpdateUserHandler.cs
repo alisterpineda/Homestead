@@ -4,13 +4,11 @@ using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Identity;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Admin.Features.Users.UpdateUser;
 
 public class UpdateUserHandler(AppDbContext db, ICurrentUserAccessor currentUser, IAuditContext audit)
-    : IRequestHandler<UpdateUserCommand, UserResponse?>
 {
     public async Task<UserResponse?> Handle(UpdateUserCommand request, CancellationToken ct)
     {

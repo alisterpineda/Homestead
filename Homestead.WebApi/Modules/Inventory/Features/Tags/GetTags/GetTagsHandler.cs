@@ -1,13 +1,11 @@
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Search;
-using MediatR;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Tags.GetTags;
 
 public class GetTagsHandler(AppDbContext db)
-    : IRequestHandler<GetInventoryTagsQuery, PaginatedResponse<GetInventoryTagsResponse>>
 {
     public async Task<PaginatedResponse<GetInventoryTagsResponse>> Handle(GetInventoryTagsQuery request, CancellationToken ct)
     {

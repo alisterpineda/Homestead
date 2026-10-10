@@ -6,7 +6,6 @@ using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Modules.Finances.PriceProviders;
 using Homestead.WebApi.Modules.Finances.Processing;
 using Homestead.WebApi.Processing;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Finances.Features.PriceSources.RunPriceSourceImportNow;
 
@@ -14,7 +13,6 @@ public class RunPriceSourceImportNowHandler(
     IJobQueue queue,
     ICurrentUserAccessor currentUser,
     IPriceSourceRegistry sources)
-    : IRequestHandler<RunPriceSourceImportNowCommand, RunPriceSourceImportNowResponse>
 {
     public async Task<RunPriceSourceImportNowResponse> Handle(
         RunPriceSourceImportNowCommand request, CancellationToken ct)

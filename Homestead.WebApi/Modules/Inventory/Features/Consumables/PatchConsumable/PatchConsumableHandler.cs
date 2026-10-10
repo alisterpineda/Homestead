@@ -5,7 +5,6 @@ using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Inventory;
 using Homestead.WebApi.Modules.Inventory.Services;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Consumables.PatchConsumable;
@@ -16,7 +15,6 @@ public class PatchConsumableHandler(
     IAuditContext audit,
     IInventoryTagPathResolver tagResolver,
     IUnitOfWork unitOfWork)
-    : IRequestHandler<PatchConsumableCommand, ConsumableResponse>
 {
     // A consumable uses only the reduced fungible lifecycle; lending or repairing a count is meaningless.
     private static readonly ItemStatus[] FungibleStatuses = [ItemStatus.Active, ItemStatus.Archived];

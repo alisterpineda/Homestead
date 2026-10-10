@@ -1,9 +1,9 @@
+using FluentValidation;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Inventory;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Items.Notes.CreateNote;
@@ -12,11 +12,13 @@ public class CreateItemNoteHandler(
     AppDbContext db,
     ICurrentUserAccessor currentUser,
     IAuditContext audit,
-    IUnitOfWork unitOfWork)
-    : IRequestHandler<CreateItemNoteCommand, ItemNoteResponse>
+    IUnitOfWork unitOfWork,
+    IValidator<CreateItemNoteCommand> validator)
 {
     public async Task<ItemNoteResponse> Handle(CreateItemNoteCommand request, CancellationToken ct)
     {
+        await validator.ValidateAndThrowAsync(request, ct);
+
         // Any kind, any status: a sold or archived item can still have its story completed
         // (activity.md §Which items can carry notes).
         var itemExists = await db.Items.AnyAsync(i => i.Id == request.ItemId, ct);

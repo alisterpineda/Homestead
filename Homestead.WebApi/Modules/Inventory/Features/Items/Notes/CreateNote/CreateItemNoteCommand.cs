@@ -1,8 +1,6 @@
-using Homestead.WebApi.Common;
-
 namespace Homestead.WebApi.Modules.Inventory.Features.Items.Notes.CreateNote;
 
-public record CreateItemNoteCommand : ICommand<ItemNoteResponse>
+public record CreateItemNoteCommand
 {
     /// <summary>The owning item, taken from the route by the endpoint (never from the body).</summary>
     internal Guid ItemId { get; init; }

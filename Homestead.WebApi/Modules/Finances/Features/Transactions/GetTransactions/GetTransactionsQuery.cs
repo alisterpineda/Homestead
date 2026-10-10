@@ -1,10 +1,9 @@
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Modules.Finances.Features.Transactions;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Transactions.GetTransactions;
 
-public record GetTransactionsQuery : PaginatedRequest, IRequest<PaginatedResponse<TransactionResponse>>
+public record GetTransactionsQuery : PaginatedRequest
 {
     public Guid? AccountId { get; init; }
     public Guid? CommodityId { get; init; }

@@ -1,6 +1,6 @@
+using System.Net.Http.Json;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Tests.Integration.Infrastructure;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using static Homestead.WebApi.Tests.Integration.Infrastructure.TransactionRollbackProbes;
@@ -8,9 +8,10 @@ using static Homestead.WebApi.Tests.Integration.Infrastructure.TransactionRollba
 namespace Homestead.WebApi.Tests.Integration.Transactions;
 
 /// <summary>
-/// Proves the request-scoped transaction (opened by <c>UnitOfWorkBehavior</c> via
-/// <c>UnitOfWork.ExecuteInTransactionAsync</c>) commits exactly once and rolls everything back on
-/// failure — including writes a handler already flushed mid-handler and jobs it enqueued. Real rollback
+/// Proves the request-scoped transaction (opened by <c>CommandTransactionFilter</c> via
+/// <c>UnitOfWork.ExecuteInTransactionAsync</c> on a <c>.WithCommandTransaction()</c> group) commits exactly
+/// once and rolls everything back on failure — including writes a handler already flushed mid-handler and
+/// jobs it enqueued. The probes are driven over HTTP, so the filter itself is under test. Real rollback
 /// needs a relational provider, so this lives in the integration suite (InMemory ignores transactions).
 /// </summary>
 public class TransactionRollbackTests(PostgresFixture fixture) : IntegrationTestBase(fixture)
@@ -20,14 +21,11 @@ public class TransactionRollbackTests(PostgresFixture fixture) : IntegrationTest
     {
         var entityId = Guid.NewGuid();
 
-        // Dispatch the probe through the real pipeline. It stages an audited user, flushes mid-handler,
+        // POST the probe through the transaction filter. It stages an audited user, flushes mid-handler,
         // then throws — so the flush happened inside the transaction but the transaction never commits.
-        using (var scope = CreateScope())
-        {
-            var sender = scope.ServiceProvider.GetRequiredService<ISender>();
-            await Assert.ThrowsAsync<InvalidOperationException>(() =>
-                sender.Send(new AuditedRollbackProbeCommand(entityId), CT));
-        }
+        var response = await CreateAnonymousClient().PostAsJsonAsync(
+            AuditedRollbackRoute, new AuditedRollbackProbeCommand(entityId), CT);
+        Assert.Equal(ProbeFailedStatusCode, (int)response.StatusCode);
 
         // Fresh scope (new connection): neither the entity nor its audit row may have survived.
         using (var scope = CreateScope())
@@ -47,12 +45,9 @@ public class TransactionRollbackTests(PostgresFixture fixture) : IntegrationTest
 
         // The probe enqueues a job (which flushes into the transaction and defers its processor signal to
         // after-commit), then throws. The rollback must take the job with it and the signal must not fire.
-        using (var scope = CreateScope())
-        {
-            var sender = scope.ServiceProvider.GetRequiredService<ISender>();
-            await Assert.ThrowsAsync<InvalidOperationException>(() =>
-                sender.Send(new EnqueueRollbackProbeCommand(marker), CT));
-        }
+        var response = await CreateAnonymousClient().PostAsJsonAsync(
+            EnqueueRollbackRoute, new EnqueueRollbackProbeCommand(marker), CT);
+        Assert.Equal(ProbeFailedStatusCode, (int)response.StatusCode);
 
         using (var scope = CreateScope())
         {

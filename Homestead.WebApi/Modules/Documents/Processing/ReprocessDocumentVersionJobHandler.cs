@@ -1,3 +1,4 @@
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Modules.Documents.Processing.Commands;
@@ -5,7 +6,6 @@ using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Processing;
 using Homestead.WebApi.Infrastructure.Storage;
 using Homestead.WebApi.Infrastructure.TextExtraction;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -16,7 +16,8 @@ public class ReprocessDocumentVersionJobHandler(
     IOptions<FileStorageOptions> storage,
     IProcessingNotifier notifier,
     TextExtractionHelper textExtractionHelper,
-    ISender sender) : IJobHandler
+    IUnitOfWork unitOfWork,
+    IReprocessVersionTextHandler reprocessVersionText) : IJobHandler
 {
     public ProcessingJobType Type => ProcessingJobType.ReprocessDocumentVersion;
 
@@ -49,15 +50,16 @@ public class ReprocessDocumentVersionJobHandler(
                 extractionResult.Error!);
         }
 
-        // Persist the re-extracted text + audit in one unit of work.
-        var result = await sender.Send(new ReprocessVersionTextCommand
+        // Persist the re-extracted text + audit in one unit of work, attributed to the job's creator.
+        var command = new ReprocessVersionTextCommand
         {
             DocumentId = payload.DocumentId,
             VersionId = payload.VersionId,
             ExtractedText = extractionResult.Text,
-            TextExtractionMetadata = TextExtractionMetadata.Serialize(extractionResult.Metadata),
-            ActorUserId = job.CreatedByUserId
-        }, ct);
+            TextExtractionMetadata = TextExtractionMetadata.Serialize(extractionResult.Metadata)
+        };
+        unitOfWork.SetActor(job.CreatedByUserId);
+        var result = await unitOfWork.ExecuteInTransactionAsync(() => reprocessVersionText.Handle(command, ct), ct);
 
         job.EntityId = payload.DocumentId;
 

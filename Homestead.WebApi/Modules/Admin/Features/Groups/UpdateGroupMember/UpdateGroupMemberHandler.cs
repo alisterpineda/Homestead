@@ -1,17 +1,18 @@
+using FluentValidation;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Groups;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Admin.Features.Groups.UpdateGroupMember;
 
-public class UpdateGroupMemberHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork)
-    : IRequestHandler<UpdateGroupMemberCommand, GroupMemberResponse>
+public class UpdateGroupMemberHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork, IValidator<UpdateGroupMemberCommand> validator)
 {
     public async Task<GroupMemberResponse> Handle(UpdateGroupMemberCommand command, CancellationToken ct)
     {
+        await validator.ValidateAndThrowAsync(command, ct);
+
         var member = await db.GroupMembers
             .Include(gm => gm.User)
             .FirstOrDefaultAsync(gm => gm.GroupId == command.GroupId && gm.UserId == command.UserId, ct);
@@ -54,7 +55,7 @@ public class UpdateGroupMemberHandler(AppDbContext db, IAuditContext audit, IUni
     }
 }
 
-public record UpdateGroupMemberCommand : ICommand<GroupMemberResponse>
+public record UpdateGroupMemberCommand
 {
     public Guid GroupId { get; init; }
     public Guid UserId { get; init; }

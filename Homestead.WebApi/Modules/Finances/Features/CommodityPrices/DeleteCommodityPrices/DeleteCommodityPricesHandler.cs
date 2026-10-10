@@ -2,13 +2,11 @@ using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Features.CommodityPrices.DeleteCommodityPrices;
 
 public class DeleteCommodityPricesHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork)
-    : IRequestHandler<DeleteCommodityPricesCommand, DeleteCommodityPricesResponse>
 {
     public async Task<DeleteCommodityPricesResponse> Handle(
         DeleteCommodityPricesCommand request, CancellationToken ct)

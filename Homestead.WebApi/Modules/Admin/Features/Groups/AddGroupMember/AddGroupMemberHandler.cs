@@ -1,17 +1,18 @@
+using FluentValidation;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Groups;
 using Homestead.WebApi.Persistence;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Admin.Features.Groups.AddGroupMember;
 
-public class AddGroupMemberHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork)
-    : IRequestHandler<AddGroupMemberCommand, GroupMemberResponse>
+public class AddGroupMemberHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork, IValidator<AddGroupMemberCommand> validator)
 {
     public async Task<GroupMemberResponse> Handle(AddGroupMemberCommand command, CancellationToken ct)
     {
+        await validator.ValidateAndThrowAsync(command, ct);
+
         var groupExists = await db.Groups.AnyAsync(g => g.Id == command.GroupId, ct);
         if (!groupExists)
             throw new EntityNotFoundException("Group not found.");
@@ -56,7 +57,7 @@ public class AddGroupMemberHandler(AppDbContext db, IAuditContext audit, IUnitOf
     }
 }
 
-public record AddGroupMemberCommand : ICommand<GroupMemberResponse>
+public record AddGroupMemberCommand
 {
     public Guid GroupId { get; init; }
     public required AddGroupMemberRequest Request { get; init; }

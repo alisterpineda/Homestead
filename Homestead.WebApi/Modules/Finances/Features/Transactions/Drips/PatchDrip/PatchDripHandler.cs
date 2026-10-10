@@ -1,7 +1,7 @@
+using FluentValidation;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Persistence;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Transactions.Drips.PatchDrip;
 
@@ -9,11 +9,13 @@ public class PatchDripHandler(
     AppDbContext db,
     IDripService drips,
     IBalanceEntryReconciler reconciler,
-    IUnitOfWork unitOfWork)
-    : IRequestHandler<PatchDripCommand, TransactionResponse>
+    IUnitOfWork unitOfWork,
+    IValidator<PatchDripCommand> validator)
 {
     public async Task<TransactionResponse> Handle(PatchDripCommand request, CancellationToken ct)
     {
+        await validator.ValidateAndThrowAsync(request, ct);
+
         var result = await drips.UpdateAsync(
             request.TransactionId,
             new UpdateDripRequest(
