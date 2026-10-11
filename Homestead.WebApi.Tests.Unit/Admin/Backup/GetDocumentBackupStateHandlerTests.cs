@@ -61,8 +61,8 @@ public class GetDocumentBackupStateHandlerTests : IDisposable
         new(_db, _resolver, _gate, _catalog, _runHistory);
 
     private Task<GetDocumentBackupStateResponse?> HandleAsync(Guid? documentId = null) =>
-        CreateSut().Handle(
-            new GetDocumentBackupStateQuery(documentId ?? _documentId),
+        CreateSut().HandleAsync(
+            documentId ?? _documentId,
             TestContext.Current.CancellationToken);
 
     // --- seeding --------------------------------------------------------------------------------------

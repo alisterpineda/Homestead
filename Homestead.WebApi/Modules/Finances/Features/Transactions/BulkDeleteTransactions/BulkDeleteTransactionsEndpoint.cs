@@ -14,7 +14,7 @@ public static class BulkDeleteTransactionsEndpoint
                 return ProblemDetailsFactory.BusinessRuleResult(
                     "At least one transaction ID must be provided.");
 
-            var response = await handler.Handle(request, ct);
+            var response = await handler.HandleAsync(request, ct);
             return Results.Ok(response);
         })
         .WithName("BulkDeleteTransactions")

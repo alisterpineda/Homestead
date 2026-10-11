@@ -6,7 +6,7 @@ public static class GetItemWarrantiesEndpoint
     {
         group.MapGet("/{id:guid}/warranties", async (Guid id, GetItemWarrantiesHandler handler, CancellationToken ct) =>
         {
-            var response = await handler.Handle(new GetItemWarrantiesQuery(id), ct);
+            var response = await handler.HandleAsync(id, ct);
             return response is null ? Results.NotFound() : Results.Ok(response);
         })
         .WithName("GetItemWarranties")

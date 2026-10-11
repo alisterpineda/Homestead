@@ -12,13 +12,7 @@ public static class SummarizeDocumentEndpoint
     {
         group.MapPost("/{documentId:guid}/summarize", async (Guid documentId,
             SummarizeDocumentBody? body, SummarizeDocumentHandler handler, CancellationToken ct) =>
-        {
-            var response = await handler.Handle(new SummarizeDocumentCommand
-            {
-                DocumentId = documentId
-            }, ct);
-            return Results.Ok(response);
-        })
+            Results.Ok(await handler.HandleAsync(documentId, ct)))
         .WithName("SummarizeDocument")
         .Produces<SummarizeDocumentResponse>(StatusCodes.Status200OK)
         .RequireAuthorization(AuthPolicies.RequireContributor)

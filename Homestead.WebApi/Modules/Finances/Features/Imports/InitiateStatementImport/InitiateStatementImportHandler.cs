@@ -19,7 +19,7 @@ public class InitiateStatementImportHandler(
     IJobQueue jobQueue,
     ILogger<InitiateStatementImportHandler> logger)
 {
-    public async Task<InitiateStatementImportResponse> Handle(
+    public async Task<InitiateStatementImportResponse> HandleAsync(
         InitiateStatementImportCommand request, CancellationToken ct)
     {
         var account = await db.Accounts.FindAsync([request.AccountId], ct)

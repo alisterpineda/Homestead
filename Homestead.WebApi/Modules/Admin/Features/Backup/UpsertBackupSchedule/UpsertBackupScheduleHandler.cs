@@ -22,7 +22,7 @@ public class UpsertBackupScheduleHandler(
     ICurrentUserAccessor currentUser,
     IAuditContext audit,
     IUnitOfWork unitOfWork,
-    IValidator<UpsertBackupScheduleCommand> validator)
+    IValidator<UpsertBackupScheduleBody> validator)
 {
     /// <summary>
     /// How a schedule reads in the audit log. The cron and its enabled flag live on the
@@ -36,13 +36,13 @@ public class UpsertBackupScheduleHandler(
             : $"{schedule.CronExpression} ({(schedule.IsEnabled ? "enabled" : "disabled")}), " +
               $"priority {schedule.Priority}";
 
-    public async Task<UpsertBackupScheduleResponse> Handle(
-        UpsertBackupScheduleCommand request, CancellationToken ct)
+    public async Task<UpsertBackupScheduleResponse> HandleAsync(
+        Guid id, UpsertBackupScheduleBody body, CancellationToken ct)
     {
-        await validator.ValidateAndThrowAsync(request, ct);
+        await validator.ValidateAndThrowAsync(body, ct);
 
         var source = await db.BackupSources
-            .FirstOrDefaultAsync(s => s.Id == request.BackupSourceId, ct)
+            .FirstOrDefaultAsync(s => s.Id == id, ct)
             ?? throw new EntityNotFoundException("Backup source not found.");
 
         var descriptor = catalog.Find(source.SourceKind)
@@ -60,7 +60,7 @@ public class UpsertBackupScheduleHandler(
         // filling the job list with failures.
 
         var now = DateTimeOffset.UtcNow;
-        var nextRunAt = CronSchedule.NextOccurrence(request.CronExpression, now);
+        var nextRunAt = CronSchedule.NextOccurrence(body.CronExpression, now);
         var name = $"Backup {descriptor.DisplayName} to {source.TargetKey}";
 
         // Scheduled runs are never dry and never bypass the delete breaker: an unattended run that could
@@ -84,10 +84,10 @@ public class UpsertBackupScheduleHandler(
                 Name = name,
                 Description = "Managed via /admin/backup",
                 JobType = descriptor.JobType,
-                CronExpression = request.CronExpression,
+                CronExpression = body.CronExpression,
                 TimeZone = CronSchedule.DefaultTimeZone,
-                Priority = request.Priority,
-                IsEnabled = request.IsEnabled,
+                Priority = body.Priority,
+                IsEnabled = body.IsEnabled,
                 CreatedAt = now,
                 CreatedByUserId = currentUser.UserId,
                 NextRunAt = nextRunAt,
@@ -101,9 +101,9 @@ public class UpsertBackupScheduleHandler(
         {
             schedule.Name = name;
             schedule.JobType = descriptor.JobType;
-            schedule.CronExpression = request.CronExpression;
-            schedule.Priority = request.Priority;
-            schedule.IsEnabled = request.IsEnabled;
+            schedule.CronExpression = body.CronExpression;
+            schedule.Priority = body.Priority;
+            schedule.IsEnabled = body.IsEnabled;
             schedule.NextRunAt = nextRunAt;
             schedule.SetPayload(payload);
         }

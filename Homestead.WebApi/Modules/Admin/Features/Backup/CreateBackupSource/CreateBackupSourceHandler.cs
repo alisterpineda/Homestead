@@ -18,22 +18,22 @@ public class CreateBackupSourceHandler(
     IAuditContext audit,
     IUnitOfWork unitOfWork)
 {
-    public async Task<CreateBackupSourceResponse> Handle(
-        CreateBackupSourceCommand request, CancellationToken ct)
+    public async Task<CreateBackupSourceResponse> HandleAsync(
+        CreateBackupSourceBody body, CancellationToken ct)
     {
         // An unregistered kind is a bad request, not a missing resource: the caller sent a value outside
         // the enumerable set the picker offers.
-        var descriptor = catalog.Find(request.SourceKind)
+        var descriptor = catalog.Find(body.SourceKind)
             ?? throw new BusinessRuleException(
-                $"'{request.SourceKind}' is not a backup source kind. " +
+                $"'{body.SourceKind}' is not a backup source kind. " +
                 $"Known kinds: {string.Join(", ", catalog.All().Select(d => d.Key))}.");
 
         // A target that is DEFINED but unavailable is still pairable — an operator sets up the mirror
         // while the NAS is still being mounted, and run-now / schedule-upsert / the planner are the
         // enforcement points. An UNDEFINED key is a 404: config is the only thing that makes a target
         // exist, so there is nothing to pair with.
-        var target = resolver.Find(request.TargetKey)
-            ?? throw new EntityNotFoundException($"Backup target '{request.TargetKey}' is not configured.");
+        var target = resolver.Find(body.TargetKey)
+            ?? throw new EntityNotFoundException($"Backup target '{body.TargetKey}' is not configured.");
 
         // Friendly pre-check for the common case. The real guarantee is the expression unique index on
         // (SourceKind, lower(TargetKey)) — this read-then-write is racy on its own, and the index is what

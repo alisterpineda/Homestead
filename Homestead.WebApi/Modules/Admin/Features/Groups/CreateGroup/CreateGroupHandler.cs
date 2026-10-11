@@ -12,7 +12,7 @@ public class CreateGroupHandler(
     AppDbContext db, ICurrentUserAccessor currentUser, IAuditContext audit, IUnitOfWork unitOfWork,
     IValidator<CreateGroupCommand> validator)
 {
-    public async Task<GroupResponse> Handle(CreateGroupCommand request, CancellationToken ct)
+    public async Task<GroupResponse> HandleAsync(CreateGroupCommand request, CancellationToken ct)
     {
         await validator.ValidateAndThrowAsync(request, ct);
 

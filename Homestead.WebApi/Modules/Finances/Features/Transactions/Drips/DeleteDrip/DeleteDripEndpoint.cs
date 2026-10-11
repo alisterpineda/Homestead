@@ -9,7 +9,7 @@ public static class DeleteDripEndpoint
         group.MapDelete("/{transactionId:guid}",
             async (Guid transactionId, DeleteDripHandler handler, CancellationToken ct) =>
         {
-            await handler.Handle(new DeleteDripCommand(transactionId), ct);
+            await handler.HandleAsync(transactionId, ct);
             return Results.NoContent();
         })
         .WithName("DeleteDrip")

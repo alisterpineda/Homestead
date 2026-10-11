@@ -16,9 +16,9 @@ public class DeleteCategoryHandler(
     ISystemAccountProvider systemAccounts,
     IUnitOfWork unitOfWork)
 {
-    public async Task<bool> Handle(DeleteCategoryCommand request, CancellationToken ct)
+    public async Task<bool> HandleAsync(Guid id, CancellationToken ct)
     {
-        var category = await db.Accounts.FirstOrDefaultAsync(a => a.Id == request.Id, ct);
+        var category = await db.Accounts.FirstOrDefaultAsync(a => a.Id == id, ct);
 
         // Not a category → not found on this surface (a balance-sheet account is deleted via /accounts).
         if (category is null || !category.AccountType.IsCategory())

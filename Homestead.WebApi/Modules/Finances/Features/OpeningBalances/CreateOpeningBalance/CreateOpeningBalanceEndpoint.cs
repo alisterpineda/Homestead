@@ -10,7 +10,7 @@ public static class CreateOpeningBalanceEndpoint
             async (Guid accountId, CreateOpeningBalanceCommand body, CreateOpeningBalanceHandler handler, CancellationToken ct) =>
         {
             var request = body with { AccountId = accountId };
-            var response = await handler.Handle(request, ct);
+            var response = await handler.HandleAsync(request, ct);
             return Results.Created(
                 $"/api/v1/finances/accounts/{accountId}/opening-balances/{response.CommodityId}",
                 response);

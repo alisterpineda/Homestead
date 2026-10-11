@@ -38,7 +38,7 @@ public class GetAreasHandlerTests : IAsyncLifetime
             Item(null, ItemStatus.Active));
         await _db.SaveChangesAsync(Ct);
 
-        var resp = await _sut.Handle(new GetAreasQuery { Page = 1, PageSize = 50 }, Ct);
+        var resp = await _sut.HandleAsync(new GetAreasQuery { Page = 1, PageSize = 50 }, Ct);
 
         var area = Assert.Single(resp.Items);
         Assert.Equal("Garage", area.Name);
@@ -65,7 +65,7 @@ public class GetAreasHandlerTests : IAsyncLifetime
         _db.Items.AddRange(bin, nested, floatingBin, adrift);
         await _db.SaveChangesAsync(Ct);
 
-        var resp = await _sut.Handle(new GetAreasQuery { Page = 1, PageSize = 50 }, Ct);
+        var resp = await _sut.HandleAsync(new GetAreasQuery { Page = 1, PageSize = 50 }, Ct);
 
         var area = Assert.Single(resp.Items);
         Assert.Equal(2, area.LiveItemCount); // the bin + the nested item
@@ -95,7 +95,7 @@ public class GetAreasHandlerTests : IAsyncLifetime
 
         await _db.SaveChangesAsync(Ct);
 
-        var resp = await _sut.Handle(new GetAreasQuery { Page = 1, PageSize = 50 }, Ct);
+        var resp = await _sut.HandleAsync(new GetAreasQuery { Page = 1, PageSize = 50 }, Ct);
 
         var area = Assert.Single(resp.Items);
         Assert.Equal(2, area.LiveItemCount); // the bin + batteries once
@@ -109,7 +109,7 @@ public class GetAreasHandlerTests : IAsyncLifetime
             new Area { Id = Guid.NewGuid(), Name = "Attic" });
         await _db.SaveChangesAsync(Ct);
 
-        var resp = await _sut.Handle(new GetAreasQuery { Page = 1, PageSize = 50 }, Ct);
+        var resp = await _sut.HandleAsync(new GetAreasQuery { Page = 1, PageSize = 50 }, Ct);
 
         Assert.Equal(["Attic", "Office"], resp.Items.Select(a => a.Name));
     }
@@ -122,7 +122,7 @@ public class GetAreasHandlerTests : IAsyncLifetime
         _db.Areas.AddRange(house, basement);
         await _db.SaveChangesAsync(Ct);
 
-        var resp = await _sut.Handle(new GetAreasQuery { Page = 1, PageSize = 50 }, Ct);
+        var resp = await _sut.HandleAsync(new GetAreasQuery { Page = 1, PageSize = 50 }, Ct);
 
         var basementResp = resp.Items.Single(a => a.Name == "Basement");
         Assert.Equal(house.Id, basementResp.ParentAreaId);
@@ -146,7 +146,7 @@ public class GetAreasHandlerTests : IAsyncLifetime
         _db.Areas.AddRange(attic, house, basement, bedroom, garage);
         await _db.SaveChangesAsync(Ct);
 
-        var resp = await _sut.Handle(new GetAreasQuery { Page = 1, PageSize = 50 }, Ct);
+        var resp = await _sut.HandleAsync(new GetAreasQuery { Page = 1, PageSize = 50 }, Ct);
 
         Assert.Equal(["Attic", "House", "Basement", "Bedroom", "Garage"], resp.Items.Select(a => a.Name));
     }
@@ -163,7 +163,7 @@ public class GetAreasHandlerTests : IAsyncLifetime
             Item(bedroom.Id, ItemStatus.Active));
         await _db.SaveChangesAsync(Ct);
 
-        var resp = await _sut.Handle(new GetAreasQuery { Page = 1, PageSize = 50 }, Ct);
+        var resp = await _sut.HandleAsync(new GetAreasQuery { Page = 1, PageSize = 50 }, Ct);
 
         Assert.Equal(2, resp.Items.Single(a => a.Name == "Bedroom").LiveItemCount);
         Assert.Equal(3, resp.Items.Single(a => a.Name == "House").LiveItemCount); // own + nested

@@ -62,24 +62,22 @@ public class AddTransactionDocumentLinkHandlerTests : IAsyncLifetime
         return ValueTask.CompletedTask;
     }
 
-    private AddTransactionDocumentLinkCommand Command(Guid? transactionId = null, Guid? documentId = null) => new()
-    {
-        TransactionId = transactionId ?? _transaction.Id,
-        DocumentId = documentId ?? _document.Id,
-    };
-
     [Fact]
     public async Task Add_UnknownTransaction_ThrowsNotFound()
     {
         await Assert.ThrowsAsync<EntityNotFoundException>(
-            () => _sut.Handle(Command(transactionId: Guid.NewGuid()), TestContext.Current.CancellationToken));
+            () => _sut.HandleAsync(
+                Guid.NewGuid(), new AddTransactionDocumentLinkRequest(_document.Id),
+                TestContext.Current.CancellationToken));
     }
 
     [Fact]
     public async Task Add_UnknownDocument_ThrowsNotFound()
     {
         await Assert.ThrowsAsync<EntityNotFoundException>(
-            () => _sut.Handle(Command(documentId: Guid.NewGuid()), TestContext.Current.CancellationToken));
+            () => _sut.HandleAsync(
+                _transaction.Id, new AddTransactionDocumentLinkRequest(Guid.NewGuid()),
+                TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -90,7 +88,9 @@ public class AddTransactionDocumentLinkHandlerTests : IAsyncLifetime
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         await Assert.ThrowsAsync<EntityNotFoundException>(
-            () => _sut.Handle(Command(documentId: trashed.Id), TestContext.Current.CancellationToken));
+            () => _sut.HandleAsync(
+                _transaction.Id, new AddTransactionDocumentLinkRequest(trashed.Id),
+                TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -100,7 +100,9 @@ public class AddTransactionDocumentLinkHandlerTests : IAsyncLifetime
             .Returns(_ => _db.Documents.Where(d => d.Id != _document.Id));
 
         await Assert.ThrowsAsync<EntityNotFoundException>(
-            () => _sut.Handle(Command(), TestContext.Current.CancellationToken));
+            () => _sut.HandleAsync(
+                _transaction.Id, new AddTransactionDocumentLinkRequest(_document.Id),
+                TestContext.Current.CancellationToken));
     }
 
     [Theory]
@@ -118,13 +120,17 @@ public class AddTransactionDocumentLinkHandlerTests : IAsyncLifetime
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         await Assert.ThrowsAsync<DuplicateEntityException>(
-            () => _sut.Handle(Command(), TestContext.Current.CancellationToken));
+            () => _sut.HandleAsync(
+                _transaction.Id, new AddTransactionDocumentLinkRequest(_document.Id),
+                TestContext.Current.CancellationToken));
     }
 
     [Fact]
     public async Task Add_PersistsManualLink_ReturnsResponse_AndAudits()
     {
-        var response = await _sut.Handle(Command(), TestContext.Current.CancellationToken);
+        var response = await _sut.HandleAsync(
+            _transaction.Id, new AddTransactionDocumentLinkRequest(_document.Id),
+            TestContext.Current.CancellationToken);
 
         var link = await _db.TransactionDocumentLinks.SingleAsync(
             l => l.AccountTransactionId == _transaction.Id && l.DocumentId == _document.Id,

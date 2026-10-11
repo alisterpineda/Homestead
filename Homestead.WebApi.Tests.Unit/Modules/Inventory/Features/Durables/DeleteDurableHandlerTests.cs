@@ -47,7 +47,7 @@ public class DeleteDurableHandlerTests : IDisposable
     {
         var item = await AddItemAsync();
 
-        var result = await _sut.Handle(new DeleteDurableCommand(item.Id), Ct);
+        var result = await _sut.HandleAsync(item.Id, Ct);
 
         Assert.True(result);
         Assert.Empty(_db.Items);
@@ -57,7 +57,7 @@ public class DeleteDurableHandlerTests : IDisposable
     [Fact]
     public async Task Handle_MissingItem_ReturnsFalse()
     {
-        var result = await _sut.Handle(new DeleteDurableCommand(Guid.NewGuid()), Ct);
+        var result = await _sut.HandleAsync(Guid.NewGuid(), Ct);
 
         Assert.False(result);
     }
@@ -69,7 +69,7 @@ public class DeleteDurableHandlerTests : IDisposable
         await AddItemAsync(parentItemId: container.Id);
 
         await Assert.ThrowsAsync<BusinessRuleException>(() =>
-            _sut.Handle(new DeleteDurableCommand(container.Id), Ct));
+            _sut.HandleAsync(container.Id, Ct));
 
         // Container survives the blocked delete.
         Assert.Contains(_db.Items, i => i.Id == container.Id);
@@ -96,7 +96,7 @@ public class DeleteDurableHandlerTests : IDisposable
         await AddNoteAsync(item.Id);
 
         var ex = await Assert.ThrowsAsync<BusinessRuleException>(() =>
-            _sut.Handle(new DeleteDurableCommand(item.Id), Ct));
+            _sut.HandleAsync(item.Id, Ct));
 
         Assert.Contains("notes", ex.Message);
         Assert.Contains(_db.Items, i => i.Id == item.Id);
@@ -111,7 +111,7 @@ public class DeleteDurableHandlerTests : IDisposable
         _db.ItemNotes.Remove(note);
         await _db.SaveChangesAsync(Ct);
 
-        Assert.True(await _sut.Handle(new DeleteDurableCommand(item.Id), Ct));
+        Assert.True(await _sut.HandleAsync(item.Id, Ct));
         Assert.Empty(_db.Items);
     }
 }

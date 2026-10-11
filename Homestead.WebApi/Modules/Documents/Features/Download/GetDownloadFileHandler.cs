@@ -12,11 +12,11 @@ public class GetDownloadFileHandler(
     IOptions<FileStorageOptions> storage,
     ICurrentUserAccessor currentUser)
 {
-    public async Task<IResult> Handle(GetDownloadFileQuery request, CancellationToken ct)
+    public async Task<IResult> HandleAsync(Guid jobId, CancellationToken ct)
     {
         var job = await db.ProcessingJobs
             .AsNoTracking()
-            .FirstOrDefaultAsync(j => j.Id == request.JobId, ct);
+            .FirstOrDefaultAsync(j => j.Id == jobId, ct);
 
         if (job is null || job.Type != ProcessingJobType.DownloadDocuments)
             return Results.NotFound();

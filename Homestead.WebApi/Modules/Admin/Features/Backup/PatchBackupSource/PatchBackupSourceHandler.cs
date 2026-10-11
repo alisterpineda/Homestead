@@ -11,20 +11,20 @@ namespace Homestead.WebApi.Modules.Admin.Features.Backup.PatchBackupSource;
 /// </summary>
 public class PatchBackupSourceHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork)
 {
-    public async Task<PatchBackupSourceResponse> Handle(
-        PatchBackupSourceCommand request, CancellationToken ct)
+    public async Task<PatchBackupSourceResponse> HandleAsync(
+        Guid id, PatchBackupSourceBody body, CancellationToken ct)
     {
-        var source = await db.BackupSources.FirstOrDefaultAsync(s => s.Id == request.Id, ct)
+        var source = await db.BackupSources.FirstOrDefaultAsync(s => s.Id == id, ct)
             ?? throw new EntityNotFoundException("Backup source not found.");
 
         audit.Track<BackupSourceSnapshot, Domain.Backup.BackupSource>(
             source, "BackupSource", source.Id);
 
-        if (request.IsEnabled is { } isEnabled)
+        if (body.IsEnabled is { } isEnabled)
             source.IsEnabled = isEnabled;
 
-        // Only an explicit acknowledgement clears the latch — see the command's remarks.
-        if (request.AcknowledgePruneBlock is true)
+        // Only an explicit acknowledgement clears the latch — see PatchBackupSourceBody.AcknowledgePruneBlock.
+        if (body.AcknowledgePruneBlock is true)
         {
             source.PruneBlockedAt = null;
             source.PruneBlockedCount = null;

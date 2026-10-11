@@ -46,7 +46,7 @@ public class DownloadDocumentsHandlerTests : IDisposable
         var ids = new List<Guid> { Guid.NewGuid(), Guid.NewGuid() };
         var command = new DownloadDocumentsCommand(ids);
 
-        var result = await _sut.Handle(command, TestContext.Current.CancellationToken);
+        var result = await _sut.HandleAsync(command, TestContext.Current.CancellationToken);
 
         Assert.NotEqual(Guid.Empty, result.JobId);
         await _jobQueue.Received(1).EnqueueAsync(
@@ -61,7 +61,7 @@ public class DownloadDocumentsHandlerTests : IDisposable
         var ids = new List<Guid> { Guid.NewGuid() };
         var command = new DownloadDocumentsCommand(ids);
 
-        await _sut.Handle(command, TestContext.Current.CancellationToken);
+        await _sut.HandleAsync(command, TestContext.Current.CancellationToken);
 
         await _accessService.Received(1).EnsureAllDocumentsAccessibleAsync(
             Arg.Any<IQueryable<Guid>>(), Arg.Any<CancellationToken>());
@@ -78,7 +78,7 @@ public class DownloadDocumentsHandlerTests : IDisposable
 
         var command = new DownloadDocumentsCommand(null);
 
-        var result = await _sut.Handle(command, TestContext.Current.CancellationToken);
+        var result = await _sut.HandleAsync(command, TestContext.Current.CancellationToken);
 
         Assert.NotEqual(Guid.Empty, result.JobId);
         _accessService.Received(1).AccessibleDocumentIds();
@@ -94,7 +94,7 @@ public class DownloadDocumentsHandlerTests : IDisposable
 
         var command = new DownloadDocumentsCommand([]);
 
-        var result = await _sut.Handle(command, TestContext.Current.CancellationToken);
+        var result = await _sut.HandleAsync(command, TestContext.Current.CancellationToken);
 
         Assert.NotEqual(Guid.Empty, result.JobId);
         _accessService.Received(1).AccessibleDocumentIds();
@@ -110,7 +110,7 @@ public class DownloadDocumentsHandlerTests : IDisposable
         var command = new DownloadDocumentsCommand(null);
 
         await Assert.ThrowsAsync<BusinessRuleException>(() =>
-            _sut.Handle(command, TestContext.Current.CancellationToken));
+            _sut.HandleAsync(command, TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -130,7 +130,7 @@ public class DownloadDocumentsHandlerTests : IDisposable
         var command = new DownloadDocumentsCommand(new List<Guid> { Guid.NewGuid() });
 
         var ex = await Assert.ThrowsAsync<BusinessRuleException>(() =>
-            _sut.Handle(command, TestContext.Current.CancellationToken));
+            _sut.HandleAsync(command, TestContext.Current.CancellationToken));
 
         Assert.Contains("already in progress", ex.Message);
     }
@@ -152,7 +152,7 @@ public class DownloadDocumentsHandlerTests : IDisposable
         var ids = new List<Guid> { Guid.NewGuid() };
         var command = new DownloadDocumentsCommand(ids);
 
-        var result = await _sut.Handle(command, TestContext.Current.CancellationToken);
+        var result = await _sut.HandleAsync(command, TestContext.Current.CancellationToken);
 
         Assert.NotEqual(Guid.Empty, result.JobId);
     }
@@ -173,7 +173,7 @@ public class DownloadDocumentsHandlerTests : IDisposable
         var command = new DownloadDocumentsCommand(new List<Guid> { Guid.NewGuid() });
 
         await Assert.ThrowsAsync<BusinessRuleException>(() =>
-            _sut.Handle(command, TestContext.Current.CancellationToken));
+            _sut.HandleAsync(command, TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -193,7 +193,7 @@ public class DownloadDocumentsHandlerTests : IDisposable
         var ids = new List<Guid> { Guid.NewGuid() };
         var command = new DownloadDocumentsCommand(ids);
 
-        var result = await _sut.Handle(command, TestContext.Current.CancellationToken);
+        var result = await _sut.HandleAsync(command, TestContext.Current.CancellationToken);
 
         Assert.NotEqual(Guid.Empty, result.JobId);
     }
@@ -204,7 +204,7 @@ public class DownloadDocumentsHandlerTests : IDisposable
         var ids = new List<Guid> { Guid.NewGuid() };
         var command = new DownloadDocumentsCommand(ids);
 
-        await _sut.Handle(command, TestContext.Current.CancellationToken);
+        await _sut.HandleAsync(command, TestContext.Current.CancellationToken);
 
         await _jobQueue.Received(1).EnqueueAsync(
             ProcessingJobType.DownloadDocuments,

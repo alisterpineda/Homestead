@@ -53,7 +53,7 @@ public class DeletePayeeHandlerTests : IDisposable
     {
         var payee = await AddPayeeAsync("Costco");
 
-        var result = await _sut.Handle(new DeletePayeeCommand(payee.Id), Ct);
+        var result = await _sut.HandleAsync(payee.Id, Ct);
 
         Assert.True(result);
         Assert.Empty(_db.Payees);
@@ -67,7 +67,7 @@ public class DeletePayeeHandlerTests : IDisposable
         await AddTransactionForPayeeAsync(payee.Id);
 
         await Assert.ThrowsAsync<EntityInUseException>(() =>
-            _sut.Handle(new DeletePayeeCommand(payee.Id), Ct));
+            _sut.HandleAsync(payee.Id, Ct));
 
         Assert.Contains(_db.Payees, p => p.Id == payee.Id);
         _audit.DidNotReceive().Deleted("Payee", Arg.Any<Guid>(), Arg.Any<string?>(), Arg.Any<Guid?>());
@@ -76,7 +76,7 @@ public class DeletePayeeHandlerTests : IDisposable
     [Fact]
     public async Task Handle_MissingPayee_ReturnsFalse()
     {
-        var result = await _sut.Handle(new DeletePayeeCommand(Guid.NewGuid()), Ct);
+        var result = await _sut.HandleAsync(Guid.NewGuid(), Ct);
 
         Assert.False(result);
     }

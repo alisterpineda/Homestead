@@ -9,7 +9,7 @@ public static class GetDurableEndpoint
             GetDurableHandler handler,
             CancellationToken ct) =>
         {
-            var response = await handler.Handle(request, ct);
+            var response = await handler.HandleAsync(request, ct);
             return response is not null ? Results.Ok(response) : Results.NotFound();
         })
         .WithName("GetDurable")

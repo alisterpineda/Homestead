@@ -6,15 +6,7 @@ public static class UpdateGroupMemberEndpoint
     {
         group.MapPut("/{id:guid}/members/{userId:guid}", async (Guid id, Guid userId,
             UpdateGroupMemberRequest request, UpdateGroupMemberHandler handler, CancellationToken ct) =>
-        {
-            var command = new UpdateGroupMemberCommand
-            {
-                GroupId = id,
-                UserId = userId,
-                Request = request
-            };
-            return Results.Ok(await handler.Handle(command, ct));
-        })
+            Results.Ok(await handler.HandleAsync(id, userId, request, ct)))
         .WithName("UpdateGroupMember")
         .Produces<GroupMemberResponse>();
     }

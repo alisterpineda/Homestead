@@ -8,10 +8,7 @@ public static class GetTransactionDocumentsEndpoint
     {
         group.MapGet("/{transactionId:guid}/documents",
             async (Guid transactionId, GetTransactionDocumentsHandler handler, CancellationToken ct) =>
-        {
-            var response = await handler.Handle(new GetTransactionDocumentsQuery(transactionId), ct);
-            return Results.Ok(response);
-        })
+            Results.Ok(await handler.HandleAsync(transactionId, ct)))
         .WithName("GetTransactionDocuments")
         .Produces<IReadOnlyList<TransactionDocumentLinkResponse>>()
         .Produces(StatusCodes.Status404NotFound)

@@ -35,7 +35,7 @@ public class CreateItemNoteHandlerTests : IDisposable
     public async Task Handle_MissingItem_Throws()
     {
         await Assert.ThrowsAsync<EntityNotFoundException>(() =>
-            _sut.Handle(new CreateItemNoteCommand { ItemId = Guid.NewGuid(), Body = "x" }, Ct));
+            _sut.HandleAsync(new CreateItemNoteCommand { ItemId = Guid.NewGuid(), Body = "x" }, Ct));
     }
 
     [Fact]
@@ -44,7 +44,7 @@ public class CreateItemNoteHandlerTests : IDisposable
         var item = await ItemNoteTestData.AddItemAsync(_db);
         var before = DateTimeOffset.UtcNow;
 
-        var response = await _sut.Handle(new CreateItemNoteCommand { ItemId = item.Id, Body = "Replaced belt" }, Ct);
+        var response = await _sut.HandleAsync(new CreateItemNoteCommand { ItemId = item.Id, Body = "Replaced belt" }, Ct);
 
         var after = DateTimeOffset.UtcNow;
         Assert.InRange(response.OccurredAt, before, after);
@@ -59,7 +59,7 @@ public class CreateItemNoteHandlerTests : IDisposable
         var item = await ItemNoteTestData.AddItemAsync(_db);
         var when = new DateTimeOffset(2021, 4, 5, 10, 30, 0, TimeSpan.Zero);
 
-        var response = await _sut.Handle(new CreateItemNoteCommand
+        var response = await _sut.HandleAsync(new CreateItemNoteCommand
         {
             ItemId = item.Id, OccurredAt = when, Body = "5W-30",
         }, Ct);
@@ -74,7 +74,7 @@ public class CreateItemNoteHandlerTests : IDisposable
     {
         var item = await ItemNoteTestData.AddItemAsync(_db);
 
-        var response = await _sut.Handle(new CreateItemNoteCommand
+        var response = await _sut.HandleAsync(new CreateItemNoteCommand
         {
             ItemId = item.Id, Body = "  needs a new blade  \n",
         }, Ct);
@@ -88,7 +88,7 @@ public class CreateItemNoteHandlerTests : IDisposable
     {
         var item = await ItemNoteTestData.AddItemAsync(_db);
 
-        var response = await _sut.Handle(new CreateItemNoteCommand { ItemId = item.Id, Body = "x" }, Ct);
+        var response = await _sut.HandleAsync(new CreateItemNoteCommand { ItemId = item.Id, Body = "x" }, Ct);
 
         _audit.Received(1).Created("InventoryNote", response.Id, item.Id);
     }
@@ -100,7 +100,7 @@ public class CreateItemNoteHandlerTests : IDisposable
         _db.Users.Add(new Domain.Identity.AppUser { Id = _userId, DisplayName = "Alice", Email = "alice@test.com" });
         await _db.SaveChangesAsync(Ct);
 
-        var response = await _sut.Handle(new CreateItemNoteCommand { ItemId = item.Id, Body = "x" }, Ct);
+        var response = await _sut.HandleAsync(new CreateItemNoteCommand { ItemId = item.Id, Body = "x" }, Ct);
 
         var note = Assert.Single(_db.ItemNotes);
         Assert.Equal(_userId, note.CreatedByUserId);
@@ -120,7 +120,7 @@ public class CreateItemNoteHandlerTests : IDisposable
         // take them (activity.md §Which items can carry notes).
         var item = await ItemNoteTestData.AddItemAsync(_db, fungibility, status);
 
-        var response = await _sut.Handle(new CreateItemNoteCommand { ItemId = item.Id, Body = "x" }, Ct);
+        var response = await _sut.HandleAsync(new CreateItemNoteCommand { ItemId = item.Id, Body = "x" }, Ct);
 
         Assert.Equal(item.Id, response.ItemId);
     }
@@ -131,7 +131,7 @@ public class CreateItemNoteHandlerTests : IDisposable
         var item = await ItemNoteTestData.AddItemAsync(_db);
         var itemUpdatedAt = item.UpdatedAt;
 
-        await _sut.Handle(new CreateItemNoteCommand { ItemId = item.Id, Body = "x" }, Ct);
+        await _sut.HandleAsync(new CreateItemNoteCommand { ItemId = item.Id, Body = "x" }, Ct);
 
         // A note is history about the item, not an edit of it — Browse recency is unaffected.
         Assert.Equal(itemUpdatedAt, (await _db.Items.FindAsync([item.Id], Ct))!.UpdatedAt);
@@ -143,6 +143,6 @@ public class CreateItemNoteHandlerTests : IDisposable
         var item = await ItemNoteTestData.AddItemAsync(_db);
 
         await Assert.ThrowsAsync<ValidationException>(() =>
-            _sut.Handle(new CreateItemNoteCommand { ItemId = item.Id, Body = "   " }, Ct));
+            _sut.HandleAsync(new CreateItemNoteCommand { ItemId = item.Id, Body = "   " }, Ct));
     }
 }

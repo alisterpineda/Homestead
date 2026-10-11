@@ -16,7 +16,7 @@ public class PatchPayeeHandler(
     IUnitOfWork unitOfWork,
     IValidator<PatchPayeeCommand> validator)
 {
-    public async Task<PayeeResponse> Handle(PatchPayeeCommand request, CancellationToken ct)
+    public async Task<PayeeResponse> HandleAsync(PatchPayeeCommand request, CancellationToken ct)
     {
         await validator.ValidateAndThrowAsync(request, ct);
 

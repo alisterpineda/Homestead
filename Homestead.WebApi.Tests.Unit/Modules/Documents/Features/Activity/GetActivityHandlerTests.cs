@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Auditing;
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Domain.Identity;
@@ -98,7 +99,7 @@ public class GetActivityHandlerTests : IDisposable
         await AddDocumentAuditAsync(documentId, AuditAction.Updated, userId: Guid.NewGuid(), DateTimeOffset.UtcNow.AddMinutes(-1),
             changes: [new ScalarFieldChange("Notes", null, "Note")]);
 
-        var result = await _sut.Handle(new GetActivityQuery { DocumentId = documentId }, Ct);
+        var result = await _sut.HandleAsync(documentId, new PaginatedRequest(), Ct);
 
         Assert.Equal(3, result.TotalCount);
 
@@ -119,7 +120,7 @@ public class GetActivityHandlerTests : IDisposable
         var documentId = Guid.NewGuid();
         await AddVersionAuditAsync(documentId, AuditAction.Created, userId: null, DateTimeOffset.UtcNow);
 
-        var result = await _sut.Handle(new GetActivityQuery { DocumentId = documentId }, Ct);
+        var result = await _sut.HandleAsync(documentId, new PaginatedRequest(), Ct);
 
         var item = Assert.Single(result.Items);
         Assert.Equal("audit_log", item.Type);
@@ -141,7 +142,7 @@ public class GetActivityHandlerTests : IDisposable
         // A comment whose author has since been deleted (null CreatedByUserId) — must also survive.
         await AddCommentAsync(documentId, "Orphan comment", userId: null, DateTimeOffset.UtcNow.AddMinutes(-1));
 
-        var result = await _sut.Handle(new GetActivityQuery { DocumentId = documentId }, Ct);
+        var result = await _sut.HandleAsync(documentId, new PaginatedRequest(), Ct);
 
         Assert.Equal(4, result.TotalCount);
         // Both sources are merged and ordered newest-first.
@@ -165,8 +166,8 @@ public class GetActivityHandlerTests : IDisposable
                 changes: [new ScalarFieldChange("Notes", null, $"note {i}")]);
         await AddCommentAsync(documentId, "Tied comment", alice.Id, sameInstant);
 
-        var first = await _sut.Handle(new GetActivityQuery { DocumentId = documentId }, Ct);
-        var second = await _sut.Handle(new GetActivityQuery { DocumentId = documentId }, Ct);
+        var first = await _sut.HandleAsync(documentId, new PaginatedRequest(), Ct);
+        var second = await _sut.HandleAsync(documentId, new PaginatedRequest(), Ct);
 
         // The Id tiebreaker makes the order stable across requests, so paging can't drop/duplicate ties.
         Assert.Equal(first.Items.Select(x => x.Id), second.Items.Select(x => x.Id));

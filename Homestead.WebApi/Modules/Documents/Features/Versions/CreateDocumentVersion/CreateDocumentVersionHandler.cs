@@ -17,13 +17,13 @@ public class CreateDocumentVersionHandler(
     ICurrentUserAccessor currentUser,
     IJobQueue jobQueue)
 {
-    public async Task<CreateDocumentVersionResponse> Handle(CreateDocumentVersionCommand request, CancellationToken ct)
+    public async Task<CreateDocumentVersionResponse> HandleAsync(Guid documentId, string? label, IFormFile file,
+        CancellationToken ct)
     {
-        var documentExists = await db.Documents.AnyAsync(d => d.Id == request.DocumentId, ct);
+        var documentExists = await db.Documents.AnyAsync(d => d.Id == documentId, ct);
         if (!documentExists)
             throw new EntityNotFoundException("Document not found.");
 
-        var file = request.File;
         var extension = Path.GetExtension(file.FileName);
         var uploadId = Guid.NewGuid();
 
@@ -42,9 +42,9 @@ public class CreateDocumentVersionHandler(
 
         var payload = new UploadDocumentVersionPayload(
             uploadId,
-            request.DocumentId,
+            documentId,
             file.FileName,
-            request.Label,
+            label,
             file.ContentType,
             file.Length,
             extension);
@@ -52,7 +52,7 @@ public class CreateDocumentVersionHandler(
         var jobId = await jobQueue.EnqueueAsync(ProcessingJobType.UploadDocumentVersion, opts =>
         {
             opts.EntityType = ProcessingEntityType.Document;
-            opts.EntityId = request.DocumentId;
+            opts.EntityId = documentId;
             opts.CreatedByUserId = userId;
             opts.Payload = System.Text.Json.JsonSerializer.Serialize(payload);
         }, ct);

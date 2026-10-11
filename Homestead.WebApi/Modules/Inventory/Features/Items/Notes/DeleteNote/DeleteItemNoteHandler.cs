@@ -7,10 +7,10 @@ namespace Homestead.WebApi.Modules.Inventory.Features.Items.Notes.DeleteNote;
 
 public class DeleteItemNoteHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork)
 {
-    public async Task<bool> Handle(DeleteItemNoteCommand request, CancellationToken ct)
+    public async Task<bool> HandleAsync(Guid id, Guid noteId, CancellationToken ct)
     {
         var note = await db.ItemNotes.FirstOrDefaultAsync(
-            n => n.Id == request.NoteId && n.ItemId == request.ItemId, ct);
+            n => n.Id == noteId && n.ItemId == id, ct);
         if (note is null)
             return false;
 

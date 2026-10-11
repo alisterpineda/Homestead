@@ -21,11 +21,11 @@ public class ConnectBackupTargetHandler(
     IGoogleOAuthClient oauth,
     IGoogleDriveConnectTokenProtector protector)
 {
-    public async Task<ConnectBackupTargetResponse> Handle(
-        ConnectBackupTargetCommand request, CancellationToken ct)
+    public async Task<ConnectBackupTargetResponse> HandleAsync(
+        string key, CancellationToken ct)
     {
-        var target = resolver.Find(request.TargetKey)
-            ?? throw new EntityNotFoundException($"Backup target '{request.TargetKey}' is not configured.");
+        var target = resolver.Find(key)
+            ?? throw new EntityNotFoundException($"Backup target '{key}' is not configured.");
 
         if (target.Kind is not BackupTargetKind.GoogleDrive)
             throw new BusinessRuleException($"Backup target '{target.Key}' is not a Google Drive target.");

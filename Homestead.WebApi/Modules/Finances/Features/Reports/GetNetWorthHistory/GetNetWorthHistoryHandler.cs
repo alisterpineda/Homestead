@@ -12,7 +12,7 @@ public class GetNetWorthHistoryHandler(AppDbContext db, IValuationService valuat
     // Threshold below which "All" range stays daily; above, switches to monthly.
     private const int DailyAllRangeThresholdDays = 365;
 
-    public async Task<GetNetWorthHistoryResponse> Handle(
+    public async Task<GetNetWorthHistoryResponse> HandleAsync(
         GetNetWorthHistoryQuery request, CancellationToken ct)
     {
         ValidateCustomRange(request);

@@ -30,8 +30,8 @@ public class GetDocumentBackupStateHandler(
     IBackupSourceCatalog catalog,
     IBackupRunHistory runHistory)
 {
-    public async Task<GetDocumentBackupStateResponse?> Handle(
-        GetDocumentBackupStateQuery request, CancellationToken ct)
+    public async Task<GetDocumentBackupStateResponse?> HandleAsync(
+        Guid documentId, CancellationToken ct)
     {
         // Explicit, because DocumentAuthorizationHandler short-circuits for admins and would never reject
         // this: without the check, asking about a document that does not exist would render an empty
@@ -40,14 +40,14 @@ public class GetDocumentBackupStateHandler(
         // known gap, not an oversight.
         var documentExists = await db.Documents
             .AsNoTracking()
-            .AnyAsync(d => d.Id == request.DocumentId, ct);
+            .AnyAsync(d => d.Id == documentId, ct);
 
         if (!documentExists)
             return null;
 
         var versions = await db.DocumentVersions
             .AsNoTracking()
-            .Where(v => v.DocumentId == request.DocumentId)
+            .Where(v => v.DocumentId == documentId)
             .OrderByDescending(v => v.VersionNumber)
             .Select(v => new LiveVersion(v.Id, v.VersionNumber))
             .ToListAsync(ct);
@@ -62,7 +62,7 @@ public class GetDocumentBackupStateHandler(
         {
             return new GetDocumentBackupStateResponse
             {
-                DocumentId = request.DocumentId,
+                DocumentId = documentId,
                 LiveVersionCount = versions.Count,
                 Sources = [],
             };
@@ -94,7 +94,7 @@ public class GetDocumentBackupStateHandler(
         // leads with it, so that shape would seq-scan the whole state table.
         var stateRows = await db.DocumentBackupStates
             .AsNoTracking()
-            .Where(s => sourceIds.Contains(s.BackupSourceId) && s.DocumentId == request.DocumentId)
+            .Where(s => sourceIds.Contains(s.BackupSourceId) && s.DocumentId == documentId)
             .ToListAsync(ct);
 
         var statesBySource = stateRows
@@ -179,7 +179,7 @@ public class GetDocumentBackupStateHandler(
 
         return new GetDocumentBackupStateResponse
         {
-            DocumentId = request.DocumentId,
+            DocumentId = documentId,
             LiveVersionCount = versions.Count,
             Sources = items,
         };

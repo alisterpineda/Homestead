@@ -18,7 +18,7 @@ public class CreateDurableHandler(
     IUnitOfWork unitOfWork,
     IValidator<CreateDurableCommand> validator)
 {
-    public async Task<DurableResponse> Handle(CreateDurableCommand request, CancellationToken ct)
+    public async Task<DurableResponse> HandleAsync(CreateDurableCommand request, CancellationToken ct)
     {
         await validator.ValidateAndThrowAsync(request, ct);
 

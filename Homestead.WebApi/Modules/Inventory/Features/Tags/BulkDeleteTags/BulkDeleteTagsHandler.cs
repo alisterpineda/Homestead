@@ -8,7 +8,7 @@ namespace Homestead.WebApi.Modules.Inventory.Features.Tags.BulkDeleteTags;
 
 public class BulkDeleteTagsHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork)
 {
-    public async Task<BulkDeleteInventoryTagsResponse> Handle(BulkDeleteInventoryTagsCommand request, CancellationToken ct)
+    public async Task<BulkDeleteInventoryTagsResponse> HandleAsync(BulkDeleteInventoryTagsCommand request, CancellationToken ct)
     {
         var tags = await db.InventoryTags
             .Where(t => request.Ids.Contains(t.Id))

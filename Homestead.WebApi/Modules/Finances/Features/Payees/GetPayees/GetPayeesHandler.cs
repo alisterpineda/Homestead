@@ -7,7 +7,7 @@ namespace Homestead.WebApi.Modules.Finances.Features.Payees.GetPayees;
 
 public class GetPayeesHandler(AppDbContext db)
 {
-    public async Task<PaginatedResponse<PayeeResponse>> Handle(
+    public async Task<PaginatedResponse<PayeeResponse>> HandleAsync(
         GetPayeesQuery request, CancellationToken ct)
     {
         var query = db.Payees.AsNoTracking();

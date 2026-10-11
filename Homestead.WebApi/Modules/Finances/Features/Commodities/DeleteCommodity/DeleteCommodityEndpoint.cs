@@ -8,7 +8,7 @@ public static class DeleteCommodityEndpoint
     {
         group.MapDelete("/{id:guid}", async (Guid id, DeleteCommodityHandler handler, CancellationToken ct) =>
         {
-            var deleted = await handler.Handle(new DeleteCommodityCommand(id), ct);
+            var deleted = await handler.HandleAsync(id, ct);
             return deleted ? Results.NoContent() : Results.NotFound();
         })
         .WithName("DeleteCommodity")

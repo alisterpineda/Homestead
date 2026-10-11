@@ -7,7 +7,7 @@ public static class GetCategoriesEndpoint
         group.MapGet("", async ([AsParameters] GetCategoriesQuery request,
             GetCategoriesHandler handler, CancellationToken ct) =>
         {
-            return Results.Ok(await handler.Handle(request, ct));
+            return Results.Ok(await handler.HandleAsync(request, ct));
         })
         .WithName("GetCategories")
         .Produces<IReadOnlyList<CategoryResponse>>();

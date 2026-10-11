@@ -8,7 +8,7 @@ public static class CreateCommodityPriceEndpoint
     {
         group.MapPost("", async (CreateCommodityPriceCommand request, CreateCommodityPriceHandler handler, CancellationToken ct) =>
         {
-            var response = await handler.Handle(request, ct);
+            var response = await handler.HandleAsync(request, ct);
             return Results.Created($"/api/v1/finances/commodity-prices/{response.Id}", response);
         })
         .WithName("CreateCommodityPrice")

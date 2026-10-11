@@ -30,7 +30,7 @@ public class DeleteItemNoteHandlerTests : IDisposable
     {
         var item = await ItemNoteTestData.AddItemAsync(_db);
 
-        Assert.False(await _sut.Handle(new DeleteItemNoteCommand(item.Id, Guid.NewGuid()), Ct));
+        Assert.False(await _sut.HandleAsync(item.Id, Guid.NewGuid(), Ct));
     }
 
     [Fact]
@@ -40,7 +40,7 @@ public class DeleteItemNoteHandlerTests : IDisposable
         var other = await ItemNoteTestData.AddItemAsync(_db, name: "Other");
         var note = await ItemNoteTestData.AddNoteAsync(_db, item.Id, DateTimeOffset.UtcNow.AddDays(-1));
 
-        Assert.False(await _sut.Handle(new DeleteItemNoteCommand(other.Id, note.Id), Ct));
+        Assert.False(await _sut.HandleAsync(other.Id, note.Id, Ct));
         Assert.Single(_db.ItemNotes);
     }
 
@@ -51,7 +51,7 @@ public class DeleteItemNoteHandlerTests : IDisposable
         var note = await ItemNoteTestData.AddNoteAsync(_db, item.Id, DateTimeOffset.UtcNow.AddDays(-1),
             body: "Needs a new blade \r\nOrdered one from the store");
 
-        var result = await _sut.Handle(new DeleteItemNoteCommand(item.Id, note.Id), Ct);
+        var result = await _sut.HandleAsync(item.Id, note.Id, Ct);
 
         Assert.True(result);
         Assert.Empty(_db.ItemNotes);

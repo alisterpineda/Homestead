@@ -156,7 +156,7 @@ public class CommodityPriceImportPipelineTests : IntegrationTestBase
             };
             await unitOfWork.ExecuteInTransactionAsync(async () =>
             {
-                await handler.Handle(command, CT);
+                await handler.HandleAsync(command, CT);
                 return true;
             }, CT);
             // No Assert.ThrowsAsync: the assertion is that this does NOT throw a unique-violation.

@@ -9,13 +9,7 @@ public static class GetItemActivityEndpoint
         group.MapGet("/{id:guid}/activity", async (Guid id,
             [AsParameters] PaginatedRequest paging, GetItemActivityHandler handler, CancellationToken ct) =>
         {
-            var query = new GetItemActivityQuery
-            {
-                Id = id,
-                Page = paging.Page,
-                PageSize = paging.PageSize,
-            };
-            var response = await handler.Handle(query, ct);
+            var response = await handler.HandleAsync(id, paging, ct);
             return response is null ? Results.NotFound() : Results.Ok(response);
         })
         .WithName("GetItemActivity")

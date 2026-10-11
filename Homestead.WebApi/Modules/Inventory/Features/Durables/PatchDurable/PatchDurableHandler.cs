@@ -5,6 +5,7 @@ using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Inventory;
 using Homestead.WebApi.Modules.Inventory.Services;
 using Homestead.WebApi.Persistence;
+using Microsoft.AspNetCore.JsonPatch.SystemTextJson;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Durables.PatchDurable;
@@ -17,11 +18,11 @@ public class PatchDurableHandler(
     IInventoryTagPathResolver tagResolver,
     IUnitOfWork unitOfWork)
 {
-    public async Task<DurableResponse> Handle(PatchDurableCommand request, CancellationToken ct)
+    public async Task<DurableResponse> HandleAsync(Guid id, JsonPatchDocument<PatchDurableModel> patchDoc, CancellationToken ct)
     {
         var item = await db.Items
             .Include(i => i.ItemTags).ThenInclude(it => it.Tag)
-            .FirstOrDefaultAsync(i => i.Id == request.Id, ct);
+            .FirstOrDefaultAsync(i => i.Id == id, ct);
         if (item is null)
             throw new EntityNotFoundException("Item not found.");
 
@@ -54,7 +55,7 @@ public class PatchDurableHandler(
             Tags = item.ItemTags.Select(it => it.Tag.Path).ToList(),
         };
 
-        request.PatchDocument.ApplyOrThrow(model);
+        patchDoc.ApplyOrThrow(model);
 
         // JsonPatch binds arbitrary integers to the enum-typed fields (allowIntegerValues defaults
         // true), so an out-of-range Status would persist via HasConversion<string>() and later

@@ -59,7 +59,7 @@ public class ReprocessDocumentVersionJobHandler(
             TextExtractionMetadata = TextExtractionMetadata.Serialize(extractionResult.Metadata)
         };
         unitOfWork.SetActor(job.CreatedByUserId);
-        var result = await unitOfWork.ExecuteInTransactionAsync(() => reprocessVersionText.Handle(command, ct), ct);
+        var result = await unitOfWork.ExecuteInTransactionAsync(() => reprocessVersionText.HandleAsync(command, ct), ct);
 
         job.EntityId = payload.DocumentId;
 

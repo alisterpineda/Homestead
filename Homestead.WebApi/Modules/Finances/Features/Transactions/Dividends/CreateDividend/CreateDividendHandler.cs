@@ -10,7 +10,7 @@ public class CreateDividendHandler(
     IUnitOfWork unitOfWork,
     IValidator<CreateDividendCommand> validator)
 {
-    public async Task<TransactionResponse> Handle(CreateDividendCommand request, CancellationToken ct)
+    public async Task<TransactionResponse> HandleAsync(CreateDividendCommand request, CancellationToken ct)
     {
         await validator.ValidateAndThrowAsync(request, ct);
 

@@ -115,7 +115,7 @@ public class GetNetWorthHistoryHandlerTests : IAsyncLifetime
     {
         await SetDisplayCurrencyAsync(_cad.Id);
 
-        var resp = await _sut.Handle(new GetNetWorthHistoryQuery(), Ct);
+        var resp = await _sut.HandleAsync(new GetNetWorthHistoryQuery(), Ct);
 
         Assert.Equal("no_transactions", resp.Reason);
         Assert.Empty(resp.Points);
@@ -131,7 +131,7 @@ public class GetNetWorthHistoryHandlerTests : IAsyncLifetime
         var cash = await AddAccountAsync(AccountKind.Cash, _cad.Id);
         await AddSplitAsync(cash.Id, _cad.Id, 100m, DateTimeOffset.UtcNow.AddDays(-1));
 
-        var resp = await _sut.Handle(new GetNetWorthHistoryQuery(), Ct);
+        var resp = await _sut.HandleAsync(new GetNetWorthHistoryQuery(), Ct);
 
         Assert.Equal("no_display_currency", resp.Reason);
         Assert.Empty(resp.Points);
@@ -150,7 +150,7 @@ public class GetNetWorthHistoryHandlerTests : IAsyncLifetime
         await AddSplitAsync(cash.Id, _cad.Id, 25m, new DateTimeOffset(2026, 4, 25, 12, 0, 0, TimeSpan.Zero));
         await SetDisplayCurrencyAsync(_cad.Id);
 
-        var resp = await _sut.Handle(
+        var resp = await _sut.HandleAsync(
             new GetNetWorthHistoryQuery { Range = NetWorthRange.ThisMonth, AsOf = to }, Ct);
 
         Assert.Null(resp.Reason);
@@ -183,7 +183,7 @@ public class GetNetWorthHistoryHandlerTests : IAsyncLifetime
         await AddPriceAsync(_usd.Id, _cad.Id, 1.30m, new DateTimeOffset(2026, 4, 1, 0, 0, 0, TimeSpan.Zero));
         await SetDisplayCurrencyAsync(_cad.Id);
 
-        var resp = await _sut.Handle(
+        var resp = await _sut.HandleAsync(
             new GetNetWorthHistoryQuery { Range = NetWorthRange.ThisMonth, AsOf = to }, Ct);
 
         // 1000 CAD + 500 USD * 1.30 = 1650 CAD
@@ -201,7 +201,7 @@ public class GetNetWorthHistoryHandlerTests : IAsyncLifetime
         await AddSplitAsync(archived.Id, _cad.Id, 500m, new DateTimeOffset(2026, 4, 10, 12, 0, 0, TimeSpan.Zero));
         await SetDisplayCurrencyAsync(_cad.Id);
 
-        var resp = await _sut.Handle(
+        var resp = await _sut.HandleAsync(
             new GetNetWorthHistoryQuery { Range = NetWorthRange.ThisMonth, AsOf = to }, Ct);
 
         Assert.Equal(500m, resp.Points[^1].Value);
@@ -220,7 +220,7 @@ public class GetNetWorthHistoryHandlerTests : IAsyncLifetime
         await AddSplitAsync(adjustments.Id, _cad.Id, -100m, be, TransactionType.BalanceEntry);
         await SetDisplayCurrencyAsync(_cad.Id);
 
-        var resp = await _sut.Handle(
+        var resp = await _sut.HandleAsync(
             new GetNetWorthHistoryQuery { Range = NetWorthRange.ThisMonth, AsOf = to }, Ct);
 
         Assert.Equal(100m, resp.Points[^1].Value);
@@ -239,7 +239,7 @@ public class GetNetWorthHistoryHandlerTests : IAsyncLifetime
             TransactionType.OpeningBalance);
         await SetDisplayCurrencyAsync(_cad.Id);
 
-        var resp = await _sut.Handle(
+        var resp = await _sut.HandleAsync(
             new GetNetWorthHistoryQuery { Range = NetWorthRange.ThisMonth, AsOf = to }, Ct);
 
         var openingDay = resp.Points.First(p => p.AsOf.UtcDateTime.Date == new DateTime(2026, 4, 10));
@@ -255,7 +255,7 @@ public class GetNetWorthHistoryHandlerTests : IAsyncLifetime
         await AddSplitAsync(inv.Id, _veqt.Id, 50m, new DateTimeOffset(2026, 4, 5, 12, 0, 0, TimeSpan.Zero));
         await SetDisplayCurrencyAsync(_cad.Id);
 
-        var resp = await _sut.Handle(
+        var resp = await _sut.HandleAsync(
             new GetNetWorthHistoryQuery { Range = NetWorthRange.ThisMonth, AsOf = to }, Ct);
 
         Assert.True(resp.HasUnpriced);
@@ -279,7 +279,7 @@ public class GetNetWorthHistoryHandlerTests : IAsyncLifetime
         await AddSplitAsync(card.Id, _cad.Id, -250m, new DateTimeOffset(2026, 4, 1, 12, 0, 0, TimeSpan.Zero));
         await SetDisplayCurrencyAsync(_cad.Id);
 
-        var resp = await _sut.Handle(
+        var resp = await _sut.HandleAsync(
             new GetNetWorthHistoryQuery { Range = NetWorthRange.ThisMonth, AsOf = to }, Ct);
 
         var last = resp.Points[^1];
@@ -298,7 +298,7 @@ public class GetNetWorthHistoryHandlerTests : IAsyncLifetime
         await AddSplitAsync(cash.Id, _cad.Id, 1000m, to.AddMonths(-18));
         await SetDisplayCurrencyAsync(_cad.Id);
 
-        var resp = await _sut.Handle(
+        var resp = await _sut.HandleAsync(
             new GetNetWorthHistoryQuery { Range = NetWorthRange.All, AsOf = to }, Ct);
 
         Assert.Equal(NetWorthGranularity.Monthly, resp.Granularity);
@@ -314,7 +314,7 @@ public class GetNetWorthHistoryHandlerTests : IAsyncLifetime
         await AddSplitAsync(cash.Id, _cad.Id, 100m, to.AddDays(-30));
         await SetDisplayCurrencyAsync(_cad.Id);
 
-        var resp = await _sut.Handle(
+        var resp = await _sut.HandleAsync(
             new GetNetWorthHistoryQuery { Range = NetWorthRange.All, AsOf = to }, Ct);
 
         Assert.Equal(NetWorthGranularity.Daily, resp.Granularity);
@@ -331,7 +331,7 @@ public class GetNetWorthHistoryHandlerTests : IAsyncLifetime
         await AddPriceAsync(_usd.Id, _cad.Id, 1.40m, new DateTimeOffset(2026, 4, 20, 0, 0, 0, TimeSpan.Zero));
         await SetDisplayCurrencyAsync(_cad.Id);
 
-        var resp = await _sut.Handle(
+        var resp = await _sut.HandleAsync(
             new GetNetWorthHistoryQuery { Range = NetWorthRange.ThisMonth, AsOf = to }, Ct);
 
         // April 10 → uses 1.20 rate → 120 CAD
@@ -356,7 +356,7 @@ public class GetNetWorthHistoryHandlerTests : IAsyncLifetime
         await AddSplitAsync(cash.Id, _cad.Id, 25m, new DateTimeOffset(2026, 4, 5, 12, 0, 0, TimeSpan.Zero));
         await SetDisplayCurrencyAsync(_cad.Id);
 
-        var resp = await _sut.Handle(
+        var resp = await _sut.HandleAsync(
             new GetNetWorthHistoryQuery { Range = NetWorthRange.ThreeMonths, AsOf = to }, Ct);
 
         Assert.Equal(NetWorthGranularity.Daily, resp.Granularity);
@@ -374,7 +374,7 @@ public class GetNetWorthHistoryHandlerTests : IAsyncLifetime
         await AddSplitAsync(cash.Id, _cad.Id, 100m, new DateTimeOffset(2025, 5, 1, 12, 0, 0, TimeSpan.Zero));
         await SetDisplayCurrencyAsync(_cad.Id);
 
-        var resp = await _sut.Handle(
+        var resp = await _sut.HandleAsync(
             new GetNetWorthHistoryQuery { Range = NetWorthRange.TwelveMonths, AsOf = to }, Ct);
 
         Assert.Equal(new DateTime(2025, 5, 1), resp.Points[0].AsOf.UtcDateTime.Date);
@@ -392,7 +392,7 @@ public class GetNetWorthHistoryHandlerTests : IAsyncLifetime
         await AddSplitAsync(cash.Id, _cad.Id, 50m, new DateTimeOffset(2026, 4, 5, 12, 0, 0, TimeSpan.Zero));
         await SetDisplayCurrencyAsync(_cad.Id);
 
-        var resp = await _sut.Handle(
+        var resp = await _sut.HandleAsync(
             new GetNetWorthHistoryQuery { Range = NetWorthRange.ThisMonth, AsOf = to }, Ct);
 
         Assert.Equal(NetWorthGranularity.Daily, resp.Granularity);
@@ -412,7 +412,7 @@ public class GetNetWorthHistoryHandlerTests : IAsyncLifetime
         await AddSplitAsync(cash.Id, _cad.Id, 50m, new DateTimeOffset(2026, 2, 1, 12, 0, 0, TimeSpan.Zero));
         await SetDisplayCurrencyAsync(_cad.Id);
 
-        var resp = await _sut.Handle(
+        var resp = await _sut.HandleAsync(
             new GetNetWorthHistoryQuery { Range = NetWorthRange.YearToDate, AsOf = to }, Ct);
 
         Assert.Equal(NetWorthGranularity.Daily, resp.Granularity);
@@ -434,7 +434,7 @@ public class GetNetWorthHistoryHandlerTests : IAsyncLifetime
         await AddSplitAsync(cash.Id, _cad.Id, 9999m, new DateTimeOffset(2026, 2, 1, 12, 0, 0, TimeSpan.Zero));
         await SetDisplayCurrencyAsync(_cad.Id);
 
-        var resp = await _sut.Handle(
+        var resp = await _sut.HandleAsync(
             new GetNetWorthHistoryQuery { Range = NetWorthRange.LastYear, AsOf = to }, Ct);
 
         Assert.Equal(new DateTime(2025, 1, 1), resp.Points[0].AsOf.UtcDateTime.Date);
@@ -454,7 +454,7 @@ public class GetNetWorthHistoryHandlerTests : IAsyncLifetime
         await AddSplitAsync(cash.Id, _cad.Id, 50m, new DateTimeOffset(2026, 4, 1, 12, 0, 0, TimeSpan.Zero));
         await SetDisplayCurrencyAsync(_cad.Id);
 
-        var resp = await _sut.Handle(
+        var resp = await _sut.HandleAsync(
             new GetNetWorthHistoryQuery
             {
                 Range = NetWorthRange.Custom,
@@ -479,7 +479,7 @@ public class GetNetWorthHistoryHandlerTests : IAsyncLifetime
         await AddSplitAsync(cash.Id, _cad.Id, 1000m, new DateTimeOffset(2024, 6, 1, 12, 0, 0, TimeSpan.Zero));
         await SetDisplayCurrencyAsync(_cad.Id);
 
-        var resp = await _sut.Handle(
+        var resp = await _sut.HandleAsync(
             new GetNetWorthHistoryQuery
             {
                 Range = NetWorthRange.Custom,
@@ -496,15 +496,15 @@ public class GetNetWorthHistoryHandlerTests : IAsyncLifetime
     {
         await SetDisplayCurrencyAsync(_cad.Id);
 
-        await Assert.ThrowsAsync<BusinessRuleException>(() => _sut.Handle(
+        await Assert.ThrowsAsync<BusinessRuleException>(() => _sut.HandleAsync(
             new GetNetWorthHistoryQuery { Range = NetWorthRange.Custom }, Ct));
-        await Assert.ThrowsAsync<BusinessRuleException>(() => _sut.Handle(
+        await Assert.ThrowsAsync<BusinessRuleException>(() => _sut.HandleAsync(
             new GetNetWorthHistoryQuery
             {
                 Range = NetWorthRange.Custom,
                 FromDate = new DateOnly(2026, 1, 1),
             }, Ct));
-        await Assert.ThrowsAsync<BusinessRuleException>(() => _sut.Handle(
+        await Assert.ThrowsAsync<BusinessRuleException>(() => _sut.HandleAsync(
             new GetNetWorthHistoryQuery
             {
                 Range = NetWorthRange.Custom,
@@ -517,7 +517,7 @@ public class GetNetWorthHistoryHandlerTests : IAsyncLifetime
     {
         await SetDisplayCurrencyAsync(_cad.Id);
 
-        await Assert.ThrowsAsync<BusinessRuleException>(() => _sut.Handle(
+        await Assert.ThrowsAsync<BusinessRuleException>(() => _sut.HandleAsync(
             new GetNetWorthHistoryQuery
             {
                 Range = NetWorthRange.Custom,
@@ -537,7 +537,7 @@ public class GetNetWorthHistoryHandlerTests : IAsyncLifetime
         await AddSplitAsync(cash.Id, _cad.Id, 50m, new DateTimeOffset(2026, 4, 5, 12, 0, 0, TimeSpan.Zero));
         await SetDisplayCurrencyAsync(_cad.Id);
 
-        var resp = await _sut.Handle(
+        var resp = await _sut.HandleAsync(
             new GetNetWorthHistoryQuery
             {
                 Range = NetWorthRange.Custom,
@@ -564,7 +564,7 @@ public class GetNetWorthHistoryHandlerTests : IAsyncLifetime
         await AddSplitAsync(cash.Id, _cad.Id, 50m, new DateTimeOffset(2026, 4, 20, 12, 0, 0, TimeSpan.Zero));
         await SetDisplayCurrencyAsync(_cad.Id);
 
-        var resp = await _sut.Handle(
+        var resp = await _sut.HandleAsync(
             new GetNetWorthHistoryQuery { Range = NetWorthRange.ThreeMonths, AsOf = asOf }, Ct);
 
         Assert.Equal(asOf, resp.To);

@@ -11,14 +11,14 @@ public class GetDocumentThumbnailHandler(
     IOptions<FileStorageOptions> storage,
     ThumbnailService thumbnailService)
 {
-    public async Task<IResult> Handle(GetDocumentThumbnailQuery request, CancellationToken ct)
+    public async Task<IResult> HandleAsync(Guid id, Guid? versionId, CancellationToken ct)
     {
         var versionQuery = db.DocumentVersions
             .AsNoTracking()
-            .Where(r => r.DocumentId == request.Id);
+            .Where(r => r.DocumentId == id);
 
-        if (request.VersionId.HasValue)
-            versionQuery = versionQuery.Where(r => r.Id == request.VersionId.Value);
+        if (versionId.HasValue)
+            versionQuery = versionQuery.Where(r => r.Id == versionId.Value);
         else
             versionQuery = versionQuery.OrderByDescending(r => r.VersionNumber);
 

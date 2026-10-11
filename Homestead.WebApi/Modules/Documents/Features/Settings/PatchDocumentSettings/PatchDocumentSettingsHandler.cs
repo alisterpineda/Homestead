@@ -17,8 +17,8 @@ public class PatchDocumentSettingsHandler(
     IAuditContext audit,
     IUnitOfWork unitOfWork)
 {
-    public async Task<DocumentSettingsResponse> Handle(
-        PatchDocumentSettingsCommand command, CancellationToken ct)
+    public async Task<DocumentSettingsResponse> HandleAsync(
+        JsonPatchDocument<DocumentSettings> patchDoc, CancellationToken ct)
     {
         var entity = await db.AppSettings.FirstOrDefaultAsync(s => s.Key == AppSetting.DocumentsModule, ct);
 
@@ -30,7 +30,7 @@ public class PatchDocumentSettingsHandler(
 
         // Apply patch operations directly to settings
         var errors = new List<JsonPatchError>();
-        command.PatchDocument.ApplyTo(settings, error => errors.Add(error));
+        patchDoc.ApplyTo(settings, error => errors.Add(error));
 
         if (errors.Count > 0)
             throw new BusinessRuleException(errors.Select(e => new

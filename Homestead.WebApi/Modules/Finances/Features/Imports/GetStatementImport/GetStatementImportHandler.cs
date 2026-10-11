@@ -9,13 +9,14 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Imports.GetStatementImport;
 
+// Read-only (served over GET — no transaction).
 public class GetStatementImportHandler(AppDbContext db, ICurrentUserAccessor currentUser)
 {
-    public async Task<StatementImportResponse> Handle(GetStatementImportQuery request, CancellationToken ct)
+    public async Task<StatementImportResponse> HandleAsync(Guid jobId, CancellationToken ct)
     {
         var job = await db.ProcessingJobs
             .AsNoTracking()
-            .FirstOrDefaultAsync(j => j.Id == request.JobId, ct);
+            .FirstOrDefaultAsync(j => j.Id == jobId, ct);
 
         // Not a statement-import job, or not this user's job → 404 (never leak another user's import).
         if (job is null

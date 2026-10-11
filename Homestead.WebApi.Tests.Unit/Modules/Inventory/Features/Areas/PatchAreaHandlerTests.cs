@@ -48,7 +48,7 @@ public class PatchAreaHandlerTests : IAsyncLifetime
     {
         var patch = new JsonPatchDocument<PatchAreaModel>();
         build(patch);
-        return _sut.Handle(new PatchAreaCommand { Id = id, PatchDocument = patch }, Ct);
+        return _sut.HandleAsync(id, patch, Ct);
     }
 
     [Fact]

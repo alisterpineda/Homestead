@@ -15,23 +15,24 @@ public class PatchPriceSourceHandler(
     IAuditContext audit,
     IUnitOfWork unitOfWork)
 {
-    public async Task<PatchPriceSourceResponse> Handle(PatchPriceSourceCommand request, CancellationToken ct)
+    public async Task<PatchPriceSourceResponse> HandleAsync(
+        CommodityPriceSource source, PatchPriceSourceBody body, CancellationToken ct)
     {
-        request.Source.RequireExternal("configured");
+        source.RequireExternal("configured");
 
         var entity = await db.CommodityPriceSourceSettings
-            .FirstOrDefaultAsync(s => s.Source == request.Source, ct)
+            .FirstOrDefaultAsync(s => s.Source == source, ct)
             ?? throw new EntityNotFoundException("Price source settings not found.");
 
         var before = CommodityPriceSourceSettingsSnapshot.From(entity);
 
         IReadOnlyList<string> pairAllowList = [];
-        if (request.PairAllowList is not null)
+        if (body.PairAllowList is not null)
         {
             // Persist the normalized (trimmed + de-duplicated) list, not the raw request — a
             // stored entry with surrounding whitespace or a duplicate would otherwise pass
             // validation here yet silently fail to match in the importer's symbol lookup.
-            var normalized = await ValidatePairAllowListAsync(request.PairAllowList, ct);
+            var normalized = await ValidatePairAllowListAsync(body.PairAllowList, ct);
             entity.PairAllowList = JsonSerializer.Serialize(normalized);
             pairAllowList = normalized;
         }

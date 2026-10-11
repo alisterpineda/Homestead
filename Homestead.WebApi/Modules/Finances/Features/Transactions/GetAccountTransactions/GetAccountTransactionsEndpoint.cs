@@ -10,19 +10,7 @@ public static class GetAccountTransactionsEndpoint
         group.MapGet("/{accountId:guid}/transactions",
             async (Guid accountId, [AsParameters] GetAccountTransactionsParameters parameters,
                 GetAccountTransactionsHandler handler, CancellationToken ct) =>
-        {
-            var query = new GetAccountTransactionsQuery
-            {
-                AccountId = accountId,
-                CommodityId = parameters.CommodityId,
-                DateFrom = parameters.DateFrom,
-                DateTo = parameters.DateTo,
-                Page = parameters.Page,
-                PageSize = parameters.PageSize,
-            };
-            var response = await handler.Handle(query, ct);
-            return Results.Ok(response);
-        })
+            Results.Ok(await handler.HandleAsync(accountId, parameters, ct)))
         .WithName("GetAccountTransactions")
         .Produces<PaginatedResponse<TransactionResponse>>()
         .RequireAuthorization(AuthPolicies.ActiveUser);

@@ -8,9 +8,9 @@ namespace Homestead.WebApi.Modules.Admin.Features.Groups.DeleteGroup;
 
 public class DeleteGroupHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork)
 {
-    public async Task<bool> Handle(DeleteGroupCommand request, CancellationToken ct)
+    public async Task<bool> HandleAsync(Guid id, CancellationToken ct)
     {
-        var group = await db.Groups.FirstOrDefaultAsync(g => g.Id == request.Id, ct);
+        var group = await db.Groups.FirstOrDefaultAsync(g => g.Id == id, ct);
         if (group is null)
             throw new EntityNotFoundException("Group not found.");
 
@@ -20,7 +20,7 @@ public class DeleteGroupHandler(AppDbContext db, IAuditContext audit, IUnitOfWor
 
         // Set GroupId to null on affected documents (including soft-deleted ones)
         await db.Documents.IgnoreQueryFilters([DocumentQueryFilters.SoftDelete])
-            .Where(d => d.GroupId == request.Id)
+            .Where(d => d.GroupId == id)
             .ExecuteUpdateAsync(s => s.SetProperty(d => d.GroupId, (Guid?)null), ct);
 
         audit.Deleted("Group", group.Id, description: group.Name);
@@ -32,5 +32,3 @@ public class DeleteGroupHandler(AppDbContext db, IAuditContext audit, IUnitOfWor
         return true;
     }
 }
-
-public record DeleteGroupCommand(Guid Id);

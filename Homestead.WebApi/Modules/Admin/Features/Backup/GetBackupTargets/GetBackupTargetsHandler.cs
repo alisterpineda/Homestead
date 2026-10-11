@@ -18,8 +18,7 @@ public class GetBackupTargetsHandler(
     IBackupSourceCatalog catalog,
     IBackupRunHistory runHistory)
 {
-    public async Task<GetBackupTargetsResponse> Handle(
-        GetBackupTargetsQuery request, CancellationToken ct)
+    public async Task<GetBackupTargetsResponse> HandleAsync(CancellationToken ct)
     {
         var sources = await db.BackupSources
             .AsNoTracking()

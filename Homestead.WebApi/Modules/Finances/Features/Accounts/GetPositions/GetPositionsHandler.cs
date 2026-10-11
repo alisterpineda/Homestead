@@ -8,12 +8,12 @@ namespace Homestead.WebApi.Modules.Finances.Features.Accounts.GetPositions;
 
 public class GetPositionsHandler(AppDbContext db, IValuationService valuations)
 {
-    public async Task<IReadOnlyList<PositionResponse>> Handle(
-        GetPositionsQuery request, CancellationToken ct)
+    public async Task<IReadOnlyList<PositionResponse>> HandleAsync(
+        Guid accountId, CancellationToken ct)
     {
         var account = await db.Accounts
             .AsNoTracking()
-            .FirstOrDefaultAsync(a => a.Id == request.AccountId, ct);
+            .FirstOrDefaultAsync(a => a.Id == accountId, ct);
 
         if (account is null || account.IsSystem || account.Kind != AccountKind.Investment)
             throw new EntityNotFoundException("Account not found.");

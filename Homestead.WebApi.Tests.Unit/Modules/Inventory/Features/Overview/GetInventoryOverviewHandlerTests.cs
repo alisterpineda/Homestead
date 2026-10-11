@@ -100,7 +100,7 @@ public class GetInventoryOverviewHandlerTests : IAsyncLifetime
     }
 
     private Task<GetInventoryOverviewResponse> HandleAsync() =>
-        _sut.Handle(new GetInventoryOverviewQuery(), Ct);
+        _sut.HandleAsync(Ct);
 
     [Fact]
     public async Task RecentlyUpdated_OrdersByEffectiveActivityNewestFirst()

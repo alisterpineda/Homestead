@@ -10,16 +10,7 @@ public static class CreateDocumentVersionEndpoint
     {
         group.MapPost("/", async (Guid documentId, [FromForm] string? label,
             IFormFile file, CreateDocumentVersionHandler handler, CancellationToken ct) =>
-        {
-            var request = new CreateDocumentVersionCommand
-            {
-                DocumentId = documentId,
-                Label = label,
-                File = file
-            };
-            var response = await handler.Handle(request, ct);
-            return Results.Accepted(null, response);
-        })
+            Results.Accepted(null, await handler.HandleAsync(documentId, label, file, ct)))
         .WithName("CreateDocumentVersion")
         .Produces<CreateDocumentVersionResponse>(StatusCodes.Status202Accepted)
         .DisableAntiforgery()

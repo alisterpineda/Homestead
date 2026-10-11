@@ -7,15 +7,15 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Admin.Features.Groups.UpdateGroupMember;
 
-public class UpdateGroupMemberHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork, IValidator<UpdateGroupMemberCommand> validator)
+public class UpdateGroupMemberHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork, IValidator<UpdateGroupMemberRequest> validator)
 {
-    public async Task<GroupMemberResponse> Handle(UpdateGroupMemberCommand command, CancellationToken ct)
+    public async Task<GroupMemberResponse> HandleAsync(Guid id, Guid userId, UpdateGroupMemberRequest request, CancellationToken ct)
     {
-        await validator.ValidateAndThrowAsync(command, ct);
+        await validator.ValidateAndThrowAsync(request, ct);
 
         var member = await db.GroupMembers
             .Include(gm => gm.User)
-            .FirstOrDefaultAsync(gm => gm.GroupId == command.GroupId && gm.UserId == command.UserId, ct);
+            .FirstOrDefaultAsync(gm => gm.GroupId == id && gm.UserId == userId, ct);
 
         if (member is null)
             throw new EntityNotFoundException("Group member not found.");
@@ -23,10 +23,10 @@ public class UpdateGroupMemberHandler(AppDbContext db, IAuditContext audit, IUni
         var oldAccessLevel = member.AccessLevel;
 
         if (oldAccessLevel == GroupAccessLevel.Owner
-            && command.Request.AccessLevel != GroupAccessLevel.Owner)
+            && request.AccessLevel != GroupAccessLevel.Owner)
         {
             var ownerCount = await db.GroupMembers
-                .CountAsync(gm => gm.GroupId == command.GroupId
+                .CountAsync(gm => gm.GroupId == id
                                 && gm.AccessLevel == GroupAccessLevel.Owner, ct);
 
             if (ownerCount <= 1)
@@ -34,13 +34,13 @@ public class UpdateGroupMemberHandler(AppDbContext db, IAuditContext audit, IUni
                     "Cannot change the access level of the last owner of the group.");
         }
 
-        member.AccessLevel = command.Request.AccessLevel;
+        member.AccessLevel = request.AccessLevel;
 
-        if (oldAccessLevel != command.Request.AccessLevel)
+        if (oldAccessLevel != request.AccessLevel)
         {
-            audit.TrackScalar("Group", command.GroupId, "MemberAccessLevel",
+            audit.TrackScalar("Group", id, "MemberAccessLevel",
                 $"{member.User.DisplayName} as {oldAccessLevel}",
-                $"{member.User.DisplayName} as {command.Request.AccessLevel}");
+                $"{member.User.DisplayName} as {request.AccessLevel}");
         }
 
         await unitOfWork.SaveChangesAsync(ct);
@@ -53,11 +53,4 @@ public class UpdateGroupMemberHandler(AppDbContext db, IAuditContext audit, IUni
             AccessLevel = member.AccessLevel
         };
     }
-}
-
-public record UpdateGroupMemberCommand
-{
-    public Guid GroupId { get; init; }
-    public Guid UserId { get; init; }
-    public required UpdateGroupMemberRequest Request { get; init; }
 }

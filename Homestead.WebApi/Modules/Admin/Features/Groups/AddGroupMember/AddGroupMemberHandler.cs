@@ -7,19 +7,19 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Admin.Features.Groups.AddGroupMember;
 
-public class AddGroupMemberHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork, IValidator<AddGroupMemberCommand> validator)
+public class AddGroupMemberHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork, IValidator<AddGroupMemberRequest> validator)
 {
-    public async Task<GroupMemberResponse> Handle(AddGroupMemberCommand command, CancellationToken ct)
+    public async Task<GroupMemberResponse> HandleAsync(Guid id, AddGroupMemberRequest request, CancellationToken ct)
     {
-        await validator.ValidateAndThrowAsync(command, ct);
+        await validator.ValidateAndThrowAsync(request, ct);
 
-        var groupExists = await db.Groups.AnyAsync(g => g.Id == command.GroupId, ct);
+        var groupExists = await db.Groups.AnyAsync(g => g.Id == id, ct);
         if (!groupExists)
             throw new EntityNotFoundException("Group not found.");
 
         var user = await db.Users
             .AsNoTracking()
-            .Where(u => u.Id == command.Request.UserId)
+            .Where(u => u.Id == request.UserId)
             .Select(u => new { u.Id, u.IsActive, u.DisplayName, u.Email })
             .FirstOrDefaultAsync(ct);
 
@@ -30,20 +30,20 @@ public class AddGroupMemberHandler(AppDbContext db, IAuditContext audit, IUnitOf
             throw new BusinessRuleException("User is not active.");
 
         var alreadyMember = await db.GroupMembers
-            .AnyAsync(gm => gm.GroupId == command.GroupId && gm.UserId == command.Request.UserId, ct);
+            .AnyAsync(gm => gm.GroupId == id && gm.UserId == request.UserId, ct);
 
         if (alreadyMember)
             throw new DuplicateEntityException("User is already a member of this group.");
 
         db.GroupMembers.Add(new GroupMember
         {
-            GroupId = command.GroupId,
-            UserId = command.Request.UserId,
-            AccessLevel = command.Request.AccessLevel
+            GroupId = id,
+            UserId = request.UserId,
+            AccessLevel = request.AccessLevel
         });
 
-        audit.TrackScalar("Group", command.GroupId, "MemberAdded",
-            null, $"{user.DisplayName} as {command.Request.AccessLevel}");
+        audit.TrackScalar("Group", id, "MemberAdded",
+            null, $"{user.DisplayName} as {request.AccessLevel}");
 
         await unitOfWork.SaveChangesAsync(ct);
 
@@ -52,13 +52,7 @@ public class AddGroupMemberHandler(AppDbContext db, IAuditContext audit, IUnitOf
             UserId = user.Id,
             DisplayName = user.DisplayName,
             Email = user.Email,
-            AccessLevel = command.Request.AccessLevel
+            AccessLevel = request.AccessLevel
         };
     }
-}
-
-public record AddGroupMemberCommand
-{
-    public Guid GroupId { get; init; }
-    public required AddGroupMemberRequest Request { get; init; }
 }

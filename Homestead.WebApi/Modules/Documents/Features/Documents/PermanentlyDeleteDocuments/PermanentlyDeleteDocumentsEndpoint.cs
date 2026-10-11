@@ -12,7 +12,7 @@ public static class PermanentlyDeleteDocumentsEndpoint
             if (request.Ids.Count == 0)
                 return ProblemDetailsFactory.BusinessRuleResult("At least one document ID must be provided.");
 
-            var response = await handler.Handle(request, ct);
+            var response = await handler.HandleAsync(request, ct);
             return Results.Ok(response);
         })
         .WithName("BulkPermanentlyDeleteDocuments")
@@ -22,7 +22,7 @@ public static class PermanentlyDeleteDocumentsEndpoint
         group.MapPost("/{id:guid}/permanently-delete", async (Guid id, PermanentlyDeleteDocumentsHandler handler, CancellationToken ct) =>
         {
             var request = new PermanentlyDeleteDocumentsCommand([id]);
-            var response = await handler.Handle(request, ct);
+            var response = await handler.HandleAsync(request, ct);
             return response.DeletedCount > 0 ? Results.NoContent() : Results.NotFound();
         })
         .WithName("PermanentlyDeleteDocument")

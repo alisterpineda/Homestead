@@ -6,17 +6,22 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Payees.MergePayee;
 
+/// <summary>
+/// Consolidate a source payee into a target: re-point every transaction and every learned mapping from
+/// source to target, then delete the source. The cleanup valve for AI-created near-duplicates
+/// ("Blue Bottle" / "Blue Bottle Coffee") that a case-insensitive name check can't catch.
+/// </summary>
 public class MergePayeeHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork)
 {
-    public async Task<PayeeResponse> Handle(MergePayeeCommand request, CancellationToken ct)
+    public async Task<PayeeResponse> HandleAsync(Guid id, MergePayeeRequest body, CancellationToken ct)
     {
-        if (request.SourceId == request.TargetId)
+        if (id == body.TargetId)
             throw new BusinessRuleException("A payee cannot be merged into itself.");
 
-        var source = await db.Payees.FirstOrDefaultAsync(p => p.Id == request.SourceId, ct)
+        var source = await db.Payees.FirstOrDefaultAsync(p => p.Id == id, ct)
             ?? throw new EntityNotFoundException("Source payee not found.");
 
-        var target = await db.Payees.FirstOrDefaultAsync(p => p.Id == request.TargetId, ct)
+        var target = await db.Payees.FirstOrDefaultAsync(p => p.Id == body.TargetId, ct)
             ?? throw new EntityNotFoundException("Target payee not found.");
 
         // Re-point every flow attributed to the source onto the target (MergeBrand precedent). The bulk

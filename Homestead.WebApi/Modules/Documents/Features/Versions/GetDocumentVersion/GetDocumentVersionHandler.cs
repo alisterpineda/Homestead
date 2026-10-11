@@ -5,13 +5,13 @@ namespace Homestead.WebApi.Modules.Documents.Features.Versions.GetDocumentVersio
 
 public class GetDocumentVersionHandler(AppDbContext db)
 {
-    public async Task<GetDocumentVersionResponse?> Handle(GetDocumentVersionQuery request, CancellationToken ct)
+    public async Task<GetDocumentVersionResponse?> HandleAsync(Guid documentId, Guid id, CancellationToken ct)
     {
         // Projected to an intermediate first: the provenance blob has to be deserialized and flattened in
         // memory, which EF cannot translate into the query.
         var row = await db.DocumentVersions
             .AsNoTracking()
-            .Where(r => r.DocumentId == request.DocumentId && r.Id == request.Id)
+            .Where(r => r.DocumentId == documentId && r.Id == id)
             .Select(r => new
             {
                 r.Id,

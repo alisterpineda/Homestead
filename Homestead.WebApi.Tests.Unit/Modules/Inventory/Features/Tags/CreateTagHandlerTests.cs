@@ -41,7 +41,7 @@ public class CreateTagHandlerTests : IDisposable
         _tagPathResolver.ResolveOrCreateAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
             .Returns(tag);
 
-        await _sut.Handle(new CreateInventoryTagCommand("Test"), CancellationToken.None);
+        await _sut.HandleAsync(new CreateInventoryTagCommand("Test"), CancellationToken.None);
 
         _audit.Received(1).Created("InventoryTag", tagId, Arg.Any<Guid?>());
     }
@@ -54,7 +54,7 @@ public class CreateTagHandlerTests : IDisposable
         _tagPathResolver.ResolveOrCreateAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
             .Returns(tag);
 
-        var result = await _sut.Handle(new CreateInventoryTagCommand("Parent/Test", Color: "#ff0000", Description: "My desc"), CancellationToken.None);
+        var result = await _sut.HandleAsync(new CreateInventoryTagCommand("Parent/Test", Color: "#ff0000", Description: "My desc"), CancellationToken.None);
 
         await _tagPathResolver.Received(1).ResolveOrCreateAsync("Parent/Test", leafColor: "#ff0000", leafDescription: "My desc", createdByUserId: Arg.Any<Guid?>(), ct: Arg.Any<CancellationToken>());
         Assert.Equal("My desc", result.Description);
@@ -78,7 +78,7 @@ public class CreateTagHandlerTests : IDisposable
         _tagPathResolver.ResolveOrCreateAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
             .Returns(tag);
 
-        var result = await _sut.Handle(new CreateInventoryTagCommand("Parent/Test", Color: "#ff0000"), CancellationToken.None);
+        var result = await _sut.HandleAsync(new CreateInventoryTagCommand("Parent/Test", Color: "#ff0000"), CancellationToken.None);
 
         Assert.Equal(tag.Id, result.Id);
         Assert.Equal("Test", result.Name);
@@ -95,7 +95,7 @@ public class CreateTagHandlerTests : IDisposable
         _tagPathResolver.ResolveOrCreateAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
             .Returns(tag);
 
-        var result = await _sut.Handle(new CreateInventoryTagCommand("Test"), CancellationToken.None);
+        var result = await _sut.HandleAsync(new CreateInventoryTagCommand("Test"), CancellationToken.None);
 
         Assert.Null(result.Description);
     }
@@ -107,7 +107,7 @@ public class CreateTagHandlerTests : IDisposable
         _tagPathResolver.ResolveOrCreateAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
             .Returns(tag);
 
-        await _sut.Handle(new CreateInventoryTagCommand("Test"), CancellationToken.None);
+        await _sut.HandleAsync(new CreateInventoryTagCommand("Test"), CancellationToken.None);
 
         await _unitOfWork.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }

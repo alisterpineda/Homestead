@@ -8,7 +8,7 @@ public static class CreatePartyEndpoint
     {
         group.MapPost("/", async (CreatePartyCommand request, CreatePartyHandler handler, CancellationToken ct) =>
         {
-            var response = await handler.Handle(request, ct);
+            var response = await handler.HandleAsync(request, ct);
             return Results.Created($"/api/v1/documents/parties/{response.Id}", response);
         })
         .WithName("CreateParty")

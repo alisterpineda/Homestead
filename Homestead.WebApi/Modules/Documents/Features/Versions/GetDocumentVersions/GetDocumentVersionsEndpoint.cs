@@ -9,16 +9,7 @@ public static class GetDocumentVersionsEndpoint
     {
         group.MapGet("/", async (Guid documentId, [AsParameters] PaginatedRequest pagination,
             GetDocumentVersionsHandler handler, CancellationToken ct) =>
-        {
-            var request = new GetDocumentVersionsQuery
-            {
-                DocumentId = documentId,
-                Page = pagination.Page,
-                PageSize = pagination.PageSize
-            };
-            var response = await handler.Handle(request, ct);
-            return Results.Ok(response);
-        })
+            Results.Ok(await handler.HandleAsync(documentId, pagination, ct)))
         .WithName("GetDocumentVersions")
         .Produces<PaginatedResponse<GetDocumentVersionsResponse>>()
         .RequireDocumentAuthorization(DocumentOperations.Read);

@@ -13,10 +13,10 @@ namespace Homestead.WebApi.Modules.Documents.Features.Tags.PatchTag;
 public class PatchTagHandler(AppDbContext db, IDocumentQueryService accessService, IAuditContext audit,
     ICurrentUserAccessor currentUser, IUnitOfWork unitOfWork)
 {
-    public async Task<PatchTagResponse> Handle(PatchTagCommand request, CancellationToken ct)
+    public async Task<PatchTagResponse> HandleAsync(Guid id, JsonPatchDocument<PatchTagModel> patchDoc, CancellationToken ct)
     {
         var tag = await db.Tags
-            .FirstOrDefaultAsync(t => t.Id == request.Id, ct);
+            .FirstOrDefaultAsync(t => t.Id == id, ct);
 
         if (tag is null)
             throw new EntityNotFoundException("Tag not found.");
@@ -25,7 +25,7 @@ public class PatchTagHandler(AppDbContext db, IDocumentQueryService accessServic
 
         // Block modification if the tag (or its descendants) is used on inaccessible documents
         var subtreeTagIds = db.Tags
-            .Where(t => t.Id == request.Id || t.Path.StartsWith(tag.Path + "/"))
+            .Where(t => t.Id == id || t.Path.StartsWith(tag.Path + "/"))
             .Select(t => t.Id);
 
         var relatedDocIds = db.DocumentTags
@@ -50,7 +50,7 @@ public class PatchTagHandler(AppDbContext db, IDocumentQueryService accessServic
 
         // Apply patch operations
         var errors = new List<JsonPatchError>();
-        request.PatchDocument.ApplyTo(model, error => errors.Add(error));
+        patchDoc.ApplyTo(model, error => errors.Add(error));
 
         if (errors.Count > 0)
             throw new BusinessRuleException(errors.Select(e => new
@@ -69,7 +69,7 @@ public class PatchTagHandler(AppDbContext db, IDocumentQueryService accessServic
         var normalizedName = model.Name.Trim();
 
         // Validate parent
-        if (model.ParentId == request.Id)
+        if (model.ParentId == id)
             throw new BusinessRuleException("A tag cannot be its own parent.");
 
         string? parentPath = null;
@@ -115,7 +115,7 @@ public class PatchTagHandler(AppDbContext db, IDocumentQueryService accessServic
 
             // Check for path uniqueness
             var conflictExists = await db.Tags
-                .AnyAsync(t => t.Path == newPath && t.Id != request.Id, ct);
+                .AnyAsync(t => t.Path == newPath && t.Id != id, ct);
 
             if (conflictExists)
                 throw new DuplicateEntityException($"A tag with path '{newPath}' already exists.");

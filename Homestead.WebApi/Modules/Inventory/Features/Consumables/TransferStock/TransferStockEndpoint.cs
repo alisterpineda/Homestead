@@ -8,10 +8,7 @@ public static class TransferStockEndpoint
     {
         group.MapPost("/{id:guid}/transfer", async (Guid id,
             TransferStockRequest body, TransferStockHandler handler, CancellationToken ct) =>
-        {
-            var command = new TransferStockCommand { ConsumableId = id, Body = body };
-            return Results.Ok(await handler.Handle(command, ct));
-        })
+            Results.Ok(await handler.HandleAsync(id, body, ct)))
         .WithName("TransferStock")
         .Produces<ConsumableDetailResponse>()
         .Produces(StatusCodes.Status400BadRequest)

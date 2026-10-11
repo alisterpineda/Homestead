@@ -12,7 +12,7 @@ public class BulkDeleteDocumentsHandler(AppDbContext db, ICurrentUserAccessor cu
     IAuditContext audit, IAuthorizationService authService, IHttpContextAccessor httpContext,
     IUnitOfWork unitOfWork)
 {
-    public async Task<BulkDeleteDocumentsResponse> Handle(BulkDeleteDocumentsCommand request, CancellationToken ct)
+    public async Task<BulkDeleteDocumentsResponse> HandleAsync(BulkDeleteDocumentsCommand request, CancellationToken ct)
     {
         var documents = await db.Documents
             .Where(d => request.Ids.Contains(d.Id))

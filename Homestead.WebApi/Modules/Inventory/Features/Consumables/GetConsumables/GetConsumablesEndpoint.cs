@@ -9,7 +9,7 @@ public static class GetConsumablesEndpoint
         group.MapGet("", async ([AsParameters] GetConsumablesQuery request,
             GetConsumablesHandler handler, CancellationToken ct) =>
         {
-            return Results.Ok(await handler.Handle(request, ct));
+            return Results.Ok(await handler.HandleAsync(request, ct));
         })
         .WithName("GetConsumables")
         .Produces<PaginatedResponse<ConsumableResponse>>();

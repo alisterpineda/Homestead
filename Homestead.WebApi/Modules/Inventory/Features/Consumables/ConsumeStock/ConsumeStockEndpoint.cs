@@ -8,10 +8,7 @@ public static class ConsumeStockEndpoint
     {
         group.MapPost("/{id:guid}/consume", async (Guid id,
             ConsumeStockRequest body, ConsumeStockHandler handler, CancellationToken ct) =>
-        {
-            var command = new ConsumeStockCommand { ConsumableId = id, Body = body };
-            return Results.Ok(await handler.Handle(command, ct));
-        })
+            Results.Ok(await handler.HandleAsync(id, body, ct)))
         .WithName("ConsumeStock")
         .Produces<ConsumableDetailResponse>()
         .Produces(StatusCodes.Status400BadRequest)

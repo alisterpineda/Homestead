@@ -12,9 +12,9 @@ public class DeleteAreaHandler(
     IUnitOfWork unitOfWork,
     IInventoryPlacementService placementService)
 {
-    public async Task<bool> Handle(DeleteAreaCommand request, CancellationToken ct)
+    public async Task<bool> HandleAsync(Guid id, CancellationToken ct)
     {
-        var area = await db.Areas.FirstOrDefaultAsync(a => a.Id == request.Id, ct);
+        var area = await db.Areas.FirstOrDefaultAsync(a => a.Id == id, ct);
         if (area is null)
             return false;
 

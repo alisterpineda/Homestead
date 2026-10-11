@@ -8,7 +8,7 @@ namespace Homestead.WebApi.Modules.Inventory.Features.Tags.CreateTag;
 public class CreateTagHandler(
     IInventoryTagPathResolver tagPathResolver, ICurrentUserAccessor currentUser, IAuditContext audit, IUnitOfWork unitOfWork)
 {
-    public async Task<CreateInventoryTagResponse> Handle(CreateInventoryTagCommand request, CancellationToken ct)
+    public async Task<CreateInventoryTagResponse> HandleAsync(CreateInventoryTagCommand request, CancellationToken ct)
     {
         var tag = await tagPathResolver.ResolveOrCreateAsync(request.Path, leafColor: request.Color, leafDescription: request.Description, createdByUserId: currentUser.UserId, ct: ct);
 

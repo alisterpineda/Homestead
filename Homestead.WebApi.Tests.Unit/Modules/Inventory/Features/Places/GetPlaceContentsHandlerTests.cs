@@ -92,14 +92,14 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
     public async Task Handle_NoScope_ThrowsBusinessRule()
     {
         await Assert.ThrowsAsync<BusinessRuleException>(
-            () => _sut.Handle(new GetPlaceContentsQuery(), Ct));
+            () => _sut.HandleAsync(new GetPlaceContentsQuery(), Ct));
     }
 
     [Fact]
     public async Task Handle_TwoScopes_ThrowsBusinessRule()
     {
         await Assert.ThrowsAsync<BusinessRuleException>(
-            () => _sut.Handle(new GetPlaceContentsQuery
+            () => _sut.HandleAsync(new GetPlaceContentsQuery
             {
                 AreaId = _garage.Id,
                 Unplaced = true,
@@ -110,7 +110,7 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
     public async Task Handle_UnknownArea_ThrowsNotFound()
     {
         await Assert.ThrowsAsync<EntityNotFoundException>(
-            () => _sut.Handle(new GetPlaceContentsQuery { AreaId = Guid.NewGuid() }, Ct));
+            () => _sut.HandleAsync(new GetPlaceContentsQuery { AreaId = Guid.NewGuid() }, Ct));
     }
 
     [Fact]
@@ -121,7 +121,7 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
         var consumable = await AddConsumableAsync("Screws");
 
         await Assert.ThrowsAsync<EntityNotFoundException>(
-            () => _sut.Handle(new GetPlaceContentsQuery { ContainerItemId = consumable.Id }, Ct));
+            () => _sut.HandleAsync(new GetPlaceContentsQuery { ContainerItemId = consumable.Id }, Ct));
     }
 
     [Fact]
@@ -131,7 +131,7 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
         // empty component list, which the detail page renders as "No components yet".
         var drill = await AddItemAsync("Drill", areaId: _garage.Id);
 
-        var resp = await _sut.Handle(new GetPlaceContentsQuery { ContainerItemId = drill.Id }, Ct);
+        var resp = await _sut.HandleAsync(new GetPlaceContentsQuery { ContainerItemId = drill.Id }, Ct);
 
         Assert.NotNull(resp.ContainerItem);
         Assert.Equal(drill.Id, resp.ContainerItem.Id);
@@ -148,7 +148,7 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
         var drill = await AddItemAsync("Drill", areaId: _garage.Id);
         await AddItemAsync("Elsewhere", parentItemId: chest.Id); // not direct in the area
 
-        var resp = await _sut.Handle(new GetPlaceContentsQuery { AreaId = _garage.Id }, Ct);
+        var resp = await _sut.HandleAsync(new GetPlaceContentsQuery { AreaId = _garage.Id }, Ct);
 
         var segment = Assert.Single(resp.Path);
         Assert.Equal(_garage.Id, segment.Id);
@@ -167,7 +167,7 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
         var pc = await AddItemAsync("Gaming PC", areaId: _garage.Id, isContainer: false);
         await AddItemAsync("CPU", parentItemId: pc.Id);
 
-        var resp = await _sut.Handle(new GetPlaceContentsQuery { AreaId = _garage.Id }, Ct);
+        var resp = await _sut.HandleAsync(new GetPlaceContentsQuery { AreaId = _garage.Id }, Ct);
 
         Assert.Empty(resp.Containers);
         Assert.Equal(pc.Id, Assert.Single(resp.Items).Id);
@@ -182,7 +182,7 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
         var pc = await AddItemAsync("Gaming PC", areaId: _garage.Id, isContainer: false);
         var cpu = await AddItemAsync("CPU", parentItemId: pc.Id);
 
-        var resp = await _sut.Handle(new GetPlaceContentsQuery { ContainerItemId = pc.Id }, Ct);
+        var resp = await _sut.HandleAsync(new GetPlaceContentsQuery { ContainerItemId = pc.Id }, Ct);
 
         Assert.NotNull(resp.ContainerItem);
         Assert.Equal(pc.Id, resp.ContainerItem.Id);
@@ -202,7 +202,7 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
         var driveCage = await AddItemAsync(
             "Drive cage", parentItemId: pc.Id, isContainer: true);
 
-        var resp = await _sut.Handle(new GetPlaceContentsQuery { ContainerItemId = pc.Id }, Ct);
+        var resp = await _sut.HandleAsync(new GetPlaceContentsQuery { ContainerItemId = pc.Id }, Ct);
 
         Assert.Empty(resp.Containers);
         Assert.Equal(driveCage.Id, Assert.Single(resp.Items).Id);
@@ -214,7 +214,7 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
         var chest = await AddItemAsync("Chest", areaId: _garage.Id, isContainer: true);
         var bin = await AddItemAsync("Bin", parentItemId: chest.Id, isContainer: true);
 
-        var resp = await _sut.Handle(new GetPlaceContentsQuery { ContainerItemId = bin.Id }, Ct);
+        var resp = await _sut.HandleAsync(new GetPlaceContentsQuery { ContainerItemId = bin.Id }, Ct);
 
         Assert.Equal(3, resp.Path.Count); // Garage › Chest › Bin
         Assert.Equal(LocationSegmentKind.Area, resp.Path[0].Kind);
@@ -238,7 +238,7 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
         await AddStockAsync(screws.Id, 10m, containerItemId: chest.Id);
         await AddStockAsync(screws.Id, 5m, areaId: _garage.Id); // elsewhere
 
-        var resp = await _sut.Handle(new GetPlaceContentsQuery { ContainerItemId = chest.Id }, Ct);
+        var resp = await _sut.HandleAsync(new GetPlaceContentsQuery { ContainerItemId = chest.Id }, Ct);
 
         var consumable = Assert.Single(resp.Consumables);
         Assert.Equal(screws.Id, consumable.Consumable.Id);
@@ -259,7 +259,7 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
         await AddItemAsync("Placed drill", areaId: _garage.Id);
         await AddItemAsync("Nested", parentItemId: floatingBin.Id); // resolved-unplaced, not direct
 
-        var resp = await _sut.Handle(new GetPlaceContentsQuery { Unplaced = true }, Ct);
+        var resp = await _sut.HandleAsync(new GetPlaceContentsQuery { Unplaced = true }, Ct);
 
         Assert.Empty(resp.Path);
         Assert.Null(resp.ContainerItem);
@@ -279,7 +279,7 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
         var tape = await AddConsumableAsync("Tape");
         await AddStockAsync(tape.Id, 2m, areaId: _garage.Id);
 
-        var resp = await _sut.Handle(new GetPlaceContentsQuery { AreaId = _garage.Id }, Ct);
+        var resp = await _sut.HandleAsync(new GetPlaceContentsQuery { AreaId = _garage.Id }, Ct);
 
         // The area's direct contents split into their cards/rows: chest (container), drill (item), tape (consumable).
         var chestCard = Assert.Single(resp.Containers);
@@ -300,7 +300,7 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
         var bolts = await AddConsumableAsync("Bolts");
         await AddStockAsync(bolts.Id, 10m, containerItemId: chest.Id);
 
-        var resp = await _sut.Handle(new GetPlaceContentsQuery { AreaId = _garage.Id }, Ct);
+        var resp = await _sut.HandleAsync(new GetPlaceContentsQuery { AreaId = _garage.Id }, Ct);
 
         var card = Assert.Single(resp.Containers);
         // Case-insensitive name sort across items + consumables, capped at 3.
@@ -317,7 +317,7 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
         await AddStockAsync(archived.Id, 3m, areaId: _garage.Id);
         await AddStockAsync(archived.Id, 2m, containerItemId: chest.Id);
 
-        var resp = await _sut.Handle(new GetPlaceContentsQuery { AreaId = _garage.Id }, Ct);
+        var resp = await _sut.HandleAsync(new GetPlaceContentsQuery { AreaId = _garage.Id }, Ct);
 
         Assert.Empty(resp.Items);
         Assert.Empty(resp.Consumables);
@@ -333,7 +333,7 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
             "Archived chest", status: ItemStatus.Archived, areaId: _garage.Id, isContainer: true);
         var wrench = await AddItemAsync("Wrench", parentItemId: archivedChest.Id);
 
-        var resp = await _sut.Handle(
+        var resp = await _sut.HandleAsync(
             new GetPlaceContentsQuery { ContainerItemId = archivedChest.Id }, Ct);
 
         Assert.Equal(archivedChest.Id, resp.ContainerItem!.Id);
@@ -345,7 +345,7 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
     {
         var chest = await AddItemAsync("Chest", areaId: _garage.Id, isContainer: true);
 
-        var resp = await _sut.Handle(new GetPlaceContentsQuery { ContainerItemId = chest.Id }, Ct);
+        var resp = await _sut.HandleAsync(new GetPlaceContentsQuery { ContainerItemId = chest.Id }, Ct);
 
         Assert.Empty(resp.Containers);
         Assert.Empty(resp.Items);
@@ -360,7 +360,7 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
         var bedroom = await AddAreaAsync("Bedroom", parentAreaId: basement.Id);
         await AddItemAsync("Lamp", areaId: bedroom.Id);
 
-        var resp = await _sut.Handle(new GetPlaceContentsQuery { AreaId = basement.Id }, Ct);
+        var resp = await _sut.HandleAsync(new GetPlaceContentsQuery { AreaId = basement.Id }, Ct);
 
         // Full ancestor breadcrumb, and Bedroom as a child-area card carrying its rolled count.
         Assert.Equal(["House", "Basement"], resp.Path.Select(s => s.Name));
@@ -382,7 +382,7 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
         var lowGlue = await AddConsumableAsync("Glue", threshold: 5m);
         await AddStockAsync(lowGlue.Id, 2m, areaId: _garage.Id);
 
-        var resp = await _sut.Handle(new GetPlaceContentsQuery { AreaId = _garage.Id }, Ct);
+        var resp = await _sut.HandleAsync(new GetPlaceContentsQuery { AreaId = _garage.Id }, Ct);
 
         Assert.Equal(1, resp.ScopedLowStockCount);
         Assert.Equal(2, resp.ScopedLentCount); // ladder (direct) + wrench (nested in the chest)
@@ -396,7 +396,7 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
         var lowGlue = await AddConsumableAsync("Glue", threshold: 5m);
         await AddStockAsync(lowGlue.Id, 2m, containerItemId: chest.Id);
 
-        var resp = await _sut.Handle(new GetPlaceContentsQuery { ContainerItemId = chest.Id }, Ct);
+        var resp = await _sut.HandleAsync(new GetPlaceContentsQuery { ContainerItemId = chest.Id }, Ct);
 
         Assert.Equal(1, resp.ScopedLowStockCount);
         Assert.Equal(1, resp.ScopedLentCount);
@@ -407,7 +407,7 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
     {
         await AddItemAsync("Adrift wrench"); // resolved-unplaced
 
-        var resp = await _sut.Handle(new GetPlaceContentsQuery { Unplaced = true }, Ct);
+        var resp = await _sut.HandleAsync(new GetPlaceContentsQuery { Unplaced = true }, Ct);
 
         Assert.Equal(0, resp.ScopedLowStockCount);
         Assert.Equal(0, resp.ScopedLentCount);

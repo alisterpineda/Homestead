@@ -38,7 +38,7 @@ public class ApplyClassificationHandlerTests : IDisposable
         var actorId = Guid.NewGuid();
         var classification = new ClassificationResult([], [], "summary", "Doc");
 
-        var result = await _sut.Handle(new ApplyClassificationCommand
+        var result = await _sut.HandleAsync(new ApplyClassificationCommand
         {
             DocumentId = _documentId,
             Classification = classification,
@@ -61,7 +61,7 @@ public class ApplyClassificationHandlerTests : IDisposable
     {
         var ct = TestContext.Current.CancellationToken;
 
-        var result = await _sut.Handle(new ApplyClassificationCommand
+        var result = await _sut.HandleAsync(new ApplyClassificationCommand
         {
             DocumentId = _documentId,
             Classification = null,
@@ -80,7 +80,7 @@ public class ApplyClassificationHandlerTests : IDisposable
     {
         var ct = TestContext.Current.CancellationToken;
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => _sut.Handle(new ApplyClassificationCommand
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _sut.HandleAsync(new ApplyClassificationCommand
         {
             DocumentId = Guid.NewGuid(),
             Classification = new ClassificationResult([], [], "s", "t")

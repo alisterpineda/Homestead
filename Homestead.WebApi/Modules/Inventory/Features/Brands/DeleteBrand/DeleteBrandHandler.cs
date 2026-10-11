@@ -7,9 +7,9 @@ namespace Homestead.WebApi.Modules.Inventory.Features.Brands.DeleteBrand;
 
 public class DeleteBrandHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork)
 {
-    public async Task<bool> Handle(DeleteBrandCommand request, CancellationToken ct)
+    public async Task<bool> HandleAsync(Guid id, CancellationToken ct)
     {
-        var brand = await db.Brands.FirstOrDefaultAsync(b => b.Id == request.Id, ct);
+        var brand = await db.Brands.FirstOrDefaultAsync(b => b.Id == id, ct);
         if (brand is null)
             return false;
 

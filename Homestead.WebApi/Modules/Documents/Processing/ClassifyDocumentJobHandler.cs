@@ -74,7 +74,7 @@ public class ClassifyDocumentJobHandler(
             ActorUserId = job.CreatedByUserId
         };
         unitOfWork.SetActor(job.CreatedByUserId);
-        var result = await unitOfWork.ExecuteInTransactionAsync(() => applyClassification.Handle(command, ct), ct);
+        var result = await unitOfWork.ExecuteInTransactionAsync(() => applyClassification.HandleAsync(command, ct), ct);
 
         if (job.ParentJobId is null)
         {

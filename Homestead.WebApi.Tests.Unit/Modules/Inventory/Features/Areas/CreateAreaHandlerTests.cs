@@ -39,7 +39,7 @@ public class CreateAreaHandlerTests : IDisposable
     [Fact]
     public async Task Handle_TopLevel_CreatesRootArea()
     {
-        var resp = await _sut.Handle(new CreateAreaCommand { Name = "House" }, Ct);
+        var resp = await _sut.HandleAsync(new CreateAreaCommand { Name = "House" }, Ct);
 
         Assert.Null(resp.ParentAreaId);
         Assert.Null(resp.ParentAreaName);
@@ -51,7 +51,7 @@ public class CreateAreaHandlerTests : IDisposable
     {
         var house = await AddAreaAsync("House");
 
-        var resp = await _sut.Handle(new CreateAreaCommand { Name = "Basement", ParentAreaId = house.Id }, Ct);
+        var resp = await _sut.HandleAsync(new CreateAreaCommand { Name = "Basement", ParentAreaId = house.Id }, Ct);
 
         Assert.Equal(house.Id, resp.ParentAreaId);
         Assert.Equal("House", resp.ParentAreaName);
@@ -62,7 +62,7 @@ public class CreateAreaHandlerTests : IDisposable
     {
         // BusinessRuleException (400), matching PatchArea and the item handlers' bad-reference convention.
         await Assert.ThrowsAsync<BusinessRuleException>(() =>
-            _sut.Handle(new CreateAreaCommand { Name = "Orphan", ParentAreaId = Guid.NewGuid() }, Ct));
+            _sut.HandleAsync(new CreateAreaCommand { Name = "Orphan", ParentAreaId = Guid.NewGuid() }, Ct));
 
         Assert.Empty(_db.Areas);
     }
@@ -71,6 +71,6 @@ public class CreateAreaHandlerTests : IDisposable
     public async Task Handle_BlankName_ThrowsValidationException()
     {
         await Assert.ThrowsAsync<ValidationException>(() =>
-            _sut.Handle(new CreateAreaCommand { Name = "   " }, Ct));
+            _sut.HandleAsync(new CreateAreaCommand { Name = "   " }, Ct));
     }
 }

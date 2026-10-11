@@ -7,7 +7,7 @@ public static class UniversalSearchEndpoint
         group.MapGet("", async ([AsParameters] UniversalSearchQuery query,
             UniversalSearchHandler handler, CancellationToken ct) =>
         {
-            return Results.Ok(await handler.Handle(query, ct));
+            return Results.Ok(await handler.HandleAsync(query, ct));
         })
         .WithName("UniversalSearch")
         .Produces<SearchResponse>();

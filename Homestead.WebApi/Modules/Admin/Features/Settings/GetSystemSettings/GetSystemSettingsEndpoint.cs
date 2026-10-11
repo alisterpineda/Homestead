@@ -5,9 +5,7 @@ public static class GetSystemSettingsEndpoint
     public static void Map(RouteGroupBuilder group)
     {
         group.MapGet("/system", async (GetSystemSettingsHandler handler, CancellationToken ct) =>
-        {
-            return Results.Ok(await handler.Handle(new GetSystemSettingsQuery(), ct));
-        })
+            Results.Ok(await handler.HandleAsync(ct)))
         .WithName("GetSystemSettings")
         .Produces<SystemSettingsResponse>();
     }

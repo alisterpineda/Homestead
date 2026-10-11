@@ -23,7 +23,7 @@ public class AddGroupMemberHandlerTests : IDisposable
         _unitOfWork = Substitute.For<IUnitOfWork>();
         _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
             .Returns(ci => _db.SaveChangesAsync(ci.Arg<CancellationToken>()));
-        _sut = new AddGroupMemberHandler(_db, _audit, _unitOfWork, new AddGroupMemberCommandValidator());
+        _sut = new AddGroupMemberHandler(_db, _audit, _unitOfWork, new AddGroupMemberRequestValidator());
     }
 
     public void Dispose() => _db.Dispose();
@@ -44,13 +44,8 @@ public class AddGroupMemberHandlerTests : IDisposable
         });
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var command = new AddGroupMemberCommand
-        {
-            GroupId = groupId,
-            Request = new AddGroupMemberRequest { UserId = userId, AccessLevel = GroupAccessLevel.Editor }
-        };
-
-        await _sut.Handle(command, TestContext.Current.CancellationToken);
+        await _sut.HandleAsync(groupId,
+            new AddGroupMemberRequest { UserId = userId, AccessLevel = GroupAccessLevel.Editor }, TestContext.Current.CancellationToken);
 
         _audit.Received(1).TrackScalar("Group", groupId, "MemberAdded",
             Arg.Any<string?>(), Arg.Any<string?>());
@@ -59,12 +54,7 @@ public class AddGroupMemberHandlerTests : IDisposable
     [Fact]
     public async Task Handle_EmptyUserId_ThrowsValidationException()
     {
-        var command = new AddGroupMemberCommand
-        {
-            GroupId = Guid.NewGuid(),
-            Request = new AddGroupMemberRequest { UserId = Guid.Empty, AccessLevel = GroupAccessLevel.Editor }
-        };
-
-        await Assert.ThrowsAsync<ValidationException>(() => _sut.Handle(command, TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<ValidationException>(() => _sut.HandleAsync(Guid.NewGuid(),
+            new AddGroupMemberRequest { UserId = Guid.Empty, AccessLevel = GroupAccessLevel.Editor }, TestContext.Current.CancellationToken));
     }
 }

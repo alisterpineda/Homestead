@@ -9,7 +9,7 @@ public static class GetAccountsEndpoint
         group.MapGet("", async ([AsParameters] GetAccountsQuery request,
             GetAccountsHandler handler, CancellationToken ct) =>
         {
-            return Results.Ok(await handler.Handle(request, ct));
+            return Results.Ok(await handler.HandleAsync(request, ct));
         })
         .WithName("GetAccounts")
         .Produces<PaginatedResponse<AccountResponse>>();

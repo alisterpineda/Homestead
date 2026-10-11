@@ -9,8 +9,7 @@ public class GetTextExtractionEnginesHandler(
     IEnumerable<ITextExtractionEngine> engines,
     ITextExtractionEngineResolver resolver)
 {
-    public Task<List<TextExtractionEngineResponse>> Handle(
-        GetTextExtractionEnginesQuery request, CancellationToken ct)
+    public Task<List<TextExtractionEngineResponse>> HandleAsync(CancellationToken ct)
     {
         // Matched by key (case-insensitively, like config keys) rather than by resolving: the resolver
         // returns the default VERBATIM even when dangling, and never substitutes.

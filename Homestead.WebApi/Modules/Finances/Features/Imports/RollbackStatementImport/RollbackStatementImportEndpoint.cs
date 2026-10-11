@@ -8,11 +8,7 @@ public static class RollbackStatementImportEndpoint
     {
         group.MapDelete("/{documentId:guid}", async (
             Guid documentId, RollbackStatementImportHandler handler, CancellationToken ct) =>
-        {
-            var response = await handler.Handle(
-                new RollbackStatementImportCommand { DocumentId = documentId }, ct);
-            return Results.Ok(response);
-        })
+            Results.Ok(await handler.HandleAsync(documentId, ct)))
         .WithName("RollbackStatementImport")
         .Produces<RollbackStatementImportResponse>()
         .Produces(StatusCodes.Status404NotFound)

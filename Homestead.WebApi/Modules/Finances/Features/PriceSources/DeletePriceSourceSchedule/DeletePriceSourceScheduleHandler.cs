@@ -7,11 +7,11 @@ namespace Homestead.WebApi.Modules.Finances.Features.PriceSources.DeletePriceSou
 public class DeletePriceSourceScheduleHandler(
     IPriceSourceScheduleStore scheduleStore, IUnitOfWork unitOfWork)
 {
-    public async Task<bool> Handle(DeletePriceSourceScheduleCommand request, CancellationToken ct)
+    public async Task<bool> HandleAsync(CommodityPriceSource source, CancellationToken ct)
     {
-        request.Source.RequireExternal("scheduled");
+        source.RequireExternal("scheduled");
 
-        var removed = await scheduleStore.RemoveBySourceAsync(request.Source, ct);
+        var removed = await scheduleStore.RemoveBySourceAsync(source, ct);
         if (!removed)
             throw new EntityNotFoundException("Price source schedule not found.");
 

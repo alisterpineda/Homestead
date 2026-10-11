@@ -23,7 +23,7 @@ public class GetSystemSettingsHandlerTests : IDisposable
     [Fact]
     public async Task Handle_NoExistingRow_ReturnsNullOverrides()
     {
-        var response = await _sut.Handle(new GetSystemSettingsQuery(), TestContext.Current.CancellationToken);
+        var response = await _sut.HandleAsync(TestContext.Current.CancellationToken);
 
         Assert.Null(response.LogLevelOverrides);
     }
@@ -39,7 +39,7 @@ public class GetSystemSettingsHandlerTests : IDisposable
         });
         await _db.SaveChangesAsync(ct);
 
-        var response = await _sut.Handle(new GetSystemSettingsQuery(), ct);
+        var response = await _sut.HandleAsync(ct);
 
         Assert.NotNull(response.LogLevelOverrides);
         Assert.Equal(LogLevel.Warning, response.LogLevelOverrides["Default"]);
@@ -58,7 +58,7 @@ public class GetSystemSettingsHandlerTests : IDisposable
         });
         await _db.SaveChangesAsync(ct);
 
-        var response = await _sut.Handle(new GetSystemSettingsQuery(), ct);
+        var response = await _sut.HandleAsync(ct);
 
         Assert.NotNull(response.LogLevelOverrides);
         Assert.False(response.LogLevelOverrides.ContainsKey("Default"));
@@ -77,7 +77,7 @@ public class GetSystemSettingsHandlerTests : IDisposable
         });
         await _db.SaveChangesAsync(ct);
 
-        var response = await _sut.Handle(new GetSystemSettingsQuery(), ct);
+        var response = await _sut.HandleAsync(ct);
 
         Assert.Null(response.LogLevelOverrides);
     }

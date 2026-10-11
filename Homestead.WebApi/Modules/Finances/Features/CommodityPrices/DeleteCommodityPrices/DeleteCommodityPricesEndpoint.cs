@@ -9,7 +9,7 @@ public static class DeleteCommodityPricesEndpoint
     {
         group.MapDelete("/{id:guid}", async (Guid id, DeleteCommodityPricesHandler handler, CancellationToken ct) =>
         {
-            var response = await handler.Handle(
+            var response = await handler.HandleAsync(
                 new DeleteCommodityPricesCommand([id]), ct);
             return response.DeletedCount == 1 ? Results.NoContent() : Results.NotFound();
         })
@@ -25,7 +25,7 @@ public static class DeleteCommodityPricesEndpoint
                 return ProblemDetailsFactory.BusinessRuleResult(
                     "At least one commodity price ID must be provided.");
 
-            var response = await handler.Handle(request, ct);
+            var response = await handler.HandleAsync(request, ct);
             return Results.Ok(response);
         })
         .WithName("BulkDeleteCommodityPrices")

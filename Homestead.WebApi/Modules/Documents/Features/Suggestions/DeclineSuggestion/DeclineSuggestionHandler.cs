@@ -10,7 +10,7 @@ namespace Homestead.WebApi.Modules.Documents.Features.Suggestions.DeclineSuggest
 
 public class DeclineSuggestionHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork)
 {
-    public async Task Handle(DeclineSuggestionCommand request, CancellationToken ct)
+    public async Task HandleAsync(Guid documentId, Guid suggestionId, CancellationToken ct)
     {
         var suggestion = await db.DocumentSuggestions
             .Include(s => s.Document)
@@ -18,7 +18,7 @@ public class DeclineSuggestionHandler(AppDbContext db, IAuditContext audit, IUni
             .ThenInclude(dt => dt.Tag)
             .Include(s => s.Document)
             .ThenInclude(d => d.DocumentParties)
-            .FirstOrDefaultAsync(s => s.Id == request.SuggestionId && s.DocumentId == request.DocumentId, ct)
+            .FirstOrDefaultAsync(s => s.Id == suggestionId && s.DocumentId == documentId, ct)
             ?? throw new EntityNotFoundException("Suggestion not found.");
 
         if (suggestion.Status != DocumentSuggestionStatus.Pending)

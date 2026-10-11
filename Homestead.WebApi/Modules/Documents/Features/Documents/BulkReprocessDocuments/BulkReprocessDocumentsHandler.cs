@@ -19,7 +19,7 @@ public class BulkReprocessDocumentsHandler(
     IJobQueue jobQueue,
     IValidator<BulkReprocessDocumentsCommand> validator)
 {
-    public async Task<BulkReprocessDocumentsResponse> Handle(BulkReprocessDocumentsCommand request, CancellationToken ct)
+    public async Task<BulkReprocessDocumentsResponse> HandleAsync(BulkReprocessDocumentsCommand request, CancellationToken ct)
     {
         await validator.ValidateAndThrowAsync(request, ct);
 

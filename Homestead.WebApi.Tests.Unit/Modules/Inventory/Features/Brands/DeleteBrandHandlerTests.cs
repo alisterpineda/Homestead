@@ -53,7 +53,7 @@ public class DeleteBrandHandlerTests : IDisposable
     {
         var brand = await AddBrandAsync("Apple");
 
-        var result = await _sut.Handle(new DeleteBrandCommand(brand.Id), Ct);
+        var result = await _sut.HandleAsync(brand.Id, Ct);
 
         Assert.True(result);
         Assert.Empty(_db.Brands);
@@ -67,7 +67,7 @@ public class DeleteBrandHandlerTests : IDisposable
         await AddItemWithBrandAsync(brand.Id);
 
         await Assert.ThrowsAsync<BusinessRuleException>(() =>
-            _sut.Handle(new DeleteBrandCommand(brand.Id), Ct));
+            _sut.HandleAsync(brand.Id, Ct));
 
         Assert.Contains(_db.Brands, b => b.Id == brand.Id);
         _audit.DidNotReceive().Deleted("Brand", Arg.Any<Guid>(), Arg.Any<string?>(), Arg.Any<Guid?>());
@@ -76,7 +76,7 @@ public class DeleteBrandHandlerTests : IDisposable
     [Fact]
     public async Task Handle_MissingBrand_ReturnsFalse()
     {
-        var result = await _sut.Handle(new DeleteBrandCommand(Guid.NewGuid()), Ct);
+        var result = await _sut.HandleAsync(Guid.NewGuid(), Ct);
 
         Assert.False(result);
     }

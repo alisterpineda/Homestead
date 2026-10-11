@@ -18,7 +18,7 @@ public class CreateConsumableHandler(
     IUnitOfWork unitOfWork,
     IValidator<CreateConsumableCommand> validator)
 {
-    public async Task<ConsumableResponse> Handle(CreateConsumableCommand request, CancellationToken ct)
+    public async Task<ConsumableResponse> HandleAsync(CreateConsumableCommand request, CancellationToken ct)
     {
         await validator.ValidateAndThrowAsync(request, ct);
 

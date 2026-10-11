@@ -26,11 +26,13 @@ public class RunBackupNowHandler(
     IJobQueue queue,
     ICurrentUserAccessor currentUser)
 {
-    public async Task<RunBackupNowResponse> Handle(RunBackupNowCommand request, CancellationToken ct)
+    /// <param name="id">The <c>backup.sources</c> pairing to run.</param>
+    /// <param name="body">Optional; an omitted body runs for real with the breaker in force.</param>
+    public async Task<RunBackupNowResponse> HandleAsync(Guid id, RunBackupNowBody? body, CancellationToken ct)
     {
         var source = await db.BackupSources
             .AsNoTracking()
-            .FirstOrDefaultAsync(s => s.Id == request.BackupSourceId, ct)
+            .FirstOrDefaultAsync(s => s.Id == id, ct)
             ?? throw new EntityNotFoundException("Backup source not found.");
 
         var descriptor = catalog.Find(source.SourceKind)
@@ -66,7 +68,7 @@ public class RunBackupNowHandler(
         if (alreadyQueued)
             throw new EntityInUseException("A backup run for this source is already queued.");
 
-        var payload = new BackupRunPayload(source.Id, request.DryRun, request.AllowLargePrune);
+        var payload = new BackupRunPayload(source.Id, body?.DryRun ?? false, body?.AllowLargePrune ?? false);
 
         var jobId = await queue.EnqueueAsync(descriptor.JobType, opts =>
         {

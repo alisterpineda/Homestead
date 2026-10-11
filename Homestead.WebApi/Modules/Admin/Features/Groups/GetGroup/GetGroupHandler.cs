@@ -5,11 +5,11 @@ namespace Homestead.WebApi.Modules.Admin.Features.Groups.GetGroup;
 
 public class GetGroupHandler(AppDbContext db)
 {
-    public async Task<GroupDetailResponse?> Handle(GetGroupQuery request, CancellationToken ct)
+    public async Task<GroupDetailResponse?> HandleAsync(Guid id, CancellationToken ct)
     {
         return await db.Groups
             .AsNoTracking()
-            .Where(g => g.Id == request.Id)
+            .Where(g => g.Id == id)
             .Select(g => new GroupDetailResponse
             {
                 Id = g.Id,

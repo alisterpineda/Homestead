@@ -8,7 +8,7 @@ public static class DeleteAreaEndpoint
     {
         group.MapDelete("/{id:guid}", async (Guid id, DeleteAreaHandler handler, CancellationToken ct) =>
         {
-            var deleted = await handler.Handle(new DeleteAreaCommand(id), ct);
+            var deleted = await handler.HandleAsync(id, ct);
             return deleted ? Results.NoContent() : Results.NotFound();
         })
         .WithName("DeleteArea")

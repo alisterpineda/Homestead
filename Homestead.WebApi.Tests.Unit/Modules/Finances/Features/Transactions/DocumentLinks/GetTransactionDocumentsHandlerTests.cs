@@ -67,15 +67,15 @@ public class GetTransactionDocumentsHandlerTests : IAsyncLifetime
     public async Task Get_UnknownTransaction_ThrowsNotFound()
     {
         await Assert.ThrowsAsync<EntityNotFoundException>(
-            () => _sut.Handle(
-                new GetTransactionDocumentsQuery(Guid.NewGuid()), TestContext.Current.CancellationToken));
+            () => _sut.HandleAsync(
+                Guid.NewGuid(), TestContext.Current.CancellationToken));
     }
 
     [Fact]
     public async Task Get_NoLinks_ReturnsEmptyList()
     {
-        var result = await _sut.Handle(
-            new GetTransactionDocumentsQuery(_transaction.Id), TestContext.Current.CancellationToken);
+        var result = await _sut.HandleAsync(
+            _transaction.Id, TestContext.Current.CancellationToken);
 
         Assert.Empty(result);
     }
@@ -98,8 +98,8 @@ public class GetTransactionDocumentsHandlerTests : IAsyncLifetime
             .Returns(_ => _db.Documents.IgnoreQueryFilters([DocumentQueryFilters.SoftDelete])
                 .Where(d => d.Id != inaccessible.Id));
 
-        var result = await _sut.Handle(
-            new GetTransactionDocumentsQuery(_transaction.Id), TestContext.Current.CancellationToken);
+        var result = await _sut.HandleAsync(
+            _transaction.Id, TestContext.Current.CancellationToken);
 
         Assert.Equal(3, result.Count);
 
@@ -131,8 +131,8 @@ public class GetTransactionDocumentsHandlerTests : IAsyncLifetime
         await SeedLinkAsync(oldest.Id, TransactionDocumentLinkOrigin.Manual, now.AddMinutes(-10));
         await SeedLinkAsync(middle.Id, TransactionDocumentLinkOrigin.Manual, now.AddMinutes(-5));
 
-        var result = await _sut.Handle(
-            new GetTransactionDocumentsQuery(_transaction.Id), TestContext.Current.CancellationToken);
+        var result = await _sut.HandleAsync(
+            _transaction.Id, TestContext.Current.CancellationToken);
 
         Assert.Equal([oldest.Id, middle.Id, newest.Id], result.Select(r => r.DocumentId));
     }

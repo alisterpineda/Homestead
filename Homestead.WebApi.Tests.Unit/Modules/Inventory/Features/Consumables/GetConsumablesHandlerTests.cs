@@ -123,7 +123,7 @@ public class GetConsumablesHandlerTests : IAsyncLifetime
         await TagItemAsync(screws.Id, fasteners.Id);
         await AddBareConsumableAsync("Untagged tape");
 
-        var resp = await _sut.Handle(
+        var resp = await _sut.HandleAsync(
             new GetConsumablesQuery { Page = 1, PageSize = 50, TagIds = [cleaning.Id] }, Ct);
 
         Assert.Single(resp.Items);
@@ -141,11 +141,11 @@ public class GetConsumablesHandlerTests : IAsyncLifetime
         var screws = await AddBareConsumableAsync("Wood screws");
         await TagItemAsync(screws.Id, fasteners.Id); // tagged with the CHILD tag only
 
-        var narrow = await _sut.Handle(
+        var narrow = await _sut.HandleAsync(
             new GetConsumablesQuery { Page = 1, PageSize = 50, TagIds = [hardware.Id], IncludeChildTags = false }, Ct);
         Assert.Empty(narrow.Items);
 
-        var expanded = await _sut.Handle(
+        var expanded = await _sut.HandleAsync(
             new GetConsumablesQuery { Page = 1, PageSize = 50, TagIds = [hardware.Id], IncludeChildTags = true }, Ct);
         Assert.Single(expanded.Items);
         Assert.Equal("Wood screws", expanded.Items[0].Name);
@@ -163,7 +163,7 @@ public class GetConsumablesHandlerTests : IAsyncLifetime
         await TagItemAsync(officeScrews.Id, fasteners.Id);
         await AddStockAsync(officeScrews.Id, 6, areaId: office.Id);
 
-        var resp = await _sut.Handle(
+        var resp = await _sut.HandleAsync(
             new GetConsumablesQuery { Page = 1, PageSize = 50, TagIds = [fasteners.Id], AreaId = _garage.Id }, Ct);
 
         // Both are tagged, but only the one with stock resolving to the garage survives the composed filter.
@@ -177,7 +177,7 @@ public class GetConsumablesHandlerTests : IAsyncLifetime
         await AddConsumableAsync("Wood screws");
         await AddConsumableAsync("Old caulk", ItemStatus.Archived);
 
-        var resp = await _sut.Handle(new GetConsumablesQuery { Page = 1, PageSize = 50 }, Ct);
+        var resp = await _sut.HandleAsync(new GetConsumablesQuery { Page = 1, PageSize = 50 }, Ct);
 
         Assert.Single(resp.Items);
         Assert.Equal("Wood screws", resp.Items[0].Name);
@@ -189,7 +189,7 @@ public class GetConsumablesHandlerTests : IAsyncLifetime
         await AddConsumableAsync("Wood screws");
         await AddConsumableAsync("Paper towels");
 
-        var resp = await _sut.Handle(new GetConsumablesQuery { Page = 1, PageSize = 50, Search = "screw" }, Ct);
+        var resp = await _sut.HandleAsync(new GetConsumablesQuery { Page = 1, PageSize = 50, Search = "screw" }, Ct);
 
         Assert.Single(resp.Items);
         Assert.Equal("Wood screws", resp.Items[0].Name);
@@ -207,7 +207,7 @@ public class GetConsumablesHandlerTests : IAsyncLifetime
         await _db.SaveChangesAsync(Ct);
         await AddBareConsumableAsync("Generic wire");
 
-        var resp = await _sut.Handle(new GetConsumablesQuery { Page = 1, PageSize = 50, BrandId = apple.Id }, Ct);
+        var resp = await _sut.HandleAsync(new GetConsumablesQuery { Page = 1, PageSize = 50, BrandId = apple.Id }, Ct);
 
         Assert.Single(resp.Items);
         Assert.Equal("Lightning cables", resp.Items[0].Name);
@@ -223,7 +223,7 @@ public class GetConsumablesHandlerTests : IAsyncLifetime
         await AddConsumableAsync("Tape", quantity: 10, restockThreshold: 2); // above
         await AddConsumableAsync("Glue"); // no threshold — never low
 
-        var resp = await _sut.Handle(new GetConsumablesQuery { Page = 1, PageSize = 50, LowStockOnly = true }, Ct);
+        var resp = await _sut.HandleAsync(new GetConsumablesQuery { Page = 1, PageSize = 50, LowStockOnly = true }, Ct);
 
         Assert.Equal(2, resp.Items.Count);
         Assert.Contains(resp.Items, s => s.Name == "Wood screws" && s.TotalOnHand == 4);
@@ -240,7 +240,7 @@ public class GetConsumablesHandlerTests : IAsyncLifetime
         var clips = await AddBareConsumableAsync("Paper clips");
         await AddStockAsync(clips.Id, 3, areaId: office.Id);
 
-        var resp = await _sut.Handle(new GetConsumablesQuery { Page = 1, PageSize = 50, AreaId = _garage.Id }, Ct);
+        var resp = await _sut.HandleAsync(new GetConsumablesQuery { Page = 1, PageSize = 50, AreaId = _garage.Id }, Ct);
 
         Assert.Single(resp.Items);
         Assert.Equal("Wood screws", resp.Items[0].Name);
@@ -253,7 +253,7 @@ public class GetConsumablesHandlerTests : IAsyncLifetime
         var screws = await AddBareConsumableAsync("Wood screws");
         await AddStockAsync(screws.Id, 4, containerItemId: chest.Id); // stock inside a garage container
 
-        var resp = await _sut.Handle(new GetConsumablesQuery { Page = 1, PageSize = 50, AreaId = _garage.Id }, Ct);
+        var resp = await _sut.HandleAsync(new GetConsumablesQuery { Page = 1, PageSize = 50, AreaId = _garage.Id }, Ct);
 
         Assert.Single(resp.Items);
         Assert.Equal("Wood screws", resp.Items[0].Name);
@@ -267,7 +267,7 @@ public class GetConsumablesHandlerTests : IAsyncLifetime
         await AddStockAsync(screws.Id, 6, areaId: _garage.Id);        // resolves to garage
         await AddStockAsync(screws.Id, 4, containerItemId: chest.Id); // also resolves to garage
 
-        var resp = await _sut.Handle(new GetConsumablesQuery { Page = 1, PageSize = 50, AreaId = _garage.Id }, Ct);
+        var resp = await _sut.HandleAsync(new GetConsumablesQuery { Page = 1, PageSize = 50, AreaId = _garage.Id }, Ct);
 
         Assert.Single(resp.Items); // counted once despite two matching stock locations
         Assert.Equal(1, resp.TotalCount);
@@ -280,7 +280,7 @@ public class GetConsumablesHandlerTests : IAsyncLifetime
         var screws = await AddBareConsumableAsync("Wood screws");
         await AddStockAsync(screws.Id, 6, areaId: bench.Id); // stocked in a sub-area of the garage
 
-        var resp = await _sut.Handle(new GetConsumablesQuery { Page = 1, PageSize = 50, AreaId = _garage.Id }, Ct);
+        var resp = await _sut.HandleAsync(new GetConsumablesQuery { Page = 1, PageSize = 50, AreaId = _garage.Id }, Ct);
 
         Assert.Single(resp.Items);
         Assert.Equal("Wood screws", resp.Items[0].Name);
@@ -295,7 +295,7 @@ public class GetConsumablesHandlerTests : IAsyncLifetime
         var placed = await AddBareConsumableAsync("Wood screws");
         await AddStockAsync(placed.Id, 6, areaId: _garage.Id);
 
-        var resp = await _sut.Handle(new GetConsumablesQuery { Page = 1, PageSize = 50, Unplaced = true }, Ct);
+        var resp = await _sut.HandleAsync(new GetConsumablesQuery { Page = 1, PageSize = 50, Unplaced = true }, Ct);
 
         Assert.Single(resp.Items);
         Assert.Equal("Washers", resp.Items[0].Name);
@@ -308,10 +308,10 @@ public class GetConsumablesHandlerTests : IAsyncLifetime
         await AddStockAsync(screws.Id, 6, areaId: _garage.Id);
         await AddBareConsumableAsync("Glue"); // zero stock — matches neither bucket
 
-        var area = await _sut.Handle(new GetConsumablesQuery { Page = 1, PageSize = 50, AreaId = _garage.Id }, Ct);
+        var area = await _sut.HandleAsync(new GetConsumablesQuery { Page = 1, PageSize = 50, AreaId = _garage.Id }, Ct);
         Assert.DoesNotContain(area.Items, s => s.Name == "Glue");
 
-        var unplaced = await _sut.Handle(new GetConsumablesQuery { Page = 1, PageSize = 50, Unplaced = true }, Ct);
+        var unplaced = await _sut.HandleAsync(new GetConsumablesQuery { Page = 1, PageSize = 50, Unplaced = true }, Ct);
         Assert.DoesNotContain(unplaced.Items, s => s.Name == "Glue");
     }
 
@@ -327,7 +327,7 @@ public class GetConsumablesHandlerTests : IAsyncLifetime
         var pen = await AddBareConsumableAsync("Office pen");
         await AddStockAsync(pen.Id, 1, areaId: office.Id);
 
-        var resp = await _sut.Handle(new GetConsumablesQuery { Page = 1, PageSize = 2, AreaId = _garage.Id }, Ct);
+        var resp = await _sut.HandleAsync(new GetConsumablesQuery { Page = 1, PageSize = 2, AreaId = _garage.Id }, Ct);
 
         Assert.Equal(2, resp.Items.Count); // one page
         Assert.Equal(5, resp.TotalCount);  // whole filtered set, not the page or the office pen

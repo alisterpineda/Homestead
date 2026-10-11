@@ -1,7 +1,7 @@
 namespace Homestead.WebApi.Tests.Unit.Common;
 
 /// <summary>
-/// Endpoints inject their handler and call <c>Handle</c> directly; job handlers wrap internal commands in
+/// Endpoints inject their handler and call <c>HandleAsync</c> directly; job handlers wrap internal commands in
 /// <c>IUnitOfWork</c> themselves. Nothing dispatches through a mediator, so go-to-definition from an endpoint
 /// reaches its handler and a missing registration fails the handler-resolution guard. This source scan keeps
 /// a mediator from creeping back into either place.

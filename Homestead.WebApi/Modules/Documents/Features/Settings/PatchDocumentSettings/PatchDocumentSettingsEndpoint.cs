@@ -9,10 +9,7 @@ public static class PatchDocumentSettingsEndpoint
         group.MapPatch("", async (
             JsonPatchDocument<DocumentSettings> patchDoc,
             PatchDocumentSettingsHandler handler, CancellationToken ct) =>
-        {
-            var command = new PatchDocumentSettingsCommand { PatchDocument = patchDoc };
-            return Results.Ok(await handler.Handle(command, ct));
-        })
+            Results.Ok(await handler.HandleAsync(patchDoc, ct)))
         .WithName("PatchDocumentSettings")
         .Accepts<JsonPatchDocument<DocumentSettings>>("application/json-patch+json")
         .Produces<DocumentSettingsResponse>();

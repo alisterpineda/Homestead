@@ -55,7 +55,7 @@ public class PatchConsumableHandlerTests : IAsyncLifetime
     {
         var patch = new JsonPatchDocument<PatchConsumableModel>();
         build(patch);
-        return _sut.Handle(new PatchConsumableCommand { Id = id, PatchDocument = patch }, Ct);
+        return _sut.HandleAsync(id, patch, Ct);
     }
 
     [Fact]

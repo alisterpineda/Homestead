@@ -11,7 +11,7 @@ public class BulkDeleteUsersHandler(
     ICurrentUserAccessor currentUser,
     IAuditContext audit)
 {
-    public async Task<BulkDeleteUsersResponse> Handle(BulkDeleteUsersCommand request, CancellationToken ct)
+    public async Task<BulkDeleteUsersResponse> HandleAsync(BulkDeleteUsersCommand request, CancellationToken ct)
     {
         if (currentUser.UserId is { } currentId && request.Ids.Contains(currentId))
             throw new BusinessRuleException("Cannot delete your own account.");

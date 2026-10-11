@@ -52,7 +52,7 @@ public class PatchBrandHandlerTests : IAsyncLifetime
     {
         var patch = new JsonPatchDocument<PatchBrandModel>();
         build(patch);
-        return _sut.Handle(new PatchBrandCommand { Id = id, PatchDocument = patch }, Ct);
+        return _sut.HandleAsync(id, patch, Ct);
     }
 
     [Fact]

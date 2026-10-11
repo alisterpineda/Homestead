@@ -15,7 +15,7 @@ public class CreateCommentHandler(
     IUnitOfWork unitOfWork,
     IValidator<CreateCommentCommand> validator)
 {
-    public async Task<CreateCommentResponse> Handle(CreateCommentCommand request, CancellationToken ct)
+    public async Task<CreateCommentResponse> HandleAsync(CreateCommentCommand request, CancellationToken ct)
     {
         await validator.ValidateAndThrowAsync(request, ct);
 

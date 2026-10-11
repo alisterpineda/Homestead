@@ -13,14 +13,14 @@ namespace Homestead.WebApi.Modules.Inventory.Features.Items.GetItem;
 /// </summary>
 public class GetItemHandler(AppDbContext db, IItemLocationResolver locationResolver)
 {
-    public async Task<ItemDetailResponse?> Handle(GetItemQuery request, CancellationToken ct)
+    public async Task<ItemDetailResponse?> HandleAsync(Guid id, CancellationToken ct)
     {
         // Project as a durable first: the projection is kind-agnostic and already carries Fungibility,
         // so the common durable case resolves in one query (like GetDurable) instead of a discriminator
         // probe plus a re-projection. Branch on the result; the consumable case re-reads via its reader.
         var durable = await db.Items
             .AsNoTracking()
-            .Where(i => i.Id == request.Id)
+            .Where(i => i.Id == id)
             .Select(DurableResponseMapper.Projection)
             .FirstOrDefaultAsync(ct);
 
@@ -31,19 +31,19 @@ public class GetItemHandler(AppDbContext db, IItemLocationResolver locationResol
         {
             return new ItemDetailResponse
             {
-                Id = request.Id,
+                Id = id,
                 Fungibility = Fungibility.NonFungible,
                 Durable = await locationResolver.EnrichAsync(durable, ct),
             };
         }
 
-        var consumable = await ConsumableDetailReader.LoadAsync(db, locationResolver, request.Id, ct);
+        var consumable = await ConsumableDetailReader.LoadAsync(db, locationResolver, id, ct);
         if (consumable is null)
             return null;
 
         return new ItemDetailResponse
         {
-            Id = request.Id,
+            Id = id,
             Fungibility = Fungibility.Fungible,
             Consumable = consumable,
         };

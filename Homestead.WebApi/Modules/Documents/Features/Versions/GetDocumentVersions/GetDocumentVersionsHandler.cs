@@ -6,12 +6,12 @@ namespace Homestead.WebApi.Modules.Documents.Features.Versions.GetDocumentVersio
 
 public class GetDocumentVersionsHandler(AppDbContext db)
 {
-    public async Task<PaginatedResponse<GetDocumentVersionsResponse>> Handle(
-        GetDocumentVersionsQuery request, CancellationToken ct)
+    public async Task<PaginatedResponse<GetDocumentVersionsResponse>> HandleAsync(
+        Guid documentId, PaginatedRequest pagination, CancellationToken ct)
     {
         return await db.DocumentVersions
             .AsNoTracking()
-            .Where(r => r.DocumentId == request.DocumentId)
+            .Where(r => r.DocumentId == documentId)
             .OrderByDescending(r => r.VersionNumber)
             .Select(r => new GetDocumentVersionsResponse
             {
@@ -24,6 +24,6 @@ public class GetDocumentVersionsHandler(AppDbContext db)
                 CreatedAt = r.CreatedAt,
                 UpdatedAt = r.UpdatedAt
             })
-            .ToPaginatedAsync(request, ct);
+            .ToPaginatedAsync(pagination, ct);
     }
 }

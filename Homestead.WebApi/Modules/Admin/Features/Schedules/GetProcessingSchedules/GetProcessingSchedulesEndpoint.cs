@@ -9,7 +9,7 @@ public static class GetProcessingSchedulesEndpoint
         group.MapGet("/", async ([AsParameters] GetProcessingSchedulesQuery request,
             GetProcessingSchedulesHandler handler, CancellationToken ct) =>
         {
-            var response = await handler.Handle(request, ct);
+            var response = await handler.HandleAsync(request, ct);
             return Results.Ok(response);
         })
         .WithName("GetProcessingSchedules")

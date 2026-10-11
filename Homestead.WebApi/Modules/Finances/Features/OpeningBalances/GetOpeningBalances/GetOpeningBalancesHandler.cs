@@ -9,17 +9,17 @@ public class GetOpeningBalancesHandler(
     AppDbContext db,
     ISystemAccountProvider systemAccounts)
 {
-    public async Task<IReadOnlyList<OpeningBalanceResponse>> Handle(
-        GetOpeningBalancesQuery request, CancellationToken ct)
+    public async Task<IReadOnlyList<OpeningBalanceResponse>> HandleAsync(
+        Guid accountId, CancellationToken ct)
     {
-        await AccountVisibility.EnsureUserVisibleAsync(db, request.AccountId, ct);
+        await AccountVisibility.EnsureUserVisibleAsync(db, accountId, ct);
 
         var openingBalancesAccount = await systemAccounts.GetOpeningBalancesAsync(ct);
 
         var transactions = await db.AccountTransactions
             .OfType<OpeningBalanceTransaction>()
             .AsNoTracking()
-            .Where(t => t.Splits.Any(s => s.AccountId == request.AccountId))
+            .Where(t => t.Splits.Any(s => s.AccountId == accountId))
             .Include(t => t.Splits)
             .ToListAsync(ct);
 

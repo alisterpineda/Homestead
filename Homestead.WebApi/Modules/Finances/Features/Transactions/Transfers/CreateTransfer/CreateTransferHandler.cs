@@ -10,7 +10,7 @@ public class CreateTransferHandler(
     IUnitOfWork unitOfWork,
     IValidator<CreateTransferCommand> validator)
 {
-    public async Task<TransactionResponse> Handle(CreateTransferCommand request, CancellationToken ct)
+    public async Task<TransactionResponse> HandleAsync(CreateTransferCommand request, CancellationToken ct)
     {
         await validator.ValidateAndThrowAsync(request, ct);
 

@@ -37,13 +37,13 @@ public record CreateDocumentFromUploadResult(Guid DocumentId, string Name);
 
 public interface ICreateDocumentFromUploadHandler
 {
-    Task<CreateDocumentFromUploadResult> Handle(CreateDocumentFromUploadCommand request, CancellationToken ct);
+    Task<CreateDocumentFromUploadResult> HandleAsync(CreateDocumentFromUploadCommand request, CancellationToken ct);
 }
 
 public class CreateDocumentFromUploadHandler(
     AppDbContext db, IDocumentClassifier classifier, IAuditContext audit) : ICreateDocumentFromUploadHandler
 {
-    public async Task<CreateDocumentFromUploadResult> Handle(CreateDocumentFromUploadCommand request, CancellationToken ct)
+    public async Task<CreateDocumentFromUploadResult> HandleAsync(CreateDocumentFromUploadCommand request, CancellationToken ct)
     {
         var document = new Document
         {

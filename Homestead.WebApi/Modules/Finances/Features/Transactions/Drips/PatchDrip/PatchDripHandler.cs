@@ -12,7 +12,7 @@ public class PatchDripHandler(
     IUnitOfWork unitOfWork,
     IValidator<PatchDripCommand> validator)
 {
-    public async Task<TransactionResponse> Handle(PatchDripCommand request, CancellationToken ct)
+    public async Task<TransactionResponse> HandleAsync(PatchDripCommand request, CancellationToken ct)
     {
         await validator.ValidateAndThrowAsync(request, ct);
 

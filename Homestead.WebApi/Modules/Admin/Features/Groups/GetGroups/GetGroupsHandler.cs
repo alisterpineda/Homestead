@@ -6,7 +6,7 @@ namespace Homestead.WebApi.Modules.Admin.Features.Groups.GetGroups;
 
 public class GetGroupsHandler(AppDbContext db)
 {
-    public async Task<PaginatedResponse<GroupResponse>> Handle(
+    public async Task<PaginatedResponse<GroupResponse>> HandleAsync(
         GetGroupsQuery request, CancellationToken ct)
     {
         var query = db.Groups.AsNoTracking();

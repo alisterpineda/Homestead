@@ -9,7 +9,7 @@ public static class PatchPayeeEndpoint
         group.MapPatch("/{id:guid}", async (Guid id, PatchPayeeCommand body,
             PatchPayeeHandler handler, CancellationToken ct) =>
         {
-            return Results.Ok(await handler.Handle(body with { Id = id }, ct));
+            return Results.Ok(await handler.HandleAsync(body with { Id = id }, ct));
         })
         .WithName("PatchPayee")
         .Produces<PayeeResponse>()

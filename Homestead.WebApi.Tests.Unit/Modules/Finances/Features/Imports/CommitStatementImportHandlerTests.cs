@@ -154,7 +154,7 @@ public class CommitStatementImportHandlerTests : IAsyncLifetime
     {
         var (job, documentId) = await SeedJobAsync();
 
-        var result = await _sut.Handle(Command(job.Id), TestContext.Current.CancellationToken);
+        var result = await _sut.HandleAsync(Command(job.Id), TestContext.Current.CancellationToken);
 
         Assert.True(result.Committed);
         Assert.NotNull(result.EntryId);
@@ -189,7 +189,7 @@ public class CommitStatementImportHandlerTests : IAsyncLifetime
             ],
         };
 
-        var result = await _sut.Handle(command, TestContext.Current.CancellationToken);
+        var result = await _sut.HandleAsync(command, TestContext.Current.CancellationToken);
 
         Assert.True(result.Committed);
         Assert.NotNull(result.EntryId);
@@ -233,7 +233,7 @@ public class CommitStatementImportHandlerTests : IAsyncLifetime
             ],
         };
 
-        var result = await sut.Handle(command, TestContext.Current.CancellationToken);
+        var result = await sut.HandleAsync(command, TestContext.Current.CancellationToken);
 
         // The manual line still became a flow.
         Assert.Equal(1, result.FlowsCreated);
@@ -262,7 +262,7 @@ public class CommitStatementImportHandlerTests : IAsyncLifetime
             ],
         };
 
-        var result = await sut.Handle(command, TestContext.Current.CancellationToken);
+        var result = await sut.HandleAsync(command, TestContext.Current.CancellationToken);
 
         Assert.Equal(2, result.FlowsCreated);
         var links = await _db.TransactionDocumentLinks
@@ -282,7 +282,7 @@ public class CommitStatementImportHandlerTests : IAsyncLifetime
             LineItems = [new CommitLineItem(0, FlowDirection.Expense, 15m, new DateOnly(2026, 6, 3), "COFFEE")],
         };
 
-        var result = await _sut.Handle(command, TestContext.Current.CancellationToken);
+        var result = await _sut.HandleAsync(command, TestContext.Current.CancellationToken);
 
         Assert.False(result.Committed);   // reviewer declined the assertion
         Assert.Null(result.EntryId);
@@ -306,7 +306,7 @@ public class CommitStatementImportHandlerTests : IAsyncLifetime
     {
         var (job, _) = await SeedJobAsync();
 
-        var result = await _sut.Handle(Command(job.Id, accepted: false), TestContext.Current.CancellationToken);
+        var result = await _sut.HandleAsync(Command(job.Id, accepted: false), TestContext.Current.CancellationToken);
 
         Assert.False(result.Committed);
         Assert.Null(result.EntryId);
@@ -323,7 +323,7 @@ public class CommitStatementImportHandlerTests : IAsyncLifetime
         await SeedLinkedTransactionAsync(documentId, TransactionDocumentLinkOrigin.StatementImport);
 
         await Assert.ThrowsAsync<BusinessRuleException>(
-            () => _sut.Handle(Command(job.Id), TestContext.Current.CancellationToken));
+            () => _sut.HandleAsync(Command(job.Id), TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -333,7 +333,7 @@ public class CommitStatementImportHandlerTests : IAsyncLifetime
         // A *manual* link to the statement's document must never trip the origin-scoped guard.
         await SeedLinkedTransactionAsync(documentId, TransactionDocumentLinkOrigin.Manual);
 
-        var result = await _sut.Handle(Command(job.Id), TestContext.Current.CancellationToken);
+        var result = await _sut.HandleAsync(Command(job.Id), TestContext.Current.CancellationToken);
 
         Assert.True(result.Committed);
         Assert.Single(await _db.TransactionDocumentLinks
@@ -348,7 +348,7 @@ public class CommitStatementImportHandlerTests : IAsyncLifetime
         var (job, _) = await SeedJobAsync(owner: Guid.NewGuid());
 
         await Assert.ThrowsAsync<EntityNotFoundException>(
-            () => _sut.Handle(Command(job.Id), TestContext.Current.CancellationToken));
+            () => _sut.HandleAsync(Command(job.Id), TestContext.Current.CancellationToken));
     }
 
     // ─── Learning + client-authoritative category ───────────────────────────────
@@ -447,7 +447,7 @@ public class CommitStatementImportHandlerTests : IAsyncLifetime
             ],
         };
 
-        await sut.Handle(command, TestContext.Current.CancellationToken);
+        await sut.HandleAsync(command, TestContext.Current.CancellationToken);
 
         var expectedKey = PayeeDescriptionNormalizer.Normalize("SQ *BLUE BOTTLE")!;
         await _payeeMappings.Received(1).UpsertAsync(
@@ -472,7 +472,7 @@ public class CommitStatementImportHandlerTests : IAsyncLifetime
             ],
         };
 
-        await sut.Handle(command, TestContext.Current.CancellationToken);
+        await sut.HandleAsync(command, TestContext.Current.CancellationToken);
 
         await _payeeMappings.DidNotReceive().UpsertAsync(
             Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
@@ -496,7 +496,7 @@ public class CommitStatementImportHandlerTests : IAsyncLifetime
             ],
         };
 
-        await sut.Handle(command, TestContext.Current.CancellationToken);
+        await sut.HandleAsync(command, TestContext.Current.CancellationToken);
 
         // One upsert for the shared key; last-wins → payeeB.
         await _payeeMappings.Received(1).UpsertAsync(
@@ -522,7 +522,7 @@ public class CommitStatementImportHandlerTests : IAsyncLifetime
             ],
         };
 
-        await sut.Handle(command, TestContext.Current.CancellationToken);
+        await sut.HandleAsync(command, TestContext.Current.CancellationToken);
 
         await flows.Received(1).CreateAsync(
             Arg.Is<CreateFlowRequest>(r => r.CategoryId == category.Id), Arg.Any<CancellationToken>());
@@ -547,7 +547,7 @@ public class CommitStatementImportHandlerTests : IAsyncLifetime
             ],
         };
 
-        await sut.Handle(command, TestContext.Current.CancellationToken);
+        await sut.HandleAsync(command, TestContext.Current.CancellationToken);
 
         await flows.Received(1).CreateAsync(
             Arg.Is<CreateFlowRequest>(r => r.PayeeId == payee && r.CategoryId == null), Arg.Any<CancellationToken>());
@@ -577,7 +577,7 @@ public class CommitStatementImportHandlerTests : IAsyncLifetime
         };
 
         await Assert.ThrowsAsync<BusinessRuleException>(
-            () => sut.Handle(command, TestContext.Current.CancellationToken));
+            () => sut.HandleAsync(command, TestContext.Current.CancellationToken));
 
         // Pre-validated before the atomic materialize loop → nothing was created (atomic rollback).
         await flows.DidNotReceive().CreateAsync(Arg.Any<CreateFlowRequest>(), Arg.Any<CancellationToken>());
@@ -599,7 +599,7 @@ public class CommitStatementImportHandlerTests : IAsyncLifetime
         };
 
         await Assert.ThrowsAsync<BusinessRuleException>(
-            () => sut.Handle(command, TestContext.Current.CancellationToken));
+            () => sut.HandleAsync(command, TestContext.Current.CancellationToken));
         await flows.DidNotReceive().CreateAsync(Arg.Any<CreateFlowRequest>(), Arg.Any<CancellationToken>());
     }
 
@@ -623,7 +623,7 @@ public class CommitStatementImportHandlerTests : IAsyncLifetime
             ],
         };
 
-        await sut.Handle(command, TestContext.Current.CancellationToken);
+        await sut.HandleAsync(command, TestContext.Current.CancellationToken);
 
         await flows.Received(1).CreateAsync(
             Arg.Is<CreateFlowRequest>(r => r.CategoryId == category.Id && r.PayeeId == payee),
@@ -639,6 +639,6 @@ public class CommitStatementImportHandlerTests : IAsyncLifetime
         var (job, _) = await SeedJobAsync();
 
         await Assert.ThrowsAsync<ValidationException>(
-            () => _sut.Handle(Command(job.Id) with { AssertedAmount = -1m }, TestContext.Current.CancellationToken));
+            () => _sut.HandleAsync(Command(job.Id) with { AssertedAmount = -1m }, TestContext.Current.CancellationToken));
     }
 }

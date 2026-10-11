@@ -10,14 +10,7 @@ public static class PatchTagEndpoint
         group.MapPatch("/{id:guid}", async (Guid id,
             JsonPatchDocument<PatchInventoryTagModel> patchDoc,
             PatchTagHandler handler, CancellationToken ct) =>
-        {
-            var command = new PatchInventoryTagCommand
-            {
-                Id = id,
-                PatchDocument = patchDoc
-            };
-            return Results.Ok(await handler.Handle(command, ct));
-        })
+            Results.Ok(await handler.HandleAsync(id, patchDoc, ct)))
         .WithName("PatchInventoryTag")
         .Accepts<JsonPatchDocument<PatchInventoryTagModel>>("application/json-patch+json")
         .Produces<PatchInventoryTagResponse>()

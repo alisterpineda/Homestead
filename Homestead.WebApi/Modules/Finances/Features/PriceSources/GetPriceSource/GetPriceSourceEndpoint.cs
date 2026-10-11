@@ -7,10 +7,7 @@ public static class GetPriceSourceEndpoint
     public static void Map(RouteGroupBuilder group)
     {
         group.MapGet("/{source}", async (CommodityPriceSource source, GetPriceSourceHandler handler, CancellationToken ct) =>
-        {
-            var response = await handler.Handle(new GetPriceSourceQuery(source), ct);
-            return Results.Ok(response);
-        })
+            Results.Ok(await handler.HandleAsync(source, ct)))
         .WithName("GetPriceSource")
         .Produces<GetPriceSourceResponse>()
         .Produces(StatusCodes.Status404NotFound);

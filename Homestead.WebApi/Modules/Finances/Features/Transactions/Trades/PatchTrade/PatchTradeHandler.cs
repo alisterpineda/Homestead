@@ -12,7 +12,7 @@ public class PatchTradeHandler(
     IUnitOfWork unitOfWork,
     IValidator<PatchTradeCommand> validator)
 {
-    public async Task<TransactionResponse> Handle(PatchTradeCommand request, CancellationToken ct)
+    public async Task<TransactionResponse> HandleAsync(PatchTradeCommand request, CancellationToken ct)
     {
         await validator.ValidateAndThrowAsync(request, ct);
 

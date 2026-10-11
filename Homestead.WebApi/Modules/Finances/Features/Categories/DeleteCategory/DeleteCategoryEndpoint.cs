@@ -8,7 +8,7 @@ public static class DeleteCategoryEndpoint
     {
         group.MapDelete("/{id:guid}", async (Guid id, DeleteCategoryHandler handler, CancellationToken ct) =>
         {
-            var deleted = await handler.Handle(new DeleteCategoryCommand(id), ct);
+            var deleted = await handler.HandleAsync(id, ct);
             return deleted ? Results.NoContent() : Results.NotFound();
         })
         .WithName("DeleteCategory")

@@ -43,7 +43,7 @@ public class CreateTagHandlerTests : IDisposable
         _tagPathResolver.ResolveOrCreateAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
             .Returns(tag);
 
-        await _sut.Handle(new CreateTagCommand("Test"), CancellationToken.None);
+        await _sut.HandleAsync(new CreateTagCommand("Test"), CancellationToken.None);
 
         _audit.Received(1).Created("Tag", tagId, Arg.Any<Guid?>());
     }
@@ -56,7 +56,7 @@ public class CreateTagHandlerTests : IDisposable
         _tagPathResolver.ResolveOrCreateAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
             .Returns(tag);
 
-        var result = await _sut.Handle(new CreateTagCommand("Test", Description: "My desc"), CancellationToken.None);
+        var result = await _sut.HandleAsync(new CreateTagCommand("Test", Description: "My desc"), CancellationToken.None);
 
         await _tagPathResolver.Received(1).ResolveOrCreateAsync("Test", leafColor: null, leafDescription: "My desc", createdByUserId: Arg.Any<Guid?>(), ct: Arg.Any<CancellationToken>());
         Assert.Equal("My desc", result.Description);
@@ -70,7 +70,7 @@ public class CreateTagHandlerTests : IDisposable
         _tagPathResolver.ResolveOrCreateAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
             .Returns(tag);
 
-        var result = await _sut.Handle(new CreateTagCommand("Test"), CancellationToken.None);
+        var result = await _sut.HandleAsync(new CreateTagCommand("Test"), CancellationToken.None);
 
         Assert.Null(result.Description);
     }

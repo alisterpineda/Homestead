@@ -23,7 +23,7 @@ public class UpdateGroupMemberHandlerTests : IDisposable
         _unitOfWork = Substitute.For<IUnitOfWork>();
         _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
             .Returns(ci => _db.SaveChangesAsync(ci.Arg<CancellationToken>()));
-        _sut = new UpdateGroupMemberHandler(_db, _audit, _unitOfWork, new UpdateGroupMemberCommandValidator());
+        _sut = new UpdateGroupMemberHandler(_db, _audit, _unitOfWork, new UpdateGroupMemberRequestValidator());
     }
 
     public void Dispose() => _db.Dispose();
@@ -50,14 +50,8 @@ public class UpdateGroupMemberHandlerTests : IDisposable
         });
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var command = new UpdateGroupMemberCommand
-        {
-            GroupId = groupId,
-            UserId = userId,
-            Request = new UpdateGroupMemberRequest { AccessLevel = GroupAccessLevel.Editor }
-        };
-
-        await _sut.Handle(command, TestContext.Current.CancellationToken);
+        await _sut.HandleAsync(groupId, userId,
+            new UpdateGroupMemberRequest { AccessLevel = GroupAccessLevel.Editor }, TestContext.Current.CancellationToken);
 
         _audit.Received(1).TrackScalar("Group", groupId, "MemberAccessLevel",
             Arg.Any<string?>(), Arg.Any<string?>());
@@ -85,14 +79,8 @@ public class UpdateGroupMemberHandlerTests : IDisposable
         });
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var command = new UpdateGroupMemberCommand
-        {
-            GroupId = groupId,
-            UserId = userId,
-            Request = new UpdateGroupMemberRequest { AccessLevel = GroupAccessLevel.Editor }
-        };
-
-        await _sut.Handle(command, TestContext.Current.CancellationToken);
+        await _sut.HandleAsync(groupId, userId,
+            new UpdateGroupMemberRequest { AccessLevel = GroupAccessLevel.Editor }, TestContext.Current.CancellationToken);
 
         _audit.DidNotReceive().TrackScalar(Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<string>(),
             Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<Guid?>());
@@ -120,15 +108,9 @@ public class UpdateGroupMemberHandlerTests : IDisposable
         });
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var command = new UpdateGroupMemberCommand
-        {
-            GroupId = groupId,
-            UserId = userId,
-            Request = new UpdateGroupMemberRequest { AccessLevel = GroupAccessLevel.Editor }
-        };
-
         var ex = await Assert.ThrowsAsync<BusinessRuleException>(() =>
-            _sut.Handle(command, TestContext.Current.CancellationToken));
+            _sut.HandleAsync(groupId, userId,
+                new UpdateGroupMemberRequest { AccessLevel = GroupAccessLevel.Editor }, TestContext.Current.CancellationToken));
         Assert.Contains("last owner", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -158,14 +140,8 @@ public class UpdateGroupMemberHandlerTests : IDisposable
         _db.GroupMembers.Add(new GroupMember { GroupId = groupId, UserId = userId2, AccessLevel = GroupAccessLevel.Owner });
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var command = new UpdateGroupMemberCommand
-        {
-            GroupId = groupId,
-            UserId = userId1,
-            Request = new UpdateGroupMemberRequest { AccessLevel = GroupAccessLevel.Editor }
-        };
-
-        var result = await _sut.Handle(command, TestContext.Current.CancellationToken);
+        var result = await _sut.HandleAsync(groupId, userId1,
+            new UpdateGroupMemberRequest { AccessLevel = GroupAccessLevel.Editor }, TestContext.Current.CancellationToken);
 
         Assert.Equal(GroupAccessLevel.Editor, result.AccessLevel);
     }
@@ -192,14 +168,8 @@ public class UpdateGroupMemberHandlerTests : IDisposable
         });
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var command = new UpdateGroupMemberCommand
-        {
-            GroupId = groupId,
-            UserId = userId,
-            Request = new UpdateGroupMemberRequest { AccessLevel = GroupAccessLevel.Owner }
-        };
-
-        var result = await _sut.Handle(command, TestContext.Current.CancellationToken);
+        var result = await _sut.HandleAsync(groupId, userId,
+            new UpdateGroupMemberRequest { AccessLevel = GroupAccessLevel.Owner }, TestContext.Current.CancellationToken);
 
         Assert.Equal(GroupAccessLevel.Owner, result.AccessLevel);
     }
@@ -207,13 +177,7 @@ public class UpdateGroupMemberHandlerTests : IDisposable
     [Fact]
     public async Task Handle_UndefinedAccessLevel_ThrowsValidationException()
     {
-        var command = new UpdateGroupMemberCommand
-        {
-            GroupId = Guid.NewGuid(),
-            UserId = Guid.NewGuid(),
-            Request = new UpdateGroupMemberRequest { AccessLevel = (GroupAccessLevel)42 }
-        };
-
-        await Assert.ThrowsAsync<ValidationException>(() => _sut.Handle(command, TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<ValidationException>(() => _sut.HandleAsync(Guid.NewGuid(), Guid.NewGuid(),
+            new UpdateGroupMemberRequest { AccessLevel = (GroupAccessLevel)42 }, TestContext.Current.CancellationToken));
     }
 }

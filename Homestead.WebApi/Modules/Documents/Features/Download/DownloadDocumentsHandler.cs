@@ -15,7 +15,7 @@ public class DownloadDocumentsHandler(
     IDocumentQueryService accessService,
     IJobQueue jobQueue)
 {
-    public async Task<DownloadDocumentsResponse> Handle(DownloadDocumentsCommand request, CancellationToken ct)
+    public async Task<DownloadDocumentsResponse> HandleAsync(DownloadDocumentsCommand request, CancellationToken ct)
     {
         // Guard: only one active download per user
         var hasActiveDownload = await db.ProcessingJobs

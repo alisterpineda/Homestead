@@ -29,7 +29,7 @@ public class UpdatePartyHandlerTests : IDisposable
         _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
             .Returns(ci => _db.SaveChangesAsync(ci.Arg<CancellationToken>()));
         _sut = new UpdatePartyHandler(_db, accessService, _audit, currentUser, _unitOfWork,
-            new UpdatePartyCommandValidator());
+            new UpdatePartyRequestValidator());
     }
 
     public void Dispose() => _db.Dispose();
@@ -47,14 +47,13 @@ public class UpdatePartyHandlerTests : IDisposable
         _db.Parties.Add(party);
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var command = new UpdatePartyCommand
+        var request = new UpdatePartyRequest
         {
-            Id = party.Id,
             Name = "New Name",
             Description = "New desc"
         };
 
-        await _sut.Handle(command, TestContext.Current.CancellationToken);
+        await _sut.HandleAsync(party.Id, request, TestContext.Current.CancellationToken);
 
         _audit.Received(1).Track<PartySnapshot, Party>(Arg.Any<Party>(), "Party", party.Id, Arg.Any<Guid?>());
     }
@@ -73,14 +72,13 @@ public class UpdatePartyHandlerTests : IDisposable
 
         var before = DateTimeOffset.UtcNow;
 
-        var command = new UpdatePartyCommand
+        var request = new UpdatePartyRequest
         {
-            Id = party.Id,
             Name = "New Name",
             Description = "New desc"
         };
 
-        var result = await _sut.Handle(command, TestContext.Current.CancellationToken);
+        var result = await _sut.HandleAsync(party.Id, request, TestContext.Current.CancellationToken);
 
         Assert.NotNull(result);
         Assert.True(result.UpdatedAt >= before);
@@ -100,14 +98,13 @@ public class UpdatePartyHandlerTests : IDisposable
         _db.Parties.Add(party);
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var command = new UpdatePartyCommand
+        var request = new UpdatePartyRequest
         {
-            Id = party.Id,
             Name = "Same Name",
             Description = "Same desc"
         };
 
-        await _sut.Handle(command, TestContext.Current.CancellationToken);
+        await _sut.HandleAsync(party.Id, request, TestContext.Current.CancellationToken);
 
         // Track is always called before mutations; diff computation is deferred
         _audit.Received(1).Track<PartySnapshot, Party>(Arg.Any<Party>(), "Party", party.Id, Arg.Any<Guid?>());
@@ -116,9 +113,9 @@ public class UpdatePartyHandlerTests : IDisposable
     [Fact]
     public async Task Handle_BlankName_ThrowsValidationException()
     {
-        var request = new UpdatePartyCommand { Id = Guid.NewGuid(), Name = "" };
+        var request = new UpdatePartyRequest { Name = "" };
 
         await Assert.ThrowsAsync<ValidationException>(
-            () => _sut.Handle(request, TestContext.Current.CancellationToken));
+            () => _sut.HandleAsync(Guid.NewGuid(), request, TestContext.Current.CancellationToken));
     }
 }

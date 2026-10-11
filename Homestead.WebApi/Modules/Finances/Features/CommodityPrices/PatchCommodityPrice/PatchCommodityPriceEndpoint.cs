@@ -10,14 +10,7 @@ public static class PatchCommodityPriceEndpoint
         group.MapPatch("/{id:guid}", async (Guid id,
             JsonPatchDocument<PatchCommodityPriceModel> patchDoc,
             PatchCommodityPriceHandler handler, CancellationToken ct) =>
-        {
-            var command = new PatchCommodityPriceCommand
-            {
-                Id = id,
-                PatchDocument = patchDoc
-            };
-            return Results.Ok(await handler.Handle(command, ct));
-        })
+            Results.Ok(await handler.HandleAsync(id, patchDoc, ct)))
         .WithName("PatchCommodityPrice")
         .Accepts<JsonPatchDocument<PatchCommodityPriceModel>>("application/json-patch+json")
         .Produces<CommodityPriceResponse>()

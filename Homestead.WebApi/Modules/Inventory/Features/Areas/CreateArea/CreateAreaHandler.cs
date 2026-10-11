@@ -9,7 +9,7 @@ namespace Homestead.WebApi.Modules.Inventory.Features.Areas.CreateArea;
 
 public class CreateAreaHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork, IValidator<CreateAreaCommand> validator)
 {
-    public async Task<AreaResponse> Handle(CreateAreaCommand request, CancellationToken ct)
+    public async Task<AreaResponse> HandleAsync(CreateAreaCommand request, CancellationToken ct)
     {
         await validator.ValidateAndThrowAsync(request, ct);
 

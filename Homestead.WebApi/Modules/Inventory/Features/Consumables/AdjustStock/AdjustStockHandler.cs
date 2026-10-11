@@ -10,16 +10,15 @@ public class AdjustStockHandler(
     IItemLocationResolver locationResolver,
     IUnitOfWork unitOfWork)
 {
-    public async Task<ConsumableDetailResponse> Handle(AdjustStockCommand request, CancellationToken ct)
+    public async Task<ConsumableDetailResponse> HandleAsync(Guid id, AdjustStockRequest body, CancellationToken ct)
     {
-        var body = request.Body;
-        await stock.AdjustAsync(request.ConsumableId, new StockAdjustRequest(
+        await stock.AdjustAsync(id, new StockAdjustRequest(
             new StockLocation(body.AreaId, body.ContainerItemId),
             body.NewQuantity, body.OccurredAt, body.Note), ct);
 
         await unitOfWork.SaveChangesAsync(ct);
 
-        return await ConsumableDetailReader.LoadAsync(db, locationResolver, request.ConsumableId, ct)
+        return await ConsumableDetailReader.LoadAsync(db, locationResolver, id, ct)
             ?? throw new EntityNotFoundException("Consumable not found.");
     }
 }

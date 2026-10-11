@@ -7,7 +7,7 @@ public static class PatchSystemSettingsEndpoint
         group.MapPatch("/system", async (PatchSystemSettingsCommand request,
             PatchSystemSettingsHandler handler, CancellationToken ct) =>
         {
-            return Results.Ok(await handler.Handle(request, ct));
+            return Results.Ok(await handler.HandleAsync(request, ct));
         })
         .WithName("PatchSystemSettings")
         .Produces<SystemSettingsResponse>();

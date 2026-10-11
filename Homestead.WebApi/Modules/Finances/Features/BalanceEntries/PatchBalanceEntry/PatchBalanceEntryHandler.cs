@@ -10,7 +10,7 @@ public class PatchBalanceEntryHandler(
     IUnitOfWork unitOfWork,
     IValidator<PatchBalanceEntryCommand> validator)
 {
-    public async Task<BalanceEntryResponse> Handle(PatchBalanceEntryCommand request, CancellationToken ct)
+    public async Task<BalanceEntryResponse> HandleAsync(PatchBalanceEntryCommand request, CancellationToken ct)
     {
         await validator.ValidateAndThrowAsync(request, ct);
 

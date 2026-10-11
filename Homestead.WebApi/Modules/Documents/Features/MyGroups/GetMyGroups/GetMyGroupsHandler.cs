@@ -6,8 +6,7 @@ namespace Homestead.WebApi.Modules.Documents.Features.MyGroups.GetMyGroups;
 
 public class GetMyGroupsHandler(AppDbContext db, ICurrentUserAccessor currentUser)
 {
-    public async Task<IReadOnlyList<GetMyGroupsResponse>> Handle(
-        GetMyGroupsQuery request, CancellationToken ct)
+    public async Task<IReadOnlyList<GetMyGroupsResponse>> HandleAsync(CancellationToken ct)
     {
         var userId = currentUser.UserId;
         if (userId is null)

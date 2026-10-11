@@ -109,7 +109,7 @@ public class GetAccountsHandlerTests : IAsyncLifetime
         var userAccount = await AddCashAccountAsync();
         await AddSystemAccountAsync();
 
-        var resp = await _sut.Handle(new GetAccountsQuery { Page = 1, PageSize = 10 }, Ct);
+        var resp = await _sut.HandleAsync(new GetAccountsQuery { Page = 1, PageSize = 10 }, Ct);
 
         Assert.Single(resp.Items);
         Assert.Equal(userAccount.Id, resp.Items[0].Id);
@@ -124,7 +124,7 @@ public class GetAccountsHandlerTests : IAsyncLifetime
         await AddSplitAsync(account.Id, 50m, new DateTimeOffset(2026, 4, 20, 12, 0, 0, TimeSpan.Zero));
 
         var asOf = new DateTimeOffset(2026, 4, 15, 23, 59, 59, TimeSpan.Zero);
-        var resp = await _sut.Handle(new GetAccountsQuery { Page = 1, PageSize = 10, AsOf = asOf }, Ct);
+        var resp = await _sut.HandleAsync(new GetAccountsQuery { Page = 1, PageSize = 10, AsOf = asOf }, Ct);
 
         Assert.Single(resp.Items);
         Assert.Equal(100m, resp.Items[0].NativeBalance);
@@ -136,7 +136,7 @@ public class GetAccountsHandlerTests : IAsyncLifetime
         var account = await AddCashAccountAsync();
         await AddSplitAsync(account.Id, 200m, new DateTimeOffset(2020, 1, 1, 12, 0, 0, TimeSpan.Zero));
 
-        var resp = await _sut.Handle(new GetAccountsQuery { Page = 1, PageSize = 10 }, Ct);
+        var resp = await _sut.HandleAsync(new GetAccountsQuery { Page = 1, PageSize = 10 }, Ct);
 
         Assert.Single(resp.Items);
         Assert.Equal(200m, resp.Items[0].NativeBalance);

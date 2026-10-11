@@ -24,7 +24,7 @@ public static class BulkUpdateDocumentsEndpoint
                 return ProblemDetailsFactory.BusinessRuleResult("Parties cannot be both added and removed in the same request.");
             }
 
-            var response = await handler.Handle(request, ct);
+            var response = await handler.HandleAsync(request, ct);
             return Results.Ok(response);
         })
         .WithName("BulkUpdateDocuments")

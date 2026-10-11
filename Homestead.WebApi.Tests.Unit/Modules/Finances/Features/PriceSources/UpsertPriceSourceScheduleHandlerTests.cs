@@ -28,13 +28,9 @@ public class UpsertPriceSourceScheduleHandlerTests : IDisposable
     public async Task SystemSource_Throws_BusinessRuleException()
     {
         var sut = new UpsertPriceSourceScheduleHandler(
-            _db, _currentUser, new PriceSourceScheduleStore(_db), new UpsertPriceSourceScheduleCommandValidator());
-        await Assert.ThrowsAsync<BusinessRuleException>(() => sut.Handle(
-            new UpsertPriceSourceScheduleCommand
-            {
-                Source = CommodityPriceSource.Manual,
-                CronExpression = "0 6 * * *",
-            },
+            _db, _currentUser, new PriceSourceScheduleStore(_db), new UpsertPriceSourceScheduleBodyValidator());
+        await Assert.ThrowsAsync<BusinessRuleException>(() => sut.HandleAsync(
+            CommodityPriceSource.Manual, new UpsertPriceSourceScheduleBody { CronExpression = "0 6 * * *" },
             TestContext.Current.CancellationToken));
     }
 
@@ -44,22 +40,16 @@ public class UpsertPriceSourceScheduleHandlerTests : IDisposable
         var ct = TestContext.Current.CancellationToken;
 
         // The handler now only stages Remove + Add; the command pipeline's transaction commits. These
-        // unit tests bypass the pipeline, so save explicitly after each Handle to mirror that commit —
+        // unit tests bypass the pipeline, so save explicitly after each HandleAsync to mirror that commit —
         // each call is a separate command (and therefore a separate transaction) in production.
         var sut = new UpsertPriceSourceScheduleHandler(
-            _db, _currentUser, new PriceSourceScheduleStore(_db), new UpsertPriceSourceScheduleCommandValidator());
-        var first = await sut.Handle(new UpsertPriceSourceScheduleCommand
-        {
-            Source = CommodityPriceSource.BankOfCanada,
-            CronExpression = "0 6 * * *",
-        }, ct);
+            _db, _currentUser, new PriceSourceScheduleStore(_db), new UpsertPriceSourceScheduleBodyValidator());
+        var first = await sut.HandleAsync(
+            CommodityPriceSource.BankOfCanada, new UpsertPriceSourceScheduleBody { CronExpression = "0 6 * * *" }, ct);
         await _db.SaveChangesAsync(ct);
 
-        var second = await sut.Handle(new UpsertPriceSourceScheduleCommand
-        {
-            Source = CommodityPriceSource.BankOfCanada,
-            CronExpression = "0 7 * * *",
-        }, ct);
+        var second = await sut.HandleAsync(
+            CommodityPriceSource.BankOfCanada, new UpsertPriceSourceScheduleBody { CronExpression = "0 7 * * *" }, ct);
         await _db.SaveChangesAsync(ct);
 
         var schedules = _db.ProcessingSchedules.ToList();
@@ -80,12 +70,9 @@ public class UpsertPriceSourceScheduleHandlerTests : IDisposable
         var userId = Guid.NewGuid();
         _currentUser.UserId.Returns(userId);
         var sut = new UpsertPriceSourceScheduleHandler(
-            _db, _currentUser, new PriceSourceScheduleStore(_db), new UpsertPriceSourceScheduleCommandValidator());
-        var response = await sut.Handle(new UpsertPriceSourceScheduleCommand
-        {
-            Source = CommodityPriceSource.BankOfCanada,
-            CronExpression = "0 6 * * *",
-        }, ct);
+            _db, _currentUser, new PriceSourceScheduleStore(_db), new UpsertPriceSourceScheduleBodyValidator());
+        var response = await sut.HandleAsync(
+            CommodityPriceSource.BankOfCanada, new UpsertPriceSourceScheduleBody { CronExpression = "0 6 * * *" }, ct);
         // The handler stages the Add; the pipeline transaction commits. Bypassing the pipeline here, save
         // explicitly to mirror that commit before asserting on persisted state.
         await _db.SaveChangesAsync(ct);
@@ -98,13 +85,9 @@ public class UpsertPriceSourceScheduleHandlerTests : IDisposable
     public async Task InvalidCronExpression_Throws_ValidationException()
     {
         var sut = new UpsertPriceSourceScheduleHandler(
-            _db, _currentUser, new PriceSourceScheduleStore(_db), new UpsertPriceSourceScheduleCommandValidator());
-        await Assert.ThrowsAsync<ValidationException>(() => sut.Handle(
-            new UpsertPriceSourceScheduleCommand
-            {
-                Source = CommodityPriceSource.BankOfCanada,
-                CronExpression = "not a cron",
-            },
+            _db, _currentUser, new PriceSourceScheduleStore(_db), new UpsertPriceSourceScheduleBodyValidator());
+        await Assert.ThrowsAsync<ValidationException>(() => sut.HandleAsync(
+            CommodityPriceSource.BankOfCanada, new UpsertPriceSourceScheduleBody { CronExpression = "not a cron" },
             TestContext.Current.CancellationToken));
     }
 }

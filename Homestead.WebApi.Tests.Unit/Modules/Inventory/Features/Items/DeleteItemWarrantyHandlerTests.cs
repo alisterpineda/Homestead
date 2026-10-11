@@ -30,7 +30,7 @@ public class DeleteItemWarrantyHandlerTests : IDisposable
     {
         var item = await ItemNoteTestData.AddItemAsync(_db);
 
-        Assert.False(await _sut.Handle(new DeleteItemWarrantyCommand(item.Id, Guid.NewGuid()), Ct));
+        Assert.False(await _sut.HandleAsync(item.Id, Guid.NewGuid(), Ct));
     }
 
     [Fact]
@@ -40,7 +40,7 @@ public class DeleteItemWarrantyHandlerTests : IDisposable
         var other = await ItemNoteTestData.AddItemAsync(_db, name: "Other");
         var warranty = await ItemWarrantyTestData.AddWarrantyAsync(_db, item.Id);
 
-        Assert.False(await _sut.Handle(new DeleteItemWarrantyCommand(other.Id, warranty.Id), Ct));
+        Assert.False(await _sut.HandleAsync(other.Id, warranty.Id, Ct));
         Assert.Single(_db.ItemWarranties);
     }
 
@@ -51,7 +51,7 @@ public class DeleteItemWarrantyHandlerTests : IDisposable
         var warranty = await ItemWarrantyTestData.AddWarrantyAsync(_db, item.Id,
             provider: "Bosch", expiresOn: new DateOnly(2028, 3, 12));
 
-        Assert.True(await _sut.Handle(new DeleteItemWarrantyCommand(item.Id, warranty.Id), Ct));
+        Assert.True(await _sut.HandleAsync(item.Id, warranty.Id, Ct));
 
         Assert.Empty(_db.ItemWarranties);
         _audit.Received(1).Deleted("ItemWarranty", warranty.Id, "Bosch · until 2028-03-12", item.Id);
@@ -63,7 +63,7 @@ public class DeleteItemWarrantyHandlerTests : IDisposable
         var item = await ItemNoteTestData.AddItemAsync(_db);
         var warranty = await ItemWarrantyTestData.AddWarrantyAsync(_db, item.Id);
 
-        Assert.True(await _sut.Handle(new DeleteItemWarrantyCommand(item.Id, warranty.Id), Ct));
+        Assert.True(await _sut.HandleAsync(item.Id, warranty.Id, Ct));
 
         _audit.Received(1).Deleted("ItemWarranty", warranty.Id, "Manufacturer · no expiry", item.Id);
     }

@@ -8,7 +8,7 @@ public static class CreateConsumableEndpoint
     {
         group.MapPost("", async (CreateConsumableCommand request, CreateConsumableHandler handler, CancellationToken ct) =>
         {
-            var response = await handler.Handle(request, ct);
+            var response = await handler.HandleAsync(request, ct);
             return Results.Created($"/api/v1/inventory/consumables/{response.Id}", response);
         })
         .WithName("CreateConsumable")

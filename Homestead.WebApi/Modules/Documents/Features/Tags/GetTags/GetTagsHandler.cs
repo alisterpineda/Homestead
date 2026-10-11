@@ -7,7 +7,7 @@ namespace Homestead.WebApi.Modules.Documents.Features.Tags.GetTags;
 
 public class GetTagsHandler(AppDbContext db)
 {
-    public async Task<PaginatedResponse<GetTagsResponse>> Handle(GetTagsQuery request, CancellationToken ct)
+    public async Task<PaginatedResponse<GetTagsResponse>> HandleAsync(GetTagsQuery request, CancellationToken ct)
     {
         var query = db.Tags.AsNoTracking();
 

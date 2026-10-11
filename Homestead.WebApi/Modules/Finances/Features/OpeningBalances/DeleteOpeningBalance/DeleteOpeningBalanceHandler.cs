@@ -11,9 +11,9 @@ public class DeleteOpeningBalanceHandler(
     IBalanceEntryReconciler reconciler,
     IUnitOfWork unitOfWork)
 {
-    public async Task<bool> Handle(DeleteOpeningBalanceCommand request, CancellationToken ct)
+    public async Task<bool> HandleAsync(Guid accountId, Guid commodityId, CancellationToken ct)
     {
-        var txnId = await db.OpeningBalancesFor(request.AccountId, request.CommodityId)
+        var txnId = await db.OpeningBalancesFor(accountId, commodityId)
             .Select(t => (Guid?)t.Id)
             .FirstOrDefaultAsync(ct);
 

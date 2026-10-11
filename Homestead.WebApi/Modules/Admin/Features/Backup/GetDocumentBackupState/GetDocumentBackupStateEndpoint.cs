@@ -9,7 +9,7 @@ public static class GetDocumentBackupStateEndpoint
         group.MapGet("/documents/{documentId:guid}", async (
             Guid documentId, GetDocumentBackupStateHandler handler, CancellationToken ct) =>
         {
-            var response = await handler.Handle(new GetDocumentBackupStateQuery(documentId), ct);
+            var response = await handler.HandleAsync(documentId, ct);
             return response is not null ? Results.Ok(response) : Results.NotFound();
         })
         .WithName("GetDocumentBackupState")

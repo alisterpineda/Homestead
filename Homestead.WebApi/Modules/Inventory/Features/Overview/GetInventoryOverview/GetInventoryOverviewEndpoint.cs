@@ -5,9 +5,7 @@ public static class GetInventoryOverviewEndpoint
     public static void Map(RouteGroupBuilder group)
     {
         group.MapGet("/overview", async (GetInventoryOverviewHandler handler, CancellationToken ct) =>
-        {
-            return Results.Ok(await handler.Handle(new GetInventoryOverviewQuery(), ct));
-        })
+            Results.Ok(await handler.HandleAsync(ct)))
         .WithName("GetInventoryOverview")
         .Produces<GetInventoryOverviewResponse>();
     }

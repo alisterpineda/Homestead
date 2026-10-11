@@ -31,13 +31,13 @@ public record ApplyClassificationResult(string DocumentName);
 
 public interface IApplyClassificationHandler
 {
-    Task<ApplyClassificationResult> Handle(ApplyClassificationCommand request, CancellationToken ct);
+    Task<ApplyClassificationResult> HandleAsync(ApplyClassificationCommand request, CancellationToken ct);
 }
 
 public class ApplyClassificationHandler(
     AppDbContext db, IDocumentClassifier classifier, IAuditContext audit) : IApplyClassificationHandler
 {
-    public async Task<ApplyClassificationResult> Handle(ApplyClassificationCommand request, CancellationToken ct)
+    public async Task<ApplyClassificationResult> HandleAsync(ApplyClassificationCommand request, CancellationToken ct)
     {
         var document = await db.Documents
             .Include(d => d.DocumentTags).ThenInclude(dt => dt.Tag)

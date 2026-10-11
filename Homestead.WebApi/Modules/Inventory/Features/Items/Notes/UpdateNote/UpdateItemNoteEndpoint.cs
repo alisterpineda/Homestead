@@ -10,7 +10,7 @@ public static class UpdateItemNoteEndpoint
             UpdateItemNoteCommand request, UpdateItemNoteHandler handler, CancellationToken ct) =>
         {
             var command = request with { ItemId = id, NoteId = noteId };
-            var response = await handler.Handle(command, ct);
+            var response = await handler.HandleAsync(command, ct);
             return Results.Ok(response);
         })
         .WithName("UpdateItemNote")

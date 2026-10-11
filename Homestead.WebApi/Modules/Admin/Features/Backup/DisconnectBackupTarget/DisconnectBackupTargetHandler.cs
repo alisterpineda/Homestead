@@ -33,10 +33,10 @@ public class DisconnectBackupTargetHandler(
     IAuditContext audit,
     IUnitOfWork unitOfWork)
 {
-    public async Task<bool> Handle(DisconnectBackupTargetCommand request, CancellationToken ct)
+    public async Task<bool> HandleAsync(string key, CancellationToken ct)
     {
         // The state row is the authority on "is there something to disconnect", and it outlives config.
-        var key = request.TargetKey.Trim();
+        key = key.Trim();
 
         var state = await db.BackupTargetStates
             .AsNoTracking()

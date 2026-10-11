@@ -6,10 +6,7 @@ public static class ConnectBackupTargetEndpoint
     {
         group.MapPost("/targets/{key}/connect", async (
             string key, ConnectBackupTargetHandler handler, CancellationToken ct) =>
-        {
-            var response = await handler.Handle(new ConnectBackupTargetCommand(key), ct);
-            return Results.Ok(response);
-        })
+            Results.Ok(await handler.HandleAsync(key, ct)))
         .WithName("ConnectBackupTarget")
         .Produces<ConnectBackupTargetResponse>()
         .Produces(StatusCodes.Status400BadRequest)

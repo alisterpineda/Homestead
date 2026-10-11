@@ -37,21 +37,21 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
         _db.Dispose();
     }
 
-    private static PatchDocumentSettingsCommand CreatePatchCommand(
+    private static JsonPatchDocument<DocumentSettings> CreatePatchDocument(
         Action<JsonPatchDocument<DocumentSettings>> configure)
     {
         var patchDoc = new JsonPatchDocument<DocumentSettings>();
         configure(patchDoc);
-        return new PatchDocumentSettingsCommand { PatchDocument = patchDoc };
+        return patchDoc;
     }
 
     [Fact]
     public async Task Handle_NoExistingRow_CreatesNewSetting()
     {
-        var command = CreatePatchCommand(p =>
+        var patchDoc = CreatePatchDocument(p =>
             p.Replace(m => m.AutoClassifyOnUpload, true));
 
-        var response = await _sut.Handle(command, TestContext.Current.CancellationToken);
+        var response = await _sut.HandleAsync(patchDoc, TestContext.Current.CancellationToken);
 
         Assert.True(response.AutoClassifyOnUpload);
 
@@ -63,10 +63,10 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
     [Fact]
     public async Task Handle_NoExistingRow_LogsCreated()
     {
-        var command = CreatePatchCommand(p =>
+        var patchDoc = CreatePatchDocument(p =>
             p.Replace(m => m.AutoClassifyOnUpload, true));
 
-        await _sut.Handle(command, TestContext.Current.CancellationToken);
+        await _sut.HandleAsync(patchDoc, TestContext.Current.CancellationToken);
 
         _audit.Received(1).Created("AppSetting", Arg.Any<Guid>());
     }
@@ -82,10 +82,10 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
         });
         await _db.SaveChangesAsync(ct);
 
-        var command = CreatePatchCommand(p =>
+        var patchDoc = CreatePatchDocument(p =>
             p.Replace(m => m.AutoClassifyOnUpload, (bool?)null));
 
-        var response = await _sut.Handle(command, ct);
+        var response = await _sut.HandleAsync(patchDoc, ct);
 
         Assert.Null(response.AutoClassifyOnUpload);
 
@@ -104,10 +104,10 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
         });
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var command = CreatePatchCommand(p =>
+        var patchDoc = CreatePatchDocument(p =>
             p.Replace(m => m.AutoClassifyOnUpload, (bool?)null));
 
-        await _sut.Handle(command, TestContext.Current.CancellationToken);
+        await _sut.HandleAsync(patchDoc, TestContext.Current.CancellationToken);
 
         _audit.Received(1).Track(
             Arg.Any<Func<List<FieldChange>>>(),
@@ -120,9 +120,7 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
     public async Task Handle_EmptyPatch_UsesDefaults()
     {
         var patchDoc = new JsonPatchDocument<DocumentSettings>();
-        var command = new PatchDocumentSettingsCommand { PatchDocument = patchDoc };
-
-        var response = await _sut.Handle(command, TestContext.Current.CancellationToken);
+        var response = await _sut.HandleAsync(patchDoc, TestContext.Current.CancellationToken);
 
         Assert.Null(response.AutoClassifyOnUpload);
     }
@@ -137,10 +135,10 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
         });
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var command = CreatePatchCommand(p =>
+        var patchDoc = CreatePatchDocument(p =>
             p.Replace(m => m.AutoClassifyOnUpload, true));
 
-        await _sut.Handle(command, TestContext.Current.CancellationToken);
+        await _sut.HandleAsync(patchDoc, TestContext.Current.CancellationToken);
 
         _audit.DidNotReceive().Track(
             Arg.Any<Func<List<FieldChange>>>(),
@@ -152,10 +150,10 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
     [Fact]
     public async Task Handle_SetAutoClassify_Succeeds()
     {
-        var command = CreatePatchCommand(p =>
+        var patchDoc = CreatePatchDocument(p =>
             p.Replace(m => m.AutoClassifyOnUpload, true));
 
-        var response = await _sut.Handle(command, TestContext.Current.CancellationToken);
+        var response = await _sut.HandleAsync(patchDoc, TestContext.Current.CancellationToken);
 
         Assert.True(response.AutoClassifyOnUpload);
     }
@@ -170,10 +168,10 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
         });
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var command = CreatePatchCommand(p =>
+        var patchDoc = CreatePatchDocument(p =>
             p.Replace(m => m.AutoClassifyOnUpload, (bool?)null));
 
-        var response = await _sut.Handle(command, TestContext.Current.CancellationToken);
+        var response = await _sut.HandleAsync(patchDoc, TestContext.Current.CancellationToken);
 
         Assert.Null(response.AutoClassifyOnUpload);
     }

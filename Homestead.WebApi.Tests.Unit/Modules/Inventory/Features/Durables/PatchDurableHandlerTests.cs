@@ -71,7 +71,7 @@ public class PatchDurableHandlerTests : IAsyncLifetime
     {
         var patch = new JsonPatchDocument<PatchDurableModel>();
         build(patch);
-        return _sut.Handle(new PatchDurableCommand { Id = id, PatchDocument = patch }, Ct);
+        return _sut.HandleAsync(id, patch, Ct);
     }
 
     [Fact]

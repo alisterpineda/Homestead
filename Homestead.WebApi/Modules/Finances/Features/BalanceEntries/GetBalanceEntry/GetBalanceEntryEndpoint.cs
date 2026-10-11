@@ -8,10 +8,7 @@ public static class GetBalanceEntryEndpoint
     {
         group.MapGet("/{accountId:guid}/balance-entries/{transactionId:guid}",
             async (Guid accountId, Guid transactionId, GetBalanceEntryHandler handler, CancellationToken ct) =>
-        {
-            var response = await handler.Handle(new GetBalanceEntryQuery(accountId, transactionId), ct);
-            return Results.Ok(response);
-        })
+            Results.Ok(await handler.HandleAsync(accountId, transactionId, ct)))
         .WithName("GetBalanceEntry")
         .Produces<BalanceEntryResponse>()
         .RequireAuthorization(AuthPolicies.ActiveUser);

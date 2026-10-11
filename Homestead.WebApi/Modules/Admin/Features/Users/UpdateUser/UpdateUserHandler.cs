@@ -10,9 +10,9 @@ namespace Homestead.WebApi.Modules.Admin.Features.Users.UpdateUser;
 
 public class UpdateUserHandler(AppDbContext db, ICurrentUserAccessor currentUser, IAuditContext audit)
 {
-    public async Task<UserResponse?> Handle(UpdateUserCommand request, CancellationToken ct)
+    public async Task<UserResponse?> HandleAsync(Guid id, UpdateUserRequest request, CancellationToken ct)
     {
-        if (currentUser.UserId is { } currentId && request.Id == currentId)
+        if (currentUser.UserId is { } currentId && id == currentId)
         {
             if (!request.IsActive)
                 throw new BusinessRuleException("Cannot deactivate your own account.");
@@ -20,7 +20,7 @@ public class UpdateUserHandler(AppDbContext db, ICurrentUserAccessor currentUser
                 throw new BusinessRuleException("Cannot demote your own admin role.");
         }
 
-        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == request.Id, ct);
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == id, ct);
         if (user is null)
             return null;
 

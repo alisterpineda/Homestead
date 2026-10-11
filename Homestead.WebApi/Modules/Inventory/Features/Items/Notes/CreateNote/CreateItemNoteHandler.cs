@@ -15,7 +15,7 @@ public class CreateItemNoteHandler(
     IUnitOfWork unitOfWork,
     IValidator<CreateItemNoteCommand> validator)
 {
-    public async Task<ItemNoteResponse> Handle(CreateItemNoteCommand request, CancellationToken ct)
+    public async Task<ItemNoteResponse> HandleAsync(CreateItemNoteCommand request, CancellationToken ct)
     {
         await validator.ValidateAndThrowAsync(request, ct);
 

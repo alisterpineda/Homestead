@@ -4,13 +4,13 @@ namespace Homestead.WebApi.Modules.Admin.Features.Settings.GetLogLevels;
 
 public class GetLogLevelsHandler(ILogLevelInspector inspector)
 {
-    public Task<LogLevelsResponse> Handle(GetLogLevelsQuery request, CancellationToken ct)
+    public Task<LogLevelsResponse> HandleAsync(string? category, CancellationToken ct)
     {
         var table = inspector.GetTable();
         // Reuse the table just built for the resolution rather than letting Resolve rebuild it.
-        var resolved = string.IsNullOrWhiteSpace(request.Category)
+        var resolved = string.IsNullOrWhiteSpace(category)
             ? null
-            : inspector.Resolve(request.Category, table.Rules);
+            : inspector.Resolve(category, table.Rules);
 
         return Task.FromResult(new LogLevelsResponse
         {

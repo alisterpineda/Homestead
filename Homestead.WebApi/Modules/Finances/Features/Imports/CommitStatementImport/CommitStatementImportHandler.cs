@@ -21,7 +21,7 @@ public class CommitStatementImportHandler(
     IUnitOfWork unitOfWork,
     IValidator<CommitStatementImportCommand> validator)
 {
-    public async Task<CommitStatementImportResponse> Handle(
+    public async Task<CommitStatementImportResponse> HandleAsync(
         CommitStatementImportCommand request, CancellationToken ct)
     {
         await validator.ValidateAndThrowAsync(request, ct);

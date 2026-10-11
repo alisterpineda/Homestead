@@ -5,10 +5,7 @@ public static class GetBackupTargetsEndpoint
     public static void Map(RouteGroupBuilder group)
     {
         group.MapGet("/targets", async (GetBackupTargetsHandler handler, CancellationToken ct) =>
-        {
-            var response = await handler.Handle(new GetBackupTargetsQuery(), ct);
-            return Results.Ok(response);
-        })
+            Results.Ok(await handler.HandleAsync(ct)))
         .WithName("GetBackupTargets")
         .Produces<GetBackupTargetsResponse>();
     }

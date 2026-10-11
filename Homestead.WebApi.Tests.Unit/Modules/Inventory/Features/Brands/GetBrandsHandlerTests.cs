@@ -61,7 +61,7 @@ public class GetBrandsHandlerTests : IAsyncLifetime
         await AddBrandAsync("Apple");
         await AddBrandAsync("Makita");
 
-        var resp = await _sut.Handle(new GetBrandsQuery { Page = 1, PageSize = 50 }, Ct);
+        var resp = await _sut.HandleAsync(new GetBrandsQuery { Page = 1, PageSize = 50 }, Ct);
 
         Assert.Equal(["Apple", "Makita", "Sony"], resp.Items.Select(b => b.Name));
     }
@@ -72,7 +72,7 @@ public class GetBrandsHandlerTests : IAsyncLifetime
         await AddBrandAsync("Apple");
         await AddBrandAsync("Samsung");
 
-        var resp = await _sut.Handle(new GetBrandsQuery { Page = 1, PageSize = 50, Search = "APP" }, Ct);
+        var resp = await _sut.HandleAsync(new GetBrandsQuery { Page = 1, PageSize = 50, Search = "APP" }, Ct);
 
         Assert.Single(resp.Items);
         Assert.Equal("Apple", resp.Items[0].Name);
@@ -84,7 +84,7 @@ public class GetBrandsHandlerTests : IAsyncLifetime
         for (var i = 0; i < 5; i++)
             await AddBrandAsync($"Brand {i:D2}");
 
-        var resp = await _sut.Handle(new GetBrandsQuery { Page = 1, PageSize = 2 }, Ct);
+        var resp = await _sut.HandleAsync(new GetBrandsQuery { Page = 1, PageSize = 2 }, Ct);
 
         Assert.Equal(2, resp.Items.Count);
         Assert.Equal(5, resp.TotalCount);
@@ -96,7 +96,7 @@ public class GetBrandsHandlerTests : IAsyncLifetime
         await AddBrandWithItemsAsync("Apple", itemCount: 2);
         await AddBrandWithItemsAsync("Sony", itemCount: 0);
 
-        var resp = await _sut.Handle(new GetBrandsQuery { Page = 1, PageSize = 50 }, Ct);
+        var resp = await _sut.HandleAsync(new GetBrandsQuery { Page = 1, PageSize = 50 }, Ct);
 
         Assert.Equal(2, resp.Items.Single(b => b.Name == "Apple").ItemCount);
         Assert.Equal(0, resp.Items.Single(b => b.Name == "Sony").ItemCount);
@@ -109,7 +109,7 @@ public class GetBrandsHandlerTests : IAsyncLifetime
         await AddBrandWithItemsAsync("Sony", itemCount: 3);
         await AddBrandWithItemsAsync("Makita", itemCount: 2);
 
-        var resp = await _sut.Handle(
+        var resp = await _sut.HandleAsync(
             new GetBrandsQuery { Page = 1, PageSize = 50, SortBy = "items", SortDir = "desc" }, Ct);
 
         Assert.Equal(["Sony", "Makita", "Apple"], resp.Items.Select(b => b.Name));
@@ -123,7 +123,7 @@ public class GetBrandsHandlerTests : IAsyncLifetime
         await AddBrandWithItemsAsync("Oldest", itemCount: 0, updatedAt: now.AddDays(-2));
         await AddBrandWithItemsAsync("Middle", itemCount: 0, updatedAt: now.AddDays(-1));
 
-        var resp = await _sut.Handle(
+        var resp = await _sut.HandleAsync(
             new GetBrandsQuery { Page = 1, PageSize = 50, SortBy = "updated", SortDir = "asc" }, Ct);
 
         Assert.Equal(["Oldest", "Middle", "Newest"], resp.Items.Select(b => b.Name));
@@ -136,7 +136,7 @@ public class GetBrandsHandlerTests : IAsyncLifetime
         await AddBrandAsync("Sony");
         await AddBrandAsync("Makita");
 
-        var resp = await _sut.Handle(
+        var resp = await _sut.HandleAsync(
             new GetBrandsQuery { Page = 1, PageSize = 50, SortBy = "name", SortDir = "desc" }, Ct);
 
         Assert.Equal(["Sony", "Makita", "Apple"], resp.Items.Select(b => b.Name));

@@ -10,7 +10,7 @@ public class CreateBalanceEntryHandler(
     IUnitOfWork unitOfWork,
     IValidator<CreateBalanceEntryCommand> validator)
 {
-    public async Task<BalanceEntryResponse> Handle(CreateBalanceEntryCommand request, CancellationToken ct)
+    public async Task<BalanceEntryResponse> HandleAsync(CreateBalanceEntryCommand request, CancellationToken ct)
     {
         await validator.ValidateAndThrowAsync(request, ct);
 

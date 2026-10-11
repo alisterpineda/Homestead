@@ -27,7 +27,7 @@ public class GetTagsByIdsHandlerTests : IDisposable
         _db.InventoryTags.AddRange(tagA, tagB, tagC);
         await _db.SaveChangesAsync(ct);
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new GetInventoryTagsByIdsQuery(new[] { tagA.Id, tagB.Id }),
             ct);
 
@@ -46,7 +46,7 @@ public class GetTagsByIdsHandlerTests : IDisposable
         await _db.SaveChangesAsync(ct);
 
         var unknownId = Guid.NewGuid();
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new GetInventoryTagsByIdsQuery(new[] { tagA.Id, unknownId }),
             ct);
 
@@ -61,7 +61,7 @@ public class GetTagsByIdsHandlerTests : IDisposable
         _db.InventoryTags.Add(new Tag { Name = "Alpha", Path = "Alpha" });
         await _db.SaveChangesAsync(ct);
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new GetInventoryTagsByIdsQuery(new[] { Guid.NewGuid(), Guid.NewGuid() }),
             ct);
 
@@ -71,7 +71,7 @@ public class GetTagsByIdsHandlerTests : IDisposable
     [Fact]
     public async Task Handle_EmptyIdList_ThrowsValidationException()
     {
-        await Assert.ThrowsAsync<ValidationException>(() => _sut.Handle(
+        await Assert.ThrowsAsync<ValidationException>(() => _sut.HandleAsync(
             new GetInventoryTagsByIdsQuery(Array.Empty<Guid>()),
             TestContext.Current.CancellationToken));
     }

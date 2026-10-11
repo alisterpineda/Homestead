@@ -9,7 +9,7 @@ public static class GetPayeesEndpoint
         group.MapGet("", async ([AsParameters] GetPayeesQuery request,
             GetPayeesHandler handler, CancellationToken ct) =>
         {
-            return Results.Ok(await handler.Handle(request, ct));
+            return Results.Ok(await handler.HandleAsync(request, ct));
         })
         .WithName("GetPayees")
         .Produces<PaginatedResponse<PayeeResponse>>();

@@ -38,7 +38,7 @@ public class ClassifyDocumentJobHandlerTests : IDisposable
 
         _classifier = Substitute.For<IDocumentClassifier>();
         _applyClassification = Substitute.For<IApplyClassificationHandler>();
-        _applyClassification.Handle(Arg.Any<ApplyClassificationCommand>(), Arg.Any<CancellationToken>())
+        _applyClassification.HandleAsync(Arg.Any<ApplyClassificationCommand>(), Arg.Any<CancellationToken>())
             .Returns(new ApplyClassificationResult(DocumentName));
         // Run the work handed to the transaction, so the command handler is reached through it, and record
         // whether the command handler ran while that work was in progress.
@@ -50,7 +50,7 @@ public class ClassifyDocumentJobHandlerTests : IDisposable
                 try { return await call.Arg<Func<Task<ApplyClassificationResult>>>()(); }
                 finally { _inTransaction = false; }
             });
-        _applyClassification.When(x => x.Handle(Arg.Any<ApplyClassificationCommand>(), Arg.Any<CancellationToken>()))
+        _applyClassification.When(x => x.HandleAsync(Arg.Any<ApplyClassificationCommand>(), Arg.Any<CancellationToken>()))
             .Do(_ => _handledInTransaction = _inTransaction);
         _notifier = Substitute.For<IProcessingNotifier>();
         _sut = new ClassifyDocumentJobHandler(_db, _classifier, _notifier, _unitOfWork, _applyClassification);
@@ -114,7 +114,7 @@ public class ClassifyDocumentJobHandlerTests : IDisposable
         var job = CreateJob();
         await _sut.HandleAsync(job, ct);
 
-        await _applyClassification.Received(1).Handle(
+        await _applyClassification.Received(1).HandleAsync(
             Arg.Is<ApplyClassificationCommand>(c =>
                 c.DocumentId == _documentId
                 && c.Classification == classification
@@ -150,7 +150,7 @@ public class ClassifyDocumentJobHandlerTests : IDisposable
 
         await _sut.HandleAsync(job, ct);
 
-        await _applyClassification.Received(1).Handle(
+        await _applyClassification.Received(1).HandleAsync(
             Arg.Is<ApplyClassificationCommand>(c =>
                 c.DocumentId == _documentId
                 && c.Classification == null),
@@ -167,7 +167,7 @@ public class ClassifyDocumentJobHandlerTests : IDisposable
 
         await _classifier.Received(1).ClassifyAsync(
             _documentId, DocumentName, ClassificationScope.Summary, ct);
-        await _applyClassification.Received(1).Handle(
+        await _applyClassification.Received(1).HandleAsync(
             Arg.Is<ApplyClassificationCommand>(c => c.Scope == ClassificationScope.Summary), ct);
     }
 
@@ -175,7 +175,7 @@ public class ClassifyDocumentJobHandlerTests : IDisposable
     public async Task HandleAsync_SendsNotification_WhenNoParentJob_UsesResultName()
     {
         var ct = TestContext.Current.CancellationToken;
-        _applyClassification.Handle(Arg.Any<ApplyClassificationCommand>(), ct)
+        _applyClassification.HandleAsync(Arg.Any<ApplyClassificationCommand>(), ct)
             .Returns(new ApplyClassificationResult("AI Suggested Name"));
 
         var job = CreateJob();
@@ -202,7 +202,7 @@ public class ClassifyDocumentJobHandlerTests : IDisposable
         await _sut.HandleAsync(job, ct);
 
         // Still applies the classification...
-        await _applyClassification.Received(1).Handle(Arg.Any<ApplyClassificationCommand>(), ct);
+        await _applyClassification.Received(1).HandleAsync(Arg.Any<ApplyClassificationCommand>(), ct);
         // ...but leaves notification to the parent's progress updates.
         await _notifier.DidNotReceive().NotifyJobStatusAsync(
             Arg.Any<Guid>(), Arg.Any<ProcessingJobStatus>(),
@@ -244,7 +244,7 @@ public class ClassifyDocumentJobHandlerTests : IDisposable
     public async Task HandleAsync_CommandThrows_Propagates()
     {
         var ct = TestContext.Current.CancellationToken;
-        _applyClassification.Handle(Arg.Any<ApplyClassificationCommand>(), ct)
+        _applyClassification.HandleAsync(Arg.Any<ApplyClassificationCommand>(), ct)
             .Returns<ApplyClassificationResult>(_ => throw new InvalidOperationException("apply failed."));
 
         var job = CreateJob();

@@ -6,7 +6,7 @@ namespace Homestead.WebApi.Modules.Inventory.Features.Tags.GetTagsByIds;
 
 public class GetTagsByIdsHandler(AppDbContext db, IValidator<GetInventoryTagsByIdsQuery> validator)
 {
-    public async Task<IReadOnlyList<GetInventoryTagsByIdsResponse>> Handle(
+    public async Task<IReadOnlyList<GetInventoryTagsByIdsResponse>> HandleAsync(
         GetInventoryTagsByIdsQuery request, CancellationToken ct)
     {
         await validator.ValidateAndThrowAsync(request, ct);

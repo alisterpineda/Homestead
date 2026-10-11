@@ -52,21 +52,21 @@ public class CreatePartyCommandValidatorTests
     }
 }
 
-public class UpdatePartyCommandValidatorTests
+public class UpdatePartyRequestValidatorTests
 {
-    private readonly UpdatePartyCommandValidator _sut = new();
+    private readonly UpdatePartyRequestValidator _sut = new();
 
     [Fact]
     public async Task WhitespaceName_IsInvalid()
     {
-        var result = await _sut.ValidateAsync(new UpdatePartyCommand { Id = Guid.NewGuid(), Name = "   " }, TestContext.Current.CancellationToken);
+        var result = await _sut.ValidateAsync(new UpdatePartyRequest { Name = "   " }, TestContext.Current.CancellationToken);
         Assert.False(result.IsValid);
     }
 
     [Fact]
     public async Task ValidName_IsValid()
     {
-        var result = await _sut.ValidateAsync(new UpdatePartyCommand { Id = Guid.NewGuid(), Name = "Acme" }, TestContext.Current.CancellationToken);
+        var result = await _sut.ValidateAsync(new UpdatePartyRequest { Name = "Acme" }, TestContext.Current.CancellationToken);
         Assert.True(result.IsValid);
     }
 }
@@ -121,139 +121,103 @@ public class CreateGroupCommandValidatorTests
     }
 }
 
-public class UpdateGroupCommandValidatorTests
+public class UpdateGroupRequestValidatorTests
 {
-    private readonly UpdateGroupCommandValidator _sut = new();
+    private readonly UpdateGroupRequestValidator _sut = new();
 
     [Fact]
     public async Task WhitespaceName_IsInvalid()
     {
-        var result = await _sut.ValidateAsync(new UpdateGroupCommand
-        {
-            Id = Guid.NewGuid(),
-            Request = new UpdateGroupRequest { Name = " " }
-        }, TestContext.Current.CancellationToken);
+        var result = await _sut.ValidateAsync(new UpdateGroupRequest { Name = " " }, TestContext.Current.CancellationToken);
         Assert.False(result.IsValid);
     }
 
     [Fact]
     public async Task ValidName_IsValid()
     {
-        var result = await _sut.ValidateAsync(new UpdateGroupCommand
-        {
-            Id = Guid.NewGuid(),
-            Request = new UpdateGroupRequest { Name = "Engineering" }
-        }, TestContext.Current.CancellationToken);
+        var result = await _sut.ValidateAsync(new UpdateGroupRequest { Name = "Engineering" }, TestContext.Current.CancellationToken);
         Assert.True(result.IsValid);
     }
 
     [Fact]
     public async Task NameExceeds256Chars_IsInvalid()
     {
-        var result = await _sut.ValidateAsync(new UpdateGroupCommand
-        {
-            Id = Guid.NewGuid(),
-            Request = new UpdateGroupRequest { Name = new string('a', 257) }
-        }, TestContext.Current.CancellationToken);
+        var result = await _sut.ValidateAsync(new UpdateGroupRequest { Name = new string('a', 257) }, TestContext.Current.CancellationToken);
         Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.PropertyName == "Request.Name");
+        Assert.Contains(result.Errors, e => e.PropertyName == "Name");
     }
 
     [Fact]
     public async Task DescriptionExceeds1024Chars_IsInvalid()
     {
-        var result = await _sut.ValidateAsync(new UpdateGroupCommand
+        var result = await _sut.ValidateAsync(new UpdateGroupRequest
         {
-            Id = Guid.NewGuid(),
-            Request = new UpdateGroupRequest
-            {
-                Name = "Valid",
-                Description = new string('a', 1025)
-            }
+            Name = "Valid",
+            Description = new string('a', 1025)
         }, TestContext.Current.CancellationToken);
         Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.PropertyName == "Request.Description");
+        Assert.Contains(result.Errors, e => e.PropertyName == "Description");
     }
 }
 
-public class AddGroupMemberCommandValidatorTests
+public class AddGroupMemberRequestValidatorTests
 {
-    private readonly AddGroupMemberCommandValidator _sut = new();
+    private readonly AddGroupMemberRequestValidator _sut = new();
 
     [Fact]
     public async Task EmptyUserId_IsInvalid()
     {
-        var result = await _sut.ValidateAsync(new AddGroupMemberCommand
+        var result = await _sut.ValidateAsync(new AddGroupMemberRequest
         {
-            GroupId = Guid.NewGuid(),
-            Request = new AddGroupMemberRequest
-            {
-                UserId = Guid.Empty,
-                AccessLevel = GroupAccessLevel.Editor
-            }
+            UserId = Guid.Empty,
+            AccessLevel = GroupAccessLevel.Editor
         }, TestContext.Current.CancellationToken);
         Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.PropertyName == "Request.UserId");
+        Assert.Contains(result.Errors, e => e.PropertyName == "UserId");
     }
 
     [Fact]
     public async Task InvalidAccessLevel_IsInvalid()
     {
-        var result = await _sut.ValidateAsync(new AddGroupMemberCommand
+        var result = await _sut.ValidateAsync(new AddGroupMemberRequest
         {
-            GroupId = Guid.NewGuid(),
-            Request = new AddGroupMemberRequest
-            {
-                UserId = Guid.NewGuid(),
-                AccessLevel = (GroupAccessLevel)99
-            }
+            UserId = Guid.NewGuid(),
+            AccessLevel = (GroupAccessLevel)99
         }, TestContext.Current.CancellationToken);
         Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.PropertyName == "Request.AccessLevel");
+        Assert.Contains(result.Errors, e => e.PropertyName == "AccessLevel");
     }
 
     [Fact]
-    public async Task ValidCommand_IsValid()
+    public async Task ValidRequest_IsValid()
     {
-        var result = await _sut.ValidateAsync(new AddGroupMemberCommand
+        var result = await _sut.ValidateAsync(new AddGroupMemberRequest
         {
-            GroupId = Guid.NewGuid(),
-            Request = new AddGroupMemberRequest
-            {
-                UserId = Guid.NewGuid(),
-                AccessLevel = GroupAccessLevel.Editor
-            }
+            UserId = Guid.NewGuid(),
+            AccessLevel = GroupAccessLevel.Editor
         }, TestContext.Current.CancellationToken);
         Assert.True(result.IsValid);
     }
 }
 
-public class UpdateGroupMemberCommandValidatorTests
+public class UpdateGroupMemberRequestValidatorTests
 {
-    private readonly UpdateGroupMemberCommandValidator _sut = new();
+    private readonly UpdateGroupMemberRequestValidator _sut = new();
 
     [Fact]
     public async Task InvalidAccessLevel_IsInvalid()
     {
-        var result = await _sut.ValidateAsync(new UpdateGroupMemberCommand
-        {
-            GroupId = Guid.NewGuid(),
-            UserId = Guid.NewGuid(),
-            Request = new UpdateGroupMemberRequest { AccessLevel = (GroupAccessLevel)99 }
-        }, TestContext.Current.CancellationToken);
+        var result = await _sut.ValidateAsync(
+            new UpdateGroupMemberRequest { AccessLevel = (GroupAccessLevel)99 }, TestContext.Current.CancellationToken);
         Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.PropertyName == "Request.AccessLevel");
+        Assert.Contains(result.Errors, e => e.PropertyName == "AccessLevel");
     }
 
     [Fact]
     public async Task ValidAccessLevel_IsValid()
     {
-        var result = await _sut.ValidateAsync(new UpdateGroupMemberCommand
-        {
-            GroupId = Guid.NewGuid(),
-            UserId = Guid.NewGuid(),
-            Request = new UpdateGroupMemberRequest { AccessLevel = GroupAccessLevel.Viewer }
-        }, TestContext.Current.CancellationToken);
+        var result = await _sut.ValidateAsync(
+            new UpdateGroupMemberRequest { AccessLevel = GroupAccessLevel.Viewer }, TestContext.Current.CancellationToken);
         Assert.True(result.IsValid);
     }
 }

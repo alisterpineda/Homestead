@@ -147,7 +147,7 @@ public class UploadDocumentJobHandler(
             try
             {
                 unitOfWork.SetActor(job.CreatedByUserId);
-                result = await unitOfWork.ExecuteInTransactionAsync(() => createDocument.Handle(command, ct), ct);
+                result = await unitOfWork.ExecuteInTransactionAsync(() => createDocument.HandleAsync(command, ct), ct);
             }
             catch
             {

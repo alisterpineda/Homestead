@@ -9,7 +9,7 @@ public static class DeleteItemNoteEndpoint
         group.MapDelete("/{id:guid}/activity/notes/{noteId:guid}", async (Guid id, Guid noteId,
             DeleteItemNoteHandler handler, CancellationToken ct) =>
         {
-            var deleted = await handler.Handle(new DeleteItemNoteCommand(id, noteId), ct);
+            var deleted = await handler.HandleAsync(id, noteId, ct);
             return deleted ? Results.NoContent() : Results.NotFound();
         })
         .WithName("DeleteItemNote")

@@ -13,13 +13,13 @@ public class DeleteTransactionHandler(
     IBalanceEntryReconciler reconciler,
     IUnitOfWork unitOfWork)
 {
-    public async Task Handle(DeleteTransactionCommand request, CancellationToken ct)
+    public async Task HandleAsync(Guid transactionId, CancellationToken ct)
     {
         // Project just the discriminator: the shape services re-load the
         // tracked entity themselves, so we only need enough to dispatch.
         var probeType = await db.AccountTransactions
             .AsNoTracking()
-            .Where(t => t.Id == request.TransactionId)
+            .Where(t => t.Id == transactionId)
             .Select(t => (TransactionType?)t.Type)
             .FirstOrDefaultAsync(ct)
             ?? throw new EntityNotFoundException("Transaction not found.");
@@ -27,12 +27,12 @@ public class DeleteTransactionHandler(
         IReadOnlyCollection<TouchedPair> touched = probeType switch
         {
             TransactionType.BalanceEntry =>
-                (await balanceEntries.DeleteAsync(request.TransactionId, ct)).TouchedPairs,
+                (await balanceEntries.DeleteAsync(transactionId, ct)).TouchedPairs,
             TransactionType.OpeningBalance =>
                 throw new BusinessRuleException(
                     "Opening-balance transactions must be deleted via the opening-balance endpoint."),
             TransactionType.Normal =>
-                (await transfers.DeleteAsync(request.TransactionId, ct)).TouchedPairs,
+                (await transfers.DeleteAsync(transactionId, ct)).TouchedPairs,
             _ => throw new BusinessRuleException(
                 $"Deletion is not supported for transactions of type {probeType}."),
         };

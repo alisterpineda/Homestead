@@ -15,7 +15,7 @@ public class CreateCommodityPriceHandler(
     IUnitOfWork unitOfWork,
     IValidator<CreateCommodityPriceCommand> validator)
 {
-    public async Task<CommodityPriceResponse> Handle(
+    public async Task<CommodityPriceResponse> HandleAsync(
         CreateCommodityPriceCommand request, CancellationToken ct)
     {
         await validator.ValidateAndThrowAsync(request, ct);

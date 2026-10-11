@@ -49,9 +49,7 @@ public class RemoveGroupMemberHandlerTests : IDisposable
         });
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var command = new RemoveGroupMemberCommand { GroupId = groupId, UserId = userId };
-
-        await _sut.Handle(command, TestContext.Current.CancellationToken);
+        await _sut.HandleAsync(groupId, userId, TestContext.Current.CancellationToken);
 
         _audit.Received(1).TrackScalar("Group", groupId, "MemberRemoved",
             Arg.Any<string?>(), Arg.Any<string?>());
@@ -79,10 +77,8 @@ public class RemoveGroupMemberHandlerTests : IDisposable
         });
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var command = new RemoveGroupMemberCommand { GroupId = groupId, UserId = userId };
-
         var ex = await Assert.ThrowsAsync<BusinessRuleException>(() =>
-            _sut.Handle(command, TestContext.Current.CancellationToken));
+            _sut.HandleAsync(groupId, userId, TestContext.Current.CancellationToken));
         Assert.Contains("last owner", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -112,9 +108,7 @@ public class RemoveGroupMemberHandlerTests : IDisposable
         _db.GroupMembers.Add(new GroupMember { GroupId = groupId, UserId = userId2, AccessLevel = GroupAccessLevel.Owner });
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var command = new RemoveGroupMemberCommand { GroupId = groupId, UserId = userId1 };
-
-        await _sut.Handle(command, TestContext.Current.CancellationToken);
+        await _sut.HandleAsync(groupId, userId1, TestContext.Current.CancellationToken);
 
         Assert.Single(_db.GroupMembers.Where(gm => gm.GroupId == groupId));
     }
@@ -145,9 +139,7 @@ public class RemoveGroupMemberHandlerTests : IDisposable
         _db.GroupMembers.Add(new GroupMember { GroupId = groupId, UserId = editorId, AccessLevel = GroupAccessLevel.Editor });
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var command = new RemoveGroupMemberCommand { GroupId = groupId, UserId = editorId };
-
-        await _sut.Handle(command, TestContext.Current.CancellationToken);
+        await _sut.HandleAsync(groupId, editorId, TestContext.Current.CancellationToken);
 
         Assert.Single(_db.GroupMembers.Where(gm => gm.GroupId == groupId));
         Assert.True(_db.GroupMembers.Any(gm => gm.GroupId == groupId && gm.UserId == ownerId));

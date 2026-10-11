@@ -7,7 +7,7 @@ namespace Homestead.WebApi.Modules.Finances.Features.CommodityPrices.GetCommodit
 
 public class GetCommodityPricesHandler(AppDbContext db)
 {
-    public async Task<PaginatedResponse<CommodityPriceResponse>> Handle(
+    public async Task<PaginatedResponse<CommodityPriceResponse>> HandleAsync(
         GetCommodityPricesQuery request, CancellationToken ct)
     {
         var query = db.CommodityPrices.AsNoTracking();

@@ -7,15 +7,15 @@ namespace Homestead.WebApi.Modules.Finances.Features.BalanceEntries.GetBalanceEn
 
 public class GetBalanceEntriesHandler(AppDbContext db)
 {
-    public async Task<IReadOnlyList<BalanceEntryResponse>> Handle(
-        GetBalanceEntriesQuery request, CancellationToken ct)
+    public async Task<IReadOnlyList<BalanceEntryResponse>> HandleAsync(
+        Guid accountId, CancellationToken ct)
     {
-        await AccountVisibility.EnsureUserVisibleAsync(db, request.AccountId, ct);
+        await AccountVisibility.EnsureUserVisibleAsync(db, accountId, ct);
 
         var entries = await db.AccountTransactions
             .OfType<BalanceEntryTransaction>()
             .AsNoTracking()
-            .Where(e => e.AccountId == request.AccountId)
+            .Where(e => e.AccountId == accountId)
             .OrderByDescending(e => e.OccurredAt)
             .ThenByDescending(e => e.CreatedAt)
             .ToListAsync(ct);

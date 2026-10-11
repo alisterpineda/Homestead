@@ -48,7 +48,7 @@ public class MergeBrandHandlerTests : IDisposable
         var brand = await AddBrandAsync("Apple");
 
         await Assert.ThrowsAsync<BusinessRuleException>(() =>
-            _sut.Handle(new MergeBrandCommand { SourceId = brand.Id, TargetId = brand.Id }, Ct));
+            _sut.HandleAsync(brand.Id, new MergeBrandRequest(brand.Id), Ct));
     }
 
     [Fact]
@@ -57,7 +57,7 @@ public class MergeBrandHandlerTests : IDisposable
         var target = await AddBrandAsync("Apple");
 
         await Assert.ThrowsAsync<EntityNotFoundException>(() =>
-            _sut.Handle(new MergeBrandCommand { SourceId = Guid.NewGuid(), TargetId = target.Id }, Ct));
+            _sut.HandleAsync(Guid.NewGuid(), new MergeBrandRequest(target.Id), Ct));
     }
 
     [Fact]
@@ -66,6 +66,6 @@ public class MergeBrandHandlerTests : IDisposable
         var source = await AddBrandAsync("Apple Inc");
 
         await Assert.ThrowsAsync<EntityNotFoundException>(() =>
-            _sut.Handle(new MergeBrandCommand { SourceId = source.Id, TargetId = Guid.NewGuid() }, Ct));
+            _sut.HandleAsync(source.Id, new MergeBrandRequest(Guid.NewGuid()), Ct));
     }
 }

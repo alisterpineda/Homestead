@@ -17,13 +17,12 @@ public class TrackDurableHandler(
     IAuditContext audit,
     IItemLocationResolver locationResolver,
     IUnitOfWork unitOfWork,
-    IValidator<TrackDurableCommand> validator)
+    IValidator<TrackDurableRequest> validator)
 {
-    public async Task<TrackDurableResponse> Handle(TrackDurableCommand request, CancellationToken ct)
+    public async Task<TrackDurableResponse> HandleAsync(Guid id, TrackDurableRequest body, CancellationToken ct)
     {
-        await validator.ValidateAndThrowAsync(request, ct);
+        await validator.ValidateAndThrowAsync(body, ct);
 
-        var body = request.Body;
         var now = DateTimeOffset.UtcNow;
 
         // The source container also becomes the new item's parent, so it must be live. ConvertOutAsync
@@ -60,7 +59,7 @@ public class TrackDurableHandler(
         db.Items.Add(item);
         audit.Created("Item", item.Id);
 
-        await stock.ConvertOutAsync(request.ConsumableId, new StockConvertOutRequest(
+        await stock.ConvertOutAsync(id, new StockConvertOutRequest(
             new StockLocation(body.AreaId, body.ContainerItemId),
             item.Id, body.OccurredAt, body.Note), ct);
 
@@ -73,7 +72,7 @@ public class TrackDurableHandler(
             .FirstAsync(ct);
         itemResponse = await locationResolver.EnrichAsync(itemResponse, ct);
 
-        var detail = await ConsumableDetailReader.LoadAsync(db, locationResolver, request.ConsumableId, ct)
+        var detail = await ConsumableDetailReader.LoadAsync(db, locationResolver, id, ct)
             ?? throw new EntityNotFoundException("Consumable not found.");
 
         return new TrackDurableResponse { Detail = detail, Item = itemResponse };

@@ -27,7 +27,7 @@ public class GetPartiesByIdsHandlerTests : IDisposable
         _db.Parties.AddRange(partyA, partyB, partyC);
         await _db.SaveChangesAsync(ct);
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new GetPartiesByIdsQuery(new[] { partyA.Id, partyB.Id }),
             ct);
 
@@ -46,7 +46,7 @@ public class GetPartiesByIdsHandlerTests : IDisposable
         await _db.SaveChangesAsync(ct);
 
         var unknownId = Guid.NewGuid();
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new GetPartiesByIdsQuery(new[] { partyA.Id, unknownId }),
             ct);
 
@@ -61,7 +61,7 @@ public class GetPartiesByIdsHandlerTests : IDisposable
         _db.Parties.Add(new Party { Name = "Alpha" });
         await _db.SaveChangesAsync(ct);
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new GetPartiesByIdsQuery(new[] { Guid.NewGuid(), Guid.NewGuid() }),
             ct);
 
@@ -71,7 +71,7 @@ public class GetPartiesByIdsHandlerTests : IDisposable
     [Fact]
     public async Task Handle_EmptyIdList_ThrowsValidationException()
     {
-        await Assert.ThrowsAsync<ValidationException>(() => _sut.Handle(
+        await Assert.ThrowsAsync<ValidationException>(() => _sut.HandleAsync(
             new GetPartiesByIdsQuery(Array.Empty<Guid>()),
             TestContext.Current.CancellationToken));
     }

@@ -29,7 +29,7 @@ namespace Homestead.WebApi.Modules.Admin.Features.Backup.PollBackupTargetConnect
 /// </para>
 /// <para>
 /// <b>Not every post-exchange failure is covered, and cannot be.</b> The grant is not durable when
-/// <c>Handle</c> returns: <c>grantStore.SaveAsync</c>'s flush is joined to the pipeline transaction by
+/// <c>HandleAsync</c> returns: <c>grantStore.SaveAsync</c>'s flush is joined to the pipeline transaction by
 /// <c>CommandSaveChangesInterceptor</c>, and the unit of work commits afterwards. There is
 /// <c>OnAfterCommit</c> but no <c>OnRollback</c>, so a commit that fails at that point orphans a token no
 /// catch inside this handler can see. A single-row upsert failing is narrow enough not to be worth new
@@ -57,16 +57,16 @@ public class PollBackupTargetConnectionHandler(
     /// <summary>How long the admin has to answer the account-mismatch prompt.</summary>
     private static readonly TimeSpan PendingGrantLifetime = TimeSpan.FromMinutes(10);
 
-    public async Task<PollBackupTargetConnectionResponse> Handle(
-        PollBackupTargetConnectionCommand request, CancellationToken ct)
+    public async Task<PollBackupTargetConnectionResponse> HandleAsync(
+        string key, PollBackupTargetConnectionBody body, CancellationToken ct)
     {
-        var target = resolver.Find(request.TargetKey)
-            ?? throw new EntityNotFoundException($"Backup target '{request.TargetKey}' is not configured.");
+        var target = resolver.Find(key)
+            ?? throw new EntityNotFoundException($"Backup target '{key}' is not configured.");
 
         if (target.Kind is not BackupTargetKind.GoogleDrive)
             throw new BusinessRuleException($"Backup target '{target.Key}' is not a Google Drive target.");
 
-        var pollToken = protector.UnprotectPoll(request.PollToken)
+        var pollToken = protector.UnprotectPoll(body.PollToken)
             ?? throw new BusinessRuleException(
                 "This connection attempt is no longer valid. Start over from Connect.");
 

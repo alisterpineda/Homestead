@@ -27,6 +27,6 @@ public class CreateCommentHandlerTests : IDisposable
     public async Task Handle_EmptyBody_ThrowsValidationException()
     {
         await Assert.ThrowsAsync<ValidationException>(
-            () => _sut.Handle(new CreateCommentCommand(""), TestContext.Current.CancellationToken));
+            () => _sut.HandleAsync(new CreateCommentCommand(""), TestContext.Current.CancellationToken));
     }
 }

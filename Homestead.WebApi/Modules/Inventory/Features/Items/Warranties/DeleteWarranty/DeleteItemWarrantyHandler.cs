@@ -7,10 +7,10 @@ namespace Homestead.WebApi.Modules.Inventory.Features.Items.Warranties.DeleteWar
 
 public class DeleteItemWarrantyHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork)
 {
-    public async Task<bool> Handle(DeleteItemWarrantyCommand request, CancellationToken ct)
+    public async Task<bool> HandleAsync(Guid id, Guid warrantyId, CancellationToken ct)
     {
         var warranty = await db.ItemWarranties.FirstOrDefaultAsync(
-            w => w.Id == request.WarrantyId && w.ItemId == request.ItemId, ct);
+            w => w.Id == warrantyId && w.ItemId == id, ct);
         if (warranty is null)
             return false;
 

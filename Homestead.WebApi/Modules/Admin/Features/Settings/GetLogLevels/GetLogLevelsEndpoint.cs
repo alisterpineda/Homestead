@@ -7,9 +7,7 @@ public static class GetLogLevelsEndpoint
         // Single endpoint: the rule table is always returned; Resolved is populated when ?category= is
         // supplied. Keeps the generated client to one method.
         group.MapGet("/log-levels", async (string? category, GetLogLevelsHandler handler, CancellationToken ct) =>
-        {
-            return Results.Ok(await handler.Handle(new GetLogLevelsQuery(category), ct));
-        })
+            Results.Ok(await handler.HandleAsync(category, ct)))
         .WithName("GetLogLevels")
         .Produces<LogLevelsResponse>();
     }

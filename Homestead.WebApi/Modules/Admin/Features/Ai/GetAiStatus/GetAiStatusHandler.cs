@@ -6,7 +6,7 @@ namespace Homestead.WebApi.Modules.Admin.Features.Ai.GetAiStatus;
 // opens the UnitOfWork transaction.
 public class GetAiStatusHandler(IEnumerable<IAiProvider> providers, IAiProviderResolver resolver)
 {
-    public Task<List<AiProviderStatusResponse>> Handle(GetAiStatusQuery request, CancellationToken ct)
+    public Task<List<AiProviderStatusResponse>> HandleAsync(CancellationToken ct)
     {
         // For a DEFINED default the resolver returns the canonical registered instance (the same
         // singletons DI enumerates here), so default-ness is reference identity — no string re-matching

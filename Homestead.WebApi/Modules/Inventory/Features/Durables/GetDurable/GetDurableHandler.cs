@@ -7,7 +7,7 @@ namespace Homestead.WebApi.Modules.Inventory.Features.Durables.GetDurable;
 
 public class GetDurableHandler(AppDbContext db, IItemLocationResolver locationResolver)
 {
-    public async Task<DurableResponse?> Handle(GetDurableQuery request, CancellationToken ct)
+    public async Task<DurableResponse?> HandleAsync(GetDurableQuery request, CancellationToken ct)
     {
         var response = await db.Items
             .AsNoTracking()

@@ -97,7 +97,7 @@ public class PatchPayeeHandlerTests : IAsyncLifetime
         var payee = await AddPayeeAsync("Costco");
         var before = payee.UpdatedAt;
 
-        var resp = await _sut.Handle(Command(payee, name: "Costco Wholesale"), Ct);
+        var resp = await _sut.HandleAsync(Command(payee, name: "Costco Wholesale"), Ct);
 
         Assert.Equal("Costco Wholesale", resp.Name);
         Assert.Equal("Costco Wholesale", _db.Payees.Single(p => p.Id == payee.Id).Name);
@@ -110,7 +110,7 @@ public class PatchPayeeHandlerTests : IAsyncLifetime
     {
         var payee = await AddPayeeAsync("Costco");
 
-        await _sut.Handle(Command(payee, name: "Costco Wholesale"), Ct);
+        await _sut.HandleAsync(Command(payee, name: "Costco Wholesale"), Ct);
 
         _audit.Received(1).Track<PayeeSnapshot, Payee>(
             Arg.Any<Payee>(), "Payee", payee.Id, Arg.Any<Guid?>());
@@ -123,7 +123,7 @@ public class PatchPayeeHandlerTests : IAsyncLifetime
         var safeway = await AddPayeeAsync("Safeway");
 
         await Assert.ThrowsAsync<DuplicateEntityException>(() =>
-            _sut.Handle(Command(safeway, name: "  COSTCO "), Ct));
+            _sut.HandleAsync(Command(safeway, name: "  COSTCO "), Ct));
     }
 
     [Fact]
@@ -131,7 +131,7 @@ public class PatchPayeeHandlerTests : IAsyncLifetime
     {
         var payee = await AddPayeeAsync("Costco");
 
-        var resp = await _sut.Handle(Command(payee, name: "COSTCO"), Ct);
+        var resp = await _sut.HandleAsync(Command(payee, name: "COSTCO"), Ct);
 
         Assert.Equal("COSTCO", resp.Name);
     }
@@ -142,7 +142,7 @@ public class PatchPayeeHandlerTests : IAsyncLifetime
         var payee = await AddPayeeAsync("Costco");
         var category = await AddCategoryAsync(name: "Groceries");
 
-        var resp = await _sut.Handle(
+        var resp = await _sut.HandleAsync(
             Command(payee, defaultCategoryId: category.Id, notes: "  Warehouse  ", isArchived: true), Ct);
 
         Assert.Equal(category.Id, resp.DefaultCategoryId);
@@ -159,14 +159,14 @@ public class PatchPayeeHandlerTests : IAsyncLifetime
         var asset = await AddCategoryAsync(AccountType.Asset, name: "Chequing");
 
         await Assert.ThrowsAsync<BusinessRuleException>(() =>
-            _sut.Handle(Command(payee, defaultCategoryId: asset.Id), Ct));
+            _sut.HandleAsync(Command(payee, defaultCategoryId: asset.Id), Ct));
     }
 
     [Fact]
     public async Task Handle_MissingPayee_ThrowsNotFound()
     {
         await Assert.ThrowsAsync<EntityNotFoundException>(() =>
-            _sut.Handle(new PatchPayeeCommand { Id = Guid.NewGuid(), Name = "Nope" }, Ct));
+            _sut.HandleAsync(new PatchPayeeCommand { Id = Guid.NewGuid(), Name = "Nope" }, Ct));
     }
 
     [Fact]
@@ -176,7 +176,7 @@ public class PatchPayeeHandlerTests : IAsyncLifetime
         await AddTransactionForPayeeAsync(payee.Id);
         await AddTransactionForPayeeAsync(payee.Id);
 
-        var resp = await _sut.Handle(Command(payee, name: "Costco Wholesale"), Ct);
+        var resp = await _sut.HandleAsync(Command(payee, name: "Costco Wholesale"), Ct);
 
         Assert.Equal(2, resp.TransactionCount);
     }
@@ -187,6 +187,6 @@ public class PatchPayeeHandlerTests : IAsyncLifetime
         var payee = await AddPayeeAsync("Costco");
 
         await Assert.ThrowsAsync<ValidationException>(() =>
-            _sut.Handle(new PatchPayeeCommand { Id = payee.Id, Name = "   " }, Ct));
+            _sut.HandleAsync(new PatchPayeeCommand { Id = payee.Id, Name = "   " }, Ct));
     }
 }

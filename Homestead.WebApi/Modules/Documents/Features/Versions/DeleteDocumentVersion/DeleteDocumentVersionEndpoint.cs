@@ -10,8 +10,7 @@ public static class DeleteDocumentVersionEndpoint
         group.MapDelete("/{id:guid}", async (Guid documentId, Guid id,
             DeleteDocumentVersionHandler handler, CancellationToken ct) =>
         {
-            var request = new DeleteDocumentVersionCommand(documentId, id);
-            await handler.Handle(request, ct);
+            await handler.HandleAsync(documentId, id, ct);
             return Results.NoContent();
         })
         .WithName("DeleteDocumentVersion")

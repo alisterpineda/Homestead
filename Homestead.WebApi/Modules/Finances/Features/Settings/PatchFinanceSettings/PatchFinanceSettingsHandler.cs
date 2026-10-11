@@ -7,6 +7,7 @@ using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Domain.Settings;
 using Homestead.WebApi.Persistence;
+using Microsoft.AspNetCore.JsonPatch.SystemTextJson;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Settings.PatchFinanceSettings;
@@ -17,8 +18,8 @@ public class PatchFinanceSettingsHandler(
     IAuditContext audit,
     IUnitOfWork unitOfWork)
 {
-    public async Task<FinanceSettingsResponse> Handle(
-        PatchFinanceSettingsCommand command, CancellationToken ct)
+    public async Task<FinanceSettingsResponse> HandleAsync(
+        JsonPatchDocument<FinanceSettings> patchDoc, CancellationToken ct)
     {
         var entity = await db.AppSettings.FirstOrDefaultAsync(s => s.Key == AppSetting.FinancesModule, ct);
 
@@ -26,7 +27,7 @@ public class PatchFinanceSettingsHandler(
 
         AppSettingSnapshot? before = entity is not null ? AppSettingSnapshot.From(entity) : null;
 
-        command.PatchDocument.ApplyOrThrow(settings);
+        patchDoc.ApplyOrThrow(settings);
 
         if (settings.DisplayCurrencyId is { } currencyId)
         {

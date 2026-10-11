@@ -18,15 +18,15 @@ namespace Homestead.WebApi.Modules.Admin.Features.Backup.PatchBackupTarget;
 public class PatchBackupTargetHandler(
     AppDbContext db, IBackupTargetResolver resolver, IUnitOfWork unitOfWork)
 {
-    public async Task<PatchBackupTargetResponse> Handle(
-        PatchBackupTargetCommand request, CancellationToken ct)
+    public async Task<PatchBackupTargetResponse> HandleAsync(
+        string key, PatchBackupTargetBody body, CancellationToken ct)
     {
         // Config defines what a target IS, so an undefined key is a 404 even though a state row could be
         // written for any string. Without this, a typo would create orphan state the admin page never
         // shows and nothing ever cleans up. A DEFINED but misconfigured target is still patchable —
         // disabling one, or acknowledging its latch, is exactly what an operator does while fixing it.
-        var target = resolver.Find(request.TargetKey)
-            ?? throw new EntityNotFoundException($"Backup target '{request.TargetKey}' is not configured.");
+        var target = resolver.Find(key)
+            ?? throw new EntityNotFoundException($"Backup target '{key}' is not configured.");
 
         var now = DateTimeOffset.UtcNow;
 
@@ -44,7 +44,7 @@ public class PatchBackupTargetHandler(
             db.BackupTargetStates.Add(state);
         }
 
-        if (request.IsEnabled is { } isEnabled)
+        if (body.IsEnabled is { } isEnabled)
             state.IsEnabled = isEnabled;
 
         state.UpdatedAt = now;

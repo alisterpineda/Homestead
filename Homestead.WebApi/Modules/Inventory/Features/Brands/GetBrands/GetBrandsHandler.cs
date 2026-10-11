@@ -6,7 +6,7 @@ namespace Homestead.WebApi.Modules.Inventory.Features.Brands.GetBrands;
 
 public class GetBrandsHandler(AppDbContext db)
 {
-    public async Task<PaginatedResponse<BrandResponse>> Handle(
+    public async Task<PaginatedResponse<BrandResponse>> HandleAsync(
         GetBrandsQuery request, CancellationToken ct)
     {
         var query = db.Brands.AsNoTracking();

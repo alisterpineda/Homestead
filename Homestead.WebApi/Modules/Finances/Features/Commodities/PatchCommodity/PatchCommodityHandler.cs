@@ -4,6 +4,7 @@ using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Persistence;
+using Microsoft.AspNetCore.JsonPatch.SystemTextJson;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Commodities.PatchCommodity;
@@ -14,9 +15,10 @@ public class PatchCommodityHandler(
     ICurrentUserAccessor currentUser,
     IUnitOfWork unitOfWork)
 {
-    public async Task<CommodityResponse> Handle(PatchCommodityCommand request, CancellationToken ct)
+    public async Task<CommodityResponse> HandleAsync(
+        Guid id, JsonPatchDocument<PatchCommodityModel> patchDoc, CancellationToken ct)
     {
-        var commodity = await db.Commodities.FirstOrDefaultAsync(c => c.Id == request.Id, ct);
+        var commodity = await db.Commodities.FirstOrDefaultAsync(c => c.Id == id, ct);
         if (commodity is null)
             throw new EntityNotFoundException("Commodity not found.");
 
@@ -31,7 +33,7 @@ public class PatchCommodityHandler(
             DisplayPrecision = commodity.DisplayPrecision,
         };
 
-        request.PatchDocument.ApplyOrThrow(model);
+        patchDoc.ApplyOrThrow(model);
 
         if (string.IsNullOrWhiteSpace(model.Name))
             throw new BusinessRuleException("Name is required.");

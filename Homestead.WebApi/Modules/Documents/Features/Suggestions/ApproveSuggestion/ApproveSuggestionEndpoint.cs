@@ -10,11 +10,7 @@ public static class ApproveSuggestionEndpoint
         group.MapPost("/{suggestionId:guid}/approve", async (Guid documentId, Guid suggestionId,
             ApproveSuggestionHandler handler, CancellationToken ct) =>
         {
-            await handler.Handle(new ApproveSuggestionCommand
-            {
-                DocumentId = documentId,
-                SuggestionId = suggestionId
-            }, ct);
+            await handler.HandleAsync(documentId, suggestionId, ct);
             return Results.NoContent();
         })
         .WithName("ApproveSuggestion")

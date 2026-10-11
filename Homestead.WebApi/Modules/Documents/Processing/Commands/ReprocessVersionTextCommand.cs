@@ -9,7 +9,7 @@ namespace Homestead.WebApi.Modules.Documents.Processing.Commands;
 /// <summary>
 /// Internal command that writes freshly re-extracted text onto an existing version. The job handler
 /// performs the (failure-prone) text extraction; this command only persists the result and audits the
-/// change. Distinct name from the HTTP <c>ReprocessDocumentVersionCommand</c> (which enqueues the job).
+/// change. Distinct from the HTTP <c>ReprocessDocumentVersionHandler</c> (which enqueues the job).
 /// </summary>
 public record ReprocessVersionTextCommand
 {
@@ -25,12 +25,12 @@ public record ReprocessVersionTextResult(string DocumentName);
 
 public interface IReprocessVersionTextHandler
 {
-    Task<ReprocessVersionTextResult> Handle(ReprocessVersionTextCommand request, CancellationToken ct);
+    Task<ReprocessVersionTextResult> HandleAsync(ReprocessVersionTextCommand request, CancellationToken ct);
 }
 
 public class ReprocessVersionTextHandler(AppDbContext db, IAuditContext audit) : IReprocessVersionTextHandler
 {
-    public async Task<ReprocessVersionTextResult> Handle(ReprocessVersionTextCommand request, CancellationToken ct)
+    public async Task<ReprocessVersionTextResult> HandleAsync(ReprocessVersionTextCommand request, CancellationToken ct)
     {
         var version = await db.DocumentVersions
             .Include(v => v.Document)

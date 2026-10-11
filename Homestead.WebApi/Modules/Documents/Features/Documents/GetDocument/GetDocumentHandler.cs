@@ -8,11 +8,11 @@ namespace Homestead.WebApi.Modules.Documents.Features.Documents.GetDocument;
 
 public class GetDocumentHandler(AppDbContext db)
 {
-    public async Task<GetDocumentResponse?> Handle(GetDocumentQuery request, CancellationToken ct)
+    public async Task<GetDocumentResponse?> HandleAsync(Guid id, CancellationToken ct)
     {
         var d = await db.Documents
             .AsNoTracking()
-            .Where(d => d.Id == request.Id)
+            .Where(d => d.Id == id)
             .Select(d => new
             {
                 d.Id,

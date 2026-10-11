@@ -10,7 +10,7 @@ public class CreateTradeHandler(
     IUnitOfWork unitOfWork,
     IValidator<CreateTradeCommand> validator)
 {
-    public async Task<TransactionResponse> Handle(CreateTradeCommand request, CancellationToken ct)
+    public async Task<TransactionResponse> HandleAsync(CreateTradeCommand request, CancellationToken ct)
     {
         await validator.ValidateAndThrowAsync(request, ct);
 

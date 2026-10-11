@@ -15,21 +15,21 @@ namespace Homestead.WebApi.Modules.Documents.Features.Documents.CreateDocument;
 public class CreateDocumentHandler(IOptions<FileStorageOptions> storage, ICurrentUserAccessor currentUser, IJobQueue jobQueue,
     AppDbContext db, IDocumentQueryService accessService)
 {
-    public async Task<CreateDocumentResponse> Handle(CreateDocumentCommand request, CancellationToken ct)
+    public async Task<CreateDocumentResponse> HandleAsync(string? name, string? label, Guid? groupId, IFormFile file,
+        CancellationToken ct)
     {
         // Validate GroupId if provided
-        if (request.GroupId.HasValue)
+        if (groupId.HasValue)
         {
-            var groupExists = await db.Groups.AnyAsync(g => g.Id == request.GroupId.Value, ct);
+            var groupExists = await db.Groups.AnyAsync(g => g.Id == groupId.Value, ct);
             if (!groupExists)
                 throw new BusinessRuleException("Group not found.");
 
-            var canWrite = await accessService.CanWriteToGroupAsync(request.GroupId.Value, ct);
+            var canWrite = await accessService.CanWriteToGroupAsync(groupId.Value, ct);
             if (!canWrite)
                 throw new AccessDeniedException();
         }
 
-        var file = request.File;
         var extension = Path.GetExtension(file.FileName);
         var uploadId = Guid.NewGuid();
 
@@ -49,12 +49,12 @@ public class CreateDocumentHandler(IOptions<FileStorageOptions> storage, ICurren
         var payload = new UploadDocumentPayload(
             uploadId,
             file.FileName,
-            request.Name,
-            request.Label,
+            name,
+            label,
             file.ContentType,
             file.Length,
             extension,
-            request.GroupId);
+            groupId);
 
         var jobId = await jobQueue.EnqueueAsync(ProcessingJobType.UploadDocument, opts =>
         {

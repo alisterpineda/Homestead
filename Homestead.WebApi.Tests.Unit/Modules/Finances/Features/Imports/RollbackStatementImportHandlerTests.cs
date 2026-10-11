@@ -88,8 +88,8 @@ public class RollbackStatementImportHandlerTests : IAsyncLifetime
         var manualId = await SeedLinkedTransactionAsync(
             documentId, TransactionType.Normal, TransactionDocumentLinkOrigin.Manual);
 
-        var response = await _sut.Handle(
-            new RollbackStatementImportCommand { DocumentId = documentId },
+        var response = await _sut.HandleAsync(
+            documentId,
             TestContext.Current.CancellationToken);
 
         Assert.Equal(2, response.DeletedCount);
@@ -117,8 +117,8 @@ public class RollbackStatementImportHandlerTests : IAsyncLifetime
             documentId, TransactionType.Normal, TransactionDocumentLinkOrigin.Manual);
 
         await Assert.ThrowsAsync<EntityNotFoundException>(
-            () => _sut.Handle(
-                new RollbackStatementImportCommand { DocumentId = documentId },
+            () => _sut.HandleAsync(
+                documentId,
                 TestContext.Current.CancellationToken));
 
         await _balanceEntries.DidNotReceive().DeleteAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());

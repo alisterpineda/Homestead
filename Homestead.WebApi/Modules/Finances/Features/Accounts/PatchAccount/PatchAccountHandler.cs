@@ -5,6 +5,7 @@ using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Persistence;
+using Microsoft.AspNetCore.JsonPatch.SystemTextJson;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Accounts.PatchAccount;
@@ -16,9 +17,10 @@ public class PatchAccountHandler(
     IValuationService valuations,
     IUnitOfWork unitOfWork)
 {
-    public async Task<AccountResponse> Handle(PatchAccountCommand request, CancellationToken ct)
+    public async Task<AccountResponse> HandleAsync(
+        Guid id, JsonPatchDocument<PatchAccountModel> patchDoc, CancellationToken ct)
     {
-        var account = await db.Accounts.FirstOrDefaultAsync(a => a.Id == request.Id, ct);
+        var account = await db.Accounts.FirstOrDefaultAsync(a => a.Id == id, ct);
         if (account is null)
             throw new EntityNotFoundException("Account not found.");
 
@@ -39,7 +41,7 @@ public class PatchAccountHandler(
             IsArchived = account.IsArchived,
         };
 
-        request.PatchDocument.ApplyOrThrow(model);
+        patchDoc.ApplyOrThrow(model);
 
         if (string.IsNullOrWhiteSpace(model.Name))
             throw new BusinessRuleException("Name is required.");

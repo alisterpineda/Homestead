@@ -8,7 +8,7 @@ namespace Homestead.WebApi.Modules.Inventory.Features.Areas.GetAreas;
 
 public class GetAreasHandler(AppDbContext db, IInventoryPlacementService placementService)
 {
-    public async Task<PaginatedResponse<AreaResponse>> Handle(
+    public async Task<PaginatedResponse<AreaResponse>> HandleAsync(
         GetAreasQuery request, CancellationToken ct)
     {
         // Name-ordered first so siblings stay name-ordered after the tree pass below (collation

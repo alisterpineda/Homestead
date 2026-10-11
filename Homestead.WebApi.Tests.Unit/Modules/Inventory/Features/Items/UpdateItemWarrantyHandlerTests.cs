@@ -40,7 +40,7 @@ public class UpdateItemWarrantyHandlerTests : IDisposable
     {
         var item = await ItemNoteTestData.AddItemAsync(_db);
 
-        await Assert.ThrowsAsync<EntityNotFoundException>(() => _sut.Handle(new UpdateItemWarrantyCommand
+        await Assert.ThrowsAsync<EntityNotFoundException>(() => _sut.HandleAsync(new UpdateItemWarrantyCommand
         {
             ItemId = item.Id, WarrantyId = Guid.NewGuid(),
         }, Ct));
@@ -54,7 +54,7 @@ public class UpdateItemWarrantyHandlerTests : IDisposable
         var warranty = await ItemWarrantyTestData.AddWarrantyAsync(_db, item.Id, provider: "Bosch");
 
         // It exists, but not under the route's item — must read as not found, not as editable.
-        await Assert.ThrowsAsync<EntityNotFoundException>(() => _sut.Handle(new UpdateItemWarrantyCommand
+        await Assert.ThrowsAsync<EntityNotFoundException>(() => _sut.HandleAsync(new UpdateItemWarrantyCommand
         {
             ItemId = other.Id, WarrantyId = warranty.Id, Provider = "hijack",
         }, Ct));
@@ -69,7 +69,7 @@ public class UpdateItemWarrantyHandlerTests : IDisposable
             provider: "Bosch", expiresOn: new DateOnly(2027, 1, 1), notes: "motor only",
             createdAt: created, createdByUserId: Guid.NewGuid());
 
-        var response = await _sut.Handle(new UpdateItemWarrantyCommand
+        var response = await _sut.HandleAsync(new UpdateItemWarrantyCommand
         {
             ItemId = item.Id, WarrantyId = warranty.Id,
             Provider = "  Home Depot  ", ExpiresOn = new DateOnly(2026, 3, 10), Notes = " extended ",
@@ -93,7 +93,7 @@ public class UpdateItemWarrantyHandlerTests : IDisposable
         var warranty = await ItemWarrantyTestData.AddWarrantyAsync(_db, item.Id,
             provider: "Bosch", expiresOn: new DateOnly(2027, 1, 1), notes: "motor only");
 
-        var response = await _sut.Handle(new UpdateItemWarrantyCommand
+        var response = await _sut.HandleAsync(new UpdateItemWarrantyCommand
         {
             ItemId = item.Id, WarrantyId = warranty.Id,
         }, Ct);
@@ -116,7 +116,7 @@ public class UpdateItemWarrantyHandlerTests : IDisposable
                 Arg.Any<ItemWarranty>(), Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<Guid?>()))
             .Do(ci => providerAtTrackTime = ci.Arg<ItemWarranty>().Provider);
 
-        await _sut.Handle(new UpdateItemWarrantyCommand
+        await _sut.HandleAsync(new UpdateItemWarrantyCommand
         {
             ItemId = item.Id, WarrantyId = warranty.Id, Provider = "Home Depot",
         }, Ct);
@@ -137,7 +137,7 @@ public class UpdateItemWarrantyHandlerTests : IDisposable
             createdAt: created, createdByUserId: author);
 
         // Same values, differently padded: normalises to identical, so nothing is written.
-        var response = await _sut.Handle(new UpdateItemWarrantyCommand
+        var response = await _sut.HandleAsync(new UpdateItemWarrantyCommand
         {
             ItemId = item.Id, WarrantyId = warranty.Id,
             Provider = " Bosch ", ExpiresOn = new DateOnly(2027, 1, 1), Notes = "motor only",
@@ -156,7 +156,7 @@ public class UpdateItemWarrantyHandlerTests : IDisposable
         var itemUpdatedAt = item.UpdatedAt;
         var warranty = await ItemWarrantyTestData.AddWarrantyAsync(_db, item.Id);
 
-        await _sut.Handle(new UpdateItemWarrantyCommand
+        await _sut.HandleAsync(new UpdateItemWarrantyCommand
         {
             ItemId = item.Id, WarrantyId = warranty.Id, Provider = "Bosch",
         }, Ct);
@@ -167,7 +167,7 @@ public class UpdateItemWarrantyHandlerTests : IDisposable
     [Fact]
     public async Task Handle_NotesTooLong_ThrowsValidationException()
     {
-        await Assert.ThrowsAsync<ValidationException>(() => _sut.Handle(new UpdateItemWarrantyCommand
+        await Assert.ThrowsAsync<ValidationException>(() => _sut.HandleAsync(new UpdateItemWarrantyCommand
         {
             ItemId = Guid.NewGuid(), WarrantyId = Guid.NewGuid(), Notes = new string('x', 501),
         }, Ct));

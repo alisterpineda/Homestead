@@ -5,9 +5,9 @@ namespace Homestead.WebApi.Modules.Documents.Features.Parties.GetParty;
 
 public class GetPartyHandler(AppDbContext db)
 {
-    public async Task<GetPartyResponse?> Handle(GetPartyQuery request, CancellationToken ct)
+    public async Task<GetPartyResponse?> HandleAsync(Guid id, CancellationToken ct)
     {
-        var query = db.Parties.AsNoTracking().Where(p => p.Id == request.Id);
+        var query = db.Parties.AsNoTracking().Where(p => p.Id == id);
 
         return await query
             .Select(p => new GetPartyResponse

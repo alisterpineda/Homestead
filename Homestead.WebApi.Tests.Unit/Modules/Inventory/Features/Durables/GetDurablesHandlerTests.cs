@@ -83,7 +83,7 @@ public class GetDurablesHandlerTests : IAsyncLifetime
         await TagItemAsync(mower.Id, garden.Id);
         await AddItemAsync("Untagged drill");
 
-        var resp = await _sut.Handle(
+        var resp = await _sut.HandleAsync(
             new GetDurablesQuery { Page = 1, PageSize = 50, TagIds = [electronics.Id] }, Ct);
 
         Assert.Single(resp.Items);
@@ -102,12 +102,12 @@ public class GetDurablesHandlerTests : IAsyncLifetime
         await TagItemAsync(drill.Id, power.Id); // tagged with the CHILD tag only
 
         // Without descendant expansion, filtering on the parent tag matches nothing.
-        var narrow = await _sut.Handle(
+        var narrow = await _sut.HandleAsync(
             new GetDurablesQuery { Page = 1, PageSize = 50, TagIds = [tools.Id], IncludeChildTags = false }, Ct);
         Assert.Empty(narrow.Items);
 
         // With IncludeChildTags, the parent filter rolls in items tagged with any descendant.
-        var expanded = await _sut.Handle(
+        var expanded = await _sut.HandleAsync(
             new GetDurablesQuery { Page = 1, PageSize = 50, TagIds = [tools.Id], IncludeChildTags = true }, Ct);
         Assert.Single(expanded.Items);
         Assert.Equal("Cordless drill", expanded.Items[0].Name);
@@ -122,7 +122,7 @@ public class GetDurablesHandlerTests : IAsyncLifetime
         var officeTv = await AddItemAsync("Office TV", areaId: _office.Id);
         await TagItemAsync(officeTv.Id, electronics.Id);
 
-        var resp = await _sut.Handle(
+        var resp = await _sut.HandleAsync(
             new GetDurablesQuery { Page = 1, PageSize = 50, TagIds = [electronics.Id], AreaId = _garage.Id }, Ct);
 
         // Both are tagged, but only the garage one satisfies the composed area filter.
@@ -139,7 +139,7 @@ public class GetDurablesHandlerTests : IAsyncLifetime
         await AddItemAsync("Bravia TV", brandId: sony.Id);
         await AddItemAsync("Unbranded drill");
 
-        var resp = await _sut.Handle(new GetDurablesQuery { Page = 1, PageSize = 50, BrandId = apple.Id }, Ct);
+        var resp = await _sut.HandleAsync(new GetDurablesQuery { Page = 1, PageSize = 50, BrandId = apple.Id }, Ct);
 
         Assert.Single(resp.Items);
         Assert.Equal("MacBook", resp.Items[0].Name);
@@ -153,7 +153,7 @@ public class GetDurablesHandlerTests : IAsyncLifetime
         await AddItemAsync("Drill");
         await AddItemAsync("Archived box", ItemStatus.Archived);
 
-        var resp = await _sut.Handle(new GetDurablesQuery { Page = 1, PageSize = 50 }, Ct);
+        var resp = await _sut.HandleAsync(new GetDurablesQuery { Page = 1, PageSize = 50 }, Ct);
 
         Assert.Single(resp.Items);
         Assert.Equal("Drill", resp.Items[0].Name);
@@ -165,7 +165,7 @@ public class GetDurablesHandlerTests : IAsyncLifetime
         await AddItemAsync("Drill");
         await AddItemAsync("Old TV", ItemStatus.Archived);
 
-        var resp = await _sut.Handle(new GetDurablesQuery { Page = 1, PageSize = 50, IncludeInactive = true }, Ct);
+        var resp = await _sut.HandleAsync(new GetDurablesQuery { Page = 1, PageSize = 50, IncludeInactive = true }, Ct);
 
         Assert.Equal(2, resp.Items.Count);
     }
@@ -176,7 +176,7 @@ public class GetDurablesHandlerTests : IAsyncLifetime
         await AddItemAsync("Drill", areaId: _garage.Id);
         await AddItemAsync("Stapler", areaId: _office.Id);
 
-        var resp = await _sut.Handle(new GetDurablesQuery { Page = 1, PageSize = 50, AreaId = _garage.Id }, Ct);
+        var resp = await _sut.HandleAsync(new GetDurablesQuery { Page = 1, PageSize = 50, AreaId = _garage.Id }, Ct);
 
         Assert.Single(resp.Items);
         Assert.Equal("Drill", resp.Items[0].Name);
@@ -191,7 +191,7 @@ public class GetDurablesHandlerTests : IAsyncLifetime
         await AddItemAsync("Wrench", parentItemId: chest.Id);
         await AddItemAsync("Stapler", areaId: _office.Id);
 
-        var resp = await _sut.Handle(new GetDurablesQuery { Page = 1, PageSize = 50, AreaId = _garage.Id }, Ct);
+        var resp = await _sut.HandleAsync(new GetDurablesQuery { Page = 1, PageSize = 50, AreaId = _garage.Id }, Ct);
 
         // Both the chest (direct) and the nested wrench (resolved) match; the office stapler does not.
         Assert.Equal(2, resp.Items.Count);
@@ -209,7 +209,7 @@ public class GetDurablesHandlerTests : IAsyncLifetime
         await AddItemAsync("Vise", areaId: bench.Id); // in a sub-area of the garage
         await AddItemAsync("Stapler", areaId: _office.Id);
 
-        var resp = await _sut.Handle(new GetDurablesQuery { Page = 1, PageSize = 50, AreaId = _garage.Id }, Ct);
+        var resp = await _sut.HandleAsync(new GetDurablesQuery { Page = 1, PageSize = 50, AreaId = _garage.Id }, Ct);
 
         // Filtering the parent area rolls in items resolved to its descendant areas.
         Assert.Single(resp.Items);
@@ -222,7 +222,7 @@ public class GetDurablesHandlerTests : IAsyncLifetime
         await AddItemAsync("Drill", areaId: _garage.Id);
         await AddItemAsync("Floating thing");
 
-        var resp = await _sut.Handle(new GetDurablesQuery { Page = 1, PageSize = 50, Unplaced = true }, Ct);
+        var resp = await _sut.HandleAsync(new GetDurablesQuery { Page = 1, PageSize = 50, Unplaced = true }, Ct);
 
         Assert.Single(resp.Items);
         Assert.Equal("Floating thing", resp.Items[0].Name);
@@ -237,7 +237,7 @@ public class GetDurablesHandlerTests : IAsyncLifetime
         await AddItemAsync("Screw", parentItemId: floatingBin.Id);
         await AddItemAsync("Drill", areaId: _garage.Id);
 
-        var resp = await _sut.Handle(new GetDurablesQuery { Page = 1, PageSize = 50, Unplaced = true }, Ct);
+        var resp = await _sut.HandleAsync(new GetDurablesQuery { Page = 1, PageSize = 50, Unplaced = true }, Ct);
 
         // Both the unplaced bin and the screw nested inside it resolve to null.
         Assert.Equal(2, resp.Items.Count);
@@ -254,7 +254,7 @@ public class GetDurablesHandlerTests : IAsyncLifetime
             await AddItemAsync($"Garage item {i:D2}", areaId: _garage.Id);
         await AddItemAsync("Office stapler", areaId: _office.Id);
 
-        var resp = await _sut.Handle(new GetDurablesQuery { Page = 1, PageSize = 2, AreaId = _garage.Id }, Ct);
+        var resp = await _sut.HandleAsync(new GetDurablesQuery { Page = 1, PageSize = 2, AreaId = _garage.Id }, Ct);
 
         Assert.Equal(2, resp.Items.Count); // one page
         Assert.Equal(5, resp.TotalCount);  // whole filtered set, not the page or the office item
@@ -266,7 +266,7 @@ public class GetDurablesHandlerTests : IAsyncLifetime
         await AddItemAsync("Cordless drill");
         await AddItemAsync("Stapler");
 
-        var resp = await _sut.Handle(new GetDurablesQuery { Page = 1, PageSize = 50, Search = "drill" }, Ct);
+        var resp = await _sut.HandleAsync(new GetDurablesQuery { Page = 1, PageSize = 50, Search = "drill" }, Ct);
 
         Assert.Single(resp.Items);
         Assert.Equal("Cordless drill", resp.Items[0].Name);
@@ -280,7 +280,7 @@ public class GetDurablesHandlerTests : IAsyncLifetime
         await AddItemAsync("Wrench", parentItemId: chest.Id); // direct child
         await AddItemAsync("Screw driver", parentItemId: bin.Id); // grandchild
 
-        var resp = await _sut.Handle(
+        var resp = await _sut.HandleAsync(
             new GetDurablesQuery { Page = 1, PageSize = 50, ParentItemId = chest.Id }, Ct);
 
         Assert.Equal(2, resp.Items.Count); // bin + wrench, not the grandchild
@@ -309,7 +309,7 @@ public class GetDurablesHandlerTests : IAsyncLifetime
     {
         await AddItemAsync("Hammer");
 
-        var resp = await _sut.Handle(new GetDurablesQuery { Page = 1, PageSize = 50 }, Ct);
+        var resp = await _sut.HandleAsync(new GetDurablesQuery { Page = 1, PageSize = 50 }, Ct);
 
         Assert.Equal(WarrantyStatus.None, Assert.Single(resp.Items).WarrantyStatus);
     }
@@ -345,7 +345,7 @@ public class GetDurablesHandlerTests : IAsyncLifetime
         await AddWarrantyAsync(item.Id, today.AddDays(-400));
         await AddWarrantyAsync(item.Id, null);
 
-        var resp = await _sut.Handle(new GetDurablesQuery { Page = 1, PageSize = 50 }, Ct);
+        var resp = await _sut.HandleAsync(new GetDurablesQuery { Page = 1, PageSize = 50 }, Ct);
 
         Assert.Equal(WarrantyStatus.Active, Assert.Single(resp.Items).WarrantyStatus);
     }
@@ -381,7 +381,7 @@ public class GetDurablesHandlerTests : IAsyncLifetime
         await AddItemAsync("CPU", parentItemId: pc.Id); // a component is first-class in the list
         await AddItemAsync("Tool chest", areaId: _garage.Id, isContainer: true);
 
-        var resp = await _sut.Handle(new GetDurablesQuery { Page = 1, PageSize = 50 }, Ct);
+        var resp = await _sut.HandleAsync(new GetDurablesQuery { Page = 1, PageSize = 50 }, Ct);
 
         Assert.Equal(3, resp.Items.Count);
         Assert.Contains(resp.Items, i => i.Name == "CPU");

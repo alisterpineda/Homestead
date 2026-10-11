@@ -6,7 +6,7 @@ namespace Homestead.WebApi.Modules.Finances.Features.Categories.GetCategories;
 
 public class GetCategoriesHandler(AppDbContext db, ICategoryPathResolver pathResolver)
 {
-    public async Task<IReadOnlyList<CategoryResponse>> Handle(GetCategoriesQuery request, CancellationToken ct)
+    public async Task<IReadOnlyList<CategoryResponse>> HandleAsync(GetCategoriesQuery request, CancellationToken ct)
     {
         // User-category paths from the resolver; the two system Uncategorised buckets are appended below
         // (absent from the map) as trivial roots — this view intentionally includes them (unlike /accounts).

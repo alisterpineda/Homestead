@@ -30,7 +30,7 @@ public class UniversalSearchHandlerTests
         var src = FakeSource("inventory", "Inventory");
         var sut = Sut(src);
 
-        var result = await sut.Handle(new UniversalSearchQuery { Q = " a " }, CT);
+        var result = await sut.HandleAsync(new UniversalSearchQuery { Q = " a " }, CT);
 
         Assert.Equal("a", result.Query);
         Assert.Empty(result.Groups);
@@ -44,7 +44,7 @@ public class UniversalSearchHandlerTests
         var src = FakeSource("inventory", "Inventory");
         var sut = Sut(src);
 
-        var result = await sut.Handle(new UniversalSearchQuery { Q = null }, CT);
+        var result = await sut.HandleAsync(new UniversalSearchQuery { Q = null }, CT);
 
         Assert.Empty(result.Groups);
         await src.DidNotReceiveWithAnyArgs()
@@ -64,7 +64,7 @@ public class UniversalSearchHandlerTests
 
         var sut = Sut(inv, docs);
 
-        var result = await sut.Handle(new UniversalSearchQuery { Q = "drill" }, CT);
+        var result = await sut.HandleAsync(new UniversalSearchQuery { Q = "drill" }, CT);
 
         Assert.Equal(2, result.Groups.Count);
 
@@ -93,7 +93,7 @@ public class UniversalSearchHandlerTests
 
         var sut = Sut(bad, good);
 
-        var result = await sut.Handle(new UniversalSearchQuery { Q = "drill" }, CT);
+        var result = await sut.HandleAsync(new UniversalSearchQuery { Q = "drill" }, CT);
 
         var group = Assert.Single(result.Groups);
         Assert.Equal("documents", group.Source);
@@ -108,7 +108,7 @@ public class UniversalSearchHandlerTests
 
         var sut = Sut(empty);
 
-        var result = await sut.Handle(new UniversalSearchQuery { Q = "drill" }, CT);
+        var result = await sut.HandleAsync(new UniversalSearchQuery { Q = "drill" }, CT);
 
         Assert.Empty(result.Groups);
     }
@@ -121,7 +121,7 @@ public class UniversalSearchHandlerTests
             .Returns(new SearchSourceResult(1, [Hit("inventory", "1", "Drill")]));
         var sut = Sut(src);
 
-        await sut.Handle(new UniversalSearchQuery { Q = "drill" }, CT);
+        await sut.HandleAsync(new UniversalSearchQuery { Q = "drill" }, CT);
 
         await src.Received(1).SearchAsync("drill", 6, Arg.Any<CancellationToken>());
     }
@@ -138,7 +138,7 @@ public class UniversalSearchHandlerTests
             .Returns(new SearchSourceResult(1, [Hit("inventory", "1", "Drill")]));
         var sut = Sut(src);
 
-        await sut.Handle(new UniversalSearchQuery { Q = "drill", Limit = requested }, CT);
+        await sut.HandleAsync(new UniversalSearchQuery { Q = "drill", Limit = requested }, CT);
 
         await src.Received(1).SearchAsync("drill", expected, Arg.Any<CancellationToken>());
     }

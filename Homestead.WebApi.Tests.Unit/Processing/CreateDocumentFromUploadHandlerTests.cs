@@ -61,7 +61,7 @@ public class CreateDocumentFromUploadHandlerTests : IDisposable
             ActorUserId = _userId
         };
 
-        var result = await _sut.Handle(command, ct);
+        var result = await _sut.HandleAsync(command, ct);
         await _db.SaveChangesAsync(ct); // the job handler's unit of work performs this commit in production
 
         Assert.Equal("AI Title", result.Name);
@@ -107,7 +107,7 @@ public class CreateDocumentFromUploadHandlerTests : IDisposable
             ActorUserId = _userId
         };
 
-        var result = await _sut.Handle(command, ct);
+        var result = await _sut.HandleAsync(command, ct);
         await _db.SaveChangesAsync(ct);
 
         Assert.Equal("report.pdf", result.Name);

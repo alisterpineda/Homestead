@@ -11,14 +11,7 @@ public static class PatchDocumentEndpoint
         group.MapPatch("/{id:guid}", async (Guid id,
             JsonPatchDocument<PatchDocumentModel> patchDoc,
             PatchDocumentHandler handler, CancellationToken ct) =>
-        {
-            var command = new PatchDocumentCommand
-            {
-                Id = id,
-                PatchDocument = patchDoc
-            };
-            return Results.Ok(await handler.Handle(command, ct));
-        })
+            Results.Ok(await handler.HandleAsync(id, patchDoc, ct)))
         .WithName("PatchDocument")
         .Accepts<JsonPatchDocument<PatchDocumentModel>>("application/json-patch+json")
         .Produces<PatchDocumentResponse>()

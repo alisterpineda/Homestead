@@ -7,7 +7,7 @@ public static class DeleteBackupScheduleEndpoint
         group.MapDelete("/sources/{id:guid}/schedule", async (
             Guid id, DeleteBackupScheduleHandler handler, CancellationToken ct) =>
         {
-            await handler.Handle(new DeleteBackupScheduleCommand(id), ct);
+            await handler.HandleAsync(id, ct);
             return Results.NoContent();
         })
         .WithName("DeleteBackupSchedule")

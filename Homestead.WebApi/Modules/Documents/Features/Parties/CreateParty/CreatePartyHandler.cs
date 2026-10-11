@@ -11,7 +11,7 @@ namespace Homestead.WebApi.Modules.Documents.Features.Parties.CreateParty;
 public class CreatePartyHandler(AppDbContext db, ICurrentUserAccessor currentUser, IAuditContext audit,
     IUnitOfWork unitOfWork, IValidator<CreatePartyCommand> validator)
 {
-    public async Task<CreatePartyResponse> Handle(CreatePartyCommand request, CancellationToken ct)
+    public async Task<CreatePartyResponse> HandleAsync(CreatePartyCommand request, CancellationToken ct)
     {
         await validator.ValidateAndThrowAsync(request, ct);
 

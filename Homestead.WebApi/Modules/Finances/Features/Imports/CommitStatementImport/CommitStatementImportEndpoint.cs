@@ -10,7 +10,7 @@ public static class CommitStatementImportEndpoint
             Guid jobId, CommitStatementImportCommand body, CommitStatementImportHandler handler, CancellationToken ct) =>
         {
             var request = body with { JobId = jobId };
-            var response = await handler.Handle(request, ct);
+            var response = await handler.HandleAsync(request, ct);
             return Results.Ok(response);
         })
         .WithName("CommitStatementImport")

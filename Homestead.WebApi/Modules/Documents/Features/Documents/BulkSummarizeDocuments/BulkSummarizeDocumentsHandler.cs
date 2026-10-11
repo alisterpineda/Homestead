@@ -17,7 +17,7 @@ public class BulkSummarizeDocumentsHandler(
     IDocumentQueryService queryService,
     IJobQueue jobQueue)
 {
-    public async Task<BulkClassifyDocumentsResponse> Handle(BulkSummarizeDocumentsCommand request, CancellationToken ct)
+    public async Task<BulkClassifyDocumentsResponse> HandleAsync(BulkSummarizeDocumentsCommand request, CancellationToken ct)
     {
         var existingIds = await db.Documents
             .Where(d => request.Ids.Contains(d.Id))

@@ -7,9 +7,9 @@ namespace Homestead.WebApi.Modules.Finances.Features.Commodities.DeleteCommodity
 
 public class DeleteCommodityHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork)
 {
-    public async Task<bool> Handle(DeleteCommodityCommand request, CancellationToken ct)
+    public async Task<bool> HandleAsync(Guid id, CancellationToken ct)
     {
-        var commodity = await db.Commodities.FirstOrDefaultAsync(c => c.Id == request.Id, ct);
+        var commodity = await db.Commodities.FirstOrDefaultAsync(c => c.Id == id, ct);
         if (commodity is null)
             return false;
 
@@ -17,7 +17,7 @@ public class DeleteCommodityHandler(AppDbContext db, IAuditContext audit, IUnitO
             throw new BusinessRuleException("Seeded currencies cannot be deleted.");
 
         var refs = await db.Commodities
-            .Where(c => c.Id == request.Id)
+            .Where(c => c.Id == id)
             .Select(c => new
             {
                 ByAccount = db.Accounts.Any(a => a.ReportingCurrencyId == c.Id),

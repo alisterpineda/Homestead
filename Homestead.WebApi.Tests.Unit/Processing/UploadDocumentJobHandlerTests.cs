@@ -70,7 +70,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
         var textExtractionHelper = TestTextExtraction.Helper(_textExtractionEngine);
 
         _createDocument = Substitute.For<ICreateDocumentFromUploadHandler>();
-        _createDocument.Handle(Arg.Any<CreateDocumentFromUploadCommand>(), Arg.Any<CancellationToken>())
+        _createDocument.HandleAsync(Arg.Any<CreateDocumentFromUploadCommand>(), Arg.Any<CancellationToken>())
             .Returns(_ => new CreateDocumentFromUploadResult(Guid.NewGuid(), "Test Document"));
 
         // Run the work handed to the transaction, so the command handler is reached through it, and record
@@ -83,7 +83,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
                 try { return await call.Arg<Func<Task<CreateDocumentFromUploadResult>>>()(); }
                 finally { _inTransaction = false; }
             });
-        _createDocument.When(x => x.Handle(Arg.Any<CreateDocumentFromUploadCommand>(), Arg.Any<CancellationToken>()))
+        _createDocument.When(x => x.HandleAsync(Arg.Any<CreateDocumentFromUploadCommand>(), Arg.Any<CancellationToken>()))
             .Do(_ => _handledInTransaction = _inTransaction);
 
         _handler = new UploadDocumentJobHandler(
@@ -141,7 +141,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
 
         await _handler.HandleAsync(job, ct);
 
-        await _createDocument.Received(1).Handle(
+        await _createDocument.Received(1).HandleAsync(
             Arg.Is<CreateDocumentFromUploadCommand>(c =>
                 c.Name == "Test Document" &&
                 c.ExtractedText == "extracted text" &&
@@ -184,7 +184,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
             .Returns(TestTextExtraction.Output("text"));
 
         var resultDocumentId = Guid.NewGuid();
-        _createDocument.Handle(Arg.Any<CreateDocumentFromUploadCommand>(), Arg.Any<CancellationToken>())
+        _createDocument.HandleAsync(Arg.Any<CreateDocumentFromUploadCommand>(), Arg.Any<CancellationToken>())
             .Returns(_ => new CreateDocumentFromUploadResult(resultDocumentId, "Stored Name"));
 
         await _handler.HandleAsync(job, ct);
@@ -208,7 +208,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
 
         await _handler.HandleAsync(job, ct);
 
-        await _createDocument.Received(1).Handle(
+        await _createDocument.Received(1).HandleAsync(
             Arg.Is<CreateDocumentFromUploadCommand>(c => c.ExtractedText == null), ct);
     }
 
@@ -223,7 +223,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
 
         await _handler.HandleAsync(job, ct);
 
-        await _createDocument.Received(1).Handle(
+        await _createDocument.Received(1).HandleAsync(
             Arg.Is<CreateDocumentFromUploadCommand>(c => c.ExtractedText == null), ct);
     }
 
@@ -272,7 +272,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
 
         await _handler.HandleAsync(job, ct);
 
-        await _createDocument.Received(1).Handle(
+        await _createDocument.Received(1).HandleAsync(
             Arg.Is<CreateDocumentFromUploadCommand>(c => c.Name == "my-report"), ct);
     }
 
@@ -317,7 +317,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
         Assert.False(ex.IsTrashed);
         Assert.Equal("false", ex.ErrorData["isTrashed"]);
 
-        await _createDocument.DidNotReceive().Handle(
+        await _createDocument.DidNotReceive().HandleAsync(
             Arg.Any<CreateDocumentFromUploadCommand>(), Arg.Any<CancellationToken>());
     }
 
@@ -368,7 +368,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
         await _classifier.Received(1).ClassifyAsync(
             "Test Document", "extracted text", renderBytes, ClassificationScope.All, ct);
 
-        await _createDocument.Received(1).Handle(
+        await _createDocument.Received(1).HandleAsync(
             Arg.Is<CreateDocumentFromUploadCommand>(c => c.Classification != null),
             ct);
     }
@@ -441,7 +441,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
             Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<byte[]?>(),
             Arg.Any<ClassificationScope>(), Arg.Any<CancellationToken>());
 
-        await _createDocument.Received(1).Handle(
+        await _createDocument.Received(1).HandleAsync(
             Arg.Is<CreateDocumentFromUploadCommand>(c => c.Classification == null),
             ct);
     }
@@ -462,7 +462,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
 
         await _handler.HandleAsync(job, ct);
 
-        await _createDocument.Received(1).Handle(
+        await _createDocument.Received(1).HandleAsync(
             Arg.Is<CreateDocumentFromUploadCommand>(c => c.Classification == null), ct);
 
         await _notifier.Received(1).NotifyJobStatusAsync(

@@ -9,7 +9,7 @@ namespace Homestead.WebApi.Modules.Finances.Features.Transactions.GetTransaction
 
 public class GetTransactionsHandler(AppDbContext db, ICategoryPathResolver pathResolver)
 {
-    public async Task<PaginatedResponse<TransactionResponse>> Handle(
+    public async Task<PaginatedResponse<TransactionResponse>> HandleAsync(
         GetTransactionsQuery request, CancellationToken ct)
     {
         var query = db.AccountTransactions

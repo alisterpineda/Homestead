@@ -8,7 +8,7 @@ public static class DeletePayeeEndpoint
     {
         group.MapDelete("/{id:guid}", async (Guid id, DeletePayeeHandler handler, CancellationToken ct) =>
         {
-            var deleted = await handler.Handle(new DeletePayeeCommand(id), ct);
+            var deleted = await handler.HandleAsync(id, ct);
             return deleted ? Results.NoContent() : Results.NotFound();
         })
         .WithName("DeletePayee")

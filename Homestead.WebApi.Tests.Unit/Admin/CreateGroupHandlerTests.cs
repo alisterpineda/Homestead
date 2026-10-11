@@ -35,7 +35,7 @@ public class CreateGroupHandlerTests : IDisposable
     {
         var request = new CreateGroupCommand { Name = "Engineering" };
 
-        var response = await _sut.Handle(request, CancellationToken.None);
+        var response = await _sut.HandleAsync(request, CancellationToken.None);
 
         _audit.Received(1).Created("Group", response.Id, Arg.Any<Guid?>());
     }
@@ -44,6 +44,6 @@ public class CreateGroupHandlerTests : IDisposable
     public async Task Handle_BlankName_ThrowsValidationException()
     {
         await Assert.ThrowsAsync<ValidationException>(() =>
-            _sut.Handle(new CreateGroupCommand { Name = "   " }, CancellationToken.None));
+            _sut.HandleAsync(new CreateGroupCommand { Name = "   " }, CancellationToken.None));
     }
 }

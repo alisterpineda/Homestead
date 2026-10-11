@@ -21,8 +21,8 @@ public class GetActivityHandler(AppDbContext db)
         ["ExtractedText"] = "extracted text"
     };
 
-    public async Task<PaginatedResponse<GetActivityResponse>> Handle(
-        GetActivityQuery request, CancellationToken ct)
+    public async Task<PaginatedResponse<GetActivityResponse>> HandleAsync(
+        Guid documentId, PaginatedRequest pagination, CancellationToken ct)
     {
         // LEFT join Users (GroupJoin + SelectMany + DefaultIfEmpty), NOT an inner Join: an audit row
         // whose actor is null (a system/background action) or a since-deleted user must still surface.
@@ -30,8 +30,8 @@ public class GetActivityHandler(AppDbContext db)
         var auditRows = await db.AuditLogs
             .AsNoTracking()
             .Where(a =>
-                (a.EntityType == "Document" && a.EntityId == request.DocumentId) ||
-                (a.EntityType == "DocumentVersion" && a.ParentEntityId == request.DocumentId))
+                (a.EntityType == "Document" && a.EntityId == documentId) ||
+                (a.EntityType == "DocumentVersion" && a.ParentEntityId == documentId))
             .GroupJoin(
                 db.Users.AsNoTracking(),
                 a => a.UserId,
@@ -67,7 +67,7 @@ public class GetActivityHandler(AppDbContext db)
 
         var commentItems = await db.DocumentComments
             .AsNoTracking()
-            .Where(c => c.DocumentId == request.DocumentId)
+            .Where(c => c.DocumentId == documentId)
             .GroupJoin(
                 db.Users.AsNoTracking(),
                 c => c.CreatedByUserId,
@@ -97,15 +97,15 @@ public class GetActivityHandler(AppDbContext db)
 
         var totalCount = allItems.Count;
         var paged = allItems
-            .Skip((request.EffectivePage - 1) * request.EffectivePageSize)
-            .Take(request.EffectivePageSize)
+            .Skip((pagination.EffectivePage - 1) * pagination.EffectivePageSize)
+            .Take(pagination.EffectivePageSize)
             .ToList();
 
         return new PaginatedResponse<GetActivityResponse>
         {
             Items = paged,
-            Page = request.EffectivePage,
-            PageSize = request.EffectivePageSize,
+            Page = pagination.EffectivePage,
+            PageSize = pagination.EffectivePageSize,
             TotalCount = totalCount
         };
     }

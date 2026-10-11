@@ -95,7 +95,7 @@ public class GetAccountHandlerTests : IAsyncLifetime
 
         // Cutoff before the second split — only the first one should count.
         var asOf = new DateTimeOffset(2026, 4, 15, 23, 59, 59, TimeSpan.Zero);
-        var resp = await _sut.Handle(new GetAccountQuery { Id = account.Id, AsOf = asOf }, Ct);
+        var resp = await _sut.HandleAsync(new GetAccountQuery { Id = account.Id, AsOf = asOf }, Ct);
 
         Assert.NotNull(resp);
         Assert.Equal(100m, resp.NativeBalance);
@@ -109,7 +109,7 @@ public class GetAccountHandlerTests : IAsyncLifetime
         await AddSplitAsync(account.Id, 50m, new DateTimeOffset(2026, 4, 20, 12, 0, 0, TimeSpan.Zero));
 
         var asOf = new DateTimeOffset(2026, 4, 30, 23, 59, 59, TimeSpan.Zero);
-        var resp = await _sut.Handle(new GetAccountQuery { Id = account.Id, AsOf = asOf }, Ct);
+        var resp = await _sut.HandleAsync(new GetAccountQuery { Id = account.Id, AsOf = asOf }, Ct);
 
         Assert.NotNull(resp);
         Assert.Equal(150m, resp.NativeBalance);
@@ -122,7 +122,7 @@ public class GetAccountHandlerTests : IAsyncLifetime
         // Split well in the past so default "today" cutoff includes it.
         await AddSplitAsync(account.Id, 200m, new DateTimeOffset(2020, 1, 1, 12, 0, 0, TimeSpan.Zero));
 
-        var resp = await _sut.Handle(new GetAccountQuery { Id = account.Id }, Ct);
+        var resp = await _sut.HandleAsync(new GetAccountQuery { Id = account.Id }, Ct);
 
         Assert.NotNull(resp);
         Assert.Equal(200m, resp.NativeBalance);
@@ -131,7 +131,7 @@ public class GetAccountHandlerTests : IAsyncLifetime
     [Fact]
     public async Task UnknownId_ReturnsNull()
     {
-        var resp = await _sut.Handle(new GetAccountQuery { Id = Guid.NewGuid() }, Ct);
+        var resp = await _sut.HandleAsync(new GetAccountQuery { Id = Guid.NewGuid() }, Ct);
         Assert.Null(resp);
     }
 
@@ -151,7 +151,7 @@ public class GetAccountHandlerTests : IAsyncLifetime
         _db.Accounts.Add(systemAccount);
         await _db.SaveChangesAsync(Ct);
 
-        var resp = await _sut.Handle(new GetAccountQuery { Id = systemAccount.Id }, Ct);
+        var resp = await _sut.HandleAsync(new GetAccountQuery { Id = systemAccount.Id }, Ct);
         Assert.Null(resp);
     }
 }

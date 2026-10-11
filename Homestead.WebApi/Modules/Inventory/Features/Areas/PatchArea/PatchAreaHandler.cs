@@ -4,6 +4,7 @@ using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Inventory;
 using Homestead.WebApi.Modules.Inventory.Services;
 using Homestead.WebApi.Persistence;
+using Microsoft.AspNetCore.JsonPatch.SystemTextJson;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Areas.PatchArea;
@@ -14,16 +15,16 @@ public class PatchAreaHandler(
     IUnitOfWork unitOfWork,
     IInventoryPlacementService placementService)
 {
-    public async Task<AreaResponse> Handle(PatchAreaCommand request, CancellationToken ct)
+    public async Task<AreaResponse> HandleAsync(Guid id, JsonPatchDocument<PatchAreaModel> patchDoc, CancellationToken ct)
     {
-        var area = await db.Areas.FirstOrDefaultAsync(a => a.Id == request.Id, ct);
+        var area = await db.Areas.FirstOrDefaultAsync(a => a.Id == id, ct);
         if (area is null)
             throw new EntityNotFoundException("Area not found.");
 
         audit.Track<AreaSnapshot, Area>(area, "Area", area.Id);
 
         var model = new PatchAreaModel { Name = area.Name, ParentAreaId = area.ParentAreaId };
-        request.PatchDocument.ApplyOrThrow(model);
+        patchDoc.ApplyOrThrow(model);
 
         if (string.IsNullOrWhiteSpace(model.Name))
             throw new BusinessRuleException("Name is required.");

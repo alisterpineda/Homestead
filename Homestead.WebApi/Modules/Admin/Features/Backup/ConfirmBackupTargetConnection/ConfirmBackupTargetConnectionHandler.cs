@@ -57,16 +57,16 @@ public class ConfirmBackupTargetConnectionHandler(
     IUnitOfWork unitOfWork,
     ILogger<ConfirmBackupTargetConnectionHandler> logger)
 {
-    public async Task<ConfirmBackupTargetConnectionResponse> Handle(
-        ConfirmBackupTargetConnectionCommand request, CancellationToken ct)
+    public async Task<ConfirmBackupTargetConnectionResponse> HandleAsync(
+        string key, ConfirmBackupTargetConnectionBody body, CancellationToken ct)
     {
-        var target = resolver.Find(request.TargetKey)
-            ?? throw new EntityNotFoundException($"Backup target '{request.TargetKey}' is not configured.");
+        var target = resolver.Find(key)
+            ?? throw new EntityNotFoundException($"Backup target '{key}' is not configured.");
 
         if (target.Kind is not BackupTargetKind.GoogleDrive)
             throw new BusinessRuleException($"Backup target '{target.Key}' is not a Google Drive target.");
 
-        var pending = protector.UnprotectPending(request.PendingToken)
+        var pending = protector.UnprotectPending(body.PendingToken)
             ?? throw new BusinessRuleException(
                 "This connection attempt is no longer valid. Start over from Connect.");
 

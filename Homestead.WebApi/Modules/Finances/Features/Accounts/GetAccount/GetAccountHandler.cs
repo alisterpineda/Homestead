@@ -6,7 +6,7 @@ namespace Homestead.WebApi.Modules.Finances.Features.Accounts.GetAccount;
 
 public class GetAccountHandler(AppDbContext db, IValuationService valuations)
 {
-    public async Task<AccountResponse?> Handle(GetAccountQuery request, CancellationToken ct)
+    public async Task<AccountResponse?> HandleAsync(GetAccountQuery request, CancellationToken ct)
     {
         // Balance-sheet accounts only — a category (non-system Income/Expense) 404s here, so it can't
         // be read as (or mistaken for) a real account.

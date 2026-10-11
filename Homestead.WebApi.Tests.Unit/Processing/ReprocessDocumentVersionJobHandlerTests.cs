@@ -43,7 +43,7 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
         var textExtractionHelper = TestTextExtraction.Helper(_textExtractionEngine);
 
         _reprocessVersionText = Substitute.For<IReprocessVersionTextHandler>();
-        _reprocessVersionText.Handle(Arg.Any<ReprocessVersionTextCommand>(), Arg.Any<CancellationToken>())
+        _reprocessVersionText.HandleAsync(Arg.Any<ReprocessVersionTextCommand>(), Arg.Any<CancellationToken>())
             .Returns(_ => new ReprocessVersionTextResult("Test Document"));
 
         // Run the work handed to the transaction, so the command handler is reached through it, and record
@@ -56,7 +56,7 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
                 try { return await call.Arg<Func<Task<ReprocessVersionTextResult>>>()(); }
                 finally { _inTransaction = false; }
             });
-        _reprocessVersionText.When(x => x.Handle(Arg.Any<ReprocessVersionTextCommand>(), Arg.Any<CancellationToken>()))
+        _reprocessVersionText.When(x => x.HandleAsync(Arg.Any<ReprocessVersionTextCommand>(), Arg.Any<CancellationToken>()))
             .Do(_ => _handledInTransaction = _inTransaction);
 
         _handler = new ReprocessDocumentVersionJobHandler(
@@ -138,7 +138,7 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
 
         await _handler.HandleAsync(job, ct);
 
-        await _reprocessVersionText.Received(1).Handle(
+        await _reprocessVersionText.Received(1).HandleAsync(
             Arg.Is<ReprocessVersionTextCommand>(c =>
                 c.DocumentId == doc.Id &&
                 c.VersionId == version.Id &&
@@ -179,7 +179,7 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
         _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
             .Returns(TestTextExtraction.Output("text"));
 
-        _reprocessVersionText.Handle(Arg.Any<ReprocessVersionTextCommand>(), Arg.Any<CancellationToken>())
+        _reprocessVersionText.HandleAsync(Arg.Any<ReprocessVersionTextCommand>(), Arg.Any<CancellationToken>())
             .Returns(_ => new ReprocessVersionTextResult("Stored Doc Name"));
 
         await _handler.HandleAsync(job, ct);
@@ -209,7 +209,7 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
         await _handler.HandleAsync(job, ct);
 
         // Still persists, just no individual notification for the child job.
-        await _reprocessVersionText.Received(1).Handle(Arg.Any<ReprocessVersionTextCommand>(), ct);
+        await _reprocessVersionText.Received(1).HandleAsync(Arg.Any<ReprocessVersionTextCommand>(), ct);
         await _notifier.DidNotReceive().NotifyJobStatusAsync(
             Arg.Any<Guid>(), Arg.Any<ProcessingJobStatus>(),
             Arg.Any<ProcessingEntityType?>(), Arg.Any<Guid?>(),
@@ -228,7 +228,7 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => _handler.HandleAsync(job, ct));
 
-        await _reprocessVersionText.DidNotReceive().Handle(
+        await _reprocessVersionText.DidNotReceive().HandleAsync(
             Arg.Any<ReprocessVersionTextCommand>(), Arg.Any<CancellationToken>());
     }
 
@@ -245,7 +245,7 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
         await Assert.ThrowsAsync<TextExtractionFailedException>(
             () => _handler.HandleAsync(job, ct));
 
-        await _reprocessVersionText.DidNotReceive().Handle(
+        await _reprocessVersionText.DidNotReceive().HandleAsync(
             Arg.Any<ReprocessVersionTextCommand>(), Arg.Any<CancellationToken>());
     }
 
@@ -276,7 +276,7 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
 
         await _handler.HandleAsync(job, ct);
 
-        await _reprocessVersionText.Received(1).Handle(
+        await _reprocessVersionText.Received(1).HandleAsync(
             Arg.Is<ReprocessVersionTextCommand>(c => c.ExtractedText == null), ct);
     }
 }

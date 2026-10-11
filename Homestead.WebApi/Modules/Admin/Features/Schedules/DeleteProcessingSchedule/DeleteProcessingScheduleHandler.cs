@@ -6,14 +6,14 @@ namespace Homestead.WebApi.Modules.Admin.Features.Schedules.DeleteProcessingSche
 
 public class DeleteProcessingScheduleHandler(AppDbContext db)
 {
-    public async Task<bool> Handle(DeleteProcessingScheduleCommand request, CancellationToken ct)
+    public async Task<bool> HandleAsync(Guid id, CancellationToken ct)
     {
         // The change-tracker-bypassing ExecuteDelete is made transactional automatically:
         // CommandWriteCommandInterceptor opens the command tx as the DELETE reaches the database (the match
         // count is not yet known at that point), so it rolls back with the command on any later failure —
         // e.g. the not-found throw below leaves no committed effect.
         var affected = await db.ProcessingSchedules
-            .Where(s => s.Id == request.Id)
+            .Where(s => s.Id == id)
             .ExecuteDeleteAsync(ct);
 
         if (affected == 0)
@@ -22,5 +22,3 @@ public class DeleteProcessingScheduleHandler(AppDbContext db)
         return true;
     }
 }
-
-public record DeleteProcessingScheduleCommand(Guid Id);

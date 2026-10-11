@@ -9,7 +9,7 @@ public static class GetDurablesEndpoint
         group.MapGet("", async ([AsParameters] GetDurablesQuery request,
             GetDurablesHandler handler, CancellationToken ct) =>
         {
-            return Results.Ok(await handler.Handle(request, ct));
+            return Results.Ok(await handler.HandleAsync(request, ct));
         })
         .WithName("GetDurables")
         .Produces<PaginatedResponse<DurableResponse>>();

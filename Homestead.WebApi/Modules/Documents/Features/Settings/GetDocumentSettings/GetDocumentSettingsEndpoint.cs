@@ -5,9 +5,7 @@ public static class GetDocumentSettingsEndpoint
     public static void Map(RouteGroupBuilder group)
     {
         group.MapGet("", async (GetDocumentSettingsHandler handler, CancellationToken ct) =>
-        {
-            return Results.Ok(await handler.Handle(new GetDocumentSettingsQuery(), ct));
-        })
+            Results.Ok(await handler.HandleAsync(ct)))
         .WithName("GetDocumentSettings")
         .Produces<DocumentSettingsResponse>();
     }

@@ -9,11 +9,7 @@ public static class RemoveTransactionDocumentLinkEndpoint
         group.MapDelete("/{transactionId:guid}/documents/{documentId:guid}", async (
             Guid transactionId, Guid documentId, RemoveTransactionDocumentLinkHandler handler, CancellationToken ct) =>
         {
-            await handler.Handle(new RemoveTransactionDocumentLinkCommand
-            {
-                TransactionId = transactionId,
-                DocumentId = documentId,
-            }, ct);
+            await handler.HandleAsync(transactionId, documentId, ct);
             return Results.NoContent();
         })
         .WithName("RemoveTransactionDocumentLink")

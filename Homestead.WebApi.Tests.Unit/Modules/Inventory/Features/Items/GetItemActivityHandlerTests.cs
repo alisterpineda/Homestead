@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Auditing;
 using Homestead.WebApi.Domain.Inventory;
 using Homestead.WebApi.Modules.Inventory.Features.Items.GetItemActivity;
@@ -44,7 +45,7 @@ public class GetItemActivityHandlerTests : IDisposable
     [Fact]
     public async Task Handle_ReturnsNull_WhenItemMissing()
     {
-        var result = await _sut.Handle(new GetItemActivityQuery { Id = Guid.NewGuid() }, Ct);
+        var result = await _sut.HandleAsync(Guid.NewGuid(), new PaginatedRequest(), Ct);
 
         Assert.Null(result);
     }
@@ -58,7 +59,7 @@ public class GetItemActivityHandlerTests : IDisposable
         await AddAuditAsync(consumable.Id, AuditAction.Created, Guid.NewGuid(), DateTimeOffset.UtcNow.AddDays(-1));
         await ItemNoteTestData.AddNoteAsync(_db, consumable.Id, DateTimeOffset.UtcNow, body: "Bought a second box");
 
-        var result = await _sut.Handle(new GetItemActivityQuery { Id = consumable.Id }, Ct);
+        var result = await _sut.HandleAsync(consumable.Id, new PaginatedRequest(), Ct);
 
         Assert.NotNull(result);
         Assert.Equal(2, result.TotalCount);
@@ -83,7 +84,7 @@ public class GetItemActivityHandlerTests : IDisposable
         var recent = await ItemNoteTestData.AddNoteAsync(_db, item.Id, now.AddDays(-1),
             body: "Oil change", createdAt: now, createdByUserId: alice.Id);
 
-        var result = await _sut.Handle(new GetItemActivityQuery { Id = item.Id }, Ct);
+        var result = await _sut.HandleAsync(item.Id, new PaginatedRequest(), Ct);
 
         Assert.NotNull(result);
         Assert.Equal(4, result.TotalCount);
@@ -113,7 +114,7 @@ public class GetItemActivityHandlerTests : IDisposable
         var newer = await ItemNoteTestData.AddNoteAsync(_db, item.Id, sameDay, body: "second typed",
             createdAt: DateTimeOffset.UtcNow.AddHours(-1));
 
-        var result = await _sut.Handle(new GetItemActivityQuery { Id = item.Id }, Ct);
+        var result = await _sut.HandleAsync(item.Id, new PaginatedRequest(), Ct);
 
         Assert.NotNull(result);
         Assert.Equal([newer.Id, older.Id], result.Items.Select(i => i.Id));
@@ -132,8 +133,8 @@ public class GetItemActivityHandlerTests : IDisposable
         for (var i = 0; i < 2; i++)
             await ItemNoteTestData.AddNoteAsync(_db, item.Id, sameInstant, body: $"n{i}", createdAt: sameInstant);
 
-        var first = await _sut.Handle(new GetItemActivityQuery { Id = item.Id }, Ct);
-        var second = await _sut.Handle(new GetItemActivityQuery { Id = item.Id }, Ct);
+        var first = await _sut.HandleAsync(item.Id, new PaginatedRequest(), Ct);
+        var second = await _sut.HandleAsync(item.Id, new PaginatedRequest(), Ct);
 
         Assert.NotNull(first);
         Assert.NotNull(second);
@@ -157,7 +158,7 @@ public class GetItemActivityHandlerTests : IDisposable
         await ItemNoteTestData.AddNoteAsync(_db, item.Id, DateTimeOffset.UtcNow, body: "orphaned",
             createdByUserId: Guid.NewGuid());
 
-        var result = await _sut.Handle(new GetItemActivityQuery { Id = item.Id }, Ct);
+        var result = await _sut.HandleAsync(item.Id, new PaginatedRequest(), Ct);
 
         Assert.NotNull(result);
         Assert.Equal(2, result.TotalCount);
@@ -181,7 +182,7 @@ public class GetItemActivityHandlerTests : IDisposable
         var edited = await ItemNoteTestData.AddNoteAsync(_db, item.Id, DateTimeOffset.UtcNow.AddDays(-2),
             body: "edited", createdAt: created, updatedAt: created.AddMinutes(5), updatedByUserId: bob.Id);
 
-        var result = await _sut.Handle(new GetItemActivityQuery { Id = item.Id }, Ct);
+        var result = await _sut.HandleAsync(item.Id, new PaginatedRequest(), Ct);
 
         Assert.NotNull(result);
         var pristineRow = Assert.Single(result.Items, i => i.Id == pristine.Id);
@@ -206,7 +207,7 @@ public class GetItemActivityHandlerTests : IDisposable
         await AddAuditAsync(item.Id, AuditAction.Deleted, alice.Id, DateTimeOffset.UtcNow,
             entityType: "InventoryNote", entityId: Guid.NewGuid(), parentEntityId: item.Id);
 
-        var result = await _sut.Handle(new GetItemActivityQuery { Id = item.Id }, Ct);
+        var result = await _sut.HandleAsync(item.Id, new PaginatedRequest(), Ct);
 
         Assert.NotNull(result);
         var only = Assert.Single(result.Items);
@@ -230,7 +231,7 @@ public class GetItemActivityHandlerTests : IDisposable
             changes: [new ScalarFieldChange("Description", "Bosch · until 2028-03-12", null)],
             entityType: "ItemWarranty", entityId: warrantyId, parentEntityId: item.Id);
 
-        var result = await _sut.Handle(new GetItemActivityQuery { Id = item.Id }, Ct);
+        var result = await _sut.HandleAsync(item.Id, new PaginatedRequest(), Ct);
 
         Assert.NotNull(result);
         Assert.Equal(3, result.TotalCount);
@@ -254,7 +255,7 @@ public class GetItemActivityHandlerTests : IDisposable
             changes: [new ScalarFieldChange("Provider", null, "Bosch"), new ScalarFieldChange("Notes", null, "motor only")],
             entityType: "ItemWarranty", entityId: Guid.NewGuid(), parentEntityId: item.Id);
 
-        var result = await _sut.Handle(new GetItemActivityQuery { Id = item.Id }, Ct);
+        var result = await _sut.HandleAsync(item.Id, new PaginatedRequest(), Ct);
 
         Assert.NotNull(result);
         Assert.Equal("Alice updated a warranty (provider, notes)", Assert.Single(result.Items).Summary);
@@ -268,7 +269,7 @@ public class GetItemActivityHandlerTests : IDisposable
         await AddAuditAsync(item.Id, AuditAction.Deleted, alice.Id, DateTimeOffset.UtcNow,
             entityType: "ItemWarranty", entityId: Guid.NewGuid(), parentEntityId: item.Id);
 
-        var result = await _sut.Handle(new GetItemActivityQuery { Id = item.Id }, Ct);
+        var result = await _sut.HandleAsync(item.Id, new PaginatedRequest(), Ct);
 
         Assert.NotNull(result);
         Assert.Equal("Alice removed a warranty", Assert.Single(result.Items).Summary);
@@ -283,7 +284,7 @@ public class GetItemActivityHandlerTests : IDisposable
         await AddAuditAsync(other.Id, AuditAction.Created, alice.Id, DateTimeOffset.UtcNow,
             entityType: "ItemWarranty", entityId: Guid.NewGuid(), parentEntityId: other.Id);
 
-        var result = await _sut.Handle(new GetItemActivityQuery { Id = item.Id }, Ct);
+        var result = await _sut.HandleAsync(item.Id, new PaginatedRequest(), Ct);
 
         Assert.NotNull(result);
         Assert.Empty(result.Items);
@@ -300,7 +301,7 @@ public class GetItemActivityHandlerTests : IDisposable
         for (var i = 3; i < 5; i++)
             await ItemNoteTestData.AddNoteAsync(_db, item.Id, DateTimeOffset.UtcNow.AddMinutes(-i), body: $"n{i}");
 
-        var page = await _sut.Handle(new GetItemActivityQuery { Id = item.Id, Page = 2, PageSize = 2 }, Ct);
+        var page = await _sut.HandleAsync(item.Id, new PaginatedRequest { Page = 2, PageSize = 2 }, Ct);
 
         Assert.NotNull(page);
         Assert.Equal(5, page.TotalCount);
@@ -323,7 +324,7 @@ public class GetItemActivityHandlerTests : IDisposable
                 new ScalarFieldChange("AreaId", null, Guid.NewGuid().ToString()),
             ]);
 
-        var result = await _sut.Handle(new GetItemActivityQuery { Id = item.Id }, Ct);
+        var result = await _sut.HandleAsync(item.Id, new PaginatedRequest(), Ct);
 
         Assert.NotNull(result);
         Assert.Equal("Alice updated value, location", Assert.Single(result.Items).Summary);
@@ -350,7 +351,7 @@ public class GetItemActivityHandlerTests : IDisposable
             changes.Add(new ScalarFieldChange("StatusNote", null, note));
         await AddAuditAsync(item.Id, AuditAction.Updated, alice.Id, DateTimeOffset.UtcNow, changes);
 
-        var result = await _sut.Handle(new GetItemActivityQuery { Id = item.Id }, Ct);
+        var result = await _sut.HandleAsync(item.Id, new PaginatedRequest(), Ct);
 
         Assert.NotNull(result);
         Assert.Equal(expected, Assert.Single(result.Items).Summary);
@@ -369,7 +370,7 @@ public class GetItemActivityHandlerTests : IDisposable
                 new ScalarFieldChange("LentTo", null, "Dave"),
             ]);
 
-        var result = await _sut.Handle(new GetItemActivityQuery { Id = item.Id }, Ct);
+        var result = await _sut.HandleAsync(item.Id, new PaginatedRequest(), Ct);
 
         Assert.NotNull(result);
         Assert.Equal("Alice lent this item to Dave", Assert.Single(result.Items).Summary);
@@ -390,7 +391,7 @@ public class GetItemActivityHandlerTests : IDisposable
                 new ScalarFieldChange("Notes", null, "x"),
             ]);
 
-        var result = await _sut.Handle(new GetItemActivityQuery { Id = item.Id }, Ct);
+        var result = await _sut.HandleAsync(item.Id, new PaginatedRequest(), Ct);
 
         Assert.NotNull(result);
         Assert.Equal(
@@ -407,7 +408,7 @@ public class GetItemActivityHandlerTests : IDisposable
         await AddAuditAsync(item.Id, AuditAction.Updated, alice.Id, DateTimeOffset.UtcNow,
             changes: [new ScalarFieldChange("StatusNote", "Dave", "Dave next door")]);
 
-        var result = await _sut.Handle(new GetItemActivityQuery { Id = item.Id }, Ct);
+        var result = await _sut.HandleAsync(item.Id, new PaginatedRequest(), Ct);
 
         Assert.NotNull(result);
         Assert.Equal("Alice updated status note", Assert.Single(result.Items).Summary);
@@ -422,7 +423,7 @@ public class GetItemActivityHandlerTests : IDisposable
         await AddAuditAsync(item.Id, AuditAction.Updated, alice.Id, DateTimeOffset.UtcNow,
             changes: [new ScalarFieldChange("Notes", null, "x")]);
 
-        var result = await _sut.Handle(new GetItemActivityQuery { Id = item.Id }, Ct);
+        var result = await _sut.HandleAsync(item.Id, new PaginatedRequest(), Ct);
 
         Assert.NotNull(result);
         Assert.Equal("Alice updated description", Assert.Single(result.Items).Summary);

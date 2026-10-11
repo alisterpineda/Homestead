@@ -39,7 +39,7 @@ public class BulkDeleteTagsHandlerTests : IDisposable
         );
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        await _sut.Handle(new BulkDeleteTagsCommand([id1, id2]), TestContext.Current.CancellationToken);
+        await _sut.HandleAsync(new BulkDeleteTagsCommand([id1, id2]), TestContext.Current.CancellationToken);
 
         _audit.Received(1).Deleted("Tag", id1, "Tag A", Arg.Any<Guid?>());
         _audit.Received(1).Deleted("Tag", id2, "Tag B", Arg.Any<Guid?>());
@@ -48,7 +48,7 @@ public class BulkDeleteTagsHandlerTests : IDisposable
     [Fact]
     public async Task Handle_NoTags_DoesNotLogAudit()
     {
-        await _sut.Handle(new BulkDeleteTagsCommand([Guid.NewGuid()]), TestContext.Current.CancellationToken);
+        await _sut.HandleAsync(new BulkDeleteTagsCommand([Guid.NewGuid()]), TestContext.Current.CancellationToken);
 
         _audit.DidNotReceive().Deleted(Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<string?>(), Arg.Any<Guid?>());
     }

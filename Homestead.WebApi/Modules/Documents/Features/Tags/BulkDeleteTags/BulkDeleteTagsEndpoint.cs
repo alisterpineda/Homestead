@@ -12,7 +12,7 @@ public static class BulkDeleteTagsEndpoint
             if (request.Ids.Count == 0)
                 return ProblemDetailsFactory.BusinessRuleResult("At least one tag ID must be provided.");
 
-            var response = await handler.Handle(request, ct);
+            var response = await handler.HandleAsync(request, ct);
             return Results.Ok(response);
         })
         .WithName("BulkDeleteTags")

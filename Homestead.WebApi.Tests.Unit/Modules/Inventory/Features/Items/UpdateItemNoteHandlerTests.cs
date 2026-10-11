@@ -40,7 +40,7 @@ public class UpdateItemNoteHandlerTests : IDisposable
         var note = await ItemNoteTestData.AddNoteAsync(_db, item.Id, DateTimeOffset.UtcNow.AddDays(-1));
 
         // The note exists, but not under the route's item — must read as not found, not as editable.
-        await Assert.ThrowsAsync<EntityNotFoundException>(() => _sut.Handle(new UpdateItemNoteCommand
+        await Assert.ThrowsAsync<EntityNotFoundException>(() => _sut.HandleAsync(new UpdateItemNoteCommand
         {
             ItemId = other.Id, NoteId = note.Id, OccurredAt = note.OccurredAt, Body = "x",
         }, Ct));
@@ -51,7 +51,7 @@ public class UpdateItemNoteHandlerTests : IDisposable
     {
         var item = await ItemNoteTestData.AddItemAsync(_db);
 
-        await Assert.ThrowsAsync<EntityNotFoundException>(() => _sut.Handle(new UpdateItemNoteCommand
+        await Assert.ThrowsAsync<EntityNotFoundException>(() => _sut.HandleAsync(new UpdateItemNoteCommand
         {
             ItemId = item.Id, NoteId = Guid.NewGuid(), OccurredAt = DateTimeOffset.UtcNow, Body = "x",
         }, Ct));
@@ -66,7 +66,7 @@ public class UpdateItemNoteHandlerTests : IDisposable
             body: "5W-30", createdAt: created, createdByUserId: Guid.NewGuid());
         var newDate = created.AddDays(-7);
 
-        var response = await _sut.Handle(new UpdateItemNoteCommand
+        var response = await _sut.HandleAsync(new UpdateItemNoteCommand
         {
             ItemId = item.Id, NoteId = note.Id, OccurredAt = newDate, Body = "  belt replaced  ",
         }, Ct);
@@ -88,7 +88,7 @@ public class UpdateItemNoteHandlerTests : IDisposable
         var item = await ItemNoteTestData.AddItemAsync(_db);
         var note = await ItemNoteTestData.AddNoteAsync(_db, item.Id, DateTimeOffset.UtcNow.AddDays(-1));
 
-        await _sut.Handle(new UpdateItemNoteCommand
+        await _sut.HandleAsync(new UpdateItemNoteCommand
         {
             ItemId = item.Id, NoteId = note.Id, OccurredAt = note.OccurredAt, Body = "changed",
         }, Ct);
@@ -108,7 +108,7 @@ public class UpdateItemNoteHandlerTests : IDisposable
 
         // Same values, differently padded: normalises to identical, so nothing is written and the note
         // must not become "edited".
-        var response = await _sut.Handle(new UpdateItemNoteCommand
+        var response = await _sut.HandleAsync(new UpdateItemNoteCommand
         {
             ItemId = item.Id, NoteId = note.Id, OccurredAt = created, Body = " 5W-30 ",
         }, Ct);
@@ -127,7 +127,7 @@ public class UpdateItemNoteHandlerTests : IDisposable
         var itemUpdatedAt = item.UpdatedAt;
         var note = await ItemNoteTestData.AddNoteAsync(_db, item.Id, DateTimeOffset.UtcNow.AddDays(-1));
 
-        await _sut.Handle(new UpdateItemNoteCommand
+        await _sut.HandleAsync(new UpdateItemNoteCommand
         {
             ItemId = item.Id, NoteId = note.Id, OccurredAt = note.OccurredAt, Body = "changed",
         }, Ct);
@@ -138,7 +138,7 @@ public class UpdateItemNoteHandlerTests : IDisposable
     [Fact]
     public async Task Handle_BlankBody_ThrowsValidationException()
     {
-        await Assert.ThrowsAsync<ValidationException>(() => _sut.Handle(new UpdateItemNoteCommand
+        await Assert.ThrowsAsync<ValidationException>(() => _sut.HandleAsync(new UpdateItemNoteCommand
         {
             ItemId = Guid.NewGuid(), NoteId = Guid.NewGuid(), OccurredAt = DateTimeOffset.UtcNow.AddDays(-1), Body = "   ",
         }, Ct));

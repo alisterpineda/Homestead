@@ -57,7 +57,7 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
         var textExtractionHelper = TestTextExtraction.Helper(_textExtractionEngine);
 
         _addDocumentVersion = Substitute.For<IAddDocumentVersionHandler>();
-        _addDocumentVersion.Handle(Arg.Any<AddDocumentVersionCommand>(), Arg.Any<CancellationToken>())
+        _addDocumentVersion.HandleAsync(Arg.Any<AddDocumentVersionCommand>(), Arg.Any<CancellationToken>())
             .Returns(_ => new AddDocumentVersionResult(Guid.NewGuid(), "Existing Document"));
 
         // Run the work handed to the transaction, so the command handler is reached through it, and record
@@ -70,7 +70,7 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
                 try { return await call.Arg<Func<Task<AddDocumentVersionResult>>>()(); }
                 finally { _inTransaction = false; }
             });
-        _addDocumentVersion.When(x => x.Handle(Arg.Any<AddDocumentVersionCommand>(), Arg.Any<CancellationToken>()))
+        _addDocumentVersion.When(x => x.HandleAsync(Arg.Any<AddDocumentVersionCommand>(), Arg.Any<CancellationToken>()))
             .Do(_ => _handledInTransaction = _inTransaction);
 
         _handler = new UploadDocumentVersionJobHandler(
@@ -141,7 +141,7 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
 
         await _handler.HandleAsync(job, ct);
 
-        await _addDocumentVersion.Received(1).Handle(
+        await _addDocumentVersion.Received(1).HandleAsync(
             Arg.Is<AddDocumentVersionCommand>(c =>
                 c.DocumentId == doc.Id &&
                 c.ExtractedText == "extracted text" &&
@@ -183,7 +183,7 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
         _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
             .Returns(TestTextExtraction.Output("text"));
 
-        _addDocumentVersion.Handle(Arg.Any<AddDocumentVersionCommand>(), Arg.Any<CancellationToken>())
+        _addDocumentVersion.HandleAsync(Arg.Any<AddDocumentVersionCommand>(), Arg.Any<CancellationToken>())
             .Returns(_ => new AddDocumentVersionResult(Guid.NewGuid(), "Stored Doc Name"));
 
         await _handler.HandleAsync(job, ct);
@@ -208,7 +208,7 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => _handler.HandleAsync(job, ct));
 
-        await _addDocumentVersion.DidNotReceive().Handle(
+        await _addDocumentVersion.DidNotReceive().HandleAsync(
             Arg.Any<AddDocumentVersionCommand>(), Arg.Any<CancellationToken>());
     }
 
@@ -224,7 +224,7 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
 
         await _handler.HandleAsync(job, ct);
 
-        await _addDocumentVersion.Received(1).Handle(
+        await _addDocumentVersion.Received(1).HandleAsync(
             Arg.Is<AddDocumentVersionCommand>(c => c.ExtractedText == null), ct);
     }
 
@@ -290,7 +290,7 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
         Assert.False(ex.IsTrashed);
         Assert.Equal("false", ex.ErrorData["isTrashed"]);
 
-        await _addDocumentVersion.DidNotReceive().Handle(
+        await _addDocumentVersion.DidNotReceive().HandleAsync(
             Arg.Any<AddDocumentVersionCommand>(), Arg.Any<CancellationToken>());
     }
 

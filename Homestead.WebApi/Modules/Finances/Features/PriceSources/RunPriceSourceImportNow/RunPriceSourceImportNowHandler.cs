@@ -14,20 +14,20 @@ public class RunPriceSourceImportNowHandler(
     ICurrentUserAccessor currentUser,
     IPriceSourceRegistry sources)
 {
-    public async Task<RunPriceSourceImportNowResponse> Handle(
-        RunPriceSourceImportNowCommand request, CancellationToken ct)
+    public async Task<RunPriceSourceImportNowResponse> HandleAsync(
+        CommodityPriceSource source, RunNowBody? body, CancellationToken ct)
     {
-        request.Source.RequireExternal("imported");
+        source.RequireExternal("imported");
 
         // Fail fast with exactly the reason the job would have recorded anyway.
-        if (PriceSourceConfiguration.ImportBlocker(sources.Get(request.Source), request.Source) is { } blocked)
+        if (PriceSourceConfiguration.ImportBlocker(sources.Get(source), source) is { } blocked)
             throw new BusinessRuleException(blocked.Message);
 
         var payload = new ImportCommodityPricesPayload(
-            request.Source,
-            request.FromAt,
-            request.ToAt,
-            request.CommodityIds);
+            source,
+            body?.FromAt,
+            body?.ToAt,
+            body?.CommodityIds);
 
         var jobId = await queue.EnqueueAsync(ProcessingJobType.ImportCommodityPrices, opts =>
         {

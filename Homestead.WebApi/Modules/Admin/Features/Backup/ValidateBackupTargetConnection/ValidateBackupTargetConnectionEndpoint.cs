@@ -6,10 +6,7 @@ public static class ValidateBackupTargetConnectionEndpoint
     {
         group.MapPost("/targets/{key}/validate", async (
             string key, ValidateBackupTargetConnectionHandler handler, CancellationToken ct) =>
-        {
-            var response = await handler.Handle(new ValidateBackupTargetConnectionCommand(key), ct);
-            return Results.Ok(response);
-        })
+            Results.Ok(await handler.HandleAsync(key, ct)))
         .WithName("ValidateBackupTargetConnection")
         .Produces<ValidateBackupTargetConnectionResponse>()
         .Produces(StatusCodes.Status404NotFound);

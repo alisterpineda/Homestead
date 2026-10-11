@@ -12,10 +12,10 @@ public class DeleteDocumentVersionHandler(AppDbContext db, IOptions<FileStorageO
     IAuditContext audit, IUnitOfWork unitOfWork,
     ILogger<DeleteDocumentVersionHandler> logger)
 {
-    public async Task<bool> Handle(DeleteDocumentVersionCommand request, CancellationToken ct)
+    public async Task<bool> HandleAsync(Guid documentId, Guid id, CancellationToken ct)
     {
         var version = await db.DocumentVersions
-            .Where(r => r.DocumentId == request.DocumentId && r.Id == request.Id)
+            .Where(r => r.DocumentId == documentId && r.Id == id)
             .FirstOrDefaultAsync(ct);
 
         if (version is null)
@@ -23,7 +23,7 @@ public class DeleteDocumentVersionHandler(AppDbContext db, IOptions<FileStorageO
 
         // Prevent deleting the last version
         var versionCount = await db.DocumentVersions
-            .CountAsync(r => r.DocumentId == request.DocumentId, ct);
+            .CountAsync(r => r.DocumentId == documentId, ct);
 
         if (versionCount <= 1)
             throw new BusinessRuleException("Cannot delete the last version of a document.");
@@ -31,8 +31,6 @@ public class DeleteDocumentVersionHandler(AppDbContext db, IOptions<FileStorageO
         var mediaPath = storage.Value.MediaPath;
 
         var physicalPath = version.GetPhysicalPath(mediaPath);
-
-        var documentId = version.DocumentId;
 
         var description = $"Version {version.VersionNumber}";
         if (!string.IsNullOrWhiteSpace(version.Label))

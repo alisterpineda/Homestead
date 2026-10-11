@@ -7,7 +7,7 @@ public static class DeleteProcessingScheduleEndpoint
         group.MapDelete("/{id:guid}", async (Guid id,
             DeleteProcessingScheduleHandler handler, CancellationToken ct) =>
         {
-            await handler.Handle(new DeleteProcessingScheduleCommand(id), ct);
+            await handler.HandleAsync(id, ct);
             return Results.NoContent();
         })
         .WithName("DeleteProcessingSchedule")

@@ -7,16 +7,7 @@ public static class UpdateUserEndpoint
         group.MapPut("/{id:guid}", async (Guid id, UpdateUserRequest request,
             UpdateUserHandler handler, CancellationToken ct) =>
         {
-            var command = new UpdateUserCommand
-            {
-                Id = id,
-                Email = request.Email,
-                DisplayName = request.DisplayName,
-                Role = request.Role,
-                IsActive = request.IsActive
-            };
-
-            var response = await handler.Handle(command, ct);
+            var response = await handler.HandleAsync(id, request, ct);
             return response is not null ? Results.Ok(response) : Results.NotFound();
         })
         .WithName("UpdateUser")

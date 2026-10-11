@@ -8,7 +8,7 @@ namespace Homestead.WebApi.Modules.Documents.Features.Settings.GetDocumentSettin
 
 public class GetDocumentSettingsHandler(AppDbContext db)
 {
-    public async Task<DocumentSettingsResponse> Handle(GetDocumentSettingsQuery request, CancellationToken ct)
+    public async Task<DocumentSettingsResponse> HandleAsync(CancellationToken ct)
     {
         var entity = await db.AppSettings
             .AsNoTracking()

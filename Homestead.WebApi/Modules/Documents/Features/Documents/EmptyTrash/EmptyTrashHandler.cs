@@ -13,7 +13,7 @@ public class EmptyTrashHandler(AppDbContext db, IOptions<FileStorageOptions> sto
     IAuditContext audit, IUnitOfWork unitOfWork, IDocumentQueryService accessService,
     ILogger<EmptyTrashHandler> logger)
 {
-    public async Task<EmptyTrashResponse> Handle(EmptyTrashCommand request, CancellationToken ct)
+    public async Task<EmptyTrashResponse> HandleAsync(CancellationToken ct)
     {
         var documents = await accessService.WritableDocuments(TrashFilter.TrashedOnly)
             .Include(d => d.Versions)

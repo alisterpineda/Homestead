@@ -12,10 +12,10 @@ namespace Homestead.WebApi.Modules.Inventory.Features.Tags.PatchTag;
 public class PatchTagHandler(AppDbContext db, IAuditContext audit,
     ICurrentUserAccessor currentUser, IUnitOfWork unitOfWork)
 {
-    public async Task<PatchInventoryTagResponse> Handle(PatchInventoryTagCommand request, CancellationToken ct)
+    public async Task<PatchInventoryTagResponse> HandleAsync(Guid id, JsonPatchDocument<PatchInventoryTagModel> patchDoc, CancellationToken ct)
     {
         var tag = await db.InventoryTags
-            .FirstOrDefaultAsync(t => t.Id == request.Id, ct);
+            .FirstOrDefaultAsync(t => t.Id == id, ct);
 
         if (tag is null)
             throw new EntityNotFoundException("Tag not found.");
@@ -38,7 +38,7 @@ public class PatchTagHandler(AppDbContext db, IAuditContext audit,
 
         // Apply patch operations
         var errors = new List<JsonPatchError>();
-        request.PatchDocument.ApplyTo(model, error => errors.Add(error));
+        patchDoc.ApplyTo(model, error => errors.Add(error));
 
         if (errors.Count > 0)
             throw new BusinessRuleException(errors.Select(e => new
@@ -57,7 +57,7 @@ public class PatchTagHandler(AppDbContext db, IAuditContext audit,
         var normalizedName = model.Name.Trim();
 
         // Validate parent
-        if (model.ParentId == request.Id)
+        if (model.ParentId == id)
             throw new BusinessRuleException("A tag cannot be its own parent.");
 
         string? parentPath = null;
@@ -103,7 +103,7 @@ public class PatchTagHandler(AppDbContext db, IAuditContext audit,
 
             // Check for path uniqueness
             var conflictExists = await db.InventoryTags
-                .AnyAsync(t => t.Path == newPath && t.Id != request.Id, ct);
+                .AnyAsync(t => t.Path == newPath && t.Id != id, ct);
 
             if (conflictExists)
                 throw new DuplicateEntityException($"A tag with path '{newPath}' already exists.");

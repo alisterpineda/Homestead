@@ -8,7 +8,7 @@ public static class CreateAreaEndpoint
     {
         group.MapPost("", async (CreateAreaCommand request, CreateAreaHandler handler, CancellationToken ct) =>
         {
-            var response = await handler.Handle(request, ct);
+            var response = await handler.HandleAsync(request, ct);
             return Results.Created($"/api/v1/inventory/areas/{response.Id}", response);
         })
         .WithName("CreateArea")

@@ -5,6 +5,6 @@ namespace Homestead.WebApi.Modules.Inventory.Features.Consumables.GetConsumable;
 
 public class GetConsumableHandler(AppDbContext db, IItemLocationResolver locationResolver)
 {
-    public Task<ConsumableDetailResponse?> Handle(GetConsumableQuery request, CancellationToken ct) =>
-        ConsumableDetailReader.LoadAsync(db, locationResolver, request.Id, ct);
+    public Task<ConsumableDetailResponse?> HandleAsync(Guid id, CancellationToken ct) =>
+        ConsumableDetailReader.LoadAsync(db, locationResolver, id, ct);
 }

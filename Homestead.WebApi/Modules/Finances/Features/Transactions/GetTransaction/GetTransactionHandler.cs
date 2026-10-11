@@ -7,12 +7,12 @@ namespace Homestead.WebApi.Modules.Finances.Features.Transactions.GetTransaction
 
 public class GetTransactionHandler(AppDbContext db, ICategoryPathResolver pathResolver)
 {
-    public async Task<TransactionResponse> Handle(GetTransactionQuery request, CancellationToken ct)
+    public async Task<TransactionResponse> HandleAsync(Guid transactionId, CancellationToken ct)
     {
         var transaction = await db.AccountTransactions
             .AsNoTracking()
             .Include(t => t.Splits)
-            .FirstOrDefaultAsync(t => t.Id == request.TransactionId, ct)
+            .FirstOrDefaultAsync(t => t.Id == transactionId, ct)
             ?? throw new EntityNotFoundException("Transaction not found.");
 
         var categories = await pathResolver.GetPathMapAsync(ct);

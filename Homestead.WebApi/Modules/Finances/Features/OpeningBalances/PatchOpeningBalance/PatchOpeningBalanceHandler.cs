@@ -14,7 +14,7 @@ public class PatchOpeningBalanceHandler(
     IUnitOfWork unitOfWork,
     IValidator<PatchOpeningBalanceCommand> validator)
 {
-    public async Task<OpeningBalanceResponse> Handle(PatchOpeningBalanceCommand request, CancellationToken ct)
+    public async Task<OpeningBalanceResponse> HandleAsync(PatchOpeningBalanceCommand request, CancellationToken ct)
     {
         await validator.ValidateAndThrowAsync(request, ct);
 

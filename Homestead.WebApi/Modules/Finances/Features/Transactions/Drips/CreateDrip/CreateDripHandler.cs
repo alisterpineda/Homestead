@@ -10,7 +10,7 @@ public class CreateDripHandler(
     IUnitOfWork unitOfWork,
     IValidator<CreateDripCommand> validator)
 {
-    public async Task<TransactionResponse> Handle(CreateDripCommand request, CancellationToken ct)
+    public async Task<TransactionResponse> HandleAsync(CreateDripCommand request, CancellationToken ct)
     {
         await validator.ValidateAndThrowAsync(request, ct);
 

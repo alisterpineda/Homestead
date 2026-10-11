@@ -8,7 +8,7 @@ namespace Homestead.WebApi.Modules.Processing.Features.GetProcessingJobs;
 
 public class GetProcessingJobsHandler(AppDbContext db, ICurrentUserAccessor currentUser)
 {
-    public async Task<PaginatedResponse<GetProcessingJobsResponse>> Handle(
+    public async Task<PaginatedResponse<GetProcessingJobsResponse>> HandleAsync(
         GetProcessingJobsQuery request, CancellationToken ct)
     {
         var query = db.ProcessingJobs.AsNoTracking();

@@ -36,11 +36,11 @@ public class ValidateBackupTargetConnectionHandler(
     IBackupTargetRootProvisioner rootProvisioner,
     ILogger<ValidateBackupTargetConnectionHandler> logger)
 {
-    public async Task<ValidateBackupTargetConnectionResponse> Handle(
-        ValidateBackupTargetConnectionCommand request, CancellationToken ct)
+    public async Task<ValidateBackupTargetConnectionResponse> HandleAsync(
+        string key, CancellationToken ct)
     {
-        var target = resolver.Find(request.TargetKey)
-            ?? throw new EntityNotFoundException($"Backup target '{request.TargetKey}' is not configured.");
+        var target = resolver.Find(key)
+            ?? throw new EntityNotFoundException($"Backup target '{key}' is not configured.");
 
         // Nothing to probe on a kind with no credential; report the cheap composed answer unchanged.
         if (target.Kind is not BackupTargetKind.GoogleDrive)

@@ -22,7 +22,7 @@ public class GetTagsHandlerTests : IDisposable
     {
         await SeedTagsAsync("Charlie", "Alpha", "Bravo");
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new GetTagsQuery { Page = 1, PageSize = 10 },
             TestContext.Current.CancellationToken);
 
@@ -35,7 +35,7 @@ public class GetTagsHandlerTests : IDisposable
     {
         await SeedTagsAsync("Alpha", "Bravo", "Charlie");
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new GetTagsQuery { Page = 1, PageSize = 10, SortBy = TagSortBy.Name, SortDir = SortDirection.Desc },
             TestContext.Current.CancellationToken);
 
@@ -51,7 +51,7 @@ public class GetTagsHandlerTests : IDisposable
         _db.Tags.Add(new Tag { Name = "B", Path = "M/B" });
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new GetTagsQuery { Page = 1, PageSize = 10, SortBy = TagSortBy.Path, SortDir = SortDirection.Asc },
             TestContext.Current.CancellationToken);
 
@@ -67,7 +67,7 @@ public class GetTagsHandlerTests : IDisposable
         _db.Tags.Add(new Tag { Name = "C", Path = "Z/C" });
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new GetTagsQuery { Page = 1, PageSize = 10, SortBy = TagSortBy.Path, SortDir = SortDirection.Desc },
             TestContext.Current.CancellationToken);
 
@@ -84,7 +84,7 @@ public class GetTagsHandlerTests : IDisposable
         _db.Tags.Add(new Tag { Name = "Second", Path = "Second", CreatedAt = now.AddHours(1) });
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new GetTagsQuery { Page = 1, PageSize = 10, SortBy = TagSortBy.CreatedAt, SortDir = SortDirection.Asc },
             TestContext.Current.CancellationToken);
 
@@ -101,7 +101,7 @@ public class GetTagsHandlerTests : IDisposable
         _db.Tags.Add(new Tag { Name = "Second", Path = "Second", CreatedAt = now.AddHours(1) });
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new GetTagsQuery { Page = 1, PageSize = 10, SortBy = TagSortBy.CreatedAt, SortDir = SortDirection.Desc },
             TestContext.Current.CancellationToken);
 
@@ -132,7 +132,7 @@ public class GetTagsHandlerTests : IDisposable
         );
         await _db.SaveChangesAsync(ct);
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new GetTagsQuery { Page = 1, PageSize = 10, SortBy = TagSortBy.DocumentCount, SortDir = SortDirection.Desc },
             ct);
 
@@ -160,7 +160,7 @@ public class GetTagsHandlerTests : IDisposable
         );
         await _db.SaveChangesAsync(ct);
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new GetTagsQuery { Page = 1, PageSize = 10, SortBy = TagSortBy.DocumentCount, SortDir = SortDirection.Asc },
             ct);
 
@@ -178,7 +178,7 @@ public class GetTagsHandlerTests : IDisposable
         _db.Tags.Add(new Tag { Name = "Second", Path = "Second", UpdatedAt = now.AddHours(1) });
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new GetTagsQuery { Page = 1, PageSize = 10, SortBy = TagSortBy.UpdatedAt, SortDir = SortDirection.Asc },
             TestContext.Current.CancellationToken);
 
@@ -195,7 +195,7 @@ public class GetTagsHandlerTests : IDisposable
         _db.Tags.Add(new Tag { Name = "Second", Path = "Second", UpdatedAt = now.AddHours(1) });
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new GetTagsQuery { Page = 1, PageSize = 10, SortBy = TagSortBy.UpdatedAt, SortDir = SortDirection.Desc },
             TestContext.Current.CancellationToken);
 
@@ -208,7 +208,7 @@ public class GetTagsHandlerTests : IDisposable
     {
         await SeedTagsAsync("Zulu", "Alpha");
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new GetTagsQuery { Page = 1, PageSize = 10, SortBy = null, SortDir = null },
             TestContext.Current.CancellationToken);
 

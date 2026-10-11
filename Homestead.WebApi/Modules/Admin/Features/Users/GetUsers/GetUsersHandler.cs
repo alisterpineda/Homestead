@@ -6,7 +6,7 @@ namespace Homestead.WebApi.Modules.Admin.Features.Users.GetUsers;
 
 public class GetUsersHandler(AppDbContext db)
 {
-    public async Task<PaginatedResponse<UserResponse>> Handle(
+    public async Task<PaginatedResponse<UserResponse>> HandleAsync(
         GetUsersQuery request, CancellationToken ct)
     {
         var query = db.Users.AsNoTracking();

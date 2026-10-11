@@ -8,7 +8,7 @@ namespace Homestead.WebApi.Modules.Admin.Features.Settings.GetSystemSettings;
 
 public class GetSystemSettingsHandler(AppDbContext db)
 {
-    public async Task<SystemSettingsResponse> Handle(GetSystemSettingsQuery request, CancellationToken ct)
+    public async Task<SystemSettingsResponse> HandleAsync(CancellationToken ct)
     {
         var entity = await db.AppSettings
             .AsNoTracking()

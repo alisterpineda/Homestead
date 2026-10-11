@@ -9,7 +9,7 @@ public static class DeleteTransactionEndpoint
         group.MapDelete("/{transactionId:guid}",
             async (Guid transactionId, DeleteTransactionHandler handler, CancellationToken ct) =>
         {
-            await handler.Handle(new DeleteTransactionCommand(transactionId), ct);
+            await handler.HandleAsync(transactionId, ct);
             return Results.NoContent();
         })
         .WithName("DeleteTransaction")

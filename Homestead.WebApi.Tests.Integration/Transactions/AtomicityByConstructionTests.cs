@@ -80,14 +80,14 @@ public class AtomicityByConstructionTests(PostgresFixture fixture) : Integration
         var adminClient = await CreateAdminClientAsync();
         var groupId = await CreateGroupAsync(adminClient, "To Delete");
 
-        // DeleteGroupCommand does a change-tracker-bypassing ExecuteUpdate plus a tracked Groups.Remove and
+        // DeleteGroupHandler does a change-tracker-bypassing ExecuteUpdate plus a tracked Groups.Remove and
         // flush. On the happy path the interceptor-opened command tx commits both.
         using (var scope = CreateScope())
         {
             var handler = scope.ServiceProvider.GetRequiredService<DeleteGroupHandler>();
             var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
             var deleted = await unitOfWork.ExecuteInTransactionAsync(
-                () => handler.Handle(new DeleteGroupCommand(groupId), CT), CT);
+                () => handler.HandleAsync(groupId, CT), CT);
             Assert.True(deleted);
         }
 

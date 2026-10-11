@@ -9,7 +9,7 @@ namespace Homestead.WebApi.Modules.Inventory.Features.Consumables.GetConsumables
 
 public class GetConsumablesHandler(AppDbContext db, IItemLocationResolver locationResolver)
 {
-    public async Task<PaginatedResponse<ConsumableResponse>> Handle(
+    public async Task<PaginatedResponse<ConsumableResponse>> HandleAsync(
         GetConsumablesQuery request, CancellationToken ct)
     {
         var query = db.Items.AsNoTracking()

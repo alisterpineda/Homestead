@@ -20,7 +20,7 @@ public class PatchSystemSettingsHandler(
     ISettingsChangeNotifier settingsChangeNotifier,
     IValidator<PatchSystemSettingsCommand> validator)
 {
-    public async Task<SystemSettingsResponse> Handle(
+    public async Task<SystemSettingsResponse> HandleAsync(
         PatchSystemSettingsCommand request, CancellationToken ct)
     {
         await validator.ValidateAndThrowAsync(request, ct);

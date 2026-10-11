@@ -8,10 +8,7 @@ public static class GetTransactionEndpoint
     {
         group.MapGet("/{transactionId:guid}",
             async (Guid transactionId, GetTransactionHandler handler, CancellationToken ct) =>
-        {
-            var response = await handler.Handle(new GetTransactionQuery(transactionId), ct);
-            return Results.Ok(response);
-        })
+            Results.Ok(await handler.HandleAsync(transactionId, ct)))
         .WithName("GetTransaction")
         .Produces<TransactionResponse>()
         .RequireAuthorization(AuthPolicies.ActiveUser);

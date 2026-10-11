@@ -6,7 +6,7 @@ public static class GetItemEndpoint
     {
         group.MapGet("/{id:guid}", async (Guid id, GetItemHandler handler, CancellationToken ct) =>
         {
-            var response = await handler.Handle(new GetItemQuery(id), ct);
+            var response = await handler.HandleAsync(id, ct);
             return response is null ? Results.NotFound() : Results.Ok(response);
         })
         .WithName("GetItem")

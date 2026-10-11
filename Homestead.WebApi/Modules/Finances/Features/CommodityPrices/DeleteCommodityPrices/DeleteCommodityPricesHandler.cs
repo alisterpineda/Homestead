@@ -8,7 +8,7 @@ namespace Homestead.WebApi.Modules.Finances.Features.CommodityPrices.DeleteCommo
 
 public class DeleteCommodityPricesHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork)
 {
-    public async Task<DeleteCommodityPricesResponse> Handle(
+    public async Task<DeleteCommodityPricesResponse> HandleAsync(
         DeleteCommodityPricesCommand request, CancellationToken ct)
     {
         var prices = await db.CommodityPrices

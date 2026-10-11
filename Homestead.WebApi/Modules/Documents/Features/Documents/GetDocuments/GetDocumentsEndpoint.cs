@@ -7,7 +7,7 @@ public static class GetDocumentsEndpoint
         group.MapGet("/", async ([AsParameters] GetDocumentsQuery request,
             GetDocumentsHandler handler, CancellationToken ct) =>
         {
-            var response = await handler.Handle(request, ct);
+            var response = await handler.HandleAsync(request, ct);
             return Results.Ok(response);
         })
         .WithName("GetDocuments")

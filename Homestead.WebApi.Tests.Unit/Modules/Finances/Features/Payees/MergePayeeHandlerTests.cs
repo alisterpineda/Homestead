@@ -46,7 +46,7 @@ public class MergePayeeHandlerTests : IDisposable
         var payee = await AddPayeeAsync("Blue Bottle");
 
         await Assert.ThrowsAsync<BusinessRuleException>(() =>
-            _sut.Handle(new MergePayeeCommand { SourceId = payee.Id, TargetId = payee.Id }, Ct));
+            _sut.HandleAsync(payee.Id, new MergePayeeRequest(payee.Id), Ct));
     }
 
     [Fact]
@@ -55,7 +55,7 @@ public class MergePayeeHandlerTests : IDisposable
         var target = await AddPayeeAsync("Blue Bottle");
 
         await Assert.ThrowsAsync<EntityNotFoundException>(() =>
-            _sut.Handle(new MergePayeeCommand { SourceId = Guid.NewGuid(), TargetId = target.Id }, Ct));
+            _sut.HandleAsync(Guid.NewGuid(), new MergePayeeRequest(target.Id), Ct));
     }
 
     [Fact]
@@ -64,6 +64,6 @@ public class MergePayeeHandlerTests : IDisposable
         var source = await AddPayeeAsync("Blue Bottle Coffee");
 
         await Assert.ThrowsAsync<EntityNotFoundException>(() =>
-            _sut.Handle(new MergePayeeCommand { SourceId = source.Id, TargetId = Guid.NewGuid() }, Ct));
+            _sut.HandleAsync(source.Id, new MergePayeeRequest(Guid.NewGuid()), Ct));
     }
 }

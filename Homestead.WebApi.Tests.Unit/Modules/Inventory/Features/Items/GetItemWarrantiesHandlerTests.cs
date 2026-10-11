@@ -24,7 +24,7 @@ public class GetItemWarrantiesHandlerTests : IDisposable
     [Fact]
     public async Task Handle_MissingItem_ReturnsNull()
     {
-        Assert.Null(await _sut.Handle(new GetItemWarrantiesQuery(Guid.NewGuid()), Ct));
+        Assert.Null(await _sut.HandleAsync(Guid.NewGuid(), Ct));
     }
 
     [Fact]
@@ -32,7 +32,7 @@ public class GetItemWarrantiesHandlerTests : IDisposable
     {
         var item = await ItemNoteTestData.AddItemAsync(_db);
 
-        var result = await _sut.Handle(new GetItemWarrantiesQuery(item.Id), Ct);
+        var result = await _sut.HandleAsync(item.Id, Ct);
 
         Assert.NotNull(result);
         Assert.Empty(result);
@@ -46,7 +46,7 @@ public class GetItemWarrantiesHandlerTests : IDisposable
         var openEnded = await ItemWarrantyTestData.AddWarrantyAsync(_db, item.Id);
         var sooner = await ItemWarrantyTestData.AddWarrantyAsync(_db, item.Id, expiresOn: new DateOnly(2027, 1, 1));
 
-        var result = await _sut.Handle(new GetItemWarrantiesQuery(item.Id), Ct);
+        var result = await _sut.HandleAsync(item.Id, Ct);
 
         Assert.NotNull(result);
         Assert.Equal([sooner.Id, later.Id, openEnded.Id], result.Select(w => w.Id));
@@ -62,7 +62,7 @@ public class GetItemWarrantiesHandlerTests : IDisposable
         var first = await ItemWarrantyTestData.AddWarrantyAsync(_db, item.Id,
             expiresOn: sameDay, createdAt: Now.AddHours(-2));
 
-        var result = await _sut.Handle(new GetItemWarrantiesQuery(item.Id), Ct);
+        var result = await _sut.HandleAsync(item.Id, Ct);
 
         Assert.NotNull(result);
         Assert.Equal([first.Id, second.Id], result.Select(w => w.Id));
@@ -77,7 +77,7 @@ public class GetItemWarrantiesHandlerTests : IDisposable
         await ItemWarrantyTestData.AddWarrantyAsync(_db, item.Id, expiresOn: new DateOnly(2026, 4, 1));
         await ItemWarrantyTestData.AddWarrantyAsync(_db, item.Id);
 
-        var result = await _sut.Handle(new GetItemWarrantiesQuery(item.Id), Ct);
+        var result = await _sut.HandleAsync(item.Id, Ct);
 
         Assert.NotNull(result);
         // Per-row, not per-item: each row carries its own verdict, so a lapsed tier stays visibly
@@ -95,7 +95,7 @@ public class GetItemWarrantiesHandlerTests : IDisposable
         var mine = await ItemWarrantyTestData.AddWarrantyAsync(_db, item.Id, provider: "Bosch");
         await ItemWarrantyTestData.AddWarrantyAsync(_db, other.Id, provider: "Miele");
 
-        var result = await _sut.Handle(new GetItemWarrantiesQuery(item.Id), Ct);
+        var result = await _sut.HandleAsync(item.Id, Ct);
 
         Assert.NotNull(result);
         var only = Assert.Single(result);
@@ -109,7 +109,7 @@ public class GetItemWarrantiesHandlerTests : IDisposable
         // The route is on /items, so a consumable id is a legitimate lookup — it just has no rows.
         var consumable = await ItemNoteTestData.AddItemAsync(_db, Fungibility.Fungible);
 
-        var result = await _sut.Handle(new GetItemWarrantiesQuery(consumable.Id), Ct);
+        var result = await _sut.HandleAsync(consumable.Id, Ct);
 
         Assert.NotNull(result);
         Assert.Empty(result);

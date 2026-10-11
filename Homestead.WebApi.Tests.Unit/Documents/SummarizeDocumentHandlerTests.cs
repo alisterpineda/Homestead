@@ -61,8 +61,7 @@ public class SummarizeDocumentHandlerTests : IDisposable
         _classifier.ClassifyAsync(_documentId, "Test Doc", ClassificationScope.Summary, ct, Arg.Any<bool>())
             .Returns(output);
 
-        var response = await _sut.Handle(
-            new SummarizeDocumentCommand { DocumentId = _documentId }, ct);
+        var response = await _sut.HandleAsync(_documentId, ct);
 
         Assert.Equal("Generated summary", response.Summary);
 
@@ -84,8 +83,7 @@ public class SummarizeDocumentHandlerTests : IDisposable
         _classifier.ClassifyAsync(_documentId, "Test Doc", ClassificationScope.Summary, ct, Arg.Any<bool>())
             .Returns((DocumentClassificationOutput?)null);
 
-        var response = await _sut.Handle(
-            new SummarizeDocumentCommand { DocumentId = _documentId }, ct);
+        var response = await _sut.HandleAsync(_documentId, ct);
 
         Assert.Equal("existing summary", response.Summary);
 
@@ -106,8 +104,7 @@ public class SummarizeDocumentHandlerTests : IDisposable
         _classifier.ClassifyAsync(_documentId, "Test Doc", ClassificationScope.Summary, ct, Arg.Any<bool>())
             .Returns(output);
 
-        var response = await _sut.Handle(
-            new SummarizeDocumentCommand { DocumentId = _documentId }, ct);
+        var response = await _sut.HandleAsync(_documentId, ct);
 
         Assert.Equal("existing summary", response.Summary);
 
@@ -121,6 +118,6 @@ public class SummarizeDocumentHandlerTests : IDisposable
         var ct = TestContext.Current.CancellationToken;
 
         await Assert.ThrowsAsync<EntityNotFoundException>(
-            () => _sut.Handle(new SummarizeDocumentCommand { DocumentId = Guid.NewGuid() }, ct));
+            () => _sut.HandleAsync(Guid.NewGuid(), ct));
     }
 }

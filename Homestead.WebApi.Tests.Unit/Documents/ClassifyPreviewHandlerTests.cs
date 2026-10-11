@@ -56,8 +56,7 @@ public class ClassifyPreviewHandlerTests : IDisposable
 
         _classifier.ClassifyAsync(_documentId, "Test Doc", Arg.Any<ClassificationScope>(), ct, Arg.Any<bool>()).Returns(output);
 
-        var query = new ClassifyPreviewQuery { DocumentId = _documentId };
-        var response = await _sut.Handle(query, ct);
+        var response = await _sut.HandleAsync(_documentId, null, ct);
 
         Assert.Equal("Better Title", response.SuggestedTitle);
         Assert.Null(response.Summary); // Summary is never part of the classify scope
@@ -85,8 +84,7 @@ public class ClassifyPreviewHandlerTests : IDisposable
         _classifier.ClassifyAsync(_documentId, "Test Doc", Arg.Any<ClassificationScope>(), ct, Arg.Any<bool>())
             .Returns((DocumentClassificationOutput?)null);
 
-        var query = new ClassifyPreviewQuery { DocumentId = _documentId };
-        var response = await _sut.Handle(query, ct);
+        var response = await _sut.HandleAsync(_documentId, null, ct);
 
         Assert.Null(response.SuggestedTitle);
         Assert.Null(response.Summary);
@@ -123,8 +121,7 @@ public class ClassifyPreviewHandlerTests : IDisposable
 
         _classifier.ClassifyAsync(_documentId, "Test Doc", Arg.Any<ClassificationScope>(), ct, Arg.Any<bool>()).Returns(output);
 
-        var query = new ClassifyPreviewQuery { DocumentId = _documentId };
-        var response = await _sut.Handle(query, ct);
+        var response = await _sut.HandleAsync(_documentId, null, ct);
 
         Assert.Single(response.Tags);
         Assert.Equal(knownTagId, response.Tags[0].Id);
@@ -148,8 +145,7 @@ public class ClassifyPreviewHandlerTests : IDisposable
 
         _classifier.ClassifyAsync(_documentId, "Same Name", Arg.Any<ClassificationScope>(), ct, Arg.Any<bool>()).Returns(output);
 
-        var query = new ClassifyPreviewQuery { DocumentId = _documentId };
-        var response = await _sut.Handle(query, ct);
+        var response = await _sut.HandleAsync(_documentId, null, ct);
 
         Assert.Null(response.SuggestedTitle);
         Assert.Null(response.Summary); // Summary is never part of the classify scope
@@ -175,8 +171,7 @@ public class ClassifyPreviewHandlerTests : IDisposable
 
         _classifier.ClassifyAsync(_documentId, "Test Doc", Arg.Any<ClassificationScope>(), ct, Arg.Any<bool>()).Returns(output);
 
-        var query = new ClassifyPreviewQuery { DocumentId = _documentId };
-        var response = await _sut.Handle(query, ct);
+        var response = await _sut.HandleAsync(_documentId, null, ct);
 
         Assert.Equal("New Title", response.SuggestedTitle);
         Assert.Null(response.Summary);
@@ -198,8 +193,7 @@ public class ClassifyPreviewHandlerTests : IDisposable
         _classifier.ClassifyAsync(_documentId, "Test Doc", Arg.Any<ClassificationScope>(), ct, Arg.Any<bool>())
             .Returns((DocumentClassificationOutput?)null);
 
-        var query = new ClassifyPreviewQuery { DocumentId = _documentId, Fields = null };
-        await _sut.Handle(query, ct);
+        await _sut.HandleAsync(_documentId, new ClassifyDocumentBody(Fields: null), ct);
 
         await _classifier.Received(1).ClassifyAsync(
             _documentId, "Test Doc",
@@ -223,12 +217,7 @@ public class ClassifyPreviewHandlerTests : IDisposable
         _classifier.ClassifyAsync(_documentId, "Test Doc", Arg.Any<ClassificationScope>(), ct, Arg.Any<bool>())
             .Returns((DocumentClassificationOutput?)null);
 
-        var query = new ClassifyPreviewQuery
-        {
-            DocumentId = _documentId,
-            Fields = [DocumentSuggestionField.Tags]
-        };
-        await _sut.Handle(query, ct);
+        await _sut.HandleAsync(_documentId, new ClassifyDocumentBody([DocumentSuggestionField.Tags]), ct);
 
         await _classifier.Received(1).ClassifyAsync(
             _documentId, "Test Doc", ClassificationScope.Tags, ct, attachImage: false);
@@ -275,8 +264,7 @@ public class ClassifyPreviewHandlerTests : IDisposable
 
         _classifier.ClassifyAsync(_documentId, "Test Doc", Arg.Any<ClassificationScope>(), ct, Arg.Any<bool>()).Returns(output);
 
-        var query = new ClassifyPreviewQuery { DocumentId = _documentId };
-        var response = await _sut.Handle(query, ct);
+        var response = await _sut.HandleAsync(_documentId, null, ct);
 
         Assert.Single(response.Tags);
         Assert.Equal(newTagId, response.Tags[0].Id);
@@ -317,8 +305,7 @@ public class ClassifyPreviewHandlerTests : IDisposable
 
         _classifier.ClassifyAsync(_documentId, "Test Doc", Arg.Any<ClassificationScope>(), ct, Arg.Any<bool>()).Returns(output);
 
-        var query = new ClassifyPreviewQuery { DocumentId = _documentId };
-        var response = await _sut.Handle(query, ct);
+        var response = await _sut.HandleAsync(_documentId, null, ct);
 
         Assert.Single(response.Parties);
         Assert.Equal(newPartyId, response.Parties[0].Id);

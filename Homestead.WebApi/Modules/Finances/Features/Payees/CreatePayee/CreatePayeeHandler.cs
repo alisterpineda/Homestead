@@ -14,7 +14,7 @@ public class CreatePayeeHandler(
     IUnitOfWork unitOfWork,
     IValidator<CreatePayeeCommand> validator)
 {
-    public async Task<PayeeResponse> Handle(CreatePayeeCommand request, CancellationToken ct)
+    public async Task<PayeeResponse> HandleAsync(CreatePayeeCommand request, CancellationToken ct)
     {
         await validator.ValidateAndThrowAsync(request, ct);
 

@@ -117,7 +117,7 @@ public class ImportCommodityPricesJobHandler(
         unitOfWork.SetActor(job.ScheduleId is null ? job.CreatedByUserId : null);
         await unitOfWork.ExecuteInTransactionAsync(async () =>
         {
-            await applyObservations.Handle(command, ct);
+            await applyObservations.HandleAsync(command, ct);
             return true;
         }, ct);
     }

@@ -10,7 +10,7 @@ public static class PatchDividendEndpoint
             async (Guid transactionId, PatchDividendCommand body, PatchDividendHandler handler, CancellationToken ct) =>
         {
             var request = body with { TransactionId = transactionId };
-            var response = await handler.Handle(request, ct);
+            var response = await handler.HandleAsync(request, ct);
             return Results.Ok(response);
         })
         .WithName("PatchDividend")

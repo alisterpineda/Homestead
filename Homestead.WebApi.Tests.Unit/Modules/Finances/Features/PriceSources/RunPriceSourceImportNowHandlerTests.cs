@@ -27,16 +27,16 @@ public class RunPriceSourceImportNowHandlerTests
     [Fact]
     public async Task SystemSource_Throws()
     {
-        await Assert.ThrowsAsync<BusinessRuleException>(() => Sut().Handle(
-            new RunPriceSourceImportNowCommand { Source = CommodityPriceSource.Manual },
+        await Assert.ThrowsAsync<BusinessRuleException>(() => Sut().HandleAsync(
+            CommodityPriceSource.Manual, null,
             TestContext.Current.CancellationToken));
     }
 
     [Fact]
     public async Task UnregisteredSource_Throws()
     {
-        var ex = await Assert.ThrowsAsync<BusinessRuleException>(() => Sut().Handle(
-            new RunPriceSourceImportNowCommand { Source = CommodityPriceSource.BankOfCanada },
+        var ex = await Assert.ThrowsAsync<BusinessRuleException>(() => Sut().HandleAsync(
+            CommodityPriceSource.BankOfCanada, null,
             TestContext.Current.CancellationToken));
         Assert.Contains("No provider is registered", ex.Message);
     }
@@ -47,8 +47,8 @@ public class RunPriceSourceImportNowHandlerTests
         _sources.Providers[CommodityPriceSource.BankOfCanada] =
             TestPriceSources.Provider(CommodityPriceSource.BankOfCanada, enabled: false, configured: false);
 
-        var ex = await Assert.ThrowsAsync<BusinessRuleException>(() => Sut().Handle(
-            new RunPriceSourceImportNowCommand { Source = CommodityPriceSource.BankOfCanada },
+        var ex = await Assert.ThrowsAsync<BusinessRuleException>(() => Sut().HandleAsync(
+            CommodityPriceSource.BankOfCanada, null,
             TestContext.Current.CancellationToken));
         Assert.Contains("is disabled", ex.Message);
     }
@@ -59,8 +59,8 @@ public class RunPriceSourceImportNowHandlerTests
         _sources.Providers[CommodityPriceSource.AlphaVantage] = TestPriceSources.Provider(
             CommodityPriceSource.AlphaVantage, enabled: true, configured: false, error: "ApiKey is required.");
 
-        var ex = await Assert.ThrowsAsync<BusinessRuleException>(() => Sut().Handle(
-            new RunPriceSourceImportNowCommand { Source = CommodityPriceSource.AlphaVantage },
+        var ex = await Assert.ThrowsAsync<BusinessRuleException>(() => Sut().HandleAsync(
+            CommodityPriceSource.AlphaVantage, null,
             TestContext.Current.CancellationToken));
         Assert.Contains("is not configured: ApiKey is required.", ex.Message);
     }
@@ -95,8 +95,8 @@ public class RunPriceSourceImportNowHandlerTests
                 configure?.Invoke(captured);
             });
 
-        var response = await Sut().Handle(
-            new RunPriceSourceImportNowCommand { Source = CommodityPriceSource.BankOfCanada },
+        var response = await Sut().HandleAsync(
+            CommodityPriceSource.BankOfCanada, null,
             TestContext.Current.CancellationToken);
 
         Assert.Equal(jobId, response.JobId);

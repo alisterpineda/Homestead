@@ -1,3 +1,0 @@
-namespace Homestead.WebApi.Modules.Documents.Features.TextExtractionEngines.GetTextExtractionEngines;
-
-public record GetTextExtractionEnginesQuery;

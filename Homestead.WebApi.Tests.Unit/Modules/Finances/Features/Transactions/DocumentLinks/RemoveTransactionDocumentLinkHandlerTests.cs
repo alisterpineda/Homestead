@@ -58,17 +58,11 @@ public class RemoveTransactionDocumentLinkHandlerTests : IAsyncLifetime
         return documentId;
     }
 
-    private RemoveTransactionDocumentLinkCommand Command(Guid documentId) => new()
-    {
-        TransactionId = _transaction.Id,
-        DocumentId = documentId,
-    };
-
     [Fact]
     public async Task Remove_NoSuchLink_ThrowsNotFound()
     {
         await Assert.ThrowsAsync<EntityNotFoundException>(
-            () => _sut.Handle(Command(Guid.NewGuid()), TestContext.Current.CancellationToken));
+            () => _sut.HandleAsync(_transaction.Id, Guid.NewGuid(), TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -77,7 +71,7 @@ public class RemoveTransactionDocumentLinkHandlerTests : IAsyncLifetime
         var documentId = await SeedLinkAsync(TransactionDocumentLinkOrigin.StatementImport);
 
         await Assert.ThrowsAsync<BusinessRuleException>(
-            () => _sut.Handle(Command(documentId), TestContext.Current.CancellationToken));
+            () => _sut.HandleAsync(_transaction.Id, documentId, TestContext.Current.CancellationToken));
 
         Assert.True(await _db.TransactionDocumentLinks.AnyAsync(
             l => l.AccountTransactionId == _transaction.Id && l.DocumentId == documentId,
@@ -89,7 +83,7 @@ public class RemoveTransactionDocumentLinkHandlerTests : IAsyncLifetime
     {
         var documentId = await SeedLinkAsync(TransactionDocumentLinkOrigin.Manual);
 
-        await _sut.Handle(Command(documentId), TestContext.Current.CancellationToken);
+        await _sut.HandleAsync(_transaction.Id, documentId, TestContext.Current.CancellationToken);
 
         Assert.False(await _db.TransactionDocumentLinks.AnyAsync(
             l => l.AccountTransactionId == _transaction.Id && l.DocumentId == documentId,

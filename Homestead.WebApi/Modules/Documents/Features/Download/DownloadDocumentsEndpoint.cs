@@ -8,7 +8,7 @@ public static class DownloadDocumentsEndpoint
     {
         group.MapPost("/", async (DownloadDocumentsCommand request, DownloadDocumentsHandler handler, CancellationToken ct) =>
         {
-            var response = await handler.Handle(request, ct);
+            var response = await handler.HandleAsync(request, ct);
             return Results.Accepted(null, response);
         })
         .WithName("DownloadDocuments")

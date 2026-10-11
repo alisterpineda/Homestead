@@ -38,20 +38,17 @@ public class PatchPriceSourceHandlerTests : IDisposable
     [Fact]
     public async Task SystemSource_Throws()
     {
-        await Assert.ThrowsAsync<BusinessRuleException>(() => Sut().Handle(
-            new PatchPriceSourceCommand { Source = CommodityPriceSource.Manual },
+        await Assert.ThrowsAsync<BusinessRuleException>(() => Sut().HandleAsync(
+            CommodityPriceSource.Manual, new PatchPriceSourceBody(),
             TestContext.Current.CancellationToken));
     }
 
     [Fact]
     public async Task PairAllowList_UnknownSymbol_Throws()
     {
-        await Assert.ThrowsAsync<BusinessRuleException>(() => Sut().Handle(
-            new PatchPriceSourceCommand
-            {
-                Source = CommodityPriceSource.BankOfCanada,
-                PairAllowList = new[] { "ZZZ" },
-            },
+        await Assert.ThrowsAsync<BusinessRuleException>(() => Sut().HandleAsync(
+            CommodityPriceSource.BankOfCanada,
+            new PatchPriceSourceBody { PairAllowList = new[] { "ZZZ" } },
             TestContext.Current.CancellationToken));
     }
 
@@ -69,12 +66,9 @@ public class PatchPriceSourceHandlerTests : IDisposable
         });
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        await Sut().Handle(
-            new PatchPriceSourceCommand
-            {
-                Source = CommodityPriceSource.BankOfCanada,
-                PairAllowList = new[] { "VEQT" },
-            },
+        await Sut().HandleAsync(
+            CommodityPriceSource.BankOfCanada,
+            new PatchPriceSourceBody { PairAllowList = new[] { "VEQT" } },
             TestContext.Current.CancellationToken);
 
         Assert.Contains("VEQT", _db.CommodityPriceSourceSettings.Single().PairAllowList);
@@ -93,12 +87,9 @@ public class PatchPriceSourceHandlerTests : IDisposable
         });
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var response = await Sut().Handle(
-            new PatchPriceSourceCommand
-            {
-                Source = CommodityPriceSource.BankOfCanada,
-                PairAllowList = new[] { " USD ", "usd", "" },
-            },
+        var response = await Sut().HandleAsync(
+            CommodityPriceSource.BankOfCanada,
+            new PatchPriceSourceBody { PairAllowList = new[] { " USD ", "usd", "" } },
             TestContext.Current.CancellationToken);
 
         Assert.Equal(CommodityPriceSource.BankOfCanada, response.Source);
@@ -109,8 +100,8 @@ public class PatchPriceSourceHandlerTests : IDisposable
     [Fact]
     public async Task NoPairAllowList_Response_ReturnsEmptyList()
     {
-        var response = await Sut().Handle(
-            new PatchPriceSourceCommand { Source = CommodityPriceSource.BankOfCanada },
+        var response = await Sut().HandleAsync(
+            CommodityPriceSource.BankOfCanada, new PatchPriceSourceBody(),
             TestContext.Current.CancellationToken);
 
         Assert.Empty(response.PairAllowList);

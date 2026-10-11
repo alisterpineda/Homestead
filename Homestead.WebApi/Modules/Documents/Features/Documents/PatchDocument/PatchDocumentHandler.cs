@@ -17,13 +17,13 @@ public class PatchDocumentHandler(AppDbContext db,
     IDocumentMetadataService metadataService, IDocumentQueryService queryService,
     ICurrentUserAccessor currentUser, IUnitOfWork unitOfWork)
 {
-    public async Task<PatchDocumentResponse> Handle(PatchDocumentCommand request, CancellationToken ct)
+    public async Task<PatchDocumentResponse> HandleAsync(Guid id, JsonPatchDocument<PatchDocumentModel> patchDoc, CancellationToken ct)
     {
         var document = await db.Documents
             .Include(d => d.DocumentTags).ThenInclude(dt => dt.Tag)
             .Include(d => d.DocumentParties)
             .Include(d => d.Suggestions.Where(s => s.Status == DocumentSuggestionStatus.Pending))
-            .FirstOrDefaultAsync(d => d.Id == request.Id, ct);
+            .FirstOrDefaultAsync(d => d.Id == id, ct);
 
         if (document is null)
             throw new EntityNotFoundException("Document not found.");
@@ -44,7 +44,7 @@ public class PatchDocumentHandler(AppDbContext db,
 
         // Apply patch operations
         var errors = new List<JsonPatchError>();
-        request.PatchDocument.ApplyTo(model, error => errors.Add(error));
+        patchDoc.ApplyTo(model, error => errors.Add(error));
 
         if (errors.Count > 0)
             throw new BusinessRuleException(errors.Select(e => new
@@ -89,7 +89,7 @@ public class PatchDocumentHandler(AppDbContext db,
         metadataService.SetParties(document, model.PartyIds);
 
         // Clear pending suggestions for fields the user explicitly changed
-        var patchPaths = request.PatchDocument.Operations
+        var patchPaths = patchDoc.Operations
             .Select(op => op.path?.TrimStart('/').ToLowerInvariant())
             .Where(p => p is not null)
             .ToHashSet();

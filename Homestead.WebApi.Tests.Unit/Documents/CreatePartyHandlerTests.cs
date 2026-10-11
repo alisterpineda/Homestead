@@ -35,7 +35,7 @@ public class CreatePartyHandlerTests : IDisposable
     {
         var request = new CreatePartyCommand { Name = "Acme Corp" };
 
-        var response = await _sut.Handle(request, CancellationToken.None);
+        var response = await _sut.HandleAsync(request, CancellationToken.None);
 
         _audit.Received(1).Created("Party", response.Id, Arg.Any<Guid?>());
     }
@@ -46,6 +46,6 @@ public class CreatePartyHandlerTests : IDisposable
         var request = new CreatePartyCommand { Name = "   " };
 
         await Assert.ThrowsAsync<ValidationException>(
-            () => _sut.Handle(request, TestContext.Current.CancellationToken));
+            () => _sut.HandleAsync(request, TestContext.Current.CancellationToken));
     }
 }

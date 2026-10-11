@@ -6,8 +6,7 @@ public static class GetPartyEndpoint
     {
         group.MapGet("/{id:guid}", async (Guid id, GetPartyHandler handler, CancellationToken ct) =>
         {
-            var request = new GetPartyQuery(id);
-            var response = await handler.Handle(request, ct);
+            var response = await handler.HandleAsync(id, ct);
             return response is not null ? Results.Ok(response) : Results.NotFound();
         })
         .WithName("GetParty")

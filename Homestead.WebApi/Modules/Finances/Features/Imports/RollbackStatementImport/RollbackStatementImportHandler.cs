@@ -22,15 +22,15 @@ public class RollbackStatementImportHandler(
     IPayeeMappingService payeeMappings,
     IUnitOfWork unitOfWork)
 {
-    public async Task<RollbackStatementImportResponse> Handle(
-        RollbackStatementImportCommand request, CancellationToken ct)
+    public async Task<RollbackStatementImportResponse> HandleAsync(
+        Guid documentId, CancellationToken ct)
     {
         // Project just id + discriminator: the shape services re-load the tracked entity themselves.
         // IsImportOriginFor keeps this scope in lockstep with the initiate/commit guards — manual
         // links to the same document must not drag their transactions into a rollback.
         var rows = await db.TransactionDocumentLinks
             .AsNoTracking()
-            .Where(TransactionDocumentLink.IsImportOriginFor(request.DocumentId))
+            .Where(TransactionDocumentLink.IsImportOriginFor(documentId))
             .Select(l => new { Id = l.AccountTransactionId, l.AccountTransaction.Type })
             .ToListAsync(ct);
 
@@ -53,7 +53,7 @@ public class RollbackStatementImportHandler(
         // Retract exactly the mappings this document's import taught (precise last-writer match) — a key later
         // overwritten by a different import carries a different LastWriterDocumentId and is left intact. Same
         // command transaction as the deletes above (the interceptor enrolls the bulk ExecuteDelete).
-        await payeeMappings.RetractByDocumentAsync(request.DocumentId, ct);
+        await payeeMappings.RetractByDocumentAsync(documentId, ct);
 
         await unitOfWork.SaveChangesAsync(ct);
         await reconciler.ReconcileAsync(touched, ct);

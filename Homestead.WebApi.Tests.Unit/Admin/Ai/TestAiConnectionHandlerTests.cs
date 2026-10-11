@@ -27,7 +27,7 @@ public class TestAiConnectionHandlerTests
         var ct = TestContext.Current.CancellationToken;
 
         var result = await new TestAiConnectionHandler(TestAiProviders.Unresolved())
-            .Handle(new TestAiConnectionCommand(), ct);
+            .HandleAsync(providerKey: null, ct);
 
         Assert.False(result.Success);
         Assert.Equal("AI is not configured.", result.Message);
@@ -43,7 +43,7 @@ public class TestAiConnectionHandlerTests
         var broken = TestAiProviders.UnavailableProvider("foundry", "ApiKey is required.");
 
         var result = await new TestAiConnectionHandler(TestAiProviders.Resolver(broken))
-            .Handle(new TestAiConnectionCommand(), ct);
+            .HandleAsync(providerKey: null, ct);
 
         Assert.False(result.Success);
         Assert.Equal("AI provider 'foundry' is unavailable: ApiKey is required.", result.Message);
@@ -58,7 +58,7 @@ public class TestAiConnectionHandlerTests
         _client.GetResponseAsync(Arg.Any<IEnumerable<ChatMessage>>(), Arg.Any<ChatOptions>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, "pong"))));
 
-        await Sut().Handle(new TestAiConnectionCommand("foundry"), ct);
+        await Sut().HandleAsync("foundry", ct);
 
         _resolver.Received(1).Resolve("foundry");
     }
@@ -70,7 +70,7 @@ public class TestAiConnectionHandlerTests
         _client.GetResponseAsync(Arg.Any<IEnumerable<ChatMessage>>(), Arg.Any<ChatOptions>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, "pong"))));
 
-        var result = await Sut().Handle(new TestAiConnectionCommand(), ct);
+        var result = await Sut().HandleAsync(providerKey: null, ct);
 
         Assert.True(result.Success);
         Assert.Equal("Connection successful.", result.Message);
@@ -85,7 +85,7 @@ public class TestAiConnectionHandlerTests
         _client.GetResponseAsync(Arg.Any<IEnumerable<ChatMessage>>(), Arg.Any<ChatOptions>(), Arg.Any<CancellationToken>())
             .ThrowsAsync(new InvalidOperationException("bad endpoint"));
 
-        var result = await Sut().Handle(new TestAiConnectionCommand(), ct);
+        var result = await Sut().HandleAsync(providerKey: null, ct);
 
         Assert.False(result.Success);
         Assert.Equal("bad endpoint", result.Message);
@@ -102,7 +102,7 @@ public class TestAiConnectionHandlerTests
         provider.GetChatClient().Throws(new UriFormatException("Invalid URI."));
 
         var result = await new TestAiConnectionHandler(TestAiProviders.Resolver(provider))
-            .Handle(new TestAiConnectionCommand(), ct);
+            .HandleAsync(providerKey: null, ct);
 
         Assert.False(result.Success);
         Assert.Equal("Invalid URI.", result.Message);
@@ -118,7 +118,7 @@ public class TestAiConnectionHandlerTests
         _client.GetResponseAsync(Arg.Any<IEnumerable<ChatMessage>>(), Arg.Any<ChatOptions>(), Arg.Any<CancellationToken>())
             .ThrowsAsync(new OperationCanceledException());
 
-        var result = await Sut().Handle(new TestAiConnectionCommand(), ct);
+        var result = await Sut().HandleAsync(providerKey: null, ct);
 
         Assert.False(result.Success);
         Assert.Equal("Connection timed out.", result.Message);
@@ -132,7 +132,7 @@ public class TestAiConnectionHandlerTests
         _client.GetResponseAsync(Arg.Any<IEnumerable<ChatMessage>>(), Arg.Any<ChatOptions>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, "pong"))));
 
-        await Sut().Handle(new TestAiConnectionCommand(), ct);
+        await Sut().HandleAsync(providerKey: null, ct);
 
         // The provider returns a singleton it owns for the app lifetime — the handler must never dispose it.
         _client.DidNotReceive().Dispose();

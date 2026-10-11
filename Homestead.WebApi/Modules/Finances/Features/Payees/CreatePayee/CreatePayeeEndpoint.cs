@@ -8,7 +8,7 @@ public static class CreatePayeeEndpoint
     {
         group.MapPost("", async (CreatePayeeCommand request, CreatePayeeHandler handler, CancellationToken ct) =>
         {
-            var response = await handler.Handle(request, ct);
+            var response = await handler.HandleAsync(request, ct);
             return Results.Created($"/api/v1/finances/payees/{response.Id}", response);
         })
         .WithName("CreatePayee")

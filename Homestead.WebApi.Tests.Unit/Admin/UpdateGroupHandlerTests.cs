@@ -26,7 +26,7 @@ public class UpdateGroupHandlerTests : IDisposable
             .Returns(ci => _db.SaveChangesAsync(ci.Arg<CancellationToken>()));
         var currentUser = Substitute.For<ICurrentUserAccessor>();
         currentUser.UserId.Returns(Guid.NewGuid());
-        _sut = new UpdateGroupHandler(_db, _audit, currentUser, _unitOfWork, new UpdateGroupCommandValidator());
+        _sut = new UpdateGroupHandler(_db, _audit, currentUser, _unitOfWork, new UpdateGroupRequestValidator());
     }
 
     public void Dispose() => _db.Dispose();
@@ -44,13 +44,8 @@ public class UpdateGroupHandlerTests : IDisposable
         _db.Groups.Add(group);
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var command = new UpdateGroupCommand
-        {
-            Id = group.Id,
-            Request = new UpdateGroupRequest { Name = "New Name", Description = "New desc" }
-        };
-
-        await _sut.Handle(command, TestContext.Current.CancellationToken);
+        await _sut.HandleAsync(group.Id,
+            new UpdateGroupRequest { Name = "New Name", Description = "New desc" }, TestContext.Current.CancellationToken);
 
         _audit.Received(1).Track<GroupSnapshot, Group>(Arg.Any<Group>(), "Group", group.Id, Arg.Any<Guid?>());
     }
@@ -69,13 +64,8 @@ public class UpdateGroupHandlerTests : IDisposable
 
         var before = DateTimeOffset.UtcNow;
 
-        var command = new UpdateGroupCommand
-        {
-            Id = group.Id,
-            Request = new UpdateGroupRequest { Name = "New Name" }
-        };
-
-        var result = await _sut.Handle(command, TestContext.Current.CancellationToken);
+        var result = await _sut.HandleAsync(group.Id,
+            new UpdateGroupRequest { Name = "New Name" }, TestContext.Current.CancellationToken);
 
         Assert.True(result.UpdatedAt >= before);
         Assert.NotNull(result.UpdatedByUserId);
@@ -94,13 +84,8 @@ public class UpdateGroupHandlerTests : IDisposable
         _db.Groups.Add(group);
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var command = new UpdateGroupCommand
-        {
-            Id = group.Id,
-            Request = new UpdateGroupRequest { Name = "Same", Description = "Same desc" }
-        };
-
-        await _sut.Handle(command, TestContext.Current.CancellationToken);
+        await _sut.HandleAsync(group.Id,
+            new UpdateGroupRequest { Name = "Same", Description = "Same desc" }, TestContext.Current.CancellationToken);
 
         // Track is always called before mutations; diff computation is deferred
         _audit.Received(1).Track<GroupSnapshot, Group>(Arg.Any<Group>(), "Group", group.Id, Arg.Any<Guid?>());
@@ -109,12 +94,7 @@ public class UpdateGroupHandlerTests : IDisposable
     [Fact]
     public async Task Handle_BlankName_ThrowsValidationException()
     {
-        var command = new UpdateGroupCommand
-        {
-            Id = Guid.NewGuid(),
-            Request = new UpdateGroupRequest { Name = "   " }
-        };
-
-        await Assert.ThrowsAsync<ValidationException>(() => _sut.Handle(command, TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<ValidationException>(() => _sut.HandleAsync(Guid.NewGuid(),
+            new UpdateGroupRequest { Name = "   " }, TestContext.Current.CancellationToken));
     }
 }

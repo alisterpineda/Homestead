@@ -114,7 +114,7 @@ public class UploadDocumentVersionJobHandler(
             try
             {
                 unitOfWork.SetActor(job.CreatedByUserId);
-                result = await unitOfWork.ExecuteInTransactionAsync(() => addDocumentVersion.Handle(command, ct), ct);
+                result = await unitOfWork.ExecuteInTransactionAsync(() => addDocumentVersion.HandleAsync(command, ct), ct);
             }
             catch
             {

@@ -7,7 +7,7 @@ namespace Homestead.WebApi.Modules.Documents.Features.Parties.GetParties;
 
 public class GetPartiesHandler(AppDbContext db, IDocumentQueryService accessService)
 {
-    public async Task<PaginatedResponse<GetPartiesResponse>> Handle(
+    public async Task<PaginatedResponse<GetPartiesResponse>> HandleAsync(
         GetPartiesQuery request, CancellationToken ct)
     {
         var query = db.Parties.AsNoTracking();

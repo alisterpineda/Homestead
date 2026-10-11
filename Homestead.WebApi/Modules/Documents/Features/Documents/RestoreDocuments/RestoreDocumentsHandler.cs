@@ -10,7 +10,7 @@ public class RestoreDocumentsHandler(
     IAuditContext audit, IDocumentQueryService accessService,
     ICurrentUserAccessor currentUser, IUnitOfWork unitOfWork)
 {
-    public async Task<RestoreDocumentsResponse> Handle(RestoreDocumentsCommand request, CancellationToken ct)
+    public async Task<RestoreDocumentsResponse> HandleAsync(RestoreDocumentsCommand request, CancellationToken ct)
     {
         var documents = await accessService.WritableDocuments(TrashFilter.TrashedOnly)
             .Where(d => request.Ids.Contains(d.Id))

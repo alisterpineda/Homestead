@@ -29,9 +29,13 @@ public class DeleteBackupSourceHandler(
     IAuditContext audit,
     IUnitOfWork unitOfWork)
 {
-    public async Task<bool> Handle(DeleteBackupSourceCommand request, CancellationToken ct)
+    /// <param name="cancelRun">
+    /// Opt in to cancelling a live run so the pairing can be deleted. Without it a live run is a 409 —
+    /// deleting the row out from under a running mirror is not something to do by accident.
+    /// </param>
+    public async Task<bool> HandleAsync(Guid id, bool cancelRun, CancellationToken ct)
     {
-        var source = await db.BackupSources.FirstOrDefaultAsync(s => s.Id == request.Id, ct)
+        var source = await db.BackupSources.FirstOrDefaultAsync(s => s.Id == id, ct)
             ?? throw new EntityNotFoundException("Backup source not found.");
 
         // EntityId is the pairing's own id, so it identifies the run on its own; the job-type narrowing is
@@ -39,7 +43,7 @@ public class DeleteBackupSourceHandler(
         // deletable). ParentJobId == null is what separates the run from its batch children, which share
         // the parent's EntityId.
         var liveRuns = db.ProcessingJobs.Where(j =>
-            j.EntityId == request.Id &&
+            j.EntityId == id &&
             j.ParentJobId == null &&
             (j.Status == ProcessingJobStatus.Pending || j.Status == ProcessingJobStatus.InProgress));
 
@@ -56,7 +60,7 @@ public class DeleteBackupSourceHandler(
 
         if (liveRun is not null)
         {
-            if (!request.CancelRun)
+            if (!cancelRun)
                 throw new EntityInUseException(
                     "A backup run for this source is in progress. Cancel the run to delete it.");
 

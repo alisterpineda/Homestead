@@ -7,7 +7,7 @@ namespace Homestead.WebApi.Modules.Documents.Processing.Commands;
 
 /// <summary>
 /// Internal command that appends a new version to an existing document in one unit of work. Distinct
-/// from the HTTP <c>CreateDocumentVersionCommand</c>, which stages the file and enqueues the job that
+/// from the HTTP <c>CreateDocumentVersionHandler</c>, which stages the file and enqueues the job that
 /// ultimately sends this. No document-authorization marker — authorization happened at enqueue.
 /// </summary>
 public record AddDocumentVersionCommand
@@ -28,12 +28,12 @@ public record AddDocumentVersionResult(Guid VersionId, string DocumentName);
 
 public interface IAddDocumentVersionHandler
 {
-    Task<AddDocumentVersionResult> Handle(AddDocumentVersionCommand request, CancellationToken ct);
+    Task<AddDocumentVersionResult> HandleAsync(AddDocumentVersionCommand request, CancellationToken ct);
 }
 
 public class AddDocumentVersionHandler(AppDbContext db, IAuditContext audit) : IAddDocumentVersionHandler
 {
-    public async Task<AddDocumentVersionResult> Handle(AddDocumentVersionCommand request, CancellationToken ct)
+    public async Task<AddDocumentVersionResult> HandleAsync(AddDocumentVersionCommand request, CancellationToken ct)
     {
         var documentName = await db.Documents
             .Where(d => d.Id == request.DocumentId)

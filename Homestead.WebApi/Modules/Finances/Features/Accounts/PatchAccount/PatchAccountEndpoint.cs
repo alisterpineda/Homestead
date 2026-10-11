@@ -10,14 +10,7 @@ public static class PatchAccountEndpoint
         group.MapPatch("/{id:guid}", async (Guid id,
             JsonPatchDocument<PatchAccountModel> patchDoc,
             PatchAccountHandler handler, CancellationToken ct) =>
-        {
-            var command = new PatchAccountCommand
-            {
-                Id = id,
-                PatchDocument = patchDoc
-            };
-            return Results.Ok(await handler.Handle(command, ct));
-        })
+            Results.Ok(await handler.HandleAsync(id, patchDoc, ct)))
         .WithName("PatchAccount")
         .Accepts<JsonPatchDocument<PatchAccountModel>>("application/json-patch+json")
         .Produces<AccountResponse>()

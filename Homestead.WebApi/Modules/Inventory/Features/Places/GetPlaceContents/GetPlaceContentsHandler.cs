@@ -15,7 +15,7 @@ public class GetPlaceContentsHandler(
 {
     private const int PreviewNameCount = 3;
 
-    public async Task<PlaceContentsResponse> Handle(GetPlaceContentsQuery request, CancellationToken ct)
+    public async Task<PlaceContentsResponse> HandleAsync(GetPlaceContentsQuery request, CancellationToken ct)
     {
         var scopeCount = (request.AreaId is not null ? 1 : 0)
             + (request.ContainerItemId is not null ? 1 : 0)

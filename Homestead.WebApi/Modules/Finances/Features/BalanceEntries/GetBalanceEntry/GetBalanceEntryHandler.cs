@@ -8,17 +8,17 @@ namespace Homestead.WebApi.Modules.Finances.Features.BalanceEntries.GetBalanceEn
 
 public class GetBalanceEntryHandler(AppDbContext db)
 {
-    public async Task<BalanceEntryResponse> Handle(GetBalanceEntryQuery request, CancellationToken ct)
+    public async Task<BalanceEntryResponse> HandleAsync(Guid accountId, Guid transactionId, CancellationToken ct)
     {
-        await AccountVisibility.EnsureUserVisibleAsync(db, request.AccountId, ct);
+        await AccountVisibility.EnsureUserVisibleAsync(db, accountId, ct);
 
         var entry = await db.AccountTransactions
             .OfType<BalanceEntryTransaction>()
             .AsNoTracking()
-            .FirstOrDefaultAsync(e => e.Id == request.TransactionId, ct)
+            .FirstOrDefaultAsync(e => e.Id == transactionId, ct)
             ?? throw new EntityNotFoundException("Balance entry not found.");
 
-        if (entry.AccountId != request.AccountId)
+        if (entry.AccountId != accountId)
             throw new BusinessRuleException("Balance entry does not belong to this account.");
 
         return BalanceEntryMapping.ToResponse(entry);

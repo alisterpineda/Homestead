@@ -11,7 +11,7 @@ public static class PatchOpeningBalanceEndpoint
                 PatchOpeningBalanceHandler handler, CancellationToken ct) =>
         {
             var request = body with { AccountId = accountId, CommodityId = commodityId };
-            var response = await handler.Handle(request, ct);
+            var response = await handler.HandleAsync(request, ct);
             return Results.Ok(response);
         })
         .WithName("PatchOpeningBalance")

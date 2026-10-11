@@ -37,7 +37,7 @@ public class PatchTagHandlerTests : IDisposable
     {
         var patch = new JsonPatchDocument<PatchInventoryTagModel>();
         build(patch);
-        return _sut.Handle(new PatchInventoryTagCommand { Id = id, PatchDocument = patch }, Ct);
+        return _sut.HandleAsync(id, patch, Ct);
     }
 
     [Fact]

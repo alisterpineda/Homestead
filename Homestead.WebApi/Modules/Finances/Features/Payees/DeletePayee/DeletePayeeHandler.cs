@@ -8,9 +8,9 @@ namespace Homestead.WebApi.Modules.Finances.Features.Payees.DeletePayee;
 
 public class DeletePayeeHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork)
 {
-    public async Task<bool> Handle(DeletePayeeCommand request, CancellationToken ct)
+    public async Task<bool> HandleAsync(Guid id, CancellationToken ct)
     {
-        var payee = await db.Payees.FirstOrDefaultAsync(p => p.Id == request.Id, ct);
+        var payee = await db.Payees.FirstOrDefaultAsync(p => p.Id == id, ct);
         if (payee is null)
             return false;
 

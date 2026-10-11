@@ -9,7 +9,7 @@ public static class InitiateStatementImportEndpoint
         group.MapPost("", async (
             InitiateStatementImportCommand request, InitiateStatementImportHandler handler, CancellationToken ct) =>
         {
-            var response = await handler.Handle(request, ct);
+            var response = await handler.HandleAsync(request, ct);
             return Results.Created($"/api/v1/finances/imports/{response.JobId}", response);
         })
         .WithName("InitiateStatementImport")

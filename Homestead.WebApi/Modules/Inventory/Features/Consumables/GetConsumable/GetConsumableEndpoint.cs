@@ -6,7 +6,7 @@ public static class GetConsumableEndpoint
     {
         group.MapGet("/{id:guid}", async (Guid id, GetConsumableHandler handler, CancellationToken ct) =>
         {
-            var response = await handler.Handle(new GetConsumableQuery(id), ct);
+            var response = await handler.HandleAsync(id, ct);
             return response is null ? Results.NotFound() : Results.Ok(response);
         })
         .WithName("GetConsumable")

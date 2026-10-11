@@ -51,7 +51,7 @@ public class GetCommodityPricesHandlerTests : IDisposable
             MakePrice(now, 12m),
             MakePrice(now.AddDays(-1), 11m));
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new GetCommodityPricesQuery { CommodityId = _commodityId, Page = 1, PageSize = 10 }, Ct);
 
         Assert.Equal([12m, 11m, 10m], result.Items.Select(p => p.Rate).ToArray());
@@ -65,7 +65,7 @@ public class GetCommodityPricesHandlerTests : IDisposable
             MakePrice(now.AddDays(-1), 10m),
             MakePrice(now, 11m));
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new GetCommodityPricesQuery
             {
                 CommodityId = _commodityId,
@@ -87,7 +87,7 @@ public class GetCommodityPricesHandlerTests : IDisposable
             MakePrice(now.AddDays(-2), 10m),
             MakePrice(now.AddDays(-1), 11m));
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new GetCommodityPricesQuery
             {
                 CommodityId = _commodityId,
@@ -109,7 +109,7 @@ public class GetCommodityPricesHandlerTests : IDisposable
             MakePrice(now.AddMinutes(-1), 100m),
             MakePrice(now.AddMinutes(-2), 50m));
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new GetCommodityPricesQuery
             {
                 CommodityId = _commodityId,
@@ -131,7 +131,7 @@ public class GetCommodityPricesHandlerTests : IDisposable
             MakePrice(now.AddMinutes(-1), 5m),
             MakePrice(now.AddMinutes(-2), 50m));
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new GetCommodityPricesQuery
             {
                 CommodityId = _commodityId,
@@ -162,7 +162,7 @@ public class GetCommodityPricesHandlerTests : IDisposable
             MakePrice(now.AddMinutes(-1), 2m, quoteCurrencyId: quoteA),
             MakePrice(now.AddMinutes(-2), 3m, quoteCurrencyId: quoteB));
 
-        var ascResult = await _sut.Handle(
+        var ascResult = await _sut.HandleAsync(
             new GetCommodityPricesQuery
             {
                 CommodityId = _commodityId,
@@ -176,7 +176,7 @@ public class GetCommodityPricesHandlerTests : IDisposable
         Assert.Equal(quoteB, ascResult.Items[1].QuoteCurrencyId);
         Assert.Equal(quoteB, ascResult.Items[2].QuoteCurrencyId);
 
-        var descResult = await _sut.Handle(
+        var descResult = await _sut.HandleAsync(
             new GetCommodityPricesQuery
             {
                 CommodityId = _commodityId,
@@ -200,7 +200,7 @@ public class GetCommodityPricesHandlerTests : IDisposable
             MakePrice(now.AddMinutes(-1), 2m, CommodityPriceSource.Transaction),
             MakePrice(now.AddMinutes(-2), 3m, CommodityPriceSource.AlphaVantage));
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new GetCommodityPricesQuery
             {
                 CommodityId = _commodityId,
@@ -223,7 +223,7 @@ public class GetCommodityPricesHandlerTests : IDisposable
             MakePrice(now.AddMinutes(-2), 3m, CommodityPriceSource.AlphaVantage),
             MakePrice(now.AddMinutes(-3), 4m, CommodityPriceSource.BankOfCanada));
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new GetCommodityPricesQuery
             {
                 CommodityId = _commodityId,
@@ -245,7 +245,7 @@ public class GetCommodityPricesHandlerTests : IDisposable
             MakePrice(now, 1m, CommodityPriceSource.Manual),
             MakePrice(now.AddMinutes(-1), 2m, CommodityPriceSource.Transaction));
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new GetCommodityPricesQuery
             {
                 CommodityId = _commodityId,
@@ -265,7 +265,7 @@ public class GetCommodityPricesHandlerTests : IDisposable
             MakePrice(now, 1m, CommodityPriceSource.Manual),
             MakePrice(now.AddMinutes(-1), 2m, CommodityPriceSource.Transaction));
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new GetCommodityPricesQuery
             {
                 CommodityId = _commodityId,

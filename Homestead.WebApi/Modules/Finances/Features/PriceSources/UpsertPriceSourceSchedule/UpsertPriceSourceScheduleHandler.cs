@@ -13,37 +13,37 @@ public class UpsertPriceSourceScheduleHandler(
     AppDbContext db,
     ICurrentUserAccessor currentUser,
     IPriceSourceScheduleStore scheduleStore,
-    IValidator<UpsertPriceSourceScheduleCommand> validator)
+    IValidator<UpsertPriceSourceScheduleBody> validator)
 {
-    public async Task<UpsertPriceSourceScheduleResponse> Handle(
-        UpsertPriceSourceScheduleCommand request, CancellationToken ct)
+    public async Task<UpsertPriceSourceScheduleResponse> HandleAsync(
+        CommodityPriceSource source, UpsertPriceSourceScheduleBody body, CancellationToken ct)
     {
-        await validator.ValidateAndThrowAsync(request, ct);
+        await validator.ValidateAndThrowAsync(body, ct);
 
-        request.Source.RequireExternal("scheduled");
+        source.RequireExternal("scheduled");
 
         var now = DateTimeOffset.UtcNow;
-        var nextRunAt = CronSchedule.NextOccurrence(request.CronExpression, now);
+        var nextRunAt = CronSchedule.NextOccurrence(body.CronExpression, now);
 
         // RemoveBySource only marks the existing schedule for deletion; the Add below stages the new one.
         // Both are a single atomic SaveChanges committed by the command pipeline's transaction — no need
         // for an explicit execution strategy or transaction here (which would nest illegally now).
-        await scheduleStore.RemoveBySourceAsync(request.Source, ct);
+        await scheduleStore.RemoveBySourceAsync(source, ct);
 
         var schedule = new ProcessingSchedule
         {
-            Name = $"{request.Source.DisplayName()} price import",
+            Name = $"{source.DisplayName()} price import",
             Description = "Managed via /finances/settings/price-sources",
             JobType = ProcessingJobType.ImportCommodityPrices,
-            CronExpression = request.CronExpression,
+            CronExpression = body.CronExpression,
             TimeZone = CronSchedule.DefaultTimeZone,
-            Priority = request.Priority,
-            IsEnabled = request.IsEnabled,
+            Priority = body.Priority,
+            IsEnabled = body.IsEnabled,
             CreatedAt = now,
             CreatedByUserId = currentUser.UserId,
             NextRunAt = nextRunAt,
         };
-        schedule.SetPayload(new ImportCommodityPricesPayload(request.Source));
+        schedule.SetPayload(new ImportCommodityPricesPayload(source));
 
         db.ProcessingSchedules.Add(schedule);
 

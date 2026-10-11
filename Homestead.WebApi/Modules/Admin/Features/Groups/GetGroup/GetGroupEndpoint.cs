@@ -6,7 +6,7 @@ public static class GetGroupEndpoint
     {
         group.MapGet("/{id:guid}", async (Guid id, GetGroupHandler handler, CancellationToken ct) =>
         {
-            var response = await handler.Handle(new GetGroupQuery(id), ct);
+            var response = await handler.HandleAsync(id, ct);
             return response is not null ? Results.Ok(response) : Results.NotFound();
         })
         .WithName("GetGroup")

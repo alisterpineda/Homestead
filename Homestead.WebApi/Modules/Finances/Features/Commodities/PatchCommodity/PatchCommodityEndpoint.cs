@@ -10,14 +10,7 @@ public static class PatchCommodityEndpoint
         group.MapPatch("/{id:guid}", async (Guid id,
             JsonPatchDocument<PatchCommodityModel> patchDoc,
             PatchCommodityHandler handler, CancellationToken ct) =>
-        {
-            var command = new PatchCommodityCommand
-            {
-                Id = id,
-                PatchDocument = patchDoc
-            };
-            return Results.Ok(await handler.Handle(command, ct));
-        })
+            Results.Ok(await handler.HandleAsync(id, patchDoc, ct)))
         .WithName("PatchCommodity")
         .Accepts<JsonPatchDocument<PatchCommodityModel>>("application/json-patch+json")
         .Produces<CommodityResponse>()

@@ -10,7 +10,7 @@ public static class PatchCategoryEndpoint
             async (Guid id, PatchCategoryCommand body, PatchCategoryHandler handler, CancellationToken ct) =>
         {
             var request = body with { Id = id };
-            return Results.Ok(await handler.Handle(request, ct));
+            return Results.Ok(await handler.HandleAsync(request, ct));
         })
         .WithName("PatchCategory")
         .Produces<CategoryResponse>()

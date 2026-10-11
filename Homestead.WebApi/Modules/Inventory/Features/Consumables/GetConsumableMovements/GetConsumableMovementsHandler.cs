@@ -6,18 +6,19 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Consumables.GetConsumableMovements;
 
+/// <summary>Pages a consumable's movement ledger, newest-first. Returns null when the consumable is missing.</summary>
 public class GetConsumableMovementsHandler(AppDbContext db, IItemLocationResolver locationResolver)
 {
-    public async Task<PaginatedResponse<StockMovementResponse>?> Handle(
-        GetConsumableMovementsQuery request, CancellationToken ct)
+    public async Task<PaginatedResponse<StockMovementResponse>?> HandleAsync(
+        Guid id, PaginatedRequest paging, CancellationToken ct)
     {
         var exists = await db.Items.AsNoTracking()
-            .AnyAsync(i => i.Id == request.Id && i.Fungibility == Fungibility.Fungible, ct);
+            .AnyAsync(i => i.Id == id && i.Fungibility == Fungibility.Fungible, ct);
         if (!exists)
             return null;
 
         var page = await db.StockMovements.AsNoTracking()
-            .Where(m => m.ItemId == request.Id)
+            .Where(m => m.ItemId == id)
             .OrderByDescending(m => m.OccurredAt)
             .ThenByDescending(m => m.CreatedAt)
             .ThenByDescending(m => m.Id)
@@ -42,7 +43,7 @@ public class GetConsumableMovementsHandler(AppDbContext db, IItemLocationResolve
                 Source = m.Source,
                 CreatedAt = m.CreatedAt,
             })
-            .ToPaginatedAsync(request, ct);
+            .ToPaginatedAsync(paging, ct);
 
         var locations = page.Items
             .SelectMany(m => new[]

@@ -7,7 +7,7 @@ namespace Homestead.WebApi.Tests.Unit.Documents.TextExtraction;
 // — what engines exist is a deployment fact — so "the key names a configured engine" IS the validation.
 public class EngineKeyValidationTests
 {
-    private static ReprocessDocumentVersionCommandValidator ReprocessValidator() =>
+    private static ReprocessDocumentVersionBodyValidator ReprocessValidator() =>
         new(TestTextExtraction.Engines());
 
     private static BulkReprocessDocumentsCommandValidator BulkValidator() =>
@@ -20,7 +20,7 @@ public class EngineKeyValidationTests
     [InlineData("   ")]
     public void Reprocess_NoEngineKey_IsValid(string? key)
     {
-        var result = ReprocessValidator().Validate(new ReprocessDocumentVersionCommand { EngineKey = key });
+        var result = ReprocessValidator().Validate(new ReprocessDocumentVersionBody(key));
 
         Assert.True(result.IsValid);
     }
@@ -29,7 +29,7 @@ public class EngineKeyValidationTests
     public void Reprocess_ConfiguredKey_IsValid()
     {
         var result = ReprocessValidator().Validate(
-            new ReprocessDocumentVersionCommand { EngineKey = "azure-layout" });
+            new ReprocessDocumentVersionBody("azure-layout"));
 
         Assert.True(result.IsValid);
     }
@@ -38,11 +38,11 @@ public class EngineKeyValidationTests
     public void Reprocess_UnknownKey_IsRejectedAndListsWhatExists()
     {
         var result = ReprocessValidator().Validate(
-            new ReprocessDocumentVersionCommand { EngineKey = "azure-typo" });
+            new ReprocessDocumentVersionBody("azure-typo"));
 
         Assert.False(result.IsValid);
         var error = Assert.Single(result.Errors);
-        Assert.Equal(nameof(ReprocessDocumentVersionCommand.EngineKey), error.PropertyName);
+        Assert.Equal(nameof(ReprocessDocumentVersionBody.EngineKey), error.PropertyName);
         Assert.Contains("'tesseract'", error.ErrorMessage);
         Assert.Contains("'azure-layout'", error.ErrorMessage);
     }
@@ -70,7 +70,7 @@ public class EngineKeyValidationTests
     public void Reprocess_ConfiguredButUnavailableKey_PassesValidationAndIsLeftToTheResolver()
     {
         var result = ReprocessValidator().Validate(
-            new ReprocessDocumentVersionCommand { EngineKey = "azure-layout" });
+            new ReprocessDocumentVersionBody("azure-layout"));
 
         Assert.True(result.IsValid);
     }

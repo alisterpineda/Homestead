@@ -53,7 +53,7 @@ public class LazyTransactionTests(PostgresFixture fixture) : IntegrationTestBase
             var handler = scope.ServiceProvider.GetRequiredService<DeleteProcessingScheduleHandler>();
             var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
             var deleted = await unitOfWork.ExecuteInTransactionAsync(
-                () => handler.Handle(new DeleteProcessingScheduleCommand(scheduleId), CT), CT);
+                () => handler.HandleAsync(scheduleId, CT), CT);
             Assert.True(deleted);
         }
 

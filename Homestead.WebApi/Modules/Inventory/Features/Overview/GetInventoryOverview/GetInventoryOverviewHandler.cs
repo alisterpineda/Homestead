@@ -14,8 +14,7 @@ public class GetInventoryOverviewHandler(
     private const int PreviewCount = 5;
     private const int RecentCount = 10;
 
-    public async Task<GetInventoryOverviewResponse> Handle(
-        GetInventoryOverviewQuery request, CancellationToken ct)
+    public async Task<GetInventoryOverviewResponse> HandleAsync(CancellationToken ct)
     {
         // Low stock — same predicate as GetConsumablesHandler's LowStockOnly filter over live
         // consumables. The on-hand sum is projected once so SQL evaluates the correlated aggregate

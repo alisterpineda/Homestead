@@ -10,7 +10,7 @@ public class CreateProcessingScheduleHandler(
     AppDbContext db, ICurrentUserAccessor currentUser, IUnitOfWork unitOfWork,
     IValidator<CreateProcessingScheduleCommand> validator)
 {
-    public async Task<CreateProcessingScheduleResponse> Handle(
+    public async Task<CreateProcessingScheduleResponse> HandleAsync(
         CreateProcessingScheduleCommand request, CancellationToken ct)
     {
         await validator.ValidateAndThrowAsync(request, ct);

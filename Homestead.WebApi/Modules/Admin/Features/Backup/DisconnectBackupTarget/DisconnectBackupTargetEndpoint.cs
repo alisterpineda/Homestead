@@ -7,7 +7,7 @@ public static class DisconnectBackupTargetEndpoint
         group.MapDelete("/targets/{key}/connection", async (
             string key, DisconnectBackupTargetHandler handler, CancellationToken ct) =>
         {
-            await handler.Handle(new DisconnectBackupTargetCommand(key), ct);
+            await handler.HandleAsync(key, ct);
             return Results.NoContent();
         })
         .WithName("DisconnectBackupTarget")

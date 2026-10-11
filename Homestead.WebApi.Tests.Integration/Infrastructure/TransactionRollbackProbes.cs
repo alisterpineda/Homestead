@@ -41,18 +41,18 @@ public static class TransactionRollbackProbes
         var probes = endpoints.MapGroup(RoutePrefix).WithCommandTransaction();
 
         MapProbe<AuditedRollbackProbeCommand, AuditedRollbackProbeHandler>(
-            probes, AuditedRollbackRoute, (h, c, ct) => h.Handle(c, ct));
+            probes, AuditedRollbackRoute, (h, c, ct) => h.HandleAsync(c, ct));
         MapProbe<EnqueueRollbackProbeCommand, EnqueueRollbackProbeHandler>(
-            probes, EnqueueRollbackRoute, (h, c, ct) => h.Handle(c, ct));
+            probes, EnqueueRollbackRoute, (h, c, ct) => h.HandleAsync(c, ct));
         MapProbe<ExecuteUpdateRollbackProbeCommand, ExecuteUpdateRollbackProbeHandler>(
-            probes, ExecuteUpdateRollbackRoute, (h, c, ct) => h.Handle(c, ct));
+            probes, ExecuteUpdateRollbackRoute, (h, c, ct) => h.HandleAsync(c, ct));
         MapProbe<ExecuteDeleteNoEnsureRollbackProbeCommand, ExecuteDeleteNoEnsureRollbackProbeHandler>(
-            probes, ExecuteDeleteNoEnsureRollbackRoute, (h, c, ct) => h.Handle(c, ct));
+            probes, ExecuteDeleteNoEnsureRollbackRoute, (h, c, ct) => h.HandleAsync(c, ct));
         MapProbe<DirectSaveChangesNoEnsureRollbackProbeCommand, DirectSaveChangesNoEnsureRollbackProbeHandler>(
-            probes, DirectSaveChangesNoEnsureRollbackRoute, (h, c, ct) => h.Handle(c, ct));
+            probes, DirectSaveChangesNoEnsureRollbackRoute, (h, c, ct) => h.HandleAsync(c, ct));
     }
 
-    // Same shape as a production endpoint: bind the command from the body, inject the handler, call Handle.
+    // Same shape as a production endpoint: bind the command from the body, inject the handler, call HandleAsync.
     private static void MapProbe<TCommand, THandler>(
         RouteGroupBuilder probes, string route, Func<THandler, TCommand, CancellationToken, Task> handle)
         where THandler : notnull =>
@@ -78,7 +78,7 @@ public static class TransactionRollbackProbes
         IAuditContext auditContext,
         IUnitOfWork unitOfWork)
     {
-        public async Task Handle(AuditedRollbackProbeCommand request, CancellationToken cancellationToken)
+        public async Task HandleAsync(AuditedRollbackProbeCommand request, CancellationToken cancellationToken)
         {
             db.Users.Add(new AppUser
             {
@@ -105,7 +105,7 @@ public static class TransactionRollbackProbes
 
     public sealed class EnqueueRollbackProbeHandler(IJobQueue jobQueue)
     {
-        public async Task Handle(EnqueueRollbackProbeCommand request, CancellationToken cancellationToken)
+        public async Task HandleAsync(EnqueueRollbackProbeCommand request, CancellationToken cancellationToken)
         {
             await jobQueue.EnqueueAsync(
                 ProcessingJobType.UploadDocument,
@@ -133,7 +133,7 @@ public static class TransactionRollbackProbes
 
     public sealed class ExecuteUpdateRollbackProbeHandler(AppDbContext db)
     {
-        public async Task Handle(ExecuteUpdateRollbackProbeCommand request, CancellationToken cancellationToken)
+        public async Task HandleAsync(ExecuteUpdateRollbackProbeCommand request, CancellationToken cancellationToken)
         {
             // No manual EnsureTransaction call — the interceptor opens the command tx before this bulk
             // update reaches the database, so it lands atomically.
@@ -167,7 +167,7 @@ public static class TransactionRollbackProbes
 
     public sealed class ExecuteDeleteNoEnsureRollbackProbeHandler(AppDbContext db)
     {
-        public async Task Handle(ExecuteDeleteNoEnsureRollbackProbeCommand request, CancellationToken cancellationToken)
+        public async Task HandleAsync(ExecuteDeleteNoEnsureRollbackProbeCommand request, CancellationToken cancellationToken)
         {
             await db.Groups
                 .Where(g => g.Id == request.GroupId)
@@ -188,7 +188,7 @@ public static class TransactionRollbackProbes
 
     public sealed class DirectSaveChangesNoEnsureRollbackProbeHandler(AppDbContext db)
     {
-        public async Task Handle(DirectSaveChangesNoEnsureRollbackProbeCommand request, CancellationToken cancellationToken)
+        public async Task HandleAsync(DirectSaveChangesNoEnsureRollbackProbeCommand request, CancellationToken cancellationToken)
         {
             db.Users.Add(new AppUser
             {

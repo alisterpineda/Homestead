@@ -9,10 +9,10 @@ namespace Homestead.WebApi.Modules.Admin.Features.Backup.DeleteBackupSchedule;
 /// <summary>Drops one pairing's recurring run, leaving it manual-only.</summary>
 public class DeleteBackupScheduleHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork)
 {
-    public async Task<bool> Handle(DeleteBackupScheduleCommand request, CancellationToken ct)
+    public async Task<bool> HandleAsync(Guid id, CancellationToken ct)
     {
         var source = await db.BackupSources
-            .FirstOrDefaultAsync(s => s.Id == request.BackupSourceId, ct)
+            .FirstOrDefaultAsync(s => s.Id == id, ct)
             ?? throw new EntityNotFoundException("Backup source not found.");
 
         if (source.ScheduleId is not { } scheduleId)

@@ -50,7 +50,7 @@ public class ImportCommodityPricesJobHandlerTests : IDisposable
                 try { return await call.Arg<Func<Task<bool>>>()(); }
                 finally { _inTransaction = false; }
             });
-        _applyObservations.When(x => x.Handle(Arg.Any<ApplyCommodityPriceObservationsCommand>(), Arg.Any<CancellationToken>()))
+        _applyObservations.When(x => x.HandleAsync(Arg.Any<ApplyCommodityPriceObservationsCommand>(), Arg.Any<CancellationToken>()))
             .Do(_ => _handledInTransaction = _inTransaction);
 
         _sut = new ImportCommodityPricesJobHandler(
@@ -242,7 +242,7 @@ public class ImportCommodityPricesJobHandlerTests : IDisposable
             userId: Guid.NewGuid());
         await _sut.HandleAsync(job, ct);
 
-        await _applyObservations.Received(1).Handle(
+        await _applyObservations.Received(1).HandleAsync(
             Arg.Is<ApplyCommodityPriceObservationsCommand>(c =>
                 c.Source == CommodityPriceSource.BankOfCanada
                 && c.Observations.Count == 2
@@ -321,7 +321,7 @@ public class ImportCommodityPricesJobHandlerTests : IDisposable
         await _sut.HandleAsync(job, ct);
 
         // The command runs even with zero observations so the status stamp always runs.
-        await _applyObservations.Received(1).Handle(
+        await _applyObservations.Received(1).HandleAsync(
             Arg.Is<ApplyCommodityPriceObservationsCommand>(c => c.Warning == null),
             Arg.Any<CancellationToken>());
     }
@@ -492,7 +492,7 @@ public class ImportCommodityPricesJobHandlerTests : IDisposable
         var job = MakeJob(new ImportCommodityPricesPayload(CommodityPriceSource.BankOfCanada));
         await _sut.HandleAsync(job, ct);
 
-        await _applyObservations.Received(1).Handle(
+        await _applyObservations.Received(1).HandleAsync(
             Arg.Is<ApplyCommodityPriceObservationsCommand>(c =>
                 c.Warning == "Throttled by upstream after 5 calls."
                 && c.Observations.Count == 1),

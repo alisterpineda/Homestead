@@ -30,7 +30,7 @@ public class GetAiStatusHandlerTests
             Model = "gpt-5-mini",
         })], defaultKey: "foundry");
 
-        var result = await sut.Handle(new GetAiStatusQuery(), ct);
+        var result = await sut.HandleAsync(ct);
 
         Assert.Equal(["foundry", "local"], result.Select(r => r.Key));
         Assert.Collection(result,
@@ -50,7 +50,7 @@ public class GetAiStatusHandlerTests
         var ct = TestContext.Current.CancellationToken;
         var sut = Sut([Provider("local")]);
 
-        var result = await sut.Handle(new GetAiStatusQuery(), ct);
+        var result = await sut.HandleAsync(ct);
 
         var row = Assert.Single(result);
         Assert.True(row.IsDefault);
@@ -66,7 +66,7 @@ public class GetAiStatusHandlerTests
             Provider("typeless", new AiProviderOptions { Endpoint = "http://x/v1", Model = "m" }),
         ]);
 
-        var result = await sut.Handle(new GetAiStatusQuery(), ct);
+        var result = await sut.HandleAsync(ct);
 
         Assert.Equal("Endpoint is required.", result.Single(r => r.Key == "half").ConfigurationError);
         var typeless = result.Single(r => r.Key == "typeless");
@@ -88,7 +88,7 @@ public class GetAiStatusHandlerTests
             Model = "gpt-5-mini",
         })]);
 
-        var result = await sut.Handle(new GetAiStatusQuery(), ct);
+        var result = await sut.HandleAsync(ct);
 
         var row = Assert.Single(result);
         Assert.True(row.HasApiKey);
@@ -109,7 +109,7 @@ public class GetAiStatusHandlerTests
             MaxInputChars = AiProviderOptions.MinInputChars - 1, // below floor -> default
         };
 
-        var result = await Sut([Provider("local", options)]).Handle(new GetAiStatusQuery(), ct);
+        var result = await Sut([Provider("local", options)]).HandleAsync(ct);
 
         Assert.Equal(AiProviderOptions.DefaultMaxInputChars, Assert.Single(result).MaxInputChars);
     }
@@ -122,7 +122,7 @@ public class GetAiStatusHandlerTests
         var ct = TestContext.Current.CancellationToken;
         var sut = Sut([Provider("local"), Provider("other")]);
 
-        var result = await sut.Handle(new GetAiStatusQuery(), ct);
+        var result = await sut.HandleAsync(ct);
 
         Assert.Equal(2, result.Count);
         Assert.DoesNotContain(result, r => r.IsDefault);
@@ -133,7 +133,7 @@ public class GetAiStatusHandlerTests
     {
         var ct = TestContext.Current.CancellationToken;
 
-        var result = await Sut([]).Handle(new GetAiStatusQuery(), ct);
+        var result = await Sut([]).HandleAsync(ct);
 
         Assert.Empty(result);
     }
@@ -146,7 +146,7 @@ public class GetAiStatusHandlerTests
         var ct = TestContext.Current.CancellationToken;
         var sut = Sut([Provider("local")], defaultKey: "typo");
 
-        var result = await sut.Handle(new GetAiStatusQuery(), ct);
+        var result = await sut.HandleAsync(ct);
 
         Assert.Equal(2, result.Count);
         Assert.False(result.Single(r => r.Key == "local").IsDefault);

@@ -8,10 +8,7 @@ public static class TrackDurableEndpoint
     {
         group.MapPost("/{id:guid}/track-one", async (Guid id,
             TrackDurableRequest body, TrackDurableHandler handler, CancellationToken ct) =>
-        {
-            var command = new TrackDurableCommand { ConsumableId = id, Body = body };
-            return Results.Ok(await handler.Handle(command, ct));
-        })
+            Results.Ok(await handler.HandleAsync(id, body, ct)))
         .WithName("TrackDurableIndividually")
         .Produces<TrackDurableResponse>()
         .Produces(StatusCodes.Status400BadRequest)

@@ -11,20 +11,20 @@ namespace Homestead.WebApi.Modules.Admin.Features.Groups.UpdateGroup;
 
 public class UpdateGroupHandler(
     AppDbContext db, IAuditContext audit, ICurrentUserAccessor currentUser, IUnitOfWork unitOfWork,
-    IValidator<UpdateGroupCommand> validator)
+    IValidator<UpdateGroupRequest> validator)
 {
-    public async Task<GroupResponse> Handle(UpdateGroupCommand command, CancellationToken ct)
+    public async Task<GroupResponse> HandleAsync(Guid id, UpdateGroupRequest request, CancellationToken ct)
     {
-        await validator.ValidateAndThrowAsync(command, ct);
+        await validator.ValidateAndThrowAsync(request, ct);
 
-        var group = await db.Groups.FirstOrDefaultAsync(g => g.Id == command.Id, ct);
+        var group = await db.Groups.FirstOrDefaultAsync(g => g.Id == id, ct);
         if (group is null)
             throw new EntityNotFoundException("Group not found.");
 
-        var trimmedName = command.Request.Name.Trim();
+        var trimmedName = request.Name.Trim();
 
         var nameConflict = await db.Groups
-            .AnyAsync(g => g.Id != command.Id && g.Name == trimmedName, ct);
+            .AnyAsync(g => g.Id != id && g.Name == trimmedName, ct);
 
         if (nameConflict)
             throw new DuplicateEntityException("A group with this name already exists.");
@@ -32,7 +32,7 @@ public class UpdateGroupHandler(
         audit.Track<GroupSnapshot, Group>(group, "Group", group.Id);
 
         group.Name = trimmedName;
-        group.Description = command.Request.Description?.Trim();
+        group.Description = request.Description?.Trim();
         group.UpdatedAt = DateTimeOffset.UtcNow;
         group.UpdatedByUserId = currentUser.UserId;
 
@@ -66,10 +66,4 @@ public class UpdateGroupHandler(
             MemberCount = memberCount
         };
     }
-}
-
-public record UpdateGroupCommand
-{
-    public Guid Id { get; init; }
-    public required UpdateGroupRequest Request { get; init; }
 }

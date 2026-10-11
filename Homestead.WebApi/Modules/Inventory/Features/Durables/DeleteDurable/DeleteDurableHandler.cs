@@ -8,13 +8,13 @@ namespace Homestead.WebApi.Modules.Inventory.Features.Durables.DeleteDurable;
 
 public class DeleteDurableHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork)
 {
-    public async Task<bool> Handle(DeleteDurableCommand request, CancellationToken ct)
+    public async Task<bool> HandleAsync(Guid id, CancellationToken ct)
     {
         // This endpoint is the non-fungible items surface; a fungible consumable id is "not found" here
         // (consumables delete through DeleteConsumable, which gates on ledger history). Without this filter a
         // consumable with movements would reach Remove and trip the StockMovement Restrict FK as a raw 500.
         var item = await db.Items.FirstOrDefaultAsync(
-            i => i.Id == request.Id && i.Fungibility == Fungibility.NonFungible, ct);
+            i => i.Id == id && i.Fungibility == Fungibility.NonFungible, ct);
         if (item is null)
             return false;
 

@@ -9,7 +9,7 @@ public static class DeletePriceSourceScheduleEndpoint
         group.MapDelete("/{source}/schedule",
             async (CommodityPriceSource source, DeletePriceSourceScheduleHandler handler, CancellationToken ct) =>
         {
-            await handler.Handle(new DeletePriceSourceScheduleCommand(source), ct);
+            await handler.HandleAsync(source, ct);
             return Results.NoContent();
         })
         .WithName("DeletePriceSourceSchedule")

@@ -7,8 +7,7 @@ public static class RemoveGroupMemberEndpoint
         group.MapDelete("/{id:guid}/members/{userId:guid}", async (Guid id, Guid userId,
             RemoveGroupMemberHandler handler, CancellationToken ct) =>
         {
-            var command = new RemoveGroupMemberCommand { GroupId = id, UserId = userId };
-            await handler.Handle(command, ct);
+            await handler.HandleAsync(id, userId, ct);
             return Results.NoContent();
         })
         .WithName("RemoveGroupMember")

@@ -23,7 +23,7 @@ public class BulkDeleteTransactionsHandler(
     IBalanceEntryReconciler reconciler,
     IUnitOfWork unitOfWork)
 {
-    public async Task<BulkDeleteTransactionsResponse> Handle(
+    public async Task<BulkDeleteTransactionsResponse> HandleAsync(
         BulkDeleteTransactionsCommand request, CancellationToken ct)
     {
         // Project just id + discriminator + DRIP link: the shape services re-load the tracked

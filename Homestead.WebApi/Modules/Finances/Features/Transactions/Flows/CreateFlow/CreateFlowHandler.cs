@@ -13,7 +13,7 @@ public class CreateFlowHandler(
     IUnitOfWork unitOfWork,
     IValidator<CreateFlowCommand> validator)
 {
-    public async Task<TransactionResponse> Handle(CreateFlowCommand request, CancellationToken ct)
+    public async Task<TransactionResponse> HandleAsync(CreateFlowCommand request, CancellationToken ct)
     {
         await validator.ValidateAndThrowAsync(request, ct);
 

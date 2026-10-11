@@ -9,7 +9,7 @@ public static class GetBrandsEndpoint
         group.MapGet("", async ([AsParameters] GetBrandsQuery request,
             GetBrandsHandler handler, CancellationToken ct) =>
         {
-            return Results.Ok(await handler.Handle(request, ct));
+            return Results.Ok(await handler.HandleAsync(request, ct));
         })
         .WithName("GetBrands")
         .Produces<PaginatedResponse<BrandResponse>>();

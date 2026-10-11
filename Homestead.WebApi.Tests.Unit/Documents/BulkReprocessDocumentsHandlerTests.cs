@@ -80,7 +80,7 @@ public class BulkReprocessDocumentsHandlerTests : IDisposable
         var (docId1, _) = SeedDocument("Doc1.pdf");
         var (docId2, _) = SeedDocument("Doc2.pdf");
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new BulkReprocessDocumentsCommand([docId1, docId2]),
             CancellationToken.None);
 
@@ -94,7 +94,7 @@ public class BulkReprocessDocumentsHandlerTests : IDisposable
         var (docId1, _) = SeedDocument("Doc1.pdf");
         var (docId2, _) = SeedDocument("Doc2.pdf");
 
-        await _sut.Handle(
+        await _sut.HandleAsync(
             new BulkReprocessDocumentsCommand([docId1, docId2]),
             CancellationToken.None);
 
@@ -121,7 +121,7 @@ public class BulkReprocessDocumentsHandlerTests : IDisposable
                 return Guid.NewGuid();
             });
 
-        await _sut.Handle(
+        await _sut.HandleAsync(
             new BulkReprocessDocumentsCommand([docId1, docId2]),
             CancellationToken.None);
 
@@ -145,7 +145,7 @@ public class BulkReprocessDocumentsHandlerTests : IDisposable
                 return Guid.NewGuid();
             });
 
-        await _sut.Handle(
+        await _sut.HandleAsync(
             new BulkReprocessDocumentsCommand([docId], TestTextExtraction.DefaultKey),
             CancellationToken.None);
 
@@ -159,7 +159,7 @@ public class BulkReprocessDocumentsHandlerTests : IDisposable
     {
         var (docId, _) = SeedDocument("Doc1.pdf");
 
-        await Assert.ThrowsAsync<BusinessRuleException>(() => _sut.Handle(
+        await Assert.ThrowsAsync<BusinessRuleException>(() => _sut.HandleAsync(
             new BulkReprocessDocumentsCommand([docId], "azure-layout"), CancellationToken.None));
 
         await _jobQueue.DidNotReceive().EnqueueAsync(
@@ -169,7 +169,7 @@ public class BulkReprocessDocumentsHandlerTests : IDisposable
     [Fact]
     public async Task Handle_NoMatchingDocuments_ReturnsEmptyJobIds()
     {
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new BulkReprocessDocumentsCommand([Guid.NewGuid()]),
             CancellationToken.None);
 
@@ -181,7 +181,7 @@ public class BulkReprocessDocumentsHandlerTests : IDisposable
     {
         var (docId, _) = SeedDocument();
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new BulkReprocessDocumentsCommand([docId]),
             CancellationToken.None);
 
@@ -197,7 +197,7 @@ public class BulkReprocessDocumentsHandlerTests : IDisposable
             .ThrowsAsync(new AccessDeniedException());
 
         await Assert.ThrowsAsync<AccessDeniedException>(
-            () => _sut.Handle(
+            () => _sut.HandleAsync(
                 new BulkReprocessDocumentsCommand([docId]),
                 CancellationToken.None));
     }
@@ -207,7 +207,7 @@ public class BulkReprocessDocumentsHandlerTests : IDisposable
     {
         var (docId, _) = SeedDocument();
 
-        await Assert.ThrowsAsync<ValidationException>(() => _sut.Handle(
+        await Assert.ThrowsAsync<ValidationException>(() => _sut.HandleAsync(
             new BulkReprocessDocumentsCommand([docId], EngineKey: "no-such-engine"),
             TestContext.Current.CancellationToken));
     }

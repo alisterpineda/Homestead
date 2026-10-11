@@ -5,7 +5,11 @@ using Microsoft.Extensions.AI;
 namespace Homestead.WebApi.Modules.Admin.Features.Ai.TestAiConnection;
 
 // Live probe of one configured AI provider: sends a one-token "ping" and reports reachability.
-// Writes nothing — see TestAiConnectionCommand for why that matters.
+//
+// Deliberately write-free: the endpoint is a POST, so the command transaction filter wraps it, but the
+// transaction opens lazily on the first flush with work. A write here would open it and pin a pooled
+// connection for the duration of the slow external call (the idle-in-transaction shape the lazy-tx
+// work fights).
 public class TestAiConnectionHandler(IAiProviderResolver providerResolver)
 {
     // Generous on purpose: the real classification path (AiClassificationService) passes the job's token
@@ -14,11 +18,13 @@ public class TestAiConnectionHandler(IAiProviderResolver providerResolver)
     // broken) on a model that classification actually drives fine. 60s still bounds a genuinely hung endpoint.
     private static readonly TimeSpan ProbeTimeout = TimeSpan.FromSeconds(60);
 
-    public async Task<TestAiConnectionResponse> Handle(TestAiConnectionCommand command, CancellationToken ct)
+    // providerKey null = probe whatever the resolution chain picks (Ai:DefaultProvider / sole provider);
+    // a key probes that specific provider, so a new one can be verified before the default is flipped to it.
+    public async Task<TestAiConnectionResponse> HandleAsync(string? providerKey, CancellationToken ct)
     {
         // Gate first: an unconfigured app or an unavailable provider (missing or misconfigured — the
         // resolver never substitutes) reports a friendly result rather than throwing from GetChatClient.
-        var provider = providerResolver.Resolve(command.ProviderKey);
+        var provider = providerResolver.Resolve(providerKey);
         if (provider is null)
             return new TestAiConnectionResponse(false, "AI is not configured.", null);
         if (!provider.IsConfigured)

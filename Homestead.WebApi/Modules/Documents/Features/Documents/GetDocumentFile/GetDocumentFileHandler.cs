@@ -8,12 +8,12 @@ namespace Homestead.WebApi.Modules.Documents.Features.Documents.GetDocumentFile;
 
 public class GetDocumentFileHandler(AppDbContext db, IOptions<FileStorageOptions> storage)
 {
-    public async Task<IResult> Handle(GetDocumentFileQuery request, CancellationToken ct)
+    public async Task<IResult> HandleAsync(Guid id, Guid? versionId, bool? download, CancellationToken ct)
     {
         var documentName = await db.Documents
             .IgnoreQueryFilters([DocumentQueryFilters.SoftDelete])
             .AsNoTracking()
-            .Where(d => d.Id == request.Id)
+            .Where(d => d.Id == id)
             .Select(d => d.Name)
             .FirstOrDefaultAsync(ct);
 
@@ -22,10 +22,10 @@ public class GetDocumentFileHandler(AppDbContext db, IOptions<FileStorageOptions
 
         var versionQuery = db.DocumentVersions
             .AsNoTracking()
-            .Where(r => r.DocumentId == request.Id);
+            .Where(r => r.DocumentId == id);
 
-        if (request.VersionId.HasValue)
-            versionQuery = versionQuery.Where(r => r.Id == request.VersionId.Value);
+        if (versionId.HasValue)
+            versionQuery = versionQuery.Where(r => r.Id == versionId.Value);
         else
             versionQuery = versionQuery.OrderByDescending(r => r.VersionNumber);
 
@@ -41,7 +41,7 @@ public class GetDocumentFileHandler(AppDbContext db, IOptions<FileStorageOptions
         if (!File.Exists(physicalPath))
             return Results.NotFound();
 
-        return request.Download == true
+        return download == true
             ? Results.File(physicalPath, version.ContentType, version.GetDownloadFileName(documentName))
             : Results.File(physicalPath, version.ContentType);
     }

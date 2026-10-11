@@ -14,7 +14,7 @@ public class BulkUpdateDocumentsHandler(AppDbContext db,
     IAuditContext audit, IUnitOfWork unitOfWork, IDocumentMetadataService metadataService,
     IDocumentQueryService queryService, ICurrentUserAccessor currentUser)
 {
-    public async Task<BulkUpdateDocumentsResponse> Handle(BulkUpdateDocumentsCommand request, CancellationToken ct)
+    public async Task<BulkUpdateDocumentsResponse> HandleAsync(BulkUpdateDocumentsCommand request, CancellationToken ct)
     {
         var documents = await db.Documents
             .Include(d => d.DocumentTags).ThenInclude(dt => dt.Tag)

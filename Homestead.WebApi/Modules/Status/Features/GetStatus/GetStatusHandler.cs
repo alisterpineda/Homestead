@@ -5,7 +5,7 @@ namespace Homestead.WebApi.Modules.Status.Features.GetStatus;
 
 public class GetStatusHandler(IOptions<OidcOptions> oidcOptions)
 {
-    public Task<GetStatusResponse> Handle(GetStatusQuery request, CancellationToken ct)
+    public Task<GetStatusResponse> HandleAsync(CancellationToken ct)
     {
         return Task.FromResult(new GetStatusResponse
         {

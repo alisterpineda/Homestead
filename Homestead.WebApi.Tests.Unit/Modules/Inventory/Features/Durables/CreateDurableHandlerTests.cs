@@ -70,7 +70,7 @@ public class CreateDurableHandlerTests : IDisposable
     [Fact]
     public async Task Handle_AppliesNonFungibleActiveDefaults()
     {
-        var result = await _sut.Handle(new CreateDurableCommand { Name = "Drill" }, Ct);
+        var result = await _sut.HandleAsync(new CreateDurableCommand { Name = "Drill" }, Ct);
 
         Assert.Equal("Drill", result.Name);
         Assert.Equal(Fungibility.NonFungible, result.Fungibility);
@@ -87,7 +87,7 @@ public class CreateDurableHandlerTests : IDisposable
     [Fact]
     public async Task Handle_LogsCreatedAudit()
     {
-        var result = await _sut.Handle(new CreateDurableCommand { Name = "Drill" }, Ct);
+        var result = await _sut.HandleAsync(new CreateDurableCommand { Name = "Drill" }, Ct);
 
         _audit.Received(1).Created("Item", result.Id, Arg.Any<Guid?>());
     }
@@ -99,7 +99,7 @@ public class CreateDurableHandlerTests : IDisposable
         _db.Areas.Add(area);
         await _db.SaveChangesAsync(Ct);
 
-        var result = await _sut.Handle(new CreateDurableCommand { Name = "Drill", AreaId = area.Id }, Ct);
+        var result = await _sut.HandleAsync(new CreateDurableCommand { Name = "Drill", AreaId = area.Id }, Ct);
 
         Assert.Equal(area.Id, result.AreaId);
         Assert.Equal("Garage", result.AreaName);
@@ -109,14 +109,14 @@ public class CreateDurableHandlerTests : IDisposable
     public async Task Handle_WithUnknownArea_Throws()
     {
         await Assert.ThrowsAsync<BusinessRuleException>(() =>
-            _sut.Handle(new CreateDurableCommand { Name = "Drill", AreaId = Guid.NewGuid() }, Ct));
+            _sut.HandleAsync(new CreateDurableCommand { Name = "Drill", AreaId = Guid.NewGuid() }, Ct));
     }
 
     [Fact]
     public async Task Handle_WithValueButNoCurrency_Throws()
     {
         await Assert.ThrowsAsync<ValidationException>(() =>
-            _sut.Handle(new CreateDurableCommand { Name = "Drill", Value = 100m }, Ct));
+            _sut.HandleAsync(new CreateDurableCommand { Name = "Drill", Value = 100m }, Ct));
     }
 
     [Fact]
@@ -127,7 +127,7 @@ public class CreateDurableHandlerTests : IDisposable
         await _db.SaveChangesAsync(Ct);
 
         await Assert.ThrowsAsync<BusinessRuleException>(() =>
-            _sut.Handle(new CreateDurableCommand { Name = "Drill", Value = 100m, ValueCurrencyId = security.Id }, Ct));
+            _sut.HandleAsync(new CreateDurableCommand { Name = "Drill", Value = 100m, ValueCurrencyId = security.Id }, Ct));
     }
 
     [Fact]
@@ -135,7 +135,7 @@ public class CreateDurableHandlerTests : IDisposable
     {
         var cad = await AddCurrencyAsync();
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new CreateDurableCommand { Name = "Camera", Value = 1200m, ValueCurrencyId = cad.Id }, Ct);
 
         Assert.Equal(1200m, result.Value);
@@ -147,7 +147,7 @@ public class CreateDurableHandlerTests : IDisposable
     public async Task Handle_WithAcquisitionCostButNoCurrency_Throws()
     {
         await Assert.ThrowsAsync<ValidationException>(() =>
-            _sut.Handle(new CreateDurableCommand { Name = "Drill", AcquisitionCost = 189m }, Ct));
+            _sut.HandleAsync(new CreateDurableCommand { Name = "Drill", AcquisitionCost = 189m }, Ct));
     }
 
     [Fact]
@@ -158,7 +158,7 @@ public class CreateDurableHandlerTests : IDisposable
         await _db.SaveChangesAsync(Ct);
 
         await Assert.ThrowsAsync<BusinessRuleException>(() =>
-            _sut.Handle(new CreateDurableCommand
+            _sut.HandleAsync(new CreateDurableCommand
             {
                 Name = "Drill",
                 AcquisitionCost = 189m,
@@ -171,7 +171,7 @@ public class CreateDurableHandlerTests : IDisposable
     {
         var cad = await AddCurrencyAsync();
 
-        var result = await _sut.Handle(new CreateDurableCommand
+        var result = await _sut.HandleAsync(new CreateDurableCommand
         {
             Name = "Drill",
             AcquisitionKind = AcquisitionKind.Purchased,
@@ -196,7 +196,7 @@ public class CreateDurableHandlerTests : IDisposable
     [Fact]
     public async Task Handle_WithAcquiredFrom_TrimsAndStores()
     {
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new CreateDurableCommand { Name = "Drill", AcquiredFrom = "  Home Depot  " }, Ct);
 
         Assert.Equal("Home Depot", result.AcquiredFrom);
@@ -206,7 +206,7 @@ public class CreateDurableHandlerTests : IDisposable
     [Fact]
     public async Task Handle_WithBlankAcquiredFrom_StoresNull()
     {
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new CreateDurableCommand { Name = "Drill", AcquiredFrom = "   " }, Ct);
 
         Assert.Null(result.AcquiredFrom);
@@ -216,7 +216,7 @@ public class CreateDurableHandlerTests : IDisposable
     [Fact]
     public async Task Handle_WithIsContainer_CreatesContainer()
     {
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new CreateDurableCommand { Name = "Tool chest", IsContainer = true }, Ct);
 
         Assert.Equal(true, result.IsContainer);
@@ -229,7 +229,7 @@ public class CreateDurableHandlerTests : IDisposable
         // An assembly is a non-container that has components: create a component under a regular item.
         var pc = await AddContainerAsync(isContainer: false);
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new CreateDurableCommand { Name = "GPU", ParentItemId = pc.Id }, Ct);
 
         Assert.Equal(pc.Id, result.ParentItemId);
@@ -246,7 +246,7 @@ public class CreateDurableHandlerTests : IDisposable
         await _db.SaveChangesAsync(Ct);
         var pc = await AddContainerAsync(areaId: area.Id, isContainer: false);
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new CreateDurableCommand { Name = "CPU", ParentItemId = pc.Id, Compartment = "CPU" }, Ct);
 
         Assert.Equal(pc.Id, result.ParentItemId);
@@ -264,7 +264,7 @@ public class CreateDurableHandlerTests : IDisposable
         await _db.SaveChangesAsync(Ct);
         var chest = await AddContainerAsync(areaId: area.Id);
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new CreateDurableCommand { Name = "Wrench", ParentItemId = chest.Id, Compartment = "Top drawer" }, Ct);
 
         Assert.Equal(chest.Id, result.ParentItemId);
@@ -283,7 +283,7 @@ public class CreateDurableHandlerTests : IDisposable
     public async Task Handle_WithUnknownBrand_Throws()
     {
         await Assert.ThrowsAsync<BusinessRuleException>(() =>
-            _sut.Handle(new CreateDurableCommand { Name = "MacBook", BrandId = Guid.NewGuid() }, Ct));
+            _sut.HandleAsync(new CreateDurableCommand { Name = "MacBook", BrandId = Guid.NewGuid() }, Ct));
     }
 
     [Fact]
@@ -291,7 +291,7 @@ public class CreateDurableHandlerTests : IDisposable
     {
         var apple = await AddBrandAsync();
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new CreateDurableCommand { Name = "MacBook", BrandId = apple.Id }, Ct);
 
         Assert.Equal(apple.Id, result.BrandId);
@@ -302,7 +302,7 @@ public class CreateDurableHandlerTests : IDisposable
     [Fact]
     public async Task Handle_WithModel_TrimsAndStoresModel()
     {
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new CreateDurableCommand { Name = "MacBook", Model = "  MRW23  " }, Ct);
 
         Assert.Equal("MRW23", result.Model);
@@ -312,7 +312,7 @@ public class CreateDurableHandlerTests : IDisposable
     [Fact]
     public async Task Handle_WithBlankModel_StoresNull()
     {
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new CreateDurableCommand { Name = "MacBook", Model = "   " }, Ct);
 
         Assert.Null(result.Model);
@@ -323,13 +323,13 @@ public class CreateDurableHandlerTests : IDisposable
     public async Task Handle_WithMissingParent_Throws()
     {
         await Assert.ThrowsAsync<BusinessRuleException>(() =>
-            _sut.Handle(new CreateDurableCommand { Name = "Wrench", ParentItemId = Guid.NewGuid() }, Ct));
+            _sut.HandleAsync(new CreateDurableCommand { Name = "Wrench", ParentItemId = Guid.NewGuid() }, Ct));
     }
 
     [Fact]
     public async Task Handle_WithTags_ResolvesOrCreatesTagsAndPopulatesResponse()
     {
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new CreateDurableCommand { Name = "Drill", Tags = ["tools/power"] }, Ct);
 
         // Ancestors upserted: both "tools" and "tools/power" exist.
@@ -350,7 +350,7 @@ public class CreateDurableHandlerTests : IDisposable
     [Fact]
     public async Task Handle_WithNoTags_LeavesItemUntagged()
     {
-        var result = await _sut.Handle(new CreateDurableCommand { Name = "Drill" }, Ct);
+        var result = await _sut.HandleAsync(new CreateDurableCommand { Name = "Drill" }, Ct);
 
         Assert.Empty(result.Tags);
         Assert.Empty(_db.ItemTags.Where(it => it.ItemId == result.Id));
@@ -372,13 +372,13 @@ public class CreateDurableHandlerTests : IDisposable
         await _db.SaveChangesAsync(Ct);
 
         await Assert.ThrowsAsync<BusinessRuleException>(() =>
-            _sut.Handle(new CreateDurableCommand { Name = "Wrench", ParentItemId = consumable.Id }, Ct));
+            _sut.HandleAsync(new CreateDurableCommand { Name = "Wrench", ParentItemId = consumable.Id }, Ct));
     }
 
     [Fact]
     public async Task Handle_BlankName_ThrowsValidationException()
     {
         await Assert.ThrowsAsync<ValidationException>(() =>
-            _sut.Handle(new CreateDurableCommand { Name = "   " }, Ct));
+            _sut.HandleAsync(new CreateDurableCommand { Name = "   " }, Ct));
     }
 }

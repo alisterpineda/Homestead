@@ -10,14 +10,7 @@ public static class PatchBrandEndpoint
         group.MapPatch("/{id:guid}", async (Guid id,
             JsonPatchDocument<PatchBrandModel> patchDoc,
             PatchBrandHandler handler, CancellationToken ct) =>
-        {
-            var command = new PatchBrandCommand
-            {
-                Id = id,
-                PatchDocument = patchDoc
-            };
-            return Results.Ok(await handler.Handle(command, ct));
-        })
+            Results.Ok(await handler.HandleAsync(id, patchDoc, ct)))
         .WithName("PatchBrand")
         .Accepts<JsonPatchDocument<PatchBrandModel>>("application/json-patch+json")
         .Produces<BrandResponse>()

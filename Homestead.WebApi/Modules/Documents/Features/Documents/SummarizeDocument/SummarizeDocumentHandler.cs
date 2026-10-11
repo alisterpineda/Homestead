@@ -16,10 +16,10 @@ public class SummarizeDocumentHandler(
     IUnitOfWork unitOfWork,
     ICurrentUserAccessor currentUser)
 {
-    public async Task<SummarizeDocumentResponse> Handle(SummarizeDocumentCommand request, CancellationToken ct)
+    public async Task<SummarizeDocumentResponse> HandleAsync(Guid documentId, CancellationToken ct)
     {
         var document = await db.Documents
-            .FirstOrDefaultAsync(d => d.Id == request.DocumentId, ct)
+            .FirstOrDefaultAsync(d => d.Id == documentId, ct)
             ?? throw new EntityNotFoundException("Document not found.");
 
         // Track for the activity stream (matches PatchDocument); flushed when CommandTransactionFilter commits.
@@ -29,7 +29,7 @@ public class SummarizeDocumentHandler(
         // must run on the background-job path, and this is the handler the slow-work architecture test
         // explicitly allowlists). Stays text-only.
         var output = await classifier.ClassifyAsync(
-            request.DocumentId, document.Name, ClassificationScope.Summary, ct, attachImage: false);
+            documentId, document.Name, ClassificationScope.Summary, ct, attachImage: false);
 
         // null = no provider / nothing to summarize; blank = the model produced no usable summary.
         // Either way it's a graceful no-op — never overwrite an existing summary with nothing (no undo).

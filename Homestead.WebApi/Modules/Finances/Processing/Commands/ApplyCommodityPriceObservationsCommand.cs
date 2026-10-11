@@ -25,7 +25,7 @@ public record ApplyCommodityPriceObservationsCommand
 
 public interface IApplyCommodityPriceObservationsHandler
 {
-    Task Handle(ApplyCommodityPriceObservationsCommand request, CancellationToken ct);
+    Task HandleAsync(ApplyCommodityPriceObservationsCommand request, CancellationToken ct);
 }
 
 public class ApplyCommodityPriceObservationsHandler(AppDbContext db, IAuditContext audit)
@@ -35,7 +35,7 @@ public class ApplyCommodityPriceObservationsHandler(AppDbContext db, IAuditConte
     // trusting every caller to pre-truncate.
     private const int MaxErrorLength = 4096;
 
-    public async Task Handle(ApplyCommodityPriceObservationsCommand request, CancellationToken ct)
+    public async Task HandleAsync(ApplyCommodityPriceObservationsCommand request, CancellationToken ct)
     {
         var now = DateTimeOffset.UtcNow;
 

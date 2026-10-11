@@ -7,21 +7,25 @@ namespace Homestead.WebApi.Modules.Documents.Features.Documents.ClassifyDocument
 
 public class ClassifyPreviewHandler(AppDbContext db, IDocumentClassifier classifier)
 {
-    public async Task<ClassifyPreviewResponse> Handle(ClassifyPreviewQuery request, CancellationToken ct)
+    /// <param name="body">
+    /// The fields to classify (<c>body?.Fields</c>). Null or empty defaults to all classify fields (Tags, Parties,
+    /// Name). Summary is never part of the classify scope — use the separate summarize action instead.
+    /// </param>
+    public async Task<ClassifyPreviewResponse> HandleAsync(Guid documentId, ClassifyDocumentBody? body, CancellationToken ct)
     {
         var document = await db.Documents
             .AsNoTracking()
             .Include(d => d.DocumentTags)
             .Include(d => d.DocumentParties)
-            .FirstOrDefaultAsync(d => d.Id == request.DocumentId, ct)
+            .FirstOrDefaultAsync(d => d.Id == documentId, ct)
             ?? throw new EntityNotFoundException("Document not found.");
 
-        var scope = ClassificationScopeExtensions.FromFields(request.Fields);
+        var scope = ClassificationScopeExtensions.FromFields(body?.Fields);
 
         // Synchronous preview path: never attach the page image (the ~15-30s vision prefill must run only on
         // the background-job path). This endpoint stays text-only.
         var output = await classifier.ClassifyAsync(
-            request.DocumentId, document.Name, scope, ct, attachImage: false);
+            documentId, document.Name, scope, ct, attachImage: false);
 
         if (output is null)
         {

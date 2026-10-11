@@ -7,7 +7,7 @@ public static class DeleteBackupSourceEndpoint
         group.MapDelete("/sources/{id:guid}", async (
             Guid id, bool? cancelRun, DeleteBackupSourceHandler handler, CancellationToken ct) =>
         {
-            await handler.Handle(new DeleteBackupSourceCommand(id, cancelRun ?? false), ct);
+            await handler.HandleAsync(id, cancelRun ?? false, ct);
             return Results.NoContent();
         })
         .WithName("DeleteBackupSource")

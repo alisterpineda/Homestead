@@ -108,7 +108,7 @@ public class InitiateStatementImportHandlerTests : IAsyncLifetime
         await SeedLinkedTransactionAsync(TransactionDocumentLinkOrigin.StatementImport);
 
         var ex = await Assert.ThrowsAsync<BusinessRuleException>(
-            () => _sut.Handle(Command(), TestContext.Current.CancellationToken));
+            () => _sut.HandleAsync(Command(), TestContext.Current.CancellationToken));
 
         // The stable code lets the client recognise this specific rejection (and offer a rollback) without
         // parsing the human message.
@@ -124,7 +124,7 @@ public class InitiateStatementImportHandlerTests : IAsyncLifetime
         // A *manual* link (receipt attached by hand) must never trip the origin-scoped dedup guard.
         await SeedLinkedTransactionAsync(TransactionDocumentLinkOrigin.Manual);
 
-        var result = await _sut.Handle(Command(), TestContext.Current.CancellationToken);
+        var result = await _sut.HandleAsync(Command(), TestContext.Current.CancellationToken);
 
         Assert.NotEqual(Guid.Empty, result.JobId);
         await _jobQueue.Received(1).EnqueueAsync(

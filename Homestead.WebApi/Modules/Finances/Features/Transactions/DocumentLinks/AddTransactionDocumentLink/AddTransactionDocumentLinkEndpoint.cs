@@ -10,11 +10,7 @@ public static class AddTransactionDocumentLinkEndpoint
             Guid transactionId, AddTransactionDocumentLinkRequest body,
             AddTransactionDocumentLinkHandler handler, CancellationToken ct) =>
         {
-            var response = await handler.Handle(new AddTransactionDocumentLinkCommand
-            {
-                TransactionId = transactionId,
-                DocumentId = body.DocumentId,
-            }, ct);
+            var response = await handler.HandleAsync(transactionId, body, ct);
             return Results.Created(
                 $"/api/v1/finances/transactions/{transactionId}/documents", response);
         })

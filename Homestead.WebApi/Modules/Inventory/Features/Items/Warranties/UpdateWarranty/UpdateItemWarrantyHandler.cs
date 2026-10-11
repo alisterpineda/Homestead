@@ -17,7 +17,7 @@ public class UpdateItemWarrantyHandler(
     TimeProvider timeProvider,
     IValidator<UpdateItemWarrantyCommand> validator)
 {
-    public async Task<ItemWarrantyResponse> Handle(UpdateItemWarrantyCommand request, CancellationToken ct)
+    public async Task<ItemWarrantyResponse> HandleAsync(UpdateItemWarrantyCommand request, CancellationToken ct)
     {
         await validator.ValidateAndThrowAsync(request, ct);
 

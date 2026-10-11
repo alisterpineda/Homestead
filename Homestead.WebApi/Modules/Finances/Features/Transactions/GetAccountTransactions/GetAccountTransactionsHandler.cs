@@ -7,27 +7,27 @@ namespace Homestead.WebApi.Modules.Finances.Features.Transactions.GetAccountTran
 
 public class GetAccountTransactionsHandler(AppDbContext db, ICategoryPathResolver pathResolver)
 {
-    public async Task<PaginatedResponse<TransactionResponse>> Handle(
-        GetAccountTransactionsQuery request, CancellationToken ct)
+    public async Task<PaginatedResponse<TransactionResponse>> HandleAsync(
+        Guid accountId, GetAccountTransactionsParameters parameters, CancellationToken ct)
     {
-        await AccountVisibility.EnsureUserVisibleAsync(db, request.AccountId, ct);
+        await AccountVisibility.EnsureUserVisibleAsync(db, accountId, ct);
 
         var query = db.AccountTransactions
             .AsNoTracking()
             .Include(t => t.Splits)
-            .Where(t => t.Splits.Any(s => s.AccountId == request.AccountId));
+            .Where(t => t.Splits.Any(s => s.AccountId == accountId));
 
-        if (request.CommodityId is Guid commodityId)
-            query = query.Where(t => t.Splits.Any(s => s.AccountId == request.AccountId
+        if (parameters.CommodityId is Guid commodityId)
+            query = query.Where(t => t.Splits.Any(s => s.AccountId == accountId
                                                     && s.CommodityId == commodityId));
 
-        if (request.DateFrom is DateOnly from)
+        if (parameters.DateFrom is DateOnly from)
         {
             var fromUtc = from.ToStartOfDayUtc();
             query = query.Where(t => t.OccurredAt >= fromUtc);
         }
 
-        if (request.DateTo is DateOnly to)
+        if (parameters.DateTo is DateOnly to)
         {
             var toUtcExclusive = to.AddDays(1).ToStartOfDayUtc();
             query = query.Where(t => t.OccurredAt < toUtcExclusive);
@@ -38,7 +38,7 @@ public class GetAccountTransactionsHandler(AppDbContext db, ICategoryPathResolve
             .ThenByDescending(t => t.CreatedAt)
             .ThenByDescending(t => t.Id);
 
-        var page = await orderedQuery.ToPaginatedAsync(request, ct);
+        var page = await orderedQuery.ToPaginatedAsync(parameters, ct);
         var categories = await pathResolver.GetPathMapAsync(ct);
 
         // Feeds DocumentLinkCount — same aux-map idiom as the category path map above.

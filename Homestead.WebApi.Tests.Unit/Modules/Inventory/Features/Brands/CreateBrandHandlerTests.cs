@@ -39,7 +39,7 @@ public class CreateBrandHandlerTests : IDisposable
     [Fact]
     public async Task Handle_NewName_CreatesBrand()
     {
-        var resp = await _sut.Handle(new CreateBrandCommand { Name = "Apple" }, Ct);
+        var resp = await _sut.HandleAsync(new CreateBrandCommand { Name = "Apple" }, Ct);
 
         Assert.Equal("Apple", resp.Name);
         Assert.Contains(_db.Brands, b => b.Id == resp.Id && b.Name == "Apple");
@@ -48,7 +48,7 @@ public class CreateBrandHandlerTests : IDisposable
     [Fact]
     public async Task Handle_NewName_LogsCreatedAudit()
     {
-        var resp = await _sut.Handle(new CreateBrandCommand { Name = "Apple" }, Ct);
+        var resp = await _sut.HandleAsync(new CreateBrandCommand { Name = "Apple" }, Ct);
 
         _audit.Received(1).Created("Brand", resp.Id, Arg.Any<Guid?>());
     }
@@ -56,7 +56,7 @@ public class CreateBrandHandlerTests : IDisposable
     [Fact]
     public async Task Handle_TrimsName()
     {
-        var resp = await _sut.Handle(new CreateBrandCommand { Name = "  Apple  " }, Ct);
+        var resp = await _sut.HandleAsync(new CreateBrandCommand { Name = "  Apple  " }, Ct);
 
         Assert.Equal("Apple", resp.Name);
         Assert.Equal("Apple", _db.Brands.Single().Name);
@@ -67,7 +67,7 @@ public class CreateBrandHandlerTests : IDisposable
     {
         var existing = await AddBrandAsync("Apple");
 
-        var resp = await _sut.Handle(new CreateBrandCommand { Name = "Apple" }, Ct);
+        var resp = await _sut.HandleAsync(new CreateBrandCommand { Name = "Apple" }, Ct);
 
         Assert.Equal(existing.Id, resp.Id);
         Assert.Single(_db.Brands);
@@ -79,7 +79,7 @@ public class CreateBrandHandlerTests : IDisposable
         // Find-or-create dedups a trimmed/case-variant name (canonicalisation).
         var existing = await AddBrandAsync("Apple");
 
-        var resp = await _sut.Handle(new CreateBrandCommand { Name = "  apple " }, Ct);
+        var resp = await _sut.HandleAsync(new CreateBrandCommand { Name = "  apple " }, Ct);
 
         Assert.Equal(existing.Id, resp.Id);
         Assert.Single(_db.Brands);
@@ -90,7 +90,7 @@ public class CreateBrandHandlerTests : IDisposable
     {
         await AddBrandAsync("Apple");
 
-        await _sut.Handle(new CreateBrandCommand { Name = "apple" }, Ct);
+        await _sut.HandleAsync(new CreateBrandCommand { Name = "apple" }, Ct);
 
         _audit.DidNotReceive().Created("Brand", Arg.Any<Guid>(), Arg.Any<Guid?>());
     }
@@ -99,6 +99,6 @@ public class CreateBrandHandlerTests : IDisposable
     public async Task Handle_BlankName_ThrowsValidationException()
     {
         await Assert.ThrowsAsync<ValidationException>(() =>
-            _sut.Handle(new CreateBrandCommand { Name = "   " }, Ct));
+            _sut.HandleAsync(new CreateBrandCommand { Name = "   " }, Ct));
     }
 }

@@ -9,7 +9,7 @@ namespace Homestead.WebApi.Modules.Documents.Features.Parties.BulkDeleteParties;
 public class BulkDeletePartiesHandler(AppDbContext db, IDocumentQueryService accessService, IAuditContext audit,
     IUnitOfWork unitOfWork)
 {
-    public async Task<BulkDeletePartiesResponse> Handle(BulkDeletePartiesCommand request, CancellationToken ct)
+    public async Task<BulkDeletePartiesResponse> HandleAsync(BulkDeletePartiesCommand request, CancellationToken ct)
     {
         var parties = await db.Parties
             .Where(p => request.Ids.Contains(p.Id))

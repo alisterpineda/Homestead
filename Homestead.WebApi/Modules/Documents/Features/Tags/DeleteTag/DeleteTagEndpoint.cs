@@ -10,7 +10,7 @@ public static class DeleteTagEndpoint
         group.MapDelete("/{id:guid}", async (Guid id, BulkDeleteTagsHandler handler, CancellationToken ct) =>
         {
             var request = new BulkDeleteTagsCommand([id]);
-            var response = await handler.Handle(request, ct);
+            var response = await handler.HandleAsync(request, ct);
             return response.DeletedCount > 0 ? Results.NoContent() : Results.NotFound();
         })
         .WithName("DeleteTag")

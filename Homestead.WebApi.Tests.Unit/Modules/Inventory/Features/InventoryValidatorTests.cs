@@ -309,9 +309,9 @@ public class CreateConsumableCommandValidatorTests
     }
 }
 
-public class TrackDurableCommandValidatorTests
+public class TrackDurableRequestValidatorTests
 {
-    private readonly TrackDurableCommandValidator _sut = new();
+    private readonly TrackDurableRequestValidator _sut = new();
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
@@ -322,61 +322,61 @@ public class TrackDurableCommandValidatorTests
     public async Task WhitespaceName_IsInvalid(string? name)
     {
         var result = await _sut.ValidateAsync(
-            new TrackDurableCommand { ConsumableId = Guid.NewGuid(), Body = new() { AreaId = Guid.NewGuid(), Name = name! } }, Ct);
+            new TrackDurableRequest { AreaId = Guid.NewGuid(), Name = name! }, Ct);
         Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.PropertyName == "Body.Name");
+        Assert.Contains(result.Errors, e => e.PropertyName == "Name");
     }
 
     [Fact]
     public async Task NameOver256_IsInvalid()
     {
         var result = await _sut.ValidateAsync(
-            new TrackDurableCommand { ConsumableId = Guid.NewGuid(), Body = new() { AreaId = Guid.NewGuid(), Name = new string('a', 257) } }, Ct);
+            new TrackDurableRequest { AreaId = Guid.NewGuid(), Name = new string('a', 257) }, Ct);
         Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.PropertyName == "Body.Name");
+        Assert.Contains(result.Errors, e => e.PropertyName == "Name");
     }
 
     [Fact]
     public async Task BothLocations_IsInvalid()
     {
         var result = await _sut.ValidateAsync(
-            new TrackDurableCommand { ConsumableId = Guid.NewGuid(), Body = new() { AreaId = Guid.NewGuid(), ContainerItemId = Guid.NewGuid(), Name = "Bolt" } }, Ct);
+            new TrackDurableRequest { AreaId = Guid.NewGuid(), ContainerItemId = Guid.NewGuid(), Name = "Bolt" }, Ct);
         Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.PropertyName == "Body");
+        Assert.Contains(result.Errors, e => e.ErrorMessage.Contains("exactly one of an area or a container"));
     }
 
     [Fact]
     public async Task NoLocation_IsInvalid()
     {
         var result = await _sut.ValidateAsync(
-            new TrackDurableCommand { ConsumableId = Guid.NewGuid(), Body = new() { Name = "Bolt" } }, Ct);
+            new TrackDurableRequest { Name = "Bolt" }, Ct);
         Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.PropertyName == "Body");
+        Assert.Contains(result.Errors, e => e.ErrorMessage.Contains("exactly one of an area or a container"));
     }
 
     [Fact]
     public async Task CompartmentWithoutContainer_IsInvalid()
     {
         var result = await _sut.ValidateAsync(
-            new TrackDurableCommand { ConsumableId = Guid.NewGuid(), Body = new() { AreaId = Guid.NewGuid(), Name = "Bolt", Compartment = "Top shelf" } }, Ct);
+            new TrackDurableRequest { AreaId = Guid.NewGuid(), Name = "Bolt", Compartment = "Top shelf" }, Ct);
         Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.PropertyName == "Body.Compartment");
+        Assert.Contains(result.Errors, e => e.PropertyName == "Compartment");
     }
 
     [Fact]
     public async Task CompartmentOver256_IsInvalid()
     {
         var result = await _sut.ValidateAsync(
-            new TrackDurableCommand { ConsumableId = Guid.NewGuid(), Body = new() { ContainerItemId = Guid.NewGuid(), Name = "Bolt", Compartment = new string('a', 257) } }, Ct);
+            new TrackDurableRequest { ContainerItemId = Guid.NewGuid(), Name = "Bolt", Compartment = new string('a', 257) }, Ct);
         Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.PropertyName == "Body.Compartment");
+        Assert.Contains(result.Errors, e => e.PropertyName == "Compartment");
     }
 
     [Fact]
     public async Task AreaAndName_IsValid()
     {
         var result = await _sut.ValidateAsync(
-            new TrackDurableCommand { ConsumableId = Guid.NewGuid(), Body = new() { AreaId = Guid.NewGuid(), Name = "Bolt" } }, Ct);
+            new TrackDurableRequest { AreaId = Guid.NewGuid(), Name = "Bolt" }, Ct);
         Assert.True(result.IsValid);
     }
 
@@ -384,14 +384,14 @@ public class TrackDurableCommandValidatorTests
     public async Task ContainerWithCompartment_IsValid()
     {
         var result = await _sut.ValidateAsync(
-            new TrackDurableCommand { ConsumableId = Guid.NewGuid(), Body = new() { ContainerItemId = Guid.NewGuid(), Name = "Bolt", Compartment = "Top shelf" } }, Ct);
+            new TrackDurableRequest { ContainerItemId = Guid.NewGuid(), Name = "Bolt", Compartment = "Top shelf" }, Ct);
         Assert.True(result.IsValid);
     }
 }
 
-public class CollapseDurablesCommandValidatorTests
+public class CollapseDurablesRequestValidatorTests
 {
-    private readonly CollapseDurablesCommandValidator _sut = new();
+    private readonly CollapseDurablesRequestValidator _sut = new();
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
@@ -399,9 +399,9 @@ public class CollapseDurablesCommandValidatorTests
     public async Task EmptyItemIds_IsInvalid()
     {
         var result = await _sut.ValidateAsync(
-            new CollapseDurablesCommand { ConsumableId = Guid.NewGuid(), Body = new() { ItemIds = [], AreaId = Guid.NewGuid() } }, Ct);
+            new CollapseDurablesRequest { ItemIds = [], AreaId = Guid.NewGuid() }, Ct);
         Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.PropertyName == "Body.ItemIds");
+        Assert.Contains(result.Errors, e => e.PropertyName == "ItemIds");
     }
 
     [Fact]
@@ -409,34 +409,34 @@ public class CollapseDurablesCommandValidatorTests
     {
         var id = Guid.NewGuid();
         var result = await _sut.ValidateAsync(
-            new CollapseDurablesCommand { ConsumableId = Guid.NewGuid(), Body = new() { ItemIds = [id, id], AreaId = Guid.NewGuid() } }, Ct);
+            new CollapseDurablesRequest { ItemIds = [id, id], AreaId = Guid.NewGuid() }, Ct);
         Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.PropertyName == "Body.ItemIds");
+        Assert.Contains(result.Errors, e => e.PropertyName == "ItemIds");
     }
 
     [Fact]
     public async Task BothLocations_IsInvalid()
     {
         var result = await _sut.ValidateAsync(
-            new CollapseDurablesCommand { ConsumableId = Guid.NewGuid(), Body = new() { ItemIds = [Guid.NewGuid()], AreaId = Guid.NewGuid(), ContainerItemId = Guid.NewGuid() } }, Ct);
+            new CollapseDurablesRequest { ItemIds = [Guid.NewGuid()], AreaId = Guid.NewGuid(), ContainerItemId = Guid.NewGuid() }, Ct);
         Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.PropertyName == "Body");
+        Assert.Contains(result.Errors, e => e.ErrorMessage.Contains("exactly one of an area or a container"));
     }
 
     [Fact]
     public async Task NoLocation_IsInvalid()
     {
         var result = await _sut.ValidateAsync(
-            new CollapseDurablesCommand { ConsumableId = Guid.NewGuid(), Body = new() { ItemIds = [Guid.NewGuid()] } }, Ct);
+            new CollapseDurablesRequest { ItemIds = [Guid.NewGuid()] }, Ct);
         Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.PropertyName == "Body");
+        Assert.Contains(result.Errors, e => e.ErrorMessage.Contains("exactly one of an area or a container"));
     }
 
     [Fact]
     public async Task SingleItemWithArea_IsValid()
     {
         var result = await _sut.ValidateAsync(
-            new CollapseDurablesCommand { ConsumableId = Guid.NewGuid(), Body = new() { ItemIds = [Guid.NewGuid()], AreaId = Guid.NewGuid() } }, Ct);
+            new CollapseDurablesRequest { ItemIds = [Guid.NewGuid()], AreaId = Guid.NewGuid() }, Ct);
         Assert.True(result.IsValid);
     }
 }

@@ -12,7 +12,7 @@ public static class CreateItemNoteEndpoint
             CreateItemNoteHandler handler, CancellationToken ct) =>
         {
             var command = request with { ItemId = id };
-            var response = await handler.Handle(command, ct);
+            var response = await handler.HandleAsync(command, ct);
             return Results.Created($"/api/v1/inventory/items/{id}/activity/notes/{response.Id}", response);
         })
         .WithName("CreateItemNote")

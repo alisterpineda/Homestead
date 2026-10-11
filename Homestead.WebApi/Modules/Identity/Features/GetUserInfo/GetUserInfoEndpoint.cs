@@ -12,7 +12,7 @@ public static class GetUserInfoEndpoint
             if (userId is null)
                 return Results.Unauthorized();
 
-            var response = await handler.Handle(new GetUserInfoQuery(userId.Value), ct);
+            var response = await handler.HandleAsync(userId.Value, ct);
             return response is not null ? Results.Ok(response) : Results.Unauthorized();
         })
         .WithName("GetUserInfo")

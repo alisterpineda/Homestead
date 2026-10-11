@@ -11,27 +11,27 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Modules.Documents.Features.Parties.UpdateParty;
 
 public class UpdatePartyHandler(AppDbContext db, IDocumentQueryService accessService, IAuditContext audit,
-    ICurrentUserAccessor currentUser, IUnitOfWork unitOfWork, IValidator<UpdatePartyCommand> validator)
+    ICurrentUserAccessor currentUser, IUnitOfWork unitOfWork, IValidator<UpdatePartyRequest> validator)
 {
-    public async Task<UpdatePartyResponse?> Handle(UpdatePartyCommand request, CancellationToken ct)
+    public async Task<UpdatePartyResponse?> HandleAsync(Guid id, UpdatePartyRequest request, CancellationToken ct)
     {
         await validator.ValidateAndThrowAsync(request, ct);
 
         var party = await db.Parties
-            .FirstOrDefaultAsync(p => p.Id == request.Id, ct);
+            .FirstOrDefaultAsync(p => p.Id == id, ct);
 
         if (party is null)
             return null;
 
         var name = request.Name.Trim();
 
-        var nameConflict = await db.Parties.AnyAsync(p => p.Id != request.Id && p.Name == name, ct);
+        var nameConflict = await db.Parties.AnyAsync(p => p.Id != id && p.Name == name, ct);
         if (nameConflict)
             throw new DuplicateEntityException("A party with this name already exists.");
 
         // Block modification if the party is used on inaccessible documents
         var relatedDocIds = db.DocumentParties
-            .Where(dp => dp.PartyId == request.Id)
+            .Where(dp => dp.PartyId == id)
             .Select(dp => dp.DocumentId);
 
         await accessService.EnsureAllDocumentsAccessibleAsync(relatedDocIds, ct);

@@ -5,10 +5,7 @@ public static class GetStatusEndpoint
     public static void Map(RouteGroupBuilder group)
     {
         group.MapGet("", async (GetStatusHandler handler, CancellationToken ct) =>
-        {
-            var response = await handler.Handle(new GetStatusQuery(), ct);
-            return Results.Ok(response);
-        })
+            Results.Ok(await handler.HandleAsync(ct)))
         .WithName("GetStatus")
         .Produces<GetStatusResponse>()
         .AllowAnonymous();

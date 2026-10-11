@@ -19,7 +19,7 @@ public class CreateConsumableCommandValidator : AbstractValidator<CreateConsumab
             .When(x => x.RestockThreshold.HasValue);
 
         // Shape-coherence only: area/container existence and positivity beyond zero are left to
-        // StockService (mirroring how ReceiveStockCommand has no validator and relies on the service).
+        // StockService (mirroring how ReceiveStockRequest has no validator and relies on the service).
         RuleFor(x => x.InitialQuantity)
             .GreaterThan(0m).WithMessage("Starting quantity must be greater than zero.")
             .When(x => x.InitialQuantity.HasValue);

@@ -8,7 +8,7 @@ public static class CreateTagEndpoint
     {
         group.MapPost("/", async (CreateTagCommand request, CreateTagHandler handler, CancellationToken ct) =>
         {
-            var response = await handler.Handle(request, ct);
+            var response = await handler.HandleAsync(request, ct);
             return Results.Created($"/api/v1/documents/tags/{response.Id}", response);
         })
         .WithName("CreateTag")

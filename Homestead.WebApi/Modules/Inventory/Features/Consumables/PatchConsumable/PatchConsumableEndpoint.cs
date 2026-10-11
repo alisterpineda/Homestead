@@ -10,14 +10,7 @@ public static class PatchConsumableEndpoint
         group.MapPatch("/{id:guid}", async (Guid id,
             JsonPatchDocument<PatchConsumableModel> patchDoc,
             PatchConsumableHandler handler, CancellationToken ct) =>
-        {
-            var command = new PatchConsumableCommand
-            {
-                Id = id,
-                PatchDocument = patchDoc
-            };
-            return Results.Ok(await handler.Handle(command, ct));
-        })
+            Results.Ok(await handler.HandleAsync(id, patchDoc, ct)))
         .WithName("PatchConsumable")
         .Accepts<JsonPatchDocument<PatchConsumableModel>>("application/json-patch+json")
         .Produces<ConsumableResponse>()

@@ -73,7 +73,7 @@ public class GetPayeesHandlerTests : IAsyncLifetime
         await AddPayeeAsync("Costco");
         await AddPayeeAsync("Metro");
 
-        var resp = await _sut.Handle(new GetPayeesQuery { Page = 1, PageSize = 50 }, Ct);
+        var resp = await _sut.HandleAsync(new GetPayeesQuery { Page = 1, PageSize = 50 }, Ct);
 
         Assert.Equal(["Costco", "Metro", "Safeway"], resp.Items.Select(p => p.Name));
     }
@@ -84,7 +84,7 @@ public class GetPayeesHandlerTests : IAsyncLifetime
         await AddPayeeAsync("Costco");
         await AddPayeeAsync("Safeway");
 
-        var resp = await _sut.Handle(new GetPayeesQuery { Page = 1, PageSize = 50, Search = "COST" }, Ct);
+        var resp = await _sut.HandleAsync(new GetPayeesQuery { Page = 1, PageSize = 50, Search = "COST" }, Ct);
 
         Assert.Single(resp.Items);
         Assert.Equal("Costco", resp.Items[0].Name);
@@ -96,7 +96,7 @@ public class GetPayeesHandlerTests : IAsyncLifetime
         await AddPayeeAsync("Costco");
         await AddPayeeAsync("OldStore", isArchived: true);
 
-        var resp = await _sut.Handle(new GetPayeesQuery { Page = 1, PageSize = 50 }, Ct);
+        var resp = await _sut.HandleAsync(new GetPayeesQuery { Page = 1, PageSize = 50 }, Ct);
 
         Assert.Single(resp.Items);
         Assert.Equal("Costco", resp.Items[0].Name);
@@ -108,7 +108,7 @@ public class GetPayeesHandlerTests : IAsyncLifetime
         await AddPayeeAsync("Costco");
         await AddPayeeAsync("OldStore", isArchived: true);
 
-        var resp = await _sut.Handle(
+        var resp = await _sut.HandleAsync(
             new GetPayeesQuery { Page = 1, PageSize = 50, IncludeArchived = true }, Ct);
 
         Assert.Equal(2, resp.Items.Count);
@@ -120,7 +120,7 @@ public class GetPayeesHandlerTests : IAsyncLifetime
         await AddPayeeAsync("Costco", transactions: 3);
         await AddPayeeAsync("Safeway", transactions: 0);
 
-        var resp = await _sut.Handle(new GetPayeesQuery { Page = 1, PageSize = 50 }, Ct);
+        var resp = await _sut.HandleAsync(new GetPayeesQuery { Page = 1, PageSize = 50 }, Ct);
 
         Assert.Equal(3, resp.Items.Single(p => p.Name == "Costco").TransactionCount);
         Assert.Equal(0, resp.Items.Single(p => p.Name == "Safeway").TransactionCount);
@@ -132,7 +132,7 @@ public class GetPayeesHandlerTests : IAsyncLifetime
         var category = await AddCategoryAsync(AccountType.Expense, "Groceries");
         await AddPayeeAsync("Costco", defaultCategory: category);
 
-        var resp = await _sut.Handle(new GetPayeesQuery { Page = 1, PageSize = 50 }, Ct);
+        var resp = await _sut.HandleAsync(new GetPayeesQuery { Page = 1, PageSize = 50 }, Ct);
 
         var costco = resp.Items.Single(p => p.Name == "Costco");
         Assert.Equal(category.Id, costco.DefaultCategoryId);
@@ -147,7 +147,7 @@ public class GetPayeesHandlerTests : IAsyncLifetime
         await AddPayeeAsync("Safeway", transactions: 3);
         await AddPayeeAsync("Metro", transactions: 2);
 
-        var resp = await _sut.Handle(
+        var resp = await _sut.HandleAsync(
             new GetPayeesQuery { Page = 1, PageSize = 50, SortBy = "transactions", SortDir = "desc" }, Ct);
 
         Assert.Equal(["Safeway", "Metro", "Costco"], resp.Items.Select(p => p.Name));
@@ -161,7 +161,7 @@ public class GetPayeesHandlerTests : IAsyncLifetime
         await AddPayeeAsync("Oldest", updatedAt: now.AddDays(-2));
         await AddPayeeAsync("Middle", updatedAt: now.AddDays(-1));
 
-        var resp = await _sut.Handle(
+        var resp = await _sut.HandleAsync(
             new GetPayeesQuery { Page = 1, PageSize = 50, SortBy = "updated", SortDir = "asc" }, Ct);
 
         Assert.Equal(["Oldest", "Middle", "Newest"], resp.Items.Select(p => p.Name));
@@ -173,7 +173,7 @@ public class GetPayeesHandlerTests : IAsyncLifetime
         for (var i = 0; i < 5; i++)
             await AddPayeeAsync($"Payee {i:D2}");
 
-        var resp = await _sut.Handle(new GetPayeesQuery { Page = 1, PageSize = 2 }, Ct);
+        var resp = await _sut.HandleAsync(new GetPayeesQuery { Page = 1, PageSize = 2 }, Ct);
 
         Assert.Equal(2, resp.Items.Count);
         Assert.Equal(5, resp.TotalCount);

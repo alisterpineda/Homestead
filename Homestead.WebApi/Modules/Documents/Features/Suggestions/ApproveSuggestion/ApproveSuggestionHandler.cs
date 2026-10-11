@@ -7,10 +7,10 @@ namespace Homestead.WebApi.Modules.Documents.Features.Suggestions.ApproveSuggest
 
 public class ApproveSuggestionHandler(AppDbContext db, IUnitOfWork unitOfWork)
 {
-    public async Task Handle(ApproveSuggestionCommand request, CancellationToken ct)
+    public async Task HandleAsync(Guid documentId, Guid suggestionId, CancellationToken ct)
     {
         var suggestion = await db.DocumentSuggestions
-            .FirstOrDefaultAsync(s => s.Id == request.SuggestionId && s.DocumentId == request.DocumentId, ct)
+            .FirstOrDefaultAsync(s => s.Id == suggestionId && s.DocumentId == documentId, ct)
             ?? throw new EntityNotFoundException("Suggestion not found.");
 
         if (suggestion.Status != DocumentSuggestionStatus.Pending)

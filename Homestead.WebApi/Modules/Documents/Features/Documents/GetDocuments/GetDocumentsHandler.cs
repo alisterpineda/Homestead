@@ -20,7 +20,7 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
     private const int SuggestionLimit = 5;
     private const int SuggestionMinSearchLength = 3;
 
-    public async Task<GetDocumentsResult> Handle(
+    public async Task<GetDocumentsResult> HandleAsync(
         GetDocumentsQuery request, CancellationToken ct)
     {
         var scopedQuery = await BuildScopedQueryAsync(request, ct);

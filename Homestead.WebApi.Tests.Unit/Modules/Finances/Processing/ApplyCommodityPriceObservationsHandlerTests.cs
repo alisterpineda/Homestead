@@ -55,7 +55,7 @@ public class ApplyCommodityPriceObservationsHandlerTests : IDisposable
         });
         await _db.SaveChangesAsync(ct);
 
-        await _sut.Handle(new ApplyCommodityPriceObservationsCommand
+        await _sut.HandleAsync(new ApplyCommodityPriceObservationsCommand
         {
             Source = CommodityPriceSource.BankOfCanada,
             Observations = new[]
@@ -98,7 +98,7 @@ public class ApplyCommodityPriceObservationsHandlerTests : IDisposable
         });
         await _db.SaveChangesAsync(ct);
 
-        await _sut.Handle(new ApplyCommodityPriceObservationsCommand
+        await _sut.HandleAsync(new ApplyCommodityPriceObservationsCommand
         {
             Source = CommodityPriceSource.BankOfCanada,
             Observations = new[] { new PriceObservation(_usd, _cad, at, 1.30m) },
@@ -122,7 +122,7 @@ public class ApplyCommodityPriceObservationsHandlerTests : IDisposable
 
         var at = new DateTimeOffset(2026, 4, 1, 0, 0, 0, TimeSpan.Zero);
 
-        await _sut.Handle(new ApplyCommodityPriceObservationsCommand
+        await _sut.HandleAsync(new ApplyCommodityPriceObservationsCommand
         {
             Source = CommodityPriceSource.BankOfCanada,
             Observations = new[]
@@ -144,7 +144,7 @@ public class ApplyCommodityPriceObservationsHandlerTests : IDisposable
         var ct = TestContext.Current.CancellationToken;
         // Note: no SeedSettingsAsync — the settings row is absent.
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => _sut.Handle(
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _sut.HandleAsync(
             new ApplyCommodityPriceObservationsCommand
             {
                 Source = CommodityPriceSource.BankOfCanada,
@@ -158,7 +158,7 @@ public class ApplyCommodityPriceObservationsHandlerTests : IDisposable
         var ct = TestContext.Current.CancellationToken;
         await SeedSettingsAsync();
 
-        await _sut.Handle(new ApplyCommodityPriceObservationsCommand
+        await _sut.HandleAsync(new ApplyCommodityPriceObservationsCommand
         {
             Source = CommodityPriceSource.BankOfCanada,
             Observations = Array.Empty<PriceObservation>(),
@@ -178,7 +178,7 @@ public class ApplyCommodityPriceObservationsHandlerTests : IDisposable
         var ct = TestContext.Current.CancellationToken;
         await SeedSettingsAsync();
 
-        await _sut.Handle(new ApplyCommodityPriceObservationsCommand
+        await _sut.HandleAsync(new ApplyCommodityPriceObservationsCommand
         {
             Source = CommodityPriceSource.BankOfCanada,
             Observations = Array.Empty<PriceObservation>(),

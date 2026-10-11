@@ -11,7 +11,7 @@ public class CreateOpeningBalanceHandler(
     IUnitOfWork unitOfWork,
     IValidator<CreateOpeningBalanceCommand> validator)
 {
-    public async Task<OpeningBalanceResponse> Handle(CreateOpeningBalanceCommand request, CancellationToken ct)
+    public async Task<OpeningBalanceResponse> HandleAsync(CreateOpeningBalanceCommand request, CancellationToken ct)
     {
         await validator.ValidateAndThrowAsync(request, ct);
 

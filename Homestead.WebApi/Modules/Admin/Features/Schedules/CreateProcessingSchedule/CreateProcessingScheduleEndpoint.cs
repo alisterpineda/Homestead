@@ -7,7 +7,7 @@ public static class CreateProcessingScheduleEndpoint
         group.MapPost("/", async (CreateProcessingScheduleCommand request,
             CreateProcessingScheduleHandler handler, CancellationToken ct) =>
         {
-            var response = await handler.Handle(request, ct);
+            var response = await handler.HandleAsync(request, ct);
             return Results.Created($"/api/v1/admin/schedules/{response.Id}", response);
         })
         .WithName("CreateProcessingSchedule")

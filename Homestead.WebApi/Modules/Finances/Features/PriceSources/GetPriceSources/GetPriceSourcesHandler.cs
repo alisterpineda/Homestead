@@ -7,7 +7,7 @@ namespace Homestead.WebApi.Modules.Finances.Features.PriceSources.GetPriceSource
 
 public class GetPriceSourcesHandler(AppDbContext db, IPriceSourceRegistry registry)
 {
-    public async Task<GetPriceSourcesResponse> Handle(GetPriceSourcesQuery request, CancellationToken ct)
+    public async Task<GetPriceSourcesResponse> HandleAsync(CancellationToken ct)
     {
         var sources = Enum.GetValues<CommodityPriceSource>();
 

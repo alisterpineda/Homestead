@@ -7,7 +7,7 @@ namespace Homestead.WebApi.Modules.Documents.Features.Tags.CreateTag;
 
 public class CreateTagHandler(ITagPathResolver tagPathResolver, ICurrentUserAccessor currentUser, IAuditContext audit, IUnitOfWork unitOfWork)
 {
-    public async Task<CreateTagResponse> Handle(CreateTagCommand request, CancellationToken ct)
+    public async Task<CreateTagResponse> HandleAsync(CreateTagCommand request, CancellationToken ct)
     {
         var tag = await tagPathResolver.ResolveOrCreateAsync(request.Path, leafColor: request.Color, leafDescription: request.Description, createdByUserId: currentUser.UserId, ct: ct);
 

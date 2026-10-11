@@ -8,9 +8,9 @@ public class DeleteDripHandler(
     IBalanceEntryReconciler reconciler,
     IUnitOfWork unitOfWork)
 {
-    public async Task Handle(DeleteDripCommand request, CancellationToken ct)
+    public async Task HandleAsync(Guid transactionId, CancellationToken ct)
     {
-        var result = await drips.DeleteBothAsync(request.TransactionId, ct);
+        var result = await drips.DeleteBothAsync(transactionId, ct);
 
         await unitOfWork.SaveChangesAsync(ct);
 

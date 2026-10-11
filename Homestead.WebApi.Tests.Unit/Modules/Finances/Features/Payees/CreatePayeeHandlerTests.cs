@@ -60,7 +60,7 @@ public class CreatePayeeHandlerTests : IDisposable
     [Fact]
     public async Task Handle_NewName_CreatesPayee()
     {
-        var resp = await _sut.Handle(new CreatePayeeCommand { Name = "Costco" }, Ct);
+        var resp = await _sut.HandleAsync(new CreatePayeeCommand { Name = "Costco" }, Ct);
 
         Assert.Equal("Costco", resp.Name);
         Assert.False(resp.IsArchived);
@@ -71,7 +71,7 @@ public class CreatePayeeHandlerTests : IDisposable
     [Fact]
     public async Task Handle_AttributesCreatedByUserAndAudits()
     {
-        var resp = await _sut.Handle(new CreatePayeeCommand { Name = "Costco" }, Ct);
+        var resp = await _sut.HandleAsync(new CreatePayeeCommand { Name = "Costco" }, Ct);
 
         var stored = _db.Payees.Single(p => p.Id == resp.Id);
         Assert.Equal(_userId, stored.CreatedByUserId);
@@ -82,7 +82,7 @@ public class CreatePayeeHandlerTests : IDisposable
     [Fact]
     public async Task Handle_TrimsName()
     {
-        var resp = await _sut.Handle(new CreatePayeeCommand { Name = "  Costco  " }, Ct);
+        var resp = await _sut.HandleAsync(new CreatePayeeCommand { Name = "  Costco  " }, Ct);
 
         Assert.Equal("Costco", resp.Name);
         Assert.Equal("Costco", _db.Payees.Single().Name);
@@ -94,7 +94,7 @@ public class CreatePayeeHandlerTests : IDisposable
         await AddPayeeAsync("Costco");
 
         await Assert.ThrowsAsync<DuplicateEntityException>(() =>
-            _sut.Handle(new CreatePayeeCommand { Name = "Costco" }, Ct));
+            _sut.HandleAsync(new CreatePayeeCommand { Name = "Costco" }, Ct));
     }
 
     [Fact]
@@ -103,7 +103,7 @@ public class CreatePayeeHandlerTests : IDisposable
         await AddPayeeAsync("Costco");
 
         await Assert.ThrowsAsync<DuplicateEntityException>(() =>
-            _sut.Handle(new CreatePayeeCommand { Name = "  costco " }, Ct));
+            _sut.HandleAsync(new CreatePayeeCommand { Name = "  costco " }, Ct));
     }
 
     [Fact]
@@ -111,7 +111,7 @@ public class CreatePayeeHandlerTests : IDisposable
     {
         var category = await AddCategoryAsync(AccountType.Expense, name: "Groceries");
 
-        var resp = await _sut.Handle(
+        var resp = await _sut.HandleAsync(
             new CreatePayeeCommand { Name = "Costco", DefaultCategoryId = category.Id }, Ct);
 
         Assert.Equal(category.Id, resp.DefaultCategoryId);
@@ -123,7 +123,7 @@ public class CreatePayeeHandlerTests : IDisposable
     public async Task Handle_MissingDefaultCategory_ThrowsBusinessRule()
     {
         await Assert.ThrowsAsync<BusinessRuleException>(() =>
-            _sut.Handle(new CreatePayeeCommand { Name = "Costco", DefaultCategoryId = Guid.NewGuid() }, Ct));
+            _sut.HandleAsync(new CreatePayeeCommand { Name = "Costco", DefaultCategoryId = Guid.NewGuid() }, Ct));
     }
 
     [Fact]
@@ -132,7 +132,7 @@ public class CreatePayeeHandlerTests : IDisposable
         var asset = await AddCategoryAsync(AccountType.Asset, name: "Chequing");
 
         await Assert.ThrowsAsync<BusinessRuleException>(() =>
-            _sut.Handle(new CreatePayeeCommand { Name = "Costco", DefaultCategoryId = asset.Id }, Ct));
+            _sut.HandleAsync(new CreatePayeeCommand { Name = "Costco", DefaultCategoryId = asset.Id }, Ct));
     }
 
     [Fact]
@@ -141,13 +141,13 @@ public class CreatePayeeHandlerTests : IDisposable
         var system = await AddCategoryAsync(AccountType.Expense, isSystem: true, name: "Uncategorised");
 
         await Assert.ThrowsAsync<BusinessRuleException>(() =>
-            _sut.Handle(new CreatePayeeCommand { Name = "Costco", DefaultCategoryId = system.Id }, Ct));
+            _sut.HandleAsync(new CreatePayeeCommand { Name = "Costco", DefaultCategoryId = system.Id }, Ct));
     }
 
     [Fact]
     public async Task Handle_BlankName_ThrowsValidationException()
     {
         await Assert.ThrowsAsync<ValidationException>(() =>
-            _sut.Handle(new CreatePayeeCommand { Name = "   " }, Ct));
+            _sut.HandleAsync(new CreatePayeeCommand { Name = "   " }, Ct));
     }
 }

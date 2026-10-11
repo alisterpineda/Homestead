@@ -38,7 +38,7 @@ public class BulkDeleteTagsHandlerTests : IDisposable
             new Tag { Id = id2, Name = "Tag B", Path = "Tag B" });
         await _db.SaveChangesAsync(Ct);
 
-        var result = await _sut.Handle(new BulkDeleteInventoryTagsCommand([id1, id2]), Ct);
+        var result = await _sut.HandleAsync(new BulkDeleteInventoryTagsCommand([id1, id2]), Ct);
 
         Assert.Equal(2, result.DeletedCount);
         _audit.Received(1).Deleted("InventoryTag", id1, "Tag A", Arg.Any<Guid?>());
@@ -49,7 +49,7 @@ public class BulkDeleteTagsHandlerTests : IDisposable
     [Fact]
     public async Task Handle_NoTags_DoesNotLogAudit_ReturnsZero()
     {
-        var result = await _sut.Handle(new BulkDeleteInventoryTagsCommand([Guid.NewGuid()]), Ct);
+        var result = await _sut.HandleAsync(new BulkDeleteInventoryTagsCommand([Guid.NewGuid()]), Ct);
 
         Assert.Equal(0, result.DeletedCount);
         _audit.DidNotReceive().Deleted(Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<string?>(), Arg.Any<Guid?>());
@@ -58,7 +58,7 @@ public class BulkDeleteTagsHandlerTests : IDisposable
     [Fact]
     public async Task Handle_EmptyIds_ReturnsZero()
     {
-        var result = await _sut.Handle(new BulkDeleteInventoryTagsCommand([]), Ct);
+        var result = await _sut.HandleAsync(new BulkDeleteInventoryTagsCommand([]), Ct);
 
         Assert.Equal(0, result.DeletedCount);
     }
@@ -77,7 +77,7 @@ public class BulkDeleteTagsHandlerTests : IDisposable
         _db.InventoryTags.Add(c);
         await _db.SaveChangesAsync(ct);
 
-        var result = await _sut.Handle(new BulkDeleteInventoryTagsCommand([b.Id]), ct);
+        var result = await _sut.HandleAsync(new BulkDeleteInventoryTagsCommand([b.Id]), ct);
 
         Assert.Equal(1, result.DeletedCount);
         Assert.False(await _db.InventoryTags.AnyAsync(t => t.Id == b.Id, ct));
@@ -101,7 +101,7 @@ public class BulkDeleteTagsHandlerTests : IDisposable
         await _db.SaveChangesAsync(ct);
 
         // Delete both the root and the middle: c must cascade-reparent all the way up to root.
-        var result = await _sut.Handle(new BulkDeleteInventoryTagsCommand([a.Id, b.Id]), ct);
+        var result = await _sut.HandleAsync(new BulkDeleteInventoryTagsCommand([a.Id, b.Id]), ct);
 
         Assert.Equal(2, result.DeletedCount);
         var reloadedC = await _db.InventoryTags.SingleAsync(t => t.Id == c.Id, ct);
@@ -124,7 +124,7 @@ public class BulkDeleteTagsHandlerTests : IDisposable
         _db.InventoryTags.Add(c);
         await _db.SaveChangesAsync(ct);
 
-        await _sut.Handle(new BulkDeleteInventoryTagsCommand([b.Id]), ct);
+        await _sut.HandleAsync(new BulkDeleteInventoryTagsCommand([b.Id]), ct);
 
         var reloadedC = await _db.InventoryTags.SingleAsync(t => t.Id == c.Id, ct);
         Assert.Null(reloadedC.Color);
@@ -150,7 +150,7 @@ public class BulkDeleteTagsHandlerTests : IDisposable
         _db.ItemTags.Add(new ItemTag { ItemId = item.Id, TagId = tag.Id });
         await _db.SaveChangesAsync(ct);
 
-        var result = await _sut.Handle(new BulkDeleteInventoryTagsCommand([tag.Id]), ct);
+        var result = await _sut.HandleAsync(new BulkDeleteInventoryTagsCommand([tag.Id]), ct);
 
         Assert.Equal(1, result.DeletedCount);
         Assert.Empty(_db.ItemTags);

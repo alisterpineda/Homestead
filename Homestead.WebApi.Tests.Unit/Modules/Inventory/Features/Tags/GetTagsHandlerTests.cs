@@ -26,7 +26,7 @@ public class GetTagsHandlerTests : IDisposable
     {
         await SeedTagsAsync("Charlie", "Alpha", "Bravo");
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new GetInventoryTagsQuery { Page = 1, PageSize = 10 },
             TestContext.Current.CancellationToken);
 
@@ -39,7 +39,7 @@ public class GetTagsHandlerTests : IDisposable
     {
         await SeedTagsAsync("Alpha", "Bravo", "Charlie");
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new GetInventoryTagsQuery { Page = 1, PageSize = 10, SortBy = InventoryTagSortBy.Name, SortDir = SortDirection.Desc },
             TestContext.Current.CancellationToken);
 
@@ -55,7 +55,7 @@ public class GetTagsHandlerTests : IDisposable
         _db.InventoryTags.Add(new Tag { Name = "B", Path = "M/B" });
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new GetInventoryTagsQuery { Page = 1, PageSize = 10, SortBy = InventoryTagSortBy.Path, SortDir = SortDirection.Asc },
             TestContext.Current.CancellationToken);
 
@@ -71,7 +71,7 @@ public class GetTagsHandlerTests : IDisposable
         _db.InventoryTags.Add(new Tag { Name = "C", Path = "Z/C" });
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new GetInventoryTagsQuery { Page = 1, PageSize = 10, SortBy = InventoryTagSortBy.Path, SortDir = SortDirection.Desc },
             TestContext.Current.CancellationToken);
 
@@ -88,7 +88,7 @@ public class GetTagsHandlerTests : IDisposable
         _db.InventoryTags.Add(new Tag { Name = "Second", Path = "Second", CreatedAt = now.AddHours(1) });
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new GetInventoryTagsQuery { Page = 1, PageSize = 10, SortBy = InventoryTagSortBy.CreatedAt, SortDir = SortDirection.Asc },
             TestContext.Current.CancellationToken);
 
@@ -105,7 +105,7 @@ public class GetTagsHandlerTests : IDisposable
         _db.InventoryTags.Add(new Tag { Name = "Second", Path = "Second", CreatedAt = now.AddHours(1) });
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new GetInventoryTagsQuery { Page = 1, PageSize = 10, SortBy = InventoryTagSortBy.CreatedAt, SortDir = SortDirection.Desc },
             TestContext.Current.CancellationToken);
 
@@ -122,7 +122,7 @@ public class GetTagsHandlerTests : IDisposable
         _db.InventoryTags.Add(new Tag { Name = "Second", Path = "Second", UpdatedAt = now.AddHours(1) });
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new GetInventoryTagsQuery { Page = 1, PageSize = 10, SortBy = InventoryTagSortBy.UpdatedAt, SortDir = SortDirection.Asc },
             TestContext.Current.CancellationToken);
 
@@ -139,7 +139,7 @@ public class GetTagsHandlerTests : IDisposable
         _db.InventoryTags.Add(new Tag { Name = "Second", Path = "Second", UpdatedAt = now.AddHours(1) });
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new GetInventoryTagsQuery { Page = 1, PageSize = 10, SortBy = InventoryTagSortBy.UpdatedAt, SortDir = SortDirection.Desc },
             TestContext.Current.CancellationToken);
 
@@ -152,7 +152,7 @@ public class GetTagsHandlerTests : IDisposable
     {
         await SeedTagsAsync("Zulu", "Alpha");
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new GetInventoryTagsQuery { Page = 1, PageSize = 10, SortBy = null, SortDir = null },
             TestContext.Current.CancellationToken);
 
@@ -177,7 +177,7 @@ public class GetTagsHandlerTests : IDisposable
             new ItemTag { ItemId = itemB.Id, TagId = tagUsed.Id });
         await _db.SaveChangesAsync(ct);
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new GetInventoryTagsQuery { Page = 1, PageSize = 10 }, ct);
 
         var byName = result.Items.ToDictionary(t => t.Name, t => t.ItemCount);
@@ -206,7 +206,7 @@ public class GetTagsHandlerTests : IDisposable
             new ItemTag { ItemId = itemA.Id, TagId = tagFew.Id });
         await _db.SaveChangesAsync(ct);
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new GetInventoryTagsQuery { Page = 1, PageSize = 10, SortBy = InventoryTagSortBy.ItemCount, SortDir = SortDirection.Desc },
             ct);
 
@@ -232,7 +232,7 @@ public class GetTagsHandlerTests : IDisposable
             new ItemTag { ItemId = itemB.Id, TagId = tagWith.Id });
         await _db.SaveChangesAsync(ct);
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new GetInventoryTagsQuery { Page = 1, PageSize = 10, SortBy = InventoryTagSortBy.ItemCount, SortDir = SortDirection.Asc },
             ct);
 
@@ -257,7 +257,7 @@ public class GetTagsHandlerTests : IDisposable
         _db.InventoryTags.Add(new Tag { Name = "drill", Path = "tools/power/drill", ParentId = power.Id });
         await _db.SaveChangesAsync(ct);
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new GetInventoryTagsQuery { Page = 1, PageSize = 10, ParentPath = "tools", IncludeChildren = false },
             ct);
 
@@ -281,7 +281,7 @@ public class GetTagsHandlerTests : IDisposable
         _db.InventoryTags.Add(new Tag { Name = "kitchen", Path = "kitchen" });
         await _db.SaveChangesAsync(ct);
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new GetInventoryTagsQuery { Page = 1, PageSize = 10, ParentPath = "tools", IncludeChildren = true },
             ct);
 
@@ -297,7 +297,7 @@ public class GetTagsHandlerTests : IDisposable
         _db.InventoryTags.Add(new Tag { Name = "tools", Path = "tools" });
         await _db.SaveChangesAsync(ct);
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new GetInventoryTagsQuery { Page = 1, PageSize = 10, ParentPath = "nonexistent", IncludeChildren = false },
             ct);
 

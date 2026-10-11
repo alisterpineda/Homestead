@@ -17,13 +17,11 @@ public class CollapseDurablesHandler(
     IAuditContext audit,
     IItemLocationResolver locationResolver,
     IUnitOfWork unitOfWork,
-    IValidator<CollapseDurablesCommand> validator)
+    IValidator<CollapseDurablesRequest> validator)
 {
-    public async Task<ConsumableDetailResponse> Handle(CollapseDurablesCommand request, CancellationToken ct)
+    public async Task<ConsumableDetailResponse> HandleAsync(Guid id, CollapseDurablesRequest body, CancellationToken ct)
     {
-        await validator.ValidateAndThrowAsync(request, ct);
-
-        var body = request.Body;
+        await validator.ValidateAndThrowAsync(body, ct);
 
         // Every check runs before any mutation, so a rejected collapse leaves stock, the ledger, and
         // item statuses untouched.
@@ -76,7 +74,7 @@ public class CollapseDurablesHandler(
                     $"Cannot collapse '{blocked.Name}' while it has active contents.");
         }
 
-        await stock.ConvertInAsync(request.ConsumableId, new StockConvertInRequest(
+        await stock.ConvertInAsync(id, new StockConvertInRequest(
             new StockLocation(body.AreaId, body.ContainerItemId),
             body.ItemIds, body.OccurredAt, body.Note), ct);
 
@@ -94,7 +92,7 @@ public class CollapseDurablesHandler(
 
         await unitOfWork.SaveChangesAsync(ct);
 
-        return await ConsumableDetailReader.LoadAsync(db, locationResolver, request.ConsumableId, ct)
+        return await ConsumableDetailReader.LoadAsync(db, locationResolver, id, ct)
             ?? throw new EntityNotFoundException("Consumable not found.");
     }
 }

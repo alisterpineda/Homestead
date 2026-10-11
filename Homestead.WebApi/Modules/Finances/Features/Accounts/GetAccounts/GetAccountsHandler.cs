@@ -8,7 +8,7 @@ namespace Homestead.WebApi.Modules.Finances.Features.Accounts.GetAccounts;
 
 public class GetAccountsHandler(AppDbContext db, IValuationService valuations)
 {
-    public async Task<PaginatedResponse<AccountResponse>> Handle(
+    public async Task<PaginatedResponse<AccountResponse>> HandleAsync(
         GetAccountsQuery request, CancellationToken ct)
     {
         // Balance-sheet accounts only — categories (non-system Income/Expense) are managed under

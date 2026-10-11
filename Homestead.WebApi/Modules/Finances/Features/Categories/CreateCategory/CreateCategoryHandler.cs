@@ -18,7 +18,7 @@ public class CreateCategoryHandler(
     IUnitOfWork unitOfWork,
     IValidator<CreateCategoryCommand> validator)
 {
-    public async Task<CategoryResponse> Handle(CreateCategoryCommand request, CancellationToken ct)
+    public async Task<CategoryResponse> HandleAsync(CreateCategoryCommand request, CancellationToken ct)
     {
         await validator.ValidateAndThrowAsync(request, ct);
 

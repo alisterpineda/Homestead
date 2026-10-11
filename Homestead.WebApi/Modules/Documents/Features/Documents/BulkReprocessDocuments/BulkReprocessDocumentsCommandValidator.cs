@@ -3,7 +3,7 @@ using Homestead.WebApi.Infrastructure.TextExtraction;
 
 namespace Homestead.WebApi.Modules.Documents.Features.Documents.BulkReprocessDocuments;
 
-// See ReprocessDocumentVersionCommandValidator — same key-existence check, on the bulk path.
+// See ReprocessDocumentVersionBodyValidator — same key-existence check, on the bulk path.
 public class BulkReprocessDocumentsCommandValidator : AbstractValidator<BulkReprocessDocumentsCommand>
 {
     public BulkReprocessDocumentsCommandValidator(IEnumerable<ITextExtractionEngine> engines)

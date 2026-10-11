@@ -8,10 +8,7 @@ public static class CollapseDurablesEndpoint
     {
         group.MapPost("/{id:guid}/collapse", async (Guid id,
             CollapseDurablesRequest body, CollapseDurablesHandler handler, CancellationToken ct) =>
-        {
-            var command = new CollapseDurablesCommand { ConsumableId = id, Body = body };
-            return Results.Ok(await handler.Handle(command, ct));
-        })
+            Results.Ok(await handler.HandleAsync(id, body, ct)))
         .WithName("CollapseDurables")
         .Produces<ConsumableDetailResponse>()
         .Produces(StatusCodes.Status400BadRequest)

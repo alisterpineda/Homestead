@@ -10,7 +10,7 @@ public static class UpdateItemWarrantyEndpoint
             UpdateItemWarrantyCommand request, UpdateItemWarrantyHandler handler, CancellationToken ct) =>
         {
             var command = request with { ItemId = id, WarrantyId = warrantyId };
-            var response = await handler.Handle(command, ct);
+            var response = await handler.HandleAsync(command, ct);
             return Results.Ok(response);
         })
         .WithName("UpdateItemWarranty")

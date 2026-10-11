@@ -6,7 +6,7 @@ public static class GetCommodityEndpoint
     {
         group.MapGet("/{id:guid}", async (Guid id, GetCommodityHandler handler, CancellationToken ct) =>
         {
-            var response = await handler.Handle(new GetCommodityQuery(id), ct);
+            var response = await handler.HandleAsync(id, ct);
             return response is not null ? Results.Ok(response) : Results.NotFound();
         })
         .WithName("GetCommodity")

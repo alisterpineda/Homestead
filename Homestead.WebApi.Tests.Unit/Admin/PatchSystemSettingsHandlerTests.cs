@@ -52,7 +52,7 @@ public class PatchSystemSettingsHandlerTests : IDisposable
     {
         var request = new PatchSystemSettingsCommand();
 
-        await _sut.Handle(request, TestContext.Current.CancellationToken);
+        await _sut.HandleAsync(request, TestContext.Current.CancellationToken);
 
         var saved = await _db.AppSettings.FirstOrDefaultAsync(s => s.Key == AppSetting.SystemModule, TestContext.Current.CancellationToken);
         Assert.NotNull(saved);
@@ -63,7 +63,7 @@ public class PatchSystemSettingsHandlerTests : IDisposable
     {
         var request = new PatchSystemSettingsCommand();
 
-        await _sut.Handle(request, TestContext.Current.CancellationToken);
+        await _sut.HandleAsync(request, TestContext.Current.CancellationToken);
 
         _audit.Received(1).Created(
             "AppSetting",
@@ -83,7 +83,7 @@ public class PatchSystemSettingsHandlerTests : IDisposable
 
         var request = new PatchSystemSettingsCommand();
 
-        await _sut.Handle(request, ct);
+        await _sut.HandleAsync(request, ct);
 
         var saved = await _db.AppSettings.FirstOrDefaultAsync(s => s.Key == AppSetting.SystemModule, ct);
         Assert.NotNull(saved);
@@ -103,7 +103,7 @@ public class PatchSystemSettingsHandlerTests : IDisposable
             }
         };
 
-        await _sut.Handle(request, ct);
+        await _sut.HandleAsync(request, ct);
 
         var saved = await _db.AppSettings.FirstOrDefaultAsync(s => s.Key == AppSetting.SystemModule, ct);
         Assert.NotNull(saved);
@@ -121,7 +121,7 @@ public class PatchSystemSettingsHandlerTests : IDisposable
         var overrides = new Dictionary<string, LogLevel> { ["Default"] = LogLevel.Warning };
         var request = new PatchSystemSettingsCommand { LogLevelOverrides = overrides };
 
-        await _sut.Handle(request, ct);
+        await _sut.HandleAsync(request, ct);
 
         // The change fans out via a NOTIFY on the system key; every instance (including this one) re-reads
         // the committed row through its listener — there's no privileged inline apply.
@@ -137,7 +137,7 @@ public class PatchSystemSettingsHandlerTests : IDisposable
             LogLevelOverrides = new Dictionary<string, LogLevel> { ["Homestead"] = LogLevel.Trace }
         };
 
-        var response = await _sut.Handle(request, ct);
+        var response = await _sut.HandleAsync(request, ct);
 
         Assert.NotNull(response.LogLevelOverrides);
         Assert.Equal(LogLevel.Trace, response.LogLevelOverrides["Homestead"]);
@@ -159,7 +159,7 @@ public class PatchSystemSettingsHandlerTests : IDisposable
             LogLevelOverrides = new Dictionary<string, LogLevel> { ["Default"] = LogLevel.Warning }
         };
 
-        await _sut.Handle(request, ct);
+        await _sut.HandleAsync(request, ct);
 
         _audit.Received(1).Track(
             Arg.Any<Func<List<FieldChange>>>(),
@@ -177,7 +177,7 @@ public class PatchSystemSettingsHandlerTests : IDisposable
             LogLevelOverrides = new Dictionary<string, LogLevel> { ["Default"] = LogLevel.Warning }
         };
 
-        await _sut.Handle(request, ct);
+        await _sut.HandleAsync(request, ct);
 
         // The NOTIFY must be registered as an after-commit hook (not fired inline): peers re-read the
         // committed row on a separate connection, so a pre-commit signal could race ahead of row visibility.
@@ -189,7 +189,7 @@ public class PatchSystemSettingsHandlerTests : IDisposable
     {
         var request = new PatchSystemSettingsCommand { LogLevelOverrides = null };
 
-        await _sut.Handle(request, TestContext.Current.CancellationToken);
+        await _sut.HandleAsync(request, TestContext.Current.CancellationToken);
 
         await _notifier.DidNotReceive().NotifyAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
@@ -210,7 +210,7 @@ public class PatchSystemSettingsHandlerTests : IDisposable
             LogLevelOverrides = new Dictionary<string, LogLevel>()
         };
 
-        var response = await _sut.Handle(request, ct);
+        var response = await _sut.HandleAsync(request, ct);
 
         // An empty map is still "overrides provided" — it clears the stored set, so the change must fan out.
         Assert.NotNull(response.LogLevelOverrides);
@@ -226,6 +226,6 @@ public class PatchSystemSettingsHandlerTests : IDisposable
             LogLevelOverrides = new Dictionary<string, LogLevel> { ["Microsoft"] = (LogLevel)42 }
         };
 
-        await Assert.ThrowsAsync<ValidationException>(() => _sut.Handle(request, TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<ValidationException>(() => _sut.HandleAsync(request, TestContext.Current.CancellationToken));
     }
 }

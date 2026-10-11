@@ -7,11 +7,7 @@ public static class GetOpeningBalanceEndpoint
         group.MapGet("/{accountId:guid}/opening-balances/{commodityId:guid}",
             async (Guid accountId, Guid commodityId, GetOpeningBalanceHandler handler, CancellationToken ct) =>
         {
-            var response = await handler.Handle(new GetOpeningBalanceQuery
-            {
-                AccountId = accountId,
-                CommodityId = commodityId,
-            }, ct);
+            var response = await handler.HandleAsync(accountId, commodityId, ct);
             return response is null ? Results.NotFound() : Results.Ok(response);
         })
         .WithName("GetOpeningBalance")

@@ -38,7 +38,7 @@ public class CreateItemWarrantyHandlerTests : IDisposable
     public async Task Handle_MissingItem_Throws()
     {
         await Assert.ThrowsAsync<EntityNotFoundException>(() =>
-            _sut.Handle(new CreateItemWarrantyCommand { ItemId = Guid.NewGuid() }, Ct));
+            _sut.HandleAsync(new CreateItemWarrantyCommand { ItemId = Guid.NewGuid() }, Ct));
     }
 
     [Fact]
@@ -48,7 +48,7 @@ public class CreateItemWarrantyHandlerTests : IDisposable
         var consumable = await ItemNoteTestData.AddItemAsync(_db, Fungibility.Fungible);
 
         var ex = await Assert.ThrowsAsync<BusinessRuleException>(() =>
-            _sut.Handle(new CreateItemWarrantyCommand { ItemId = consumable.Id }, Ct));
+            _sut.HandleAsync(new CreateItemWarrantyCommand { ItemId = consumable.Id }, Ct));
         Assert.Equal("Warranties apply to durable items only.", ex.Message);
         Assert.Empty(_db.ItemWarranties);
     }
@@ -58,7 +58,7 @@ public class CreateItemWarrantyHandlerTests : IDisposable
     {
         var item = await ItemNoteTestData.AddItemAsync(_db);
 
-        var response = await _sut.Handle(new CreateItemWarrantyCommand { ItemId = item.Id }, Ct);
+        var response = await _sut.HandleAsync(new CreateItemWarrantyCommand { ItemId = item.Id }, Ct);
 
         Assert.Equal(item.Id, response.ItemId);
         Assert.Null(response.Provider);
@@ -75,7 +75,7 @@ public class CreateItemWarrantyHandlerTests : IDisposable
     {
         var item = await ItemNoteTestData.AddItemAsync(_db);
 
-        var response = await _sut.Handle(new CreateItemWarrantyCommand
+        var response = await _sut.HandleAsync(new CreateItemWarrantyCommand
         {
             ItemId = item.Id, Provider = "  Bosch  ", Notes = "   ",
         }, Ct);
@@ -94,7 +94,7 @@ public class CreateItemWarrantyHandlerTests : IDisposable
     {
         var item = await ItemNoteTestData.AddItemAsync(_db);
 
-        var response = await _sut.Handle(new CreateItemWarrantyCommand
+        var response = await _sut.HandleAsync(new CreateItemWarrantyCommand
         {
             ItemId = item.Id, ExpiresOn = DateOnly.Parse(expiresOn),
         }, Ct);
@@ -107,7 +107,7 @@ public class CreateItemWarrantyHandlerTests : IDisposable
     {
         var item = await ItemNoteTestData.AddItemAsync(_db);
 
-        var response = await _sut.Handle(new CreateItemWarrantyCommand { ItemId = item.Id }, Ct);
+        var response = await _sut.HandleAsync(new CreateItemWarrantyCommand { ItemId = item.Id }, Ct);
 
         _audit.Received(1).Created("ItemWarranty", response.Id, item.Id);
     }
@@ -117,7 +117,7 @@ public class CreateItemWarrantyHandlerTests : IDisposable
     {
         var item = await ItemNoteTestData.AddItemAsync(_db);
 
-        await _sut.Handle(new CreateItemWarrantyCommand { ItemId = item.Id, Provider = "Bosch" }, Ct);
+        await _sut.HandleAsync(new CreateItemWarrantyCommand { ItemId = item.Id, Provider = "Bosch" }, Ct);
 
         var stored = Assert.Single(_db.ItemWarranties);
         Assert.Equal(_userId, stored.CreatedByUserId);
@@ -131,7 +131,7 @@ public class CreateItemWarrantyHandlerTests : IDisposable
     {
         var item = await ItemNoteTestData.AddItemAsync(_db, status: status);
 
-        var response = await _sut.Handle(new CreateItemWarrantyCommand { ItemId = item.Id }, Ct);
+        var response = await _sut.HandleAsync(new CreateItemWarrantyCommand { ItemId = item.Id }, Ct);
 
         Assert.Equal(item.Id, response.ItemId);
     }
@@ -142,7 +142,7 @@ public class CreateItemWarrantyHandlerTests : IDisposable
         var item = await ItemNoteTestData.AddItemAsync(_db);
         var itemUpdatedAt = item.UpdatedAt;
 
-        await _sut.Handle(new CreateItemWarrantyCommand { ItemId = item.Id }, Ct);
+        await _sut.HandleAsync(new CreateItemWarrantyCommand { ItemId = item.Id }, Ct);
 
         // Paperwork about the item, not an edit of it — Browse recency is unaffected (notes precedent).
         Assert.Equal(itemUpdatedAt, (await _db.Items.FindAsync([item.Id], Ct))!.UpdatedAt);
@@ -152,6 +152,6 @@ public class CreateItemWarrantyHandlerTests : IDisposable
     public async Task Handle_ProviderTooLong_ThrowsValidationException()
     {
         await Assert.ThrowsAsync<ValidationException>(() =>
-            _sut.Handle(new CreateItemWarrantyCommand { ItemId = Guid.NewGuid(), Provider = new string('x', 201) }, Ct));
+            _sut.HandleAsync(new CreateItemWarrantyCommand { ItemId = Guid.NewGuid(), Provider = new string('x', 201) }, Ct));
     }
 }

@@ -12,7 +12,7 @@ public static class BulkReprocessDocumentsEndpoint
             if (request.Ids.Count == 0)
                 return ProblemDetailsFactory.BusinessRuleResult("At least one document ID must be provided.");
 
-            var response = await handler.Handle(request, ct);
+            var response = await handler.HandleAsync(request, ct);
             return Results.Accepted(value: response);
         })
         .WithName("BulkReprocessDocuments")

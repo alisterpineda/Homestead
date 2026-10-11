@@ -10,7 +10,7 @@ public static class DeclineAllSuggestionsEndpoint
         group.MapPost("/decline-all", async (Guid documentId,
             DeclineAllSuggestionsHandler handler, CancellationToken ct) =>
         {
-            await handler.Handle(new DeclineAllSuggestionsCommand { DocumentId = documentId }, ct);
+            await handler.HandleAsync(documentId, ct);
             return Results.NoContent();
         })
         .WithName("DeclineAllSuggestions")

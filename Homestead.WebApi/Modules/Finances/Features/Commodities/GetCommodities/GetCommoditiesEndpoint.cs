@@ -9,7 +9,7 @@ public static class GetCommoditiesEndpoint
         group.MapGet("", async ([AsParameters] GetCommoditiesQuery request,
             GetCommoditiesHandler handler, CancellationToken ct) =>
         {
-            return Results.Ok(await handler.Handle(request, ct));
+            return Results.Ok(await handler.HandleAsync(request, ct));
         })
         .WithName("GetCommodities")
         .Produces<PaginatedResponse<CommodityResponse>>();

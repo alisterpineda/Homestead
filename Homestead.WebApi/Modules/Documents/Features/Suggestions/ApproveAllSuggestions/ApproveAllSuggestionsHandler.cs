@@ -7,10 +7,10 @@ namespace Homestead.WebApi.Modules.Documents.Features.Suggestions.ApproveAllSugg
 
 public class ApproveAllSuggestionsHandler(AppDbContext db, IUnitOfWork unitOfWork)
 {
-    public async Task Handle(ApproveAllSuggestionsCommand request, CancellationToken ct)
+    public async Task HandleAsync(Guid documentId, CancellationToken ct)
     {
         var pendingSuggestions = await db.DocumentSuggestions
-            .Where(s => s.DocumentId == request.DocumentId && s.Status == DocumentSuggestionStatus.Pending)
+            .Where(s => s.DocumentId == documentId && s.Status == DocumentSuggestionStatus.Pending)
             .ToListAsync(ct);
 
         var now = DateTimeOffset.UtcNow;

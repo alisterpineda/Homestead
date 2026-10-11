@@ -13,7 +13,7 @@ public class PermanentlyDeleteDocumentsHandler(AppDbContext db, IOptions<FileSto
     IAuditContext audit, IUnitOfWork unitOfWork, IDocumentQueryService accessService,
     ILogger<PermanentlyDeleteDocumentsHandler> logger)
 {
-    public async Task<PermanentlyDeleteDocumentsResponse> Handle(PermanentlyDeleteDocumentsCommand request, CancellationToken ct)
+    public async Task<PermanentlyDeleteDocumentsResponse> HandleAsync(PermanentlyDeleteDocumentsCommand request, CancellationToken ct)
     {
         var documents = await accessService.WritableDocuments(TrashFilter.TrashedOnly)
             .Include(d => d.Versions)

@@ -7,12 +7,12 @@ namespace Homestead.WebApi.Modules.Finances.Features.Transactions.DocumentLinks.
 
 public class GetTransactionDocumentsHandler(AppDbContext db, IDocumentQueryService documentQuery)
 {
-    public async Task<IReadOnlyList<TransactionDocumentLinkResponse>> Handle(
-        GetTransactionDocumentsQuery request, CancellationToken ct)
+    public async Task<IReadOnlyList<TransactionDocumentLinkResponse>> HandleAsync(
+        Guid transactionId, CancellationToken ct)
     {
         var links = await db.TransactionDocumentLinks
             .AsNoTracking()
-            .Where(l => l.AccountTransactionId == request.TransactionId)
+            .Where(l => l.AccountTransactionId == transactionId)
             .OrderBy(l => l.CreatedAt)
             .ToListAsync(ct);
 
@@ -22,7 +22,7 @@ public class GetTransactionDocumentsHandler(AppDbContext db, IDocumentQueryServi
         {
             var exists = await db.AccountTransactions
                 .AsNoTracking()
-                .AnyAsync(t => t.Id == request.TransactionId, ct);
+                .AnyAsync(t => t.Id == transactionId, ct);
             if (!exists)
                 throw new EntityNotFoundException("Transaction not found.");
             return [];

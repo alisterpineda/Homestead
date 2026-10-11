@@ -8,7 +8,7 @@ public static class DeleteAccountEndpoint
     {
         group.MapDelete("/{id:guid}", async (Guid id, DeleteAccountHandler handler, CancellationToken ct) =>
         {
-            var deleted = await handler.Handle(new DeleteAccountCommand(id), ct);
+            var deleted = await handler.HandleAsync(id, ct);
             return deleted ? Results.NoContent() : Results.NotFound();
         })
         .WithName("DeleteAccount")

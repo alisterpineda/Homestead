@@ -8,10 +8,10 @@ namespace Homestead.WebApi.Modules.Inventory.Features.Consumables.DeleteConsumab
 
 public class DeleteConsumableHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork)
 {
-    public async Task<bool> Handle(DeleteConsumableCommand request, CancellationToken ct)
+    public async Task<bool> HandleAsync(Guid id, CancellationToken ct)
     {
         var item = await db.Items.FirstOrDefaultAsync(
-            i => i.Id == request.Id && i.Fungibility == Fungibility.Fungible, ct);
+            i => i.Id == id && i.Fungibility == Fungibility.Fungible, ct);
         if (item is null)
             return false;
 

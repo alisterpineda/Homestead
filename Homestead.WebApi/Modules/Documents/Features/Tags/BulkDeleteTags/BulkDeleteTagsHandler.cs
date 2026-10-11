@@ -9,7 +9,7 @@ namespace Homestead.WebApi.Modules.Documents.Features.Tags.BulkDeleteTags;
 public class BulkDeleteTagsHandler(AppDbContext db, IDocumentQueryService accessService, IAuditContext audit,
     IUnitOfWork unitOfWork)
 {
-    public async Task<BulkDeleteTagsResponse> Handle(BulkDeleteTagsCommand request, CancellationToken ct)
+    public async Task<BulkDeleteTagsResponse> HandleAsync(BulkDeleteTagsCommand request, CancellationToken ct)
     {
         var tags = await db.Tags
             .Where(t => request.Ids.Contains(t.Id))

@@ -8,11 +8,7 @@ public class CreateDocumentEndpoint
     public static void Map(RouteGroupBuilder group)
     {
         group.MapPost("/", async ([FromForm] string? name, [FromForm] string? label, [FromForm] Guid? groupId, IFormFile file, CreateDocumentHandler handler, CancellationToken ct) =>
-        {
-            var request = new CreateDocumentCommand { Name = name, Label = label, GroupId = groupId, File = file };
-            var response = await handler.Handle(request, ct);
-            return Results.Accepted(null, response);
-        })
+            Results.Accepted(null, await handler.HandleAsync(name, label, groupId, file, ct)))
         .WithName("CreateDocument")
         .Produces<CreateDocumentResponse>(StatusCodes.Status202Accepted)
         .DisableAntiforgery()

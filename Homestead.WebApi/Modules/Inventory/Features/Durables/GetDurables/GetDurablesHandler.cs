@@ -8,7 +8,7 @@ namespace Homestead.WebApi.Modules.Inventory.Features.Durables.GetDurables;
 
 public class GetDurablesHandler(AppDbContext db, IItemLocationResolver locationResolver)
 {
-    public async Task<PaginatedResponse<DurableResponse>> Handle(
+    public async Task<PaginatedResponse<DurableResponse>> HandleAsync(
         GetDurablesQuery request, CancellationToken ct)
     {
         // v1 surfaces non-fungible durables only.

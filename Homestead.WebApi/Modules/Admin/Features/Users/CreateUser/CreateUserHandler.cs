@@ -8,7 +8,7 @@ namespace Homestead.WebApi.Modules.Admin.Features.Users.CreateUser;
 
 public class CreateUserHandler(AppDbContext db, IAuditContext audit)
 {
-    public async Task<UserResponse> Handle(CreateUserCommand request, CancellationToken ct)
+    public async Task<UserResponse> HandleAsync(CreateUserCommand request, CancellationToken ct)
     {
         var email = request.Email.Trim();
         if (await db.Users.AnyAsync(u => u.Email == email, ct))

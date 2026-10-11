@@ -34,7 +34,7 @@ public class ReprocessDocumentVersionHandlerTests : IDisposable
 
         _resolver = new TextExtractionEngineResolver(TestTextExtraction.Engines(), defaultEngineKey: null);
         _sut = new ReprocessDocumentVersionHandler(_db, _currentUser, _resolver, _jobQueue,
-            new ReprocessDocumentVersionCommandValidator(TestTextExtraction.Engines()));
+            new ReprocessDocumentVersionBodyValidator(TestTextExtraction.Engines()));
 
         SeedDocumentAndVersion();
     }
@@ -67,13 +67,7 @@ public class ReprocessDocumentVersionHandlerTests : IDisposable
     [Fact]
     public async Task Handle_Succeeds_EnqueuesJob()
     {
-        var request = new ReprocessDocumentVersionCommand
-        {
-            DocumentId = _docId,
-            VersionId = _versionId,
-        };
-
-        var result = await _sut.Handle(request, TestContext.Current.CancellationToken);
+        var result = await _sut.HandleAsync(_docId, _versionId, null, TestContext.Current.CancellationToken);
 
         Assert.NotEqual(Guid.Empty, result.JobId);
     }
@@ -81,27 +75,15 @@ public class ReprocessDocumentVersionHandlerTests : IDisposable
     [Fact]
     public async Task Handle_NonExistentDocument_ThrowsNotFound()
     {
-        var request = new ReprocessDocumentVersionCommand
-        {
-            DocumentId = Guid.NewGuid(),
-            VersionId = _versionId,
-        };
-
         await Assert.ThrowsAsync<EntityNotFoundException>(
-            () => _sut.Handle(request, TestContext.Current.CancellationToken));
+            () => _sut.HandleAsync(Guid.NewGuid(), _versionId, null, TestContext.Current.CancellationToken));
     }
 
     [Fact]
     public async Task Handle_NonExistentVersion_ThrowsNotFound()
     {
-        var request = new ReprocessDocumentVersionCommand
-        {
-            DocumentId = _docId,
-            VersionId = Guid.NewGuid(),
-        };
-
         await Assert.ThrowsAsync<EntityNotFoundException>(
-            () => _sut.Handle(request, TestContext.Current.CancellationToken));
+            () => _sut.HandleAsync(_docId, Guid.NewGuid(), null, TestContext.Current.CancellationToken));
     }
 
     // Captures the payload the handler enqueues.
@@ -126,12 +108,8 @@ public class ReprocessDocumentVersionHandlerTests : IDisposable
     {
         var payloads = CapturePayloads();
 
-        await _sut.Handle(new ReprocessDocumentVersionCommand
-        {
-            DocumentId = _docId,
-            VersionId = _versionId,
-            EngineKey = TestTextExtraction.DefaultKey
-        }, TestContext.Current.CancellationToken);
+        await _sut.HandleAsync(_docId, _versionId,
+            new ReprocessDocumentVersionBody(TestTextExtraction.DefaultKey), TestContext.Current.CancellationToken);
 
         Assert.Contains($"\"EngineKey\":\"{TestTextExtraction.DefaultKey}\"", Assert.Single(payloads));
     }
@@ -141,11 +119,7 @@ public class ReprocessDocumentVersionHandlerTests : IDisposable
     {
         var payloads = CapturePayloads();
 
-        await _sut.Handle(new ReprocessDocumentVersionCommand
-        {
-            DocumentId = _docId,
-            VersionId = _versionId
-        }, TestContext.Current.CancellationToken);
+        await _sut.HandleAsync(_docId, _versionId, null, TestContext.Current.CancellationToken);
 
         Assert.Contains($"\"EngineKey\":\"{TestTextExtraction.DefaultKey}\"", Assert.Single(payloads));
     }
@@ -155,15 +129,10 @@ public class ReprocessDocumentVersionHandlerTests : IDisposable
     [Fact]
     public async Task Handle_UnavailableExplicitEngineKey_ThrowsAndEnqueuesNothing()
     {
-        var request = new ReprocessDocumentVersionCommand
-        {
-            DocumentId = _docId,
-            VersionId = _versionId,
-            EngineKey = "azure-layout"
-        };
+        var body = new ReprocessDocumentVersionBody("azure-layout");
 
         await Assert.ThrowsAsync<BusinessRuleException>(
-            () => _sut.Handle(request, TestContext.Current.CancellationToken));
+            () => _sut.HandleAsync(_docId, _versionId, body, TestContext.Current.CancellationToken));
 
         await _jobQueue.DidNotReceive().EnqueueAsync(
             Arg.Any<ProcessingJobType>(), Arg.Any<Action<EnqueueJobRequest>?>(), Arg.Any<CancellationToken>());
@@ -172,14 +141,9 @@ public class ReprocessDocumentVersionHandlerTests : IDisposable
     [Fact]
     public async Task Handle_UnknownEngineKey_ThrowsValidationException()
     {
-        var request = new ReprocessDocumentVersionCommand
-        {
-            DocumentId = _docId,
-            VersionId = _versionId,
-            EngineKey = "no-such-engine"
-        };
+        var body = new ReprocessDocumentVersionBody("no-such-engine");
 
         await Assert.ThrowsAsync<ValidationException>(
-            () => _sut.Handle(request, TestContext.Current.CancellationToken));
+            () => _sut.HandleAsync(_docId, _versionId, body, TestContext.Current.CancellationToken));
     }
 }

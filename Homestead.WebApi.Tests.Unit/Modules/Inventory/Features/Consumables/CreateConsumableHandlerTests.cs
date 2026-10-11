@@ -45,7 +45,7 @@ public class CreateConsumableHandlerTests : IDisposable
     [Fact]
     public async Task Handle_AppliesFungibleActiveDefaults()
     {
-        var result = await _sut.Handle(new CreateConsumableCommand { Name = "Wood screws", Unit = "pcs" }, Ct);
+        var result = await _sut.HandleAsync(new CreateConsumableCommand { Name = "Wood screws", Unit = "pcs" }, Ct);
 
         Assert.Equal("Wood screws", result.Name);
         Assert.Equal(ItemStatus.Active, result.Status);
@@ -56,7 +56,7 @@ public class CreateConsumableHandlerTests : IDisposable
     public async Task Handle_WithUnknownBrand_Throws()
     {
         await Assert.ThrowsAsync<BusinessRuleException>(() =>
-            _sut.Handle(new CreateConsumableCommand { Name = "Wood screws", BrandId = Guid.NewGuid() }, Ct));
+            _sut.HandleAsync(new CreateConsumableCommand { Name = "Wood screws", BrandId = Guid.NewGuid() }, Ct));
 
         Assert.Empty(_db.Items);
     }
@@ -66,7 +66,7 @@ public class CreateConsumableHandlerTests : IDisposable
     {
         var apple = await AddBrandAsync();
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new CreateConsumableCommand { Name = "Lightning cables", BrandId = apple.Id }, Ct);
 
         Assert.Equal(apple.Id, result.BrandId);
@@ -77,7 +77,7 @@ public class CreateConsumableHandlerTests : IDisposable
     [Fact]
     public async Task Handle_WithTags_ResolvesOrCreatesTagsAndPopulatesResponse()
     {
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new CreateConsumableCommand { Name = "Wood screws", Tags = ["hardware/fasteners"] }, Ct);
 
         // Ancestors upserted: both "hardware" and "hardware/fasteners" exist.
@@ -99,6 +99,6 @@ public class CreateConsumableHandlerTests : IDisposable
     public async Task Handle_BlankName_ThrowsValidationException()
     {
         await Assert.ThrowsAsync<ValidationException>(() =>
-            _sut.Handle(new CreateConsumableCommand { Name = "   " }, Ct));
+            _sut.HandleAsync(new CreateConsumableCommand { Name = "   " }, Ct));
     }
 }

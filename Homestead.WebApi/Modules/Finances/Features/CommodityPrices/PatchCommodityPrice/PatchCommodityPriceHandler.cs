@@ -4,6 +4,7 @@ using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Persistence;
+using Microsoft.AspNetCore.JsonPatch.SystemTextJson;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Features.CommodityPrices.PatchCommodityPrice;
@@ -14,10 +15,10 @@ public class PatchCommodityPriceHandler(
     ICurrentUserAccessor currentUser,
     IUnitOfWork unitOfWork)
 {
-    public async Task<CommodityPriceResponse> Handle(
-        PatchCommodityPriceCommand request, CancellationToken ct)
+    public async Task<CommodityPriceResponse> HandleAsync(
+        Guid id, JsonPatchDocument<PatchCommodityPriceModel> patchDoc, CancellationToken ct)
     {
-        var price = await db.CommodityPrices.FirstOrDefaultAsync(p => p.Id == request.Id, ct);
+        var price = await db.CommodityPrices.FirstOrDefaultAsync(p => p.Id == id, ct);
         if (price is null)
             throw new EntityNotFoundException("Commodity price not found.");
 
@@ -31,7 +32,7 @@ public class PatchCommodityPriceHandler(
             Rate = price.Rate,
         };
 
-        request.PatchDocument.ApplyOrThrow(model);
+        patchDoc.ApplyOrThrow(model);
 
         if (model.Rate <= 0m)
             throw new BusinessRuleException("Rate must be greater than zero.");

@@ -9,7 +9,7 @@ public static class GetAreasEndpoint
         group.MapGet("", async ([AsParameters] GetAreasQuery request,
             GetAreasHandler handler, CancellationToken ct) =>
         {
-            return Results.Ok(await handler.Handle(request, ct));
+            return Results.Ok(await handler.HandleAsync(request, ct));
         })
         .WithName("GetAreas")
         .Produces<PaginatedResponse<AreaResponse>>();

@@ -9,7 +9,7 @@ namespace Homestead.WebApi.Modules.Inventory.Features.Brands.CreateBrand;
 
 public class CreateBrandHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork, IValidator<CreateBrandCommand> validator)
 {
-    public async Task<BrandResponse> Handle(CreateBrandCommand request, CancellationToken ct)
+    public async Task<BrandResponse> HandleAsync(CreateBrandCommand request, CancellationToken ct)
     {
         await validator.ValidateAndThrowAsync(request, ct);
 

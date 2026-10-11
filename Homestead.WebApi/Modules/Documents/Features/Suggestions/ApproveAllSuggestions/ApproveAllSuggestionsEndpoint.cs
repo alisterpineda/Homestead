@@ -10,7 +10,7 @@ public static class ApproveAllSuggestionsEndpoint
         group.MapPost("/approve-all", async (Guid documentId,
             ApproveAllSuggestionsHandler handler, CancellationToken ct) =>
         {
-            await handler.Handle(new ApproveAllSuggestionsCommand { DocumentId = documentId }, ct);
+            await handler.HandleAsync(documentId, ct);
             return Results.NoContent();
         })
         .WithName("ApproveAllSuggestions")

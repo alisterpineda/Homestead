@@ -1,0 +1,9 @@
+namespace Homestead.WebApi.Modules.Documents.Features.Tags.PatchTag;
+
+public class PatchTagModel
+{
+    public string Name { get; set; } = string.Empty;
+    public Guid? ParentId { get; set; }
+    public string? Color { get; set; }
+    public string? Description { get; set; }
+}

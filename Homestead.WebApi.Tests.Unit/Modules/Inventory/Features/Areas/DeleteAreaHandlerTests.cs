@@ -52,7 +52,7 @@ public class DeleteAreaHandlerTests : IDisposable
     {
         var area = await AddAreaWithItemAsync(itemStatus: null);
 
-        var result = await _sut.Handle(new DeleteAreaCommand(area.Id), Ct);
+        var result = await _sut.HandleAsync(area.Id, Ct);
 
         Assert.True(result);
         Assert.Empty(_db.Areas);
@@ -65,7 +65,7 @@ public class DeleteAreaHandlerTests : IDisposable
         var area = await AddAreaWithItemAsync(ItemStatus.Active);
 
         await Assert.ThrowsAsync<BusinessRuleException>(() =>
-            _sut.Handle(new DeleteAreaCommand(area.Id), Ct));
+            _sut.HandleAsync(area.Id, Ct));
 
         Assert.Contains(_db.Areas, a => a.Id == area.Id);
     }
@@ -75,7 +75,7 @@ public class DeleteAreaHandlerTests : IDisposable
     {
         var area = await AddAreaWithItemAsync(ItemStatus.Archived);
 
-        var result = await _sut.Handle(new DeleteAreaCommand(area.Id), Ct);
+        var result = await _sut.HandleAsync(area.Id, Ct);
 
         Assert.True(result);
     }
@@ -106,7 +106,7 @@ public class DeleteAreaHandlerTests : IDisposable
         await _db.SaveChangesAsync(Ct);
 
         await Assert.ThrowsAsync<BusinessRuleException>(() =>
-            _sut.Handle(new DeleteAreaCommand(area.Id), Ct));
+            _sut.HandleAsync(area.Id, Ct));
 
         Assert.Contains(_db.Areas, a => a.Id == area.Id);
     }
@@ -114,7 +114,7 @@ public class DeleteAreaHandlerTests : IDisposable
     [Fact]
     public async Task Handle_MissingArea_ReturnsFalse()
     {
-        var result = await _sut.Handle(new DeleteAreaCommand(Guid.NewGuid()), Ct);
+        var result = await _sut.HandleAsync(Guid.NewGuid(), Ct);
 
         Assert.False(result);
     }
@@ -128,7 +128,7 @@ public class DeleteAreaHandlerTests : IDisposable
         await _db.SaveChangesAsync(Ct);
 
         var ex = await Assert.ThrowsAsync<BusinessRuleException>(() =>
-            _sut.Handle(new DeleteAreaCommand(house.Id), Ct));
+            _sut.HandleAsync(house.Id, Ct));
 
         Assert.Contains("sub-areas", ex.Message);
         Assert.Contains(_db.Areas, a => a.Id == house.Id);

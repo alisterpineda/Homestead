@@ -6,7 +6,7 @@ namespace Homestead.WebApi.Modules.Admin.Features.Schedules.GetProcessingSchedul
 
 public class GetProcessingSchedulesHandler(AppDbContext db)
 {
-    public async Task<PaginatedResponse<GetProcessingSchedulesResponse>> Handle(
+    public async Task<PaginatedResponse<GetProcessingSchedulesResponse>> HandleAsync(
         GetProcessingSchedulesQuery request, CancellationToken ct)
     {
         var query = db.ProcessingSchedules.AsNoTracking();

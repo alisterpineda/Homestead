@@ -5,6 +5,7 @@ using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Inventory;
 using Homestead.WebApi.Modules.Inventory.Services;
 using Homestead.WebApi.Persistence;
+using Microsoft.AspNetCore.JsonPatch.SystemTextJson;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Consumables.PatchConsumable;
@@ -19,11 +20,11 @@ public class PatchConsumableHandler(
     // A consumable uses only the reduced fungible lifecycle; lending or repairing a count is meaningless.
     private static readonly ItemStatus[] FungibleStatuses = [ItemStatus.Active, ItemStatus.Archived];
 
-    public async Task<ConsumableResponse> Handle(PatchConsumableCommand request, CancellationToken ct)
+    public async Task<ConsumableResponse> HandleAsync(Guid id, JsonPatchDocument<PatchConsumableModel> patchDoc, CancellationToken ct)
     {
         var item = await db.Items
             .Include(i => i.ItemTags).ThenInclude(it => it.Tag)
-            .FirstOrDefaultAsync(i => i.Id == request.Id, ct);
+            .FirstOrDefaultAsync(i => i.Id == id, ct);
         if (item is null)
             throw new EntityNotFoundException("Consumable not found.");
         if (item.Fungibility != Fungibility.Fungible)
@@ -43,7 +44,7 @@ public class PatchConsumableHandler(
             Tags = item.ItemTags.Select(it => it.Tag.Path).ToList(),
         };
 
-        request.PatchDocument.ApplyOrThrow(model);
+        patchDoc.ApplyOrThrow(model);
 
         if (string.IsNullOrWhiteSpace(model.Name))
             throw new BusinessRuleException("Name is required.");

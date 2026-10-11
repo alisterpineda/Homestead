@@ -46,7 +46,7 @@ public class DeleteConsumableHandlerTests : IDisposable
     {
         var item = await AddConsumableAsync();
 
-        var result = await _sut.Handle(new DeleteConsumableCommand(item.Id), Ct);
+        var result = await _sut.HandleAsync(item.Id, Ct);
 
         Assert.True(result);
         Assert.Empty(_db.Items);
@@ -56,7 +56,7 @@ public class DeleteConsumableHandlerTests : IDisposable
     [Fact]
     public async Task Handle_MissingItem_ReturnsFalse()
     {
-        Assert.False(await _sut.Handle(new DeleteConsumableCommand(Guid.NewGuid()), Ct));
+        Assert.False(await _sut.HandleAsync(Guid.NewGuid(), Ct));
     }
 
     [Fact]
@@ -75,7 +75,7 @@ public class DeleteConsumableHandlerTests : IDisposable
         await _db.SaveChangesAsync(Ct);
 
         var ex = await Assert.ThrowsAsync<BusinessRuleException>(() =>
-            _sut.Handle(new DeleteConsumableCommand(item.Id), Ct));
+            _sut.HandleAsync(item.Id, Ct));
 
         Assert.Contains("stock history", ex.Message);
         Assert.Contains(_db.Items, i => i.Id == item.Id);
@@ -93,7 +93,7 @@ public class DeleteConsumableHandlerTests : IDisposable
         await _db.SaveChangesAsync(Ct);
 
         var ex = await Assert.ThrowsAsync<BusinessRuleException>(() =>
-            _sut.Handle(new DeleteConsumableCommand(item.Id), Ct));
+            _sut.HandleAsync(item.Id, Ct));
 
         Assert.Contains("notes", ex.Message);
         Assert.Contains(_db.Items, i => i.Id == item.Id);
@@ -113,7 +113,7 @@ public class DeleteConsumableHandlerTests : IDisposable
         _db.ItemNotes.Remove(note);
         await _db.SaveChangesAsync(Ct);
 
-        Assert.True(await _sut.Handle(new DeleteConsumableCommand(item.Id), Ct));
+        Assert.True(await _sut.HandleAsync(item.Id, Ct));
         Assert.Empty(_db.Items);
     }
 }

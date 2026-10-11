@@ -6,7 +6,7 @@ namespace Homestead.WebApi.Modules.Documents.Features.Parties.GetPartiesByIds;
 
 public class GetPartiesByIdsHandler(AppDbContext db, IValidator<GetPartiesByIdsQuery> validator)
 {
-    public async Task<IReadOnlyList<GetPartiesByIdsResponse>> Handle(
+    public async Task<IReadOnlyList<GetPartiesByIdsResponse>> HandleAsync(
         GetPartiesByIdsQuery request, CancellationToken ct)
     {
         await validator.ValidateAndThrowAsync(request, ct);

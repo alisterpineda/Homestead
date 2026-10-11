@@ -9,11 +9,7 @@ public static class DeleteOpeningBalanceEndpoint
         group.MapDelete("/{accountId:guid}/opening-balances/{commodityId:guid}",
             async (Guid accountId, Guid commodityId, DeleteOpeningBalanceHandler handler, CancellationToken ct) =>
         {
-            var deleted = await handler.Handle(new DeleteOpeningBalanceCommand
-            {
-                AccountId = accountId,
-                CommodityId = commodityId,
-            }, ct);
+            var deleted = await handler.HandleAsync(accountId, commodityId, ct);
             return deleted ? Results.NoContent() : Results.NotFound();
         })
         .WithName("DeleteOpeningBalance")

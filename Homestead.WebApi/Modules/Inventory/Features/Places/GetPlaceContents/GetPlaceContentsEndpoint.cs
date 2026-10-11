@@ -7,7 +7,7 @@ public static class GetPlaceContentsEndpoint
         group.MapGet("/contents", async ([AsParameters] GetPlaceContentsQuery request,
             GetPlaceContentsHandler handler, CancellationToken ct) =>
         {
-            return Results.Ok(await handler.Handle(request, ct));
+            return Results.Ok(await handler.HandleAsync(request, ct));
         })
         .WithName("GetPlaceContents")
         .Produces<PlaceContentsResponse>();

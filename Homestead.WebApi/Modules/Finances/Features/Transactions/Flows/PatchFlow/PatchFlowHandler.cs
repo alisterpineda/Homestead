@@ -13,7 +13,7 @@ public class PatchFlowHandler(
     IUnitOfWork unitOfWork,
     IValidator<PatchFlowCommand> validator)
 {
-    public async Task<TransactionResponse> Handle(PatchFlowCommand request, CancellationToken ct)
+    public async Task<TransactionResponse> HandleAsync(PatchFlowCommand request, CancellationToken ct)
     {
         await validator.ValidateAndThrowAsync(request, ct);
 

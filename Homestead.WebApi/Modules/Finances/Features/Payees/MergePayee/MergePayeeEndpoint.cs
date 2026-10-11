@@ -8,10 +8,7 @@ public static class MergePayeeEndpoint
     {
         group.MapPost("/{id:guid}/merge", async (Guid id,
             MergePayeeRequest body, MergePayeeHandler handler, CancellationToken ct) =>
-        {
-            var command = new MergePayeeCommand { SourceId = id, TargetId = body.TargetId };
-            return Results.Ok(await handler.Handle(command, ct));
-        })
+            Results.Ok(await handler.HandleAsync(id, body, ct)))
         .WithName("MergePayee")
         .Produces<PayeeResponse>()
         .Produces(StatusCodes.Status400BadRequest)

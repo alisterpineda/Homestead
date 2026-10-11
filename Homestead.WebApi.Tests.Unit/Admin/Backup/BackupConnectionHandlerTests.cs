@@ -162,7 +162,7 @@ public class BackupConnectionHandlerTests : IDisposable
             .Returns(new GoogleDeviceAuthorization(
                 "device-code-secret", "ABC-DEF", "https://google.com/device", 5, Now.AddMinutes(30)));
 
-        var response = await Connect().Handle(new ConnectBackupTargetCommand(TargetKey), ct);
+        var response = await Connect().HandleAsync(TargetKey, ct);
 
         Assert.Equal("ABC-DEF", response.UserCode);
         Assert.Equal(5, response.IntervalSeconds);
@@ -179,7 +179,7 @@ public class BackupConnectionHandlerTests : IDisposable
         UseTarget(null, defined: false);
 
         await Assert.ThrowsAsync<EntityNotFoundException>(() =>
-            Connect().Handle(new ConnectBackupTargetCommand(TargetKey), TestContext.Current.CancellationToken));
+            Connect().HandleAsync(TargetKey, TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -188,7 +188,7 @@ public class BackupConnectionHandlerTests : IDisposable
         UseTarget(BackupTargetKind.Local);
 
         await Assert.ThrowsAsync<BusinessRuleException>(() =>
-            Connect().Handle(new ConnectBackupTargetCommand(TargetKey), TestContext.Current.CancellationToken));
+            Connect().HandleAsync(TargetKey, TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -197,7 +197,7 @@ public class BackupConnectionHandlerTests : IDisposable
         UseTarget(BackupTargetKind.GoogleDrive, "ClientId is required for a GoogleDrive target.");
 
         await Assert.ThrowsAsync<BusinessRuleException>(() =>
-            Connect().Handle(new ConnectBackupTargetCommand(TargetKey), TestContext.Current.CancellationToken));
+            Connect().HandleAsync(TargetKey, TestContext.Current.CancellationToken));
 
         await _oauth.DidNotReceive().StartDeviceAuthorizationAsync(
             Arg.Any<string>(), Arg.Any<CancellationToken>());
@@ -220,8 +220,8 @@ public class BackupConnectionHandlerTests : IDisposable
         _oauth.PollDeviceTokenAsync("client-id", "client-secret", "dc", Arg.Any<CancellationToken>())
             .Returns(new GoogleDevicePollResult(google));
 
-        var response = await Poll().Handle(
-            new PollBackupTargetConnectionCommand(TargetKey, ValidPollToken()), ct);
+        var response = await Poll().HandleAsync(
+            TargetKey, new PollBackupTargetConnectionBody(ValidPollToken()), ct);
 
         Assert.Equal(expected, response.Status);
     }
@@ -235,8 +235,8 @@ public class BackupConnectionHandlerTests : IDisposable
         _accounts.GetAccountInfoAsync("at", Arg.Any<CancellationToken>())
             .Returns(new GoogleDriveAccountInfo("owner@example.test", 100, 1000));
 
-        var response = await Poll().Handle(
-            new PollBackupTargetConnectionCommand(TargetKey, ValidPollToken()), ct);
+        var response = await Poll().HandleAsync(
+            TargetKey, new PollBackupTargetConnectionBody(ValidPollToken()), ct);
 
         Assert.Equal(BackupConnectStatus.Connected, response.Status);
         Assert.Equal("owner@example.test", response.ConnectedAccountEmail);
@@ -258,7 +258,7 @@ public class BackupConnectionHandlerTests : IDisposable
         _accounts.GetAccountInfoAsync("at", Arg.Any<CancellationToken>())
             .Returns(new GoogleDriveAccountInfo("owner@example.test", 100, 1000));
 
-        await Poll().Handle(new PollBackupTargetConnectionCommand(TargetKey, ValidPollToken()), ct);
+        await Poll().HandleAsync(TargetKey, new PollBackupTargetConnectionBody(ValidPollToken()), ct);
 
         await EnsuredTheRoot();
     }
@@ -274,7 +274,7 @@ public class BackupConnectionHandlerTests : IDisposable
         _oauth.PollDeviceTokenAsync("client-id", "client-secret", "dc", Arg.Any<CancellationToken>())
             .Returns(new GoogleDevicePollResult(status));
 
-        await Poll().Handle(new PollBackupTargetConnectionCommand(TargetKey, ValidPollToken()), ct);
+        await Poll().HandleAsync(TargetKey, new PollBackupTargetConnectionBody(ValidPollToken()), ct);
 
         await EnsuredNothing();
     }
@@ -292,8 +292,8 @@ public class BackupConnectionHandlerTests : IDisposable
         _accounts.GetAccountInfoAsync("at", Arg.Any<CancellationToken>())
             .Returns(new GoogleDriveAccountInfo("second@example.test", null, null));
 
-        var response = await Poll().Handle(
-            new PollBackupTargetConnectionCommand(TargetKey, ValidPollToken()), ct);
+        var response = await Poll().HandleAsync(
+            TargetKey, new PollBackupTargetConnectionBody(ValidPollToken()), ct);
 
         Assert.Equal(BackupConnectStatus.AccountMismatch, response.Status);
         Assert.Equal("second@example.test", response.ConnectedAccountEmail);
@@ -323,7 +323,7 @@ public class BackupConnectionHandlerTests : IDisposable
         _accounts.GetAccountInfoAsync("at", Arg.Any<CancellationToken>())
             .Returns(new GoogleDriveAccountInfo("second@example.test", null, null));
 
-        await Poll().Handle(new PollBackupTargetConnectionCommand(TargetKey, ValidPollToken()), ct);
+        await Poll().HandleAsync(TargetKey, new PollBackupTargetConnectionBody(ValidPollToken()), ct);
 
         await EnsuredNothing();
     }
@@ -339,8 +339,8 @@ public class BackupConnectionHandlerTests : IDisposable
         _accounts.GetAccountInfoAsync("at", Arg.Any<CancellationToken>())
             .Returns(new GoogleDriveAccountInfo("OWNER@example.test", null, null));
 
-        var response = await Poll().Handle(
-            new PollBackupTargetConnectionCommand(TargetKey, ValidPollToken()), ct);
+        var response = await Poll().HandleAsync(
+            TargetKey, new PollBackupTargetConnectionBody(ValidPollToken()), ct);
 
         // Case-insensitive: Google's own address comparison is, and a case flip is not an account change.
         Assert.Equal(BackupConnectStatus.Connected, response.Status);
@@ -359,8 +359,8 @@ public class BackupConnectionHandlerTests : IDisposable
                 "service_disabled", "The Google Drive API is not enabled for this project."));
 
         // The classified diagnosis must survive the revoke — it is the entire evidence trail.
-        var ex = await Assert.ThrowsAsync<GoogleDriveAuthException>(() => Poll().Handle(
-            new PollBackupTargetConnectionCommand(TargetKey, ValidPollToken()), ct));
+        var ex = await Assert.ThrowsAsync<GoogleDriveAuthException>(() => Poll().HandleAsync(
+            TargetKey, new PollBackupTargetConnectionBody(ValidPollToken()), ct));
 
         Assert.Equal("service_disabled", ex.ErrorCode);
         await _oauth.Received(1).RevokeAsync("rt", Arg.Any<CancellationToken>());
@@ -381,8 +381,8 @@ public class BackupConnectionHandlerTests : IDisposable
             .Returns<GoogleDriveAccountInfo>(_ => throw new GoogleDriveAuthException(
                 "service_disabled", "The Google Drive API is not enabled for this project."));
 
-        await Assert.ThrowsAsync<GoogleDriveAuthException>(() => Poll().Handle(
-            new PollBackupTargetConnectionCommand(TargetKey, ValidPollToken()), ct));
+        await Assert.ThrowsAsync<GoogleDriveAuthException>(() => Poll().HandleAsync(
+            TargetKey, new PollBackupTargetConnectionBody(ValidPollToken()), ct));
 
         await _oauth.DidNotReceive().RevokeAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
 
@@ -403,8 +403,8 @@ public class BackupConnectionHandlerTests : IDisposable
         _accounts.GetAccountInfoAsync("at", Arg.Any<CancellationToken>())
             .Returns<GoogleDriveAccountInfo>(_ => throw new HttpRequestException("rate limit exceeded"));
 
-        var ex = await Assert.ThrowsAsync<BusinessRuleException>(() => Poll().Handle(
-            new PollBackupTargetConnectionCommand(TargetKey, ValidPollToken()), ct));
+        var ex = await Assert.ThrowsAsync<BusinessRuleException>(() => Poll().HandleAsync(
+            TargetKey, new PollBackupTargetConnectionBody(ValidPollToken()), ct));
 
         Assert.Contains("Could not reach Google", ex.Message);
         await _oauth.DidNotReceive().RevokeAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
@@ -422,8 +422,8 @@ public class BackupConnectionHandlerTests : IDisposable
             .Returns<GoogleDevicePollResult>(_ => throw new GoogleDriveAuthException(
                 "insufficient_scope", "no Drive access") { OrphanedToken = "scopeless-rt" });
 
-        var ex = await Assert.ThrowsAsync<GoogleDriveAuthException>(() => Poll().Handle(
-            new PollBackupTargetConnectionCommand(TargetKey, ValidPollToken()), ct));
+        var ex = await Assert.ThrowsAsync<GoogleDriveAuthException>(() => Poll().HandleAsync(
+            TargetKey, new PollBackupTargetConnectionBody(ValidPollToken()), ct));
 
         Assert.Equal("insufficient_scope", ex.ErrorCode);
         await _oauth.Received(1).RevokeAsync("scopeless-rt", Arg.Any<CancellationToken>());
@@ -442,8 +442,8 @@ public class BackupConnectionHandlerTests : IDisposable
             .Returns<GoogleDevicePollResult>(_ => throw new GoogleDriveAuthException(
                 "insufficient_scope", "no Drive access") { OrphanedToken = "scopeless-rt" });
 
-        await Assert.ThrowsAsync<GoogleDriveAuthException>(() => Poll().Handle(
-            new PollBackupTargetConnectionCommand(TargetKey, ValidPollToken()), ct));
+        await Assert.ThrowsAsync<GoogleDriveAuthException>(() => Poll().HandleAsync(
+            TargetKey, new PollBackupTargetConnectionBody(ValidPollToken()), ct));
 
         await _oauth.DidNotReceive().RevokeAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
 
@@ -460,8 +460,8 @@ public class BackupConnectionHandlerTests : IDisposable
             .Returns<GoogleDevicePollResult>(_ =>
                 throw new GoogleDriveAuthException("invalid_client", "bad client"));
 
-        await Assert.ThrowsAsync<GoogleDriveAuthException>(() => Poll().Handle(
-            new PollBackupTargetConnectionCommand(TargetKey, ValidPollToken()), ct));
+        await Assert.ThrowsAsync<GoogleDriveAuthException>(() => Poll().HandleAsync(
+            TargetKey, new PollBackupTargetConnectionBody(ValidPollToken()), ct));
 
         await _oauth.DidNotReceive().RevokeAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
@@ -471,8 +471,8 @@ public class BackupConnectionHandlerTests : IDisposable
     {
         var ct = TestContext.Current.CancellationToken;
 
-        await Assert.ThrowsAsync<BusinessRuleException>(() => Poll().Handle(
-            new PollBackupTargetConnectionCommand(TargetKey, "not-a-real-token"), ct));
+        await Assert.ThrowsAsync<BusinessRuleException>(() => Poll().HandleAsync(
+            TargetKey, new PollBackupTargetConnectionBody("not-a-real-token"), ct));
     }
 
     // A token minted for one target must not be replayable against another.
@@ -483,8 +483,8 @@ public class BackupConnectionHandlerTests : IDisposable
         var foreign = _protector.ProtectPoll(
             new GoogleConnectPollToken("some-other-target", "dc", Now.AddMinutes(30)));
 
-        await Assert.ThrowsAsync<BusinessRuleException>(() => Poll().Handle(
-            new PollBackupTargetConnectionCommand(TargetKey, foreign), ct));
+        await Assert.ThrowsAsync<BusinessRuleException>(() => Poll().HandleAsync(
+            TargetKey, new PollBackupTargetConnectionBody(foreign), ct));
     }
 
     // --- Confirm --------------------------------------------------------------------------------------
@@ -544,8 +544,8 @@ public class BackupConnectionHandlerTests : IDisposable
         var pending = _protector.ProtectPending(new GoogleConnectPendingGrant(
             TargetKey, Grant("second-rt"), "second@example.test", Now.AddMinutes(10)));
 
-        var response = await Confirm().Handle(
-            new ConfirmBackupTargetConnectionCommand(TargetKey, pending), ct);
+        var response = await Confirm().HandleAsync(
+            TargetKey, new ConfirmBackupTargetConnectionBody(pending), ct);
 
         Assert.Equal("second@example.test", response.ConnectedAccountEmail);
 
@@ -566,7 +566,7 @@ public class BackupConnectionHandlerTests : IDisposable
         var pending = _protector.ProtectPending(new GoogleConnectPendingGrant(
             TargetKey, Grant("second-rt"), "second@example.test", Now.AddMinutes(10)));
 
-        await Confirm().Handle(new ConfirmBackupTargetConnectionCommand(TargetKey, pending), ct);
+        await Confirm().HandleAsync(TargetKey, new ConfirmBackupTargetConnectionBody(pending), ct);
 
         await _oauth.Received(1).RevokeAsync("original-rt", Arg.Any<CancellationToken>());
 
@@ -588,8 +588,8 @@ public class BackupConnectionHandlerTests : IDisposable
         var pending = _protector.ProtectPending(new GoogleConnectPendingGrant(
             TargetKey, Grant("second-rt"), "second@example.test", Now.AddMinutes(10)));
 
-        await Confirm().Handle(new ConfirmBackupTargetConnectionCommand(TargetKey, pending), ct);
-        await Confirm().Handle(new ConfirmBackupTargetConnectionCommand(TargetKey, pending), ct);
+        await Confirm().HandleAsync(TargetKey, new ConfirmBackupTargetConnectionBody(pending), ct);
+        await Confirm().HandleAsync(TargetKey, new ConfirmBackupTargetConnectionBody(pending), ct);
 
         await _oauth.Received(1).RevokeAsync("original-rt", Arg.Any<CancellationToken>());
         await _oauth.DidNotReceive().RevokeAsync("second-rt", Arg.Any<CancellationToken>());
@@ -609,7 +609,7 @@ public class BackupConnectionHandlerTests : IDisposable
         var pending = _protector.ProtectPending(new GoogleConnectPendingGrant(
             TargetKey, Grant("first-rt"), "first@example.test", Now.AddMinutes(10)));
 
-        await Confirm().Handle(new ConfirmBackupTargetConnectionCommand(TargetKey, pending), ct);
+        await Confirm().HandleAsync(TargetKey, new ConfirmBackupTargetConnectionBody(pending), ct);
 
         await _oauth.DidNotReceive().RevokeAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
@@ -631,7 +631,7 @@ public class BackupConnectionHandlerTests : IDisposable
         var pending = _protector.ProtectPending(new GoogleConnectPendingGrant(
             TargetKey, Grant("second-rt"), "second@example.test", Now.AddMinutes(10)));
 
-        await Confirm().Handle(new ConfirmBackupTargetConnectionCommand(TargetKey, pending), ct);
+        await Confirm().HandleAsync(TargetKey, new ConfirmBackupTargetConnectionBody(pending), ct);
 
         var state = await _db.BackupTargetStates.AsNoTracking()
             .SingleAsync(s => s.TargetKey == TargetKey, ct);
@@ -645,8 +645,8 @@ public class BackupConnectionHandlerTests : IDisposable
     [Fact]
     public async Task Confirm_ATamperedPendingTokenIsRefused()
     {
-        await Assert.ThrowsAsync<BusinessRuleException>(() => Confirm().Handle(
-            new ConfirmBackupTargetConnectionCommand(TargetKey, "nonsense"),
+        await Assert.ThrowsAsync<BusinessRuleException>(() => Confirm().HandleAsync(
+            TargetKey, new ConfirmBackupTargetConnectionBody("nonsense"),
             TestContext.Current.CancellationToken));
     }
 
@@ -660,7 +660,7 @@ public class BackupConnectionHandlerTests : IDisposable
         var ct = TestContext.Current.CancellationToken;
         await _store.SaveAsync(TargetKey, Grant("rt-to-revoke"), "owner@example.test", ct);
 
-        await Disconnect().Handle(new DisconnectBackupTargetCommand(TargetKey), ct);
+        await Disconnect().HandleAsync(TargetKey, ct);
 
         await _oauth.Received(1).RevokeAsync("rt-to-revoke", Arg.Any<CancellationToken>());
 
@@ -686,7 +686,7 @@ public class BackupConnectionHandlerTests : IDisposable
         });
         await _db.SaveChangesAsync(ct);
 
-        await Disconnect().Handle(new DisconnectBackupTargetCommand(TargetKey), ct);
+        await Disconnect().HandleAsync(TargetKey, ct);
 
         Assert.False(await _db.BackupTargetFolders.AnyAsync(ct));
 
@@ -719,7 +719,7 @@ public class BackupConnectionHandlerTests : IDisposable
         });
         await _db.SaveChangesAsync(ct);
 
-        await Disconnect().Handle(new DisconnectBackupTargetCommand(TargetKey), ct);
+        await Disconnect().HandleAsync(TargetKey, ct);
 
         // The ids go with the grant.
         Assert.False(await _db.BackupTargetFolders.AnyAsync(ct));
@@ -741,7 +741,7 @@ public class BackupConnectionHandlerTests : IDisposable
 
         UseTarget(null, defined: false);
 
-        await Disconnect().Handle(new DisconnectBackupTargetCommand(TargetKey), ct);
+        await Disconnect().HandleAsync(TargetKey, ct);
 
         await _oauth.Received(1).RevokeAsync("rt-to-revoke", Arg.Any<CancellationToken>());
     }
@@ -749,8 +749,8 @@ public class BackupConnectionHandlerTests : IDisposable
     [Fact]
     public async Task Disconnect_WithNothingStoredIs404()
     {
-        await Assert.ThrowsAsync<EntityNotFoundException>(() => Disconnect().Handle(
-            new DisconnectBackupTargetCommand(TargetKey), TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<EntityNotFoundException>(() => Disconnect().HandleAsync(
+            TargetKey, TestContext.Current.CancellationToken));
     }
 
     // --- Validate -------------------------------------------------------------------------------------
@@ -766,7 +766,7 @@ public class BackupConnectionHandlerTests : IDisposable
             .Returns(new GoogleDriveAccountInfo("owner@example.test", 400, 1000));
 
         var response = await Validate(Gate(true))
-            .Handle(new ValidateBackupTargetConnectionCommand(TargetKey), ct);
+            .HandleAsync(TargetKey, ct);
 
         Assert.True(response.IsAvailable);
         Assert.Equal(400, response.StorageUsedBytes);
@@ -786,7 +786,7 @@ public class BackupConnectionHandlerTests : IDisposable
                 throw new GoogleDriveAuthException("unauthorized", "Google rejected the token."));
 
         var response = await Validate(Gate(true))
-            .Handle(new ValidateBackupTargetConnectionCommand(TargetKey), ct);
+            .HandleAsync(TargetKey, ct);
 
         Assert.False(response.IsAvailable);
         Assert.Contains("rejected", response.Reason);
@@ -804,7 +804,7 @@ public class BackupConnectionHandlerTests : IDisposable
             .Returns<GoogleDriveAccountInfo>(_ => throw new HttpRequestException("no route to host"));
 
         var response = await Validate(Gate(true))
-            .Handle(new ValidateBackupTargetConnectionCommand(TargetKey), ct);
+            .HandleAsync(TargetKey, ct);
 
         Assert.Contains("Could not reach Google", response.Reason);
         Assert.Null((await _store.ReadAsync(TargetKey, ct)).AuthFailedAt);
@@ -816,7 +816,7 @@ public class BackupConnectionHandlerTests : IDisposable
         var ct = TestContext.Current.CancellationToken;
 
         var response = await Validate(Gate(false, BackupTargetGate.NotConnectedReason))
-            .Handle(new ValidateBackupTargetConnectionCommand(TargetKey), ct);
+            .HandleAsync(TargetKey, ct);
 
         Assert.False(response.IsAvailable);
         Assert.Equal(BackupTargetGate.NotConnectedReason, response.Reason);
@@ -832,7 +832,7 @@ public class BackupConnectionHandlerTests : IDisposable
         UseTarget(BackupTargetKind.Local);
 
         var response = await Validate(Gate(true))
-            .Handle(new ValidateBackupTargetConnectionCommand(TargetKey), ct);
+            .HandleAsync(TargetKey, ct);
 
         Assert.True(response.IsAvailable);
         await _accounts.DidNotReceive().GetAccountInfoAsync(
@@ -851,7 +851,7 @@ public class BackupConnectionHandlerTests : IDisposable
         _accounts.GetAccountInfoAsync("at", Arg.Any<CancellationToken>())
             .Returns(new GoogleDriveAccountInfo("owner@example.test", 400, 1000));
 
-        await Validate(Gate(true)).Handle(new ValidateBackupTargetConnectionCommand(TargetKey), ct);
+        await Validate(Gate(true)).HandleAsync(TargetKey, ct);
 
         await EnsuredTheRoot();
     }
@@ -862,7 +862,7 @@ public class BackupConnectionHandlerTests : IDisposable
         var ct = TestContext.Current.CancellationToken;
 
         await Validate(Gate(false, BackupTargetGate.NotConnectedReason))
-            .Handle(new ValidateBackupTargetConnectionCommand(TargetKey), ct);
+            .HandleAsync(TargetKey, ct);
 
         await EnsuredNothing();
     }
@@ -877,7 +877,7 @@ public class BackupConnectionHandlerTests : IDisposable
             .Returns<GoogleDriveAccountInfo>(_ =>
                 throw new GoogleDriveAuthException("unauthorized", "Google rejected the token."));
 
-        await Validate(Gate(true)).Handle(new ValidateBackupTargetConnectionCommand(TargetKey), ct);
+        await Validate(Gate(true)).HandleAsync(TargetKey, ct);
 
         await EnsuredNothing();
     }

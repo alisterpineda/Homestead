@@ -12,7 +12,7 @@ public class UniversalSearchHandler(IEnumerable<ISearchSource> sources, ILogger<
     // so one slow/broken source can't stall the palette.
     private static readonly TimeSpan SourceTimeout = TimeSpan.FromSeconds(3);
 
-    public async Task<SearchResponse> Handle(UniversalSearchQuery request, CancellationToken ct)
+    public async Task<SearchResponse> HandleAsync(UniversalSearchQuery request, CancellationToken ct)
     {
         var query = request.Q?.Trim() ?? string.Empty;
 

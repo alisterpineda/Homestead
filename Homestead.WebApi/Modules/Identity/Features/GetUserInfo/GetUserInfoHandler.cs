@@ -5,11 +5,11 @@ namespace Homestead.WebApi.Modules.Identity.Features.GetUserInfo;
 
 public class GetUserInfoHandler(AppDbContext db)
 {
-    public async Task<GetUserInfoResponse?> Handle(GetUserInfoQuery request, CancellationToken ct)
+    public async Task<GetUserInfoResponse?> HandleAsync(Guid userId, CancellationToken ct)
     {
         var user = await db.Users
             .AsNoTracking()
-            .FirstOrDefaultAsync(u => u.Id == request.UserId, ct);
+            .FirstOrDefaultAsync(u => u.Id == userId, ct);
         if (user is null)
             return null;
 

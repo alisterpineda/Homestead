@@ -8,9 +8,9 @@ namespace Homestead.WebApi.Modules.Finances.Features.Accounts.DeleteAccount;
 
 public class DeleteAccountHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork)
 {
-    public async Task<bool> Handle(DeleteAccountCommand request, CancellationToken ct)
+    public async Task<bool> HandleAsync(Guid id, CancellationToken ct)
     {
-        var account = await db.Accounts.FirstOrDefaultAsync(a => a.Id == request.Id, ct);
+        var account = await db.Accounts.FirstOrDefaultAsync(a => a.Id == id, ct);
         if (account is null)
             return false;
 

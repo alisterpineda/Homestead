@@ -9,7 +9,7 @@ public static class DeleteItemWarrantyEndpoint
         group.MapDelete("/{id:guid}/warranties/{warrantyId:guid}", async (Guid id, Guid warrantyId,
             DeleteItemWarrantyHandler handler, CancellationToken ct) =>
         {
-            var deleted = await handler.Handle(new DeleteItemWarrantyCommand(id, warrantyId), ct);
+            var deleted = await handler.HandleAsync(id, warrantyId, ct);
             return deleted ? Results.NoContent() : Results.NotFound();
         })
         .WithName("DeleteItemWarranty")

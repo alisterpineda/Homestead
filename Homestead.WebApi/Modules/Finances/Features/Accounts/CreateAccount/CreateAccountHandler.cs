@@ -18,7 +18,7 @@ public class CreateAccountHandler(
     IUnitOfWork unitOfWork,
     IValidator<CreateAccountCommand> validator)
 {
-    public async Task<AccountResponse> Handle(CreateAccountCommand request, CancellationToken ct)
+    public async Task<AccountResponse> HandleAsync(CreateAccountCommand request, CancellationToken ct)
     {
         await validator.ValidateAndThrowAsync(request, ct);
 

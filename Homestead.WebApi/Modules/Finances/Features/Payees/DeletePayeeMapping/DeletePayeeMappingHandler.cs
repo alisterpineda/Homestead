@@ -11,9 +11,9 @@ namespace Homestead.WebApi.Modules.Finances.Features.Payees.DeletePayeeMapping;
 /// </summary>
 public class DeletePayeeMappingHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork)
 {
-    public async Task<bool> Handle(DeletePayeeMappingCommand request, CancellationToken ct)
+    public async Task<bool> HandleAsync(Guid id, CancellationToken ct)
     {
-        var mapping = await db.PayeeMappings.FirstOrDefaultAsync(m => m.Id == request.Id, ct);
+        var mapping = await db.PayeeMappings.FirstOrDefaultAsync(m => m.Id == id, ct);
         if (mapping is null)
             return false;
 

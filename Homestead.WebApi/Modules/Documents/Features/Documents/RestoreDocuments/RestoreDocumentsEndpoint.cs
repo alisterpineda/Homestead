@@ -12,7 +12,7 @@ public static class RestoreDocumentsEndpoint
             if (request.Ids.Count == 0)
                 return ProblemDetailsFactory.BusinessRuleResult("At least one document ID must be provided.");
 
-            var response = await handler.Handle(request, ct);
+            var response = await handler.HandleAsync(request, ct);
             return Results.Ok(response);
         })
         .WithName("BulkRestoreDocuments")
@@ -22,7 +22,7 @@ public static class RestoreDocumentsEndpoint
         group.MapPost("/{id:guid}/restore", async (Guid id, RestoreDocumentsHandler handler, CancellationToken ct) =>
         {
             var request = new RestoreDocumentsCommand([id]);
-            var response = await handler.Handle(request, ct);
+            var response = await handler.HandleAsync(request, ct);
             return response.RestoredCount > 0 ? Results.NoContent() : Results.NotFound();
         })
         .WithName("RestoreDocument")

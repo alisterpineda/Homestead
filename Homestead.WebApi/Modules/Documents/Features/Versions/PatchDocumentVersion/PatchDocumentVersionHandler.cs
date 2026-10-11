@@ -11,10 +11,11 @@ namespace Homestead.WebApi.Modules.Documents.Features.Versions.PatchDocumentVers
 public class PatchDocumentVersionHandler(AppDbContext db,
     IAuditContext audit, IUnitOfWork unitOfWork)
 {
-    public async Task<PatchDocumentVersionResponse> Handle(PatchDocumentVersionCommand request, CancellationToken ct)
+    public async Task<PatchDocumentVersionResponse> HandleAsync(Guid documentId, Guid id,
+        JsonPatchDocument<PatchDocumentVersionModel> patchDoc, CancellationToken ct)
     {
         var version = await db.DocumentVersions
-            .Where(r => r.DocumentId == request.DocumentId && r.Id == request.Id)
+            .Where(r => r.DocumentId == documentId && r.Id == id)
             .FirstOrDefaultAsync(ct);
 
         if (version is null)
@@ -32,7 +33,7 @@ public class PatchDocumentVersionHandler(AppDbContext db,
 
         // Apply patch operations
         var errors = new List<JsonPatchError>();
-        request.PatchDocument.ApplyTo(model, error => errors.Add(error));
+        patchDoc.ApplyTo(model, error => errors.Add(error));
 
         if (errors.Count > 0)
             throw new BusinessRuleException(errors.Select(e => new

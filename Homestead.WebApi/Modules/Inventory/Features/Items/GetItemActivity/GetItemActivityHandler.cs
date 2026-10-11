@@ -6,6 +6,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Items.GetItemActivity;
 
+/// <summary>
+/// Pages an item's activity feed — its audit-log projection interleaved with its notes, newest-first
+/// by effective date — for either kind of item. Null only when the item is missing.
+/// </summary>
 public class GetItemActivityHandler(AppDbContext db)
 {
     // The one item audit field → human label map (the durable-only projection it superseded is gone).
@@ -53,17 +57,17 @@ public class GetItemActivityHandler(AppDbContext db)
         ["Notes"] = "notes",
     };
 
-    public async Task<PaginatedResponse<GetItemActivityResponse>?> Handle(
-        GetItemActivityQuery request, CancellationToken ct)
+    public async Task<PaginatedResponse<GetItemActivityResponse>?> HandleAsync(
+        Guid id, PaginatedRequest paging, CancellationToken ct)
     {
         // Both kinds: a consumable's feed is its notes plus its metadata audit rows (its movement
         // ledger lives on its own tab). Null only when the item is missing.
-        var exists = await db.Items.AsNoTracking().AnyAsync(i => i.Id == request.Id, ct);
+        var exists = await db.Items.AsNoTracking().AnyAsync(i => i.Id == id, ct);
         if (!exists)
             return null;
 
-        var auditRows = await LoadAuditRowsAsync(request.Id, ct);
-        var noteRows = await LoadNoteRowsAsync(request.Id, ct);
+        var auditRows = await LoadAuditRowsAsync(id, ct);
+        var noteRows = await LoadNoteRowsAsync(id, ct);
 
         // Merge + order + paginate in memory (the audit summaries parse Changes JSON, so the audit half
         // can't be sorted in SQL anyway). The sort key is explicit: effective date, then the recorded
@@ -78,15 +82,15 @@ public class GetItemActivityHandler(AppDbContext db)
             .ToList();
 
         var paged = all
-            .Skip((request.EffectivePage - 1) * request.EffectivePageSize)
-            .Take(request.EffectivePageSize)
+            .Skip((paging.EffectivePage - 1) * paging.EffectivePageSize)
+            .Take(paging.EffectivePageSize)
             .ToList();
 
         return new PaginatedResponse<GetItemActivityResponse>
         {
             Items = paged,
-            Page = request.EffectivePage,
-            PageSize = request.EffectivePageSize,
+            Page = paging.EffectivePage,
+            PageSize = paging.EffectivePageSize,
             TotalCount = all.Count,
         };
     }

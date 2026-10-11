@@ -12,7 +12,7 @@ public class PatchDividendHandler(
     IUnitOfWork unitOfWork,
     IValidator<PatchDividendCommand> validator)
 {
-    public async Task<TransactionResponse> Handle(PatchDividendCommand request, CancellationToken ct)
+    public async Task<TransactionResponse> HandleAsync(PatchDividendCommand request, CancellationToken ct)
     {
         await validator.ValidateAndThrowAsync(request, ct);
 

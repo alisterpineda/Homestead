@@ -28,7 +28,7 @@ public class GetPartiesHandlerTests : IDisposable
     {
         await SeedPartiesAsync("Charlie", "Alpha", "Bravo");
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new GetPartiesQuery { Page = 1, PageSize = 10 },
             TestContext.Current.CancellationToken);
 
@@ -41,7 +41,7 @@ public class GetPartiesHandlerTests : IDisposable
     {
         await SeedPartiesAsync("Alpha", "Bravo", "Charlie");
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new GetPartiesQuery { Page = 1, PageSize = 10, SortBy = PartySortBy.Name, SortDir = SortDirection.Desc },
             TestContext.Current.CancellationToken);
 
@@ -58,7 +58,7 @@ public class GetPartiesHandlerTests : IDisposable
         _db.Parties.Add(new Party { Name = "Second", CreatedAt = now.AddHours(1) });
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new GetPartiesQuery { Page = 1, PageSize = 10, SortBy = PartySortBy.CreatedAt, SortDir = SortDirection.Asc },
             TestContext.Current.CancellationToken);
 
@@ -75,7 +75,7 @@ public class GetPartiesHandlerTests : IDisposable
         _db.Parties.Add(new Party { Name = "Second", CreatedAt = now.AddHours(1) });
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new GetPartiesQuery { Page = 1, PageSize = 10, SortBy = PartySortBy.CreatedAt, SortDir = SortDirection.Desc },
             TestContext.Current.CancellationToken);
 
@@ -92,7 +92,7 @@ public class GetPartiesHandlerTests : IDisposable
         _db.Parties.Add(new Party { Name = "Second", UpdatedAt = now.AddHours(1) });
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new GetPartiesQuery { Page = 1, PageSize = 10, SortBy = PartySortBy.UpdatedAt, SortDir = SortDirection.Asc },
             TestContext.Current.CancellationToken);
 
@@ -109,7 +109,7 @@ public class GetPartiesHandlerTests : IDisposable
         _db.Parties.Add(new Party { Name = "Second", UpdatedAt = now.AddHours(1) });
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new GetPartiesQuery { Page = 1, PageSize = 10, SortBy = PartySortBy.UpdatedAt, SortDir = SortDirection.Desc },
             TestContext.Current.CancellationToken);
 
@@ -140,7 +140,7 @@ public class GetPartiesHandlerTests : IDisposable
         );
         await _db.SaveChangesAsync(ct);
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new GetPartiesQuery { Page = 1, PageSize = 10, SortBy = PartySortBy.DocumentCount, SortDir = SortDirection.Desc },
             ct);
 
@@ -168,7 +168,7 @@ public class GetPartiesHandlerTests : IDisposable
         );
         await _db.SaveChangesAsync(ct);
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new GetPartiesQuery { Page = 1, PageSize = 10, SortBy = PartySortBy.DocumentCount, SortDir = SortDirection.Asc },
             ct);
 
@@ -182,7 +182,7 @@ public class GetPartiesHandlerTests : IDisposable
     {
         await SeedPartiesAsync("Zulu", "Alpha");
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new GetPartiesQuery { Page = 1, PageSize = 10, SortBy = null, SortDir = null },
             TestContext.Current.CancellationToken);
 
@@ -195,7 +195,7 @@ public class GetPartiesHandlerTests : IDisposable
     {
         await SeedPartiesAsync("Banana Corp", "Apple Inc", "Cherry LLC", "Avocado Ltd");
 
-        var result = await _sut.Handle(
+        var result = await _sut.HandleAsync(
             new GetPartiesQuery { Page = 1, PageSize = 10, Search = "a", SortBy = PartySortBy.Name, SortDir = SortDirection.Asc },
             TestContext.Current.CancellationToken);
 

@@ -9,13 +9,7 @@ public static class GetConsumableMovementsEndpoint
         group.MapGet("/{id:guid}/movements", async (Guid id,
             [AsParameters] PaginatedRequest paging, GetConsumableMovementsHandler handler, CancellationToken ct) =>
         {
-            var query = new GetConsumableMovementsQuery
-            {
-                Id = id,
-                Page = paging.Page,
-                PageSize = paging.PageSize,
-            };
-            var response = await handler.Handle(query, ct);
+            var response = await handler.HandleAsync(id, paging, ct);
             return response is null ? Results.NotFound() : Results.Ok(response);
         })
         .WithName("GetConsumableMovements")

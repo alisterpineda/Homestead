@@ -10,14 +10,7 @@ public static class PatchDurableEndpoint
         group.MapPatch("/{id:guid}", async (Guid id,
             JsonPatchDocument<PatchDurableModel> patchDoc,
             PatchDurableHandler handler, CancellationToken ct) =>
-        {
-            var command = new PatchDurableCommand
-            {
-                Id = id,
-                PatchDocument = patchDoc
-            };
-            return Results.Ok(await handler.Handle(command, ct));
-        })
+            Results.Ok(await handler.HandleAsync(id, patchDoc, ct)))
         .WithName("PatchDurable")
         .Accepts<JsonPatchDocument<PatchDurableModel>>("application/json-patch+json")
         .Produces<DurableResponse>()

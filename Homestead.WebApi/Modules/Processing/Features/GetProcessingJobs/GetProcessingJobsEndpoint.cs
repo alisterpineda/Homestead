@@ -9,7 +9,7 @@ public static class GetProcessingJobsEndpoint
         group.MapGet("/", async ([AsParameters] GetProcessingJobsQuery request,
             GetProcessingJobsHandler handler, CancellationToken ct) =>
         {
-            var response = await handler.Handle(request, ct);
+            var response = await handler.HandleAsync(request, ct);
             return Results.Ok(response);
         })
         .WithName("GetProcessingJobs")

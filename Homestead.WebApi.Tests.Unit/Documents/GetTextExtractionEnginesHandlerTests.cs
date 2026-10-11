@@ -15,7 +15,7 @@ public class GetTextExtractionEnginesHandlerTests
     {
         var sut = Sut("azure-layout", TestTextExtraction.Engine(), TestTextExtraction.UnavailableEngine());
 
-        var result = await sut.Handle(new GetTextExtractionEnginesQuery(), TestContext.Current.CancellationToken);
+        var result = await sut.HandleAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(2, result.Count);
         var azure = Assert.Single(result, r => r.Key == "azure-layout");
@@ -30,7 +30,7 @@ public class GetTextExtractionEnginesHandlerTests
     {
         var sut = Sut(null, TestTextExtraction.Engine(), TestTextExtraction.Engine("azure-read"));
 
-        var result = await sut.Handle(new GetTextExtractionEnginesQuery(), TestContext.Current.CancellationToken);
+        var result = await sut.HandleAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(2, result.Count);
         var tesseract = Assert.Single(result, r => r.IsDefault);
@@ -44,7 +44,7 @@ public class GetTextExtractionEnginesHandlerTests
     {
         var sut = Sut("azure-typo", TestTextExtraction.Engine());
 
-        var result = await sut.Handle(new GetTextExtractionEnginesQuery(), TestContext.Current.CancellationToken);
+        var result = await sut.HandleAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(2, result.Count);
         Assert.False(result[0].IsDefault);

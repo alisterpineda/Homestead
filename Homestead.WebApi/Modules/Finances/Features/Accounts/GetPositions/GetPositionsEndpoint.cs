@@ -8,10 +8,7 @@ public static class GetPositionsEndpoint
     {
         group.MapGet("/{accountId:guid}/positions",
             async (Guid accountId, GetPositionsHandler handler, CancellationToken ct) =>
-        {
-            var response = await handler.Handle(new GetPositionsQuery(accountId), ct);
-            return Results.Ok(response);
-        })
+            Results.Ok(await handler.HandleAsync(accountId, ct)))
         .WithName("GetAccountPositions")
         .Produces<IReadOnlyList<PositionResponse>>()
         .RequireAuthorization(AuthPolicies.ActiveUser);

@@ -8,10 +8,7 @@ public static class ReceiveStockEndpoint
     {
         group.MapPost("/{id:guid}/receive", async (Guid id,
             ReceiveStockRequest body, ReceiveStockHandler handler, CancellationToken ct) =>
-        {
-            var command = new ReceiveStockCommand { ConsumableId = id, Body = body };
-            return Results.Ok(await handler.Handle(command, ct));
-        })
+            Results.Ok(await handler.HandleAsync(id, body, ct)))
         .WithName("ReceiveStock")
         .Produces<ConsumableDetailResponse>()
         .Produces(StatusCodes.Status400BadRequest)

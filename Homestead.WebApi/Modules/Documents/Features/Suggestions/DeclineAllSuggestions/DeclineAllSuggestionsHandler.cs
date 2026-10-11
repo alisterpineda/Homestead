@@ -10,13 +10,13 @@ namespace Homestead.WebApi.Modules.Documents.Features.Suggestions.DeclineAllSugg
 
 public class DeclineAllSuggestionsHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork)
 {
-    public async Task Handle(DeclineAllSuggestionsCommand request, CancellationToken ct)
+    public async Task HandleAsync(Guid documentId, CancellationToken ct)
     {
         var document = await db.Documents
             .Include(d => d.DocumentTags).ThenInclude(dt => dt.Tag)
             .Include(d => d.DocumentParties)
             .Include(d => d.Suggestions.Where(s => s.Status == DocumentSuggestionStatus.Pending))
-            .FirstOrDefaultAsync(d => d.Id == request.DocumentId, ct);
+            .FirstOrDefaultAsync(d => d.Id == documentId, ct);
 
         if (document is null)
             return;

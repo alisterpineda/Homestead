@@ -10,11 +10,7 @@ public static class DeclineSuggestionEndpoint
         group.MapPost("/{suggestionId:guid}/decline", async (Guid documentId, Guid suggestionId,
             DeclineSuggestionHandler handler, CancellationToken ct) =>
         {
-            await handler.Handle(new DeclineSuggestionCommand
-            {
-                DocumentId = documentId,
-                SuggestionId = suggestionId
-            }, ct);
+            await handler.HandleAsync(documentId, suggestionId, ct);
             return Results.NoContent();
         })
         .WithName("DeclineSuggestion")

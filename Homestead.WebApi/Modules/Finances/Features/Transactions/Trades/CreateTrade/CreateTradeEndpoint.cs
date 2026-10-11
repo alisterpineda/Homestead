@@ -9,7 +9,7 @@ public static class CreateTradeEndpoint
         group.MapPost("",
             async (CreateTradeCommand body, CreateTradeHandler handler, CancellationToken ct) =>
         {
-            var response = await handler.Handle(body, ct);
+            var response = await handler.HandleAsync(body, ct);
             return Results.Created(
                 $"/api/v1/finances/transactions/{response.Id}",
                 response);

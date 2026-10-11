@@ -18,7 +18,7 @@ public class PatchCategoryHandler(
     IUnitOfWork unitOfWork,
     IValidator<PatchCategoryCommand> validator)
 {
-    public async Task<CategoryResponse> Handle(PatchCategoryCommand request, CancellationToken ct)
+    public async Task<CategoryResponse> HandleAsync(PatchCategoryCommand request, CancellationToken ct)
     {
         await validator.ValidateAndThrowAsync(request, ct);
 

@@ -16,7 +16,7 @@ public class UpdateItemNoteHandler(
     IUnitOfWork unitOfWork,
     IValidator<UpdateItemNoteCommand> validator)
 {
-    public async Task<ItemNoteResponse> Handle(UpdateItemNoteCommand request, CancellationToken ct)
+    public async Task<ItemNoteResponse> HandleAsync(UpdateItemNoteCommand request, CancellationToken ct)
     {
         await validator.ValidateAndThrowAsync(request, ct);
 
