@@ -31,8 +31,10 @@ public interface IAiProvider
     bool ImageInput { get; }
     int ImageRenderMaxEdge { get; }
 
-    // The chat client for this provider. Built once and reused for the app lifetime (the underlying client
-    // is a stateless, thread-safe HTTP wrapper) — callers must NOT dispose it. Throws
+    // The chat client for this provider: the SDK client wrapped in the M.E.AI middleware pipeline
+    // (OpenTelemetry, plus any per-type option adapter). Built once and reused for the app lifetime (the
+    // underlying client is a stateless, thread-safe HTTP wrapper) — callers must NOT dispose it, since
+    // disposing the pipeline disposes the SDK client inside it. Throws
     // InvalidOperationException naming the key and ConfigurationError when the provider is unavailable.
     IChatClient GetChatClient();
 }

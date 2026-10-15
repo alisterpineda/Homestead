@@ -3,8 +3,9 @@ using Microsoft.Extensions.AI;
 namespace Homestead.WebApi.Infrastructure.Ai;
 
 // Adapts provider-neutral ChatOptions to what the Claude API accepts, so callers stay unaware of the provider
-// behind their IChatClient. Wraps the Anthropic SDK's own IChatClient; the caller's ChatOptions instance is
-// never mutated (the fallback ladder builds its options per attempt, but other callers may reuse theirs).
+// behind their IChatClient. A layer of the Anthropic provider's pipeline (AiProvider.BuildClient explains its
+// position); the caller's ChatOptions instance is never mutated (the fallback ladder builds its options per
+// attempt, but other callers may reuse theirs).
 public sealed class AnthropicChatOptionsClient(IChatClient inner) : DelegatingChatClient(inner)
 {
     // Anthropic requires max_tokens on every request and the SDK adapter sends 1024 when MaxOutputTokens is

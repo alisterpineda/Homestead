@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Homestead.WebApi.Infrastructure.Ai;
 using Microsoft.Extensions.AI;
 
@@ -73,22 +74,75 @@ public class AiProviderTests
         Assert.NotNull(provider.GetChatClient());
     }
 
-    // The Claude API takes temperature and max_tokens differently, so the SDK's client is always wrapped.
+    // The Claude API takes temperature and max_tokens differently, so the SDK's client is always wrapped — with
+    // the adapter outermost and OpenTelemetry inside it (GetService only walks inward), so spans record the
+    // options actually sent.
     [Theory]
     [InlineData(null)]
     [InlineData("https://gateway.example.com")]
-    public void GetChatClient_Anthropic_BuildsWrapped_AndMemoizes(string? endpoint)
+    public void GetChatClient_Anthropic_BuildsWrappedOutsideOpenTelemetry_AndMemoizes(string? endpoint)
     {
         var provider = new AiProvider("claude", ValidAnthropic(endpoint));
 
         var first = provider.GetChatClient();
 
         Assert.IsType<AnthropicChatOptionsClient>(first);
+        Assert.NotNull(first.GetService<OpenTelemetryChatClient>());
         Assert.Same(first, provider.GetChatClient());
     }
 
+    // Every provider type returns the M.E.AI pipeline with OpenTelemetry in it, so GenAI spans and metrics
+    // can't be silently dropped by a future switch arm.
+    public static TheoryData<AiProviderOptions> AllProviderTypes() => [ValidOpenAi(), ValidFoundry(), ValidAnthropic()];
+
+    [Theory]
+    [MemberData(nameof(AllProviderTypes))]
+    public void GetChatClient_EveryType_IncludesOpenTelemetry_AndMemoizesThePipeline(AiProviderOptions options)
+    {
+        var provider = new AiProvider("any", options);
+
+        var client = provider.GetChatClient();
+
+        Assert.NotNull(client.GetService<OpenTelemetryChatClient>());
+        Assert.Same(client, provider.GetChatClient());
+    }
+
+    // Document contents are personal: prompts and responses never reach telemetry, whatever
+    // OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT says (Aspire sets it to true in Development).
+    [Theory]
+    [MemberData(nameof(AllProviderTypes))]
+    public void GetChatClient_EveryType_KeepsSensitiveDataOutOfTelemetry(AiProviderOptions options)
+    {
+        var otel = new AiProvider("any", options).GetChatClient().GetService<OpenTelemetryChatClient>();
+
+        Assert.NotNull(otel);
+        Assert.False(otel!.EnableSensitiveData);
+    }
+
+    // ServiceDefaults only exports what it subscribes to; a name the pipeline doesn't emit under drops every
+    // GenAI span silently.
+    [Theory]
+    [MemberData(nameof(AllProviderTypes))]
+    public void GetChatClient_EveryType_EmitsUnderTheNameServiceDefaultsSubscribesTo(AiProviderOptions options)
+    {
+        var source = new AiProvider("any", options).GetChatClient().GetService<ActivitySource>();
+
+        Assert.Equal("Experimental.Microsoft.Extensions.AI", source?.Name);
+    }
+
+    // The Anthropic adapter drops Temperature and forces MaxOutputTokens, so it must never reach another type.
+    [Theory]
+    [MemberData(nameof(AllProviderTypes))]
+    public void GetChatClient_OnlyAnthropic_GetsTheOptionsAdapter(AiProviderOptions options)
+    {
+        var client = new AiProvider("any", options).GetChatClient();
+
+        Assert.Equal(options.Type == AiProviderType.Anthropic,
+            client.GetService<AnthropicChatOptionsClient>() is not null);
+    }
+
     // The configured Model and Endpoint reach the SDK client (the adapter reports both as metadata, which the
-    // wrapper forwards); a blank Endpoint means the public Claude API.
+    // pipeline forwards); a blank Endpoint means the public Claude API.
     [Theory]
     [InlineData(null, "https://api.anthropic.com/")]
     [InlineData("https://gateway.example.com", "https://gateway.example.com/")]

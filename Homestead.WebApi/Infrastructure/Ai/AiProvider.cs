@@ -45,12 +45,41 @@ public sealed class AiProvider : IAiProvider
         // Built once and reused (singleton over static config): the underlying chat client is a stateless,
         // thread-safe HTTP wrapper. Rebuilding per call would spin up a fresh HTTP pipeline each time — a
         // new TLS handshake per classify against a remote endpoint and no connection reuse under bulk
-        // classify. The benign init race (two concurrent first-calls) just discards a redundant, never-used
-        // build. The client is provider-owned for the app lifetime, so callers must not dispose it.
+        // classify. What is cached is the whole built pipeline (the SDK client plus its middleware), so the
+        // telemetry layer is shared too. The benign init race (two concurrent first-calls) just discards a
+        // redundant, never-used build. The client is provider-owned for the app lifetime, so callers must not
+        // dispose it — disposing the pipeline disposes the SDK client inside it.
         return _client ??= BuildClient();
     }
 
-    private IChatClient BuildClient() => _options.Type switch
+    // Every arm goes through the same M.E.AI pipeline (inner.AsBuilder().Use…().Build()). The first Use is the
+    // outermost layer, so the Anthropic adapter wraps OpenTelemetry rather than the reverse: the spans then
+    // record the options actually sent to the SDK (Temperature dropped, MaxOutputTokens resolved), not the
+    // caller's. Build() without a service provider is enough: UseOpenTelemetry only resolves an optional
+    // ILoggerFactory from it, which spans and metrics don't need.
+    private IChatClient BuildClient()
+    {
+        var builder = BuildSdkClient().AsBuilder();
+
+        // The Claude API takes temperature and max_tokens differently; the adapter makes callers unaware of it.
+        if (_options.Type == AiProviderType.Anthropic)
+            builder.Use(inner => new AnthropicChatOptionsClient(inner));
+
+        // GenAI semantic-convention spans and metrics (model, token counts, finish reason, duration) under the
+        // name ServiceDefaults subscribes to. EnableSensitiveData = false is an override, not a restatement of
+        // the default: the library seeds it from OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT, which
+        // Aspire sets to true for every resource in Development. Without it every prompt and response (OCR
+        // text, the page image, extracted statement lines) would be exported to the OTLP backend, and
+        // documents are personal — so this line must stay.
+        return builder
+            .UseOpenTelemetry(
+                sourceName: Microsoft.Extensions.Hosting.Extensions.MicrosoftExtensionsAiTelemetryName,
+                configure: otel => otel.EnableSensitiveData = false)
+            .Build();
+    }
+
+    // The provider SDK's own IChatClient, before the shared pipeline wraps it.
+    private IChatClient BuildSdkClient() => _options.Type switch
     {
         // The OpenAI-compatible path pointed at the configured endpoint. Local runtimes ignore the key, so
         // a dummy is substituted when none is configured; the endpoint is sent verbatim.
@@ -71,10 +100,9 @@ public sealed class AiProvider : IAiProvider
 
         // The Anthropic SDK's own IChatClient adapter maps the system prompt, the page-render DataContent, and
         // a ForJsonSchema response format (to output_config.format, forcing additionalProperties:false — the
-        // schema is enforced, so the OpenAI-only "strict" flag is simply ignored). The wrapper adapts the two
-        // options the Claude API treats differently: temperature and the required max_tokens.
-        AiProviderType.Anthropic => new AnthropicChatOptionsClient(
-            CreateAnthropicClient().AsIChatClient(_options.Model)),
+        // schema is enforced, so the OpenAI-only "strict" flag is simply ignored). BuildClient wraps it in
+        // AnthropicChatOptionsClient for the two options the Claude API treats differently.
+        AiProviderType.Anthropic => CreateAnthropicClient().AsIChatClient(_options.Model),
 
         // Unreachable behind the IsConfigured guard (a null/unknown Type always carries a ConfigurationError).
         _ => throw new InvalidOperationException($"AI provider '{Key}' has no usable Type.")
