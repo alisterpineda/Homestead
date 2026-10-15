@@ -1,5 +1,5 @@
+using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
-using System.Text.Json.Nodes;
 using Homestead.WebApi.Infrastructure.Ai;
 using Homestead.WebApi.Modules.Finances.Processing.Statements;
 using Microsoft.Extensions.AI;
@@ -22,6 +22,12 @@ public class StatementExtractionService(
     private const float Temperature = 0f;
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    // Generated from the reply DTO with the options it is deserialized with, so schema and DTO can't drift.
+    // Every property is required and optional ones are ["type","null"] unions (strict mode); the nullable
+    // direction enum comes out as an anyOf (see StructuredChatRequest.CreateStrictSchema).
+    private static readonly JsonElement ResponseSchema =
+        StructuredChatRequest.CreateStrictSchema(typeof(StatementExtractionResponse), JsonOptions);
 
     public async Task<StatementIr> ExtractAsync(string extractedText, byte[]? pageImage, CancellationToken ct)
     {
@@ -56,7 +62,7 @@ public class StatementExtractionService(
 
         // Streamed: line-item output grows with the transaction count (see StructuredChatRequest).
         var response = await StructuredChatRequest.SendAsync(
-            client, messages, BuildResponseSchema(),
+            client, messages, ResponseSchema,
             schemaName: "statement_extraction",
             schemaDescription: "Structured header of a parsed account statement.",
             Temperature, stream: true, "Statement extraction", logger, ct);
@@ -173,83 +179,6 @@ public class StatementExtractionService(
         return text[..cut];
     }
 
-    // Strict schema: an object with additionalProperties:false and every property in "required" (nullability
-    // expressed as a ["type","null"] union so strict mode is satisfied while values stay optional). Same
-    // posture for the line-item array elements — every field required, null-union where optional.
-    private static JsonElement BuildResponseSchema()
-    {
-        static JsonObject Nullable(string type) => new()
-        {
-            ["type"] = new JsonArray(type, "null"),
-        };
-
-        static JsonObject MoneySchema() => new()
-        {
-            ["type"] = new JsonArray("object", "null"),
-            ["properties"] = new JsonObject
-            {
-                ["amount"] = new JsonObject { ["type"] = "number" },
-                ["sourceAnchor"] = Nullable("string"),
-            },
-            ["required"] = new JsonArray("amount", "sourceAnchor"),
-            ["additionalProperties"] = false,
-        };
-
-        static JsonObject LineItemsSchema() => new()
-        {
-            ["type"] = "array",
-            ["items"] = new JsonObject
-            {
-                ["type"] = "object",
-                ["properties"] = new JsonObject
-                {
-                    ["date"] = Nullable("string"),
-                    ["description"] = Nullable("string"),
-                    ["amount"] = Nullable("number"),
-                    // A nullable enum as anyOf, not ["string","null"] + an enum holding null: Anthropic's
-                    // validator rejects the latter ("Enum value 'out' does not match declared type"), and
-                    // anyOf is equally valid under OpenAI strict mode.
-                    ["direction"] = new JsonObject
-                    {
-                        ["anyOf"] = new JsonArray(
-                            new JsonObject { ["type"] = "string", ["enum"] = new JsonArray("out", "in") },
-                            new JsonObject { ["type"] = "null" }),
-                    },
-                    ["runningBalance"] = Nullable("number"),
-                },
-                ["required"] = new JsonArray("date", "description", "amount", "direction", "runningBalance"),
-                ["additionalProperties"] = false,
-            },
-        };
-
-        var schema = new JsonObject
-        {
-            ["type"] = "object",
-            ["properties"] = new JsonObject
-            {
-                ["kind"] = new JsonObject
-                {
-                    ["type"] = "string",
-                    ["enum"] = new JsonArray("Bank", "CreditCard", "Brokerage", "Unknown"),
-                },
-                ["institution"] = Nullable("string"),
-                ["accountNumberMasked"] = Nullable("string"),
-                ["currency"] = Nullable("string"),
-                ["periodStart"] = Nullable("string"),
-                ["periodEnd"] = Nullable("string"),
-                ["openingBalance"] = MoneySchema(),
-                ["closingBalance"] = MoneySchema(),
-                ["lineItems"] = LineItemsSchema(),
-            },
-            ["required"] = new JsonArray(
-                "kind", "institution", "accountNumberMasked", "currency",
-                "periodStart", "periodEnd", "openingBalance", "closingBalance", "lineItems"),
-            ["additionalProperties"] = false,
-        };
-
-        return JsonSerializer.SerializeToElement(schema);
-    }
-
     private static StatementIr MapToIr(StatementExtractionResponse parsed) => new()
     {
         Kind = ParseKind(parsed.Kind),
@@ -311,9 +240,15 @@ public class StatementExtractionService(
     private static string? NullIfBlank(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
+    // Kind and Direction stay strings, not enums: [AllowedValues] puts the enum in the schema while ParseKind /
+    // ParseDirection keep tolerating a value outside it (possible once the ladder falls back to unenforced JSON).
     private sealed class StatementExtractionResponse
     {
-        public string? Kind { get; set; }
+        [AllowedValues(
+            nameof(StatementKind.Bank), nameof(StatementKind.CreditCard),
+            nameof(StatementKind.Brokerage), nameof(StatementKind.Unknown))]
+        public string Kind { get; set; } = "";
+
         public string? Institution { get; set; }
         public string? AccountNumberMasked { get; set; }
         public string? Currency { get; set; }
@@ -321,7 +256,7 @@ public class StatementExtractionService(
         public string? PeriodEnd { get; set; }
         public MoneyDto? OpeningBalance { get; set; }
         public MoneyDto? ClosingBalance { get; set; }
-        public List<LineItemDto>? LineItems { get; set; }
+        public List<LineItemDto> LineItems { get; set; } = [];
     }
 
     private sealed class MoneyDto
@@ -335,7 +270,10 @@ public class StatementExtractionService(
         public string? Date { get; set; }
         public string? Description { get; set; }
         public decimal? Amount { get; set; }
+
+        [AllowedValues("out", "in")]
         public string? Direction { get; set; }
+
         public decimal? RunningBalance { get; set; }
     }
 }

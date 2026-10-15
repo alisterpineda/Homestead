@@ -1,14 +1,67 @@
 using System.Runtime.ExceptionServices;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.Extensions.AI;
 
 namespace Homestead.WebApi.Infrastructure.Ai;
 
 // The one structured-output request path every AI service uses: a strict JSON-schema response format plus a
-// fixed temperature, the HTTP-400 degradation ladder, and a completeness check on the reply. Provider-neutral —
+// fixed temperature, the HTTP-400 degradation ladder, and a completeness check on the reply — and the generator
+// for the fixed schemas it sends (CreateStrictSchema). Provider-neutral —
 // it only speaks IChatClient and asks AiProviderErrors to read SDK exceptions.
 public static class StructuredChatRequest
 {
+    // Generates a fixed response schema from a DTO type, in the shape SendAsync's strict mode needs:
+    // additionalProperties:false on every object and every property in "required", optionality written as a
+    // ["type","null"] union. serializerOptions must be the ones the reply is deserialized with, so the schema's
+    // property names are the ones the DTO reads. The schema is enforced per provider: OpenAI applies these
+    // transforms itself only when strict is on, while the Anthropic adapter only forces additionalProperties
+    // (and silently drops a schema whose root has no "required"), so we do it once here for both.
+    public static JsonElement CreateStrictSchema(Type type, JsonSerializerOptions serializerOptions) =>
+        AIJsonUtilities.CreateJsonSchema(type, serializerOptions: serializerOptions, inferenceOptions: StrictSchemaOptions);
+
+    private static readonly AIJsonSchemaCreateOptions StrictSchemaOptions = new()
+    {
+        TransformOptions = new AIJsonSchemaTransformOptions
+        {
+            DisallowAdditionalProperties = true,
+            RequireAllProperties = true,
+            TransformSchemaNode = (_, node) => RewriteNullableEnum(node),
+        },
+    };
+
+    // A nullable enum is generated as {type:[T,"null"], enum:[…]}. Anthropic's validator rejects that shape
+    // ("Enum value 'out' does not match declared type"), so rewrite it as anyOf [{type:T, enum:[non-null values]},
+    // {type:"null"}], which both Anthropic and OpenAI strict mode accept. Without this a rejected schema wouldn't
+    // fail loudly: the 400 names output_config, so the ladder would quietly fall back to unenforced JSON. Sibling
+    // keywords (a [Description] is prompt text) stay on the outer node.
+    private static JsonNode RewriteNullableEnum(JsonNode node)
+    {
+        if (node is not JsonObject obj
+            || obj["enum"] is not JsonArray values
+            || obj["type"] is not JsonArray { Count: 2 } types
+            || !types.Any(t => t?.GetValue<string>() == "null"))
+            return node;
+
+        var type = types.First(t => t?.GetValue<string>() != "null")!.GetValue<string>();
+        var rewritten = new JsonObject
+        {
+            ["anyOf"] = new JsonArray(
+                new JsonObject
+                {
+                    ["type"] = type,
+                    ["enum"] = new JsonArray(values.Where(v => v is not null).Select(v => v!.DeepClone()).ToArray()),
+                },
+                new JsonObject { ["type"] = "null" }),
+        };
+        foreach (var (key, value) in obj)
+        {
+            if (key is not ("type" or "enum"))
+                rewritten[key] = value?.DeepClone();
+        }
+        return rewritten;
+    }
+
     // We send two options that not every model/endpoint accepts:
     //   * strict structured outputs (a json_schema response format) — rejected by self-hosted runtimes and older deployments;
     //   * a custom temperature — rejected by reasoning (o-series) models, which only allow the default.

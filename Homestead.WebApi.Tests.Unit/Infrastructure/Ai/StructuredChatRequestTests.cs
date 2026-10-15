@@ -1,8 +1,11 @@
 using System.ClientModel;
 using System.ClientModel.Primitives;
+using System.ComponentModel;
+using System.ComponentModel.DataAnnotations;
 using System.Net;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Anthropic.Exceptions;
 using Homestead.WebApi.Infrastructure.Ai;
 using Microsoft.Extensions.AI;
@@ -169,5 +172,69 @@ public class StructuredChatRequestTests
             await Task.Yield();
             yield return update;
         }
+    }
+
+    // CreateStrictSchema: every object closed and fully required, optionality as a ["type","null"] union, and a
+    // nullable enum rewritten to anyOf (Anthropic rejects ["string","null"] + enum) without losing its siblings.
+
+    private static readonly JsonSerializerOptions WebJson = new(JsonSerializerDefaults.Web);
+
+    private static JsonNode StrictSchema() =>
+        JsonNode.Parse(StructuredChatRequest.CreateStrictSchema(typeof(SchemaShapes), WebJson).GetRawText())!;
+
+    private static void AssertProperty(string name, string expectedJson)
+    {
+        var actual = StrictSchema()["properties"]![name];
+        Assert.True(JsonNode.DeepEquals(JsonNode.Parse(expectedJson), actual),
+            $"Schema for '{name}' was:\n{actual?.ToJsonString()}");
+    }
+
+    [Fact]
+    public void CreateStrictSchema_ClosesAndRequiresEveryProperty()
+    {
+        var schema = StrictSchema();
+
+        Assert.False(schema["additionalProperties"]!.GetValue<bool>());
+        Assert.Equal(
+            ["nullableEnum", "describedNullableEnum", "requiredEnum", "nullableText"],
+            schema["required"]!.AsArray().Select(n => n!.GetValue<string>()));
+    }
+
+    [Fact]
+    public void CreateStrictSchema_WritesANullableEnumAsAnyOf() =>
+        AssertProperty("nullableEnum", """
+            { "anyOf": [{ "type": "string", "enum": ["out", "in"] }, { "type": "null" }] }
+            """);
+
+    [Fact]
+    public void CreateStrictSchema_KeepsTheDescriptionOfARewrittenNullableEnum() =>
+        AssertProperty("describedNullableEnum", """
+            {
+              "description": "Which way the money moved.",
+              "anyOf": [{ "type": "string", "enum": ["out", "in"] }, { "type": "null" }]
+            }
+            """);
+
+    [Fact]
+    public void CreateStrictSchema_LeavesANonNullableEnumAlone() =>
+        AssertProperty("requiredEnum", """{ "type": "string", "enum": ["Bank", "Unknown"] }""");
+
+    [Fact]
+    public void CreateStrictSchema_LeavesANullableNonEnumAlone() =>
+        AssertProperty("nullableText", """{ "type": ["string", "null"] }""");
+
+    private sealed class SchemaShapes
+    {
+        [AllowedValues("out", "in")]
+        public string? NullableEnum { get; set; }
+
+        [AllowedValues("out", "in")]
+        [Description("Which way the money moved.")]
+        public string? DescribedNullableEnum { get; set; }
+
+        [AllowedValues("Bank", "Unknown")]
+        public string RequiredEnum { get; set; } = "";
+
+        public string? NullableText { get; set; }
     }
 }

@@ -1,5 +1,6 @@
+using System.ComponentModel;
 using System.Text.Json;
-using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using Homestead.WebApi.Infrastructure.Ai;
 using Microsoft.Extensions.AI;
 
@@ -22,6 +23,11 @@ public class PayeeResolutionService(
     private const int MaxNewPayeeNameLength = 128;
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    // Generated from the reply DTO with the options it is deserialized with, so schema and DTO can't drift.
+    // The [Description]s on the DTO are part of the prompt contract.
+    private static readonly JsonElement ResponseSchema =
+        StructuredChatRequest.CreateStrictSchema(typeof(ResolutionResponse), JsonOptions);
 
     public async Task<IReadOnlyDictionary<int, PayeeResolution>> ResolveAsync(
         IReadOnlyList<PayeeResolutionInput> lines,
@@ -53,7 +59,7 @@ public class PayeeResolutionService(
         try
         {
             var response = await StructuredChatRequest.SendAsync(
-                client, messages, BuildResponseSchema(),
+                client, messages, ResponseSchema,
                 schemaName: "payee_resolution",
                 schemaDescription: "Payee suggestions for statement lines.",
                 Temperature, stream: false, "Payee resolution", logger, ct);
@@ -67,6 +73,8 @@ public class PayeeResolutionService(
                 return new Dictionary<int, PayeeResolution>();
             }
 
+            // An explicit "results": null (only possible once the ladder fell back to unenforced JSON) overrides
+            // the initializer, hence the check on Results too.
             var parsed = JsonSerializer.Deserialize<ResolutionResponse>(content, JsonOptions);
             if (parsed?.Results is null)
             {
@@ -99,9 +107,9 @@ public class PayeeResolutionService(
             if (!requested.Contains(item.LineIndex))
                 continue;
 
-            if (item.PayeeIndex is int idx && idx >= 0 && idx < catalog.Count)
+            if (item.PayeeIndex >= 0 && item.PayeeIndex < catalog.Count)
             {
-                map[item.LineIndex] = new PayeeResolution(catalog[idx].Id, null);
+                map[item.LineIndex] = new PayeeResolution(catalog[item.PayeeIndex].Id, null);
                 continue;
             }
 
@@ -166,61 +174,28 @@ public class PayeeResolutionService(
             """;
     }
 
-    private static JsonElement BuildResponseSchema()
-    {
-        var itemSchema = new JsonObject
-        {
-            ["type"] = "object",
-            ["properties"] = new JsonObject
-            {
-                ["lineIndex"] = new JsonObject
-                {
-                    ["type"] = "integer",
-                    ["description"] = "The line's index, echoed from the input.",
-                },
-                ["payeeIndex"] = new JsonObject
-                {
-                    ["type"] = "integer",
-                    ["description"] = "Zero-based index into the known-payees list, or -1 for no existing match.",
-                },
-                ["newPayeeName"] = new JsonObject
-                {
-                    ["type"] = "string",
-                    ["description"] = "A concise new payee name when proposing one (payeeIndex = -1); otherwise empty.",
-                },
-            },
-            ["required"] = new JsonArray { "lineIndex", "payeeIndex", "newPayeeName" },
-            ["additionalProperties"] = false,
-        };
-
-        var schema = new JsonObject
-        {
-            ["type"] = "object",
-            ["properties"] = new JsonObject
-            {
-                ["results"] = new JsonObject
-                {
-                    ["type"] = "array",
-                    ["description"] = "One entry per input line.",
-                    ["items"] = itemSchema,
-                },
-            },
-            ["required"] = new JsonArray { "results" },
-            ["additionalProperties"] = false,
-        };
-
-        return JsonSerializer.SerializeToElement(schema);
-    }
-
     private sealed class ResolutionResponse
     {
-        public List<ResolutionItem>? Results { get; set; }
+        [Description("One entry per input line.")]
+        public List<ResolutionItem> Results { get; set; } = [];
     }
 
+    // PayeeIndex is a plain int: the schema says non-null integer, and [Required] on an int? would still
+    // generate a nullable type. [JsonRequired] makes a missing key throw too; otherwise an int would default to 0
+    // and silently match the first catalog payee. A null or missing index can only arrive after the ladder's
+    // plain-JSON fallback. The deserializer then throws for the whole reply, so the batch gets no AI suggestions,
+    // where the old int? fell back to that line's newPayeeName.
     private sealed class ResolutionItem
     {
+        [JsonRequired]
+        [Description("The line's index, echoed from the input.")]
         public int LineIndex { get; set; }
-        public int? PayeeIndex { get; set; }
-        public string? NewPayeeName { get; set; }
+
+        [JsonRequired]
+        [Description("Zero-based index into the known-payees list, or -1 for no existing match.")]
+        public int PayeeIndex { get; set; }
+
+        [Description("A concise new payee name when proposing one (payeeIndex = -1); otherwise empty.")]
+        public string NewPayeeName { get; set; } = "";
     }
 }
