@@ -1,3 +1,5 @@
+using Anthropic;
+using Anthropic.Core;
 using Azure;
 using Azure.AI.OpenAI;
 using Microsoft.Extensions.AI;
@@ -67,7 +69,29 @@ public sealed class AiProvider : IAiProvider
             .GetChatClient(_options.Model)
             .AsIChatClient(),
 
+        // The Anthropic SDK's own IChatClient adapter maps the system prompt, the page-render DataContent, and
+        // a ForJsonSchema response format (to output_config.format, forcing additionalProperties:false — the
+        // schema is enforced, so the OpenAI-only "strict" flag is simply ignored). The wrapper adapts the two
+        // options the Claude API treats differently: temperature and the required max_tokens.
+        AiProviderType.Anthropic => new AnthropicChatOptionsClient(
+            CreateAnthropicClient().AsIChatClient(_options.Model)),
+
         // Unreachable behind the IsConfigured guard (a null/unknown Type always carries a ConfigurationError).
         _ => throw new InvalidOperationException($"AI provider '{Key}' has no usable Type.")
     };
+
+    // Built from an explicit ClientOptions so config is the only source of where requests go and how they
+    // authenticate. The SDK otherwise falls back to the process environment: ANTHROPIC_BASE_URL, an
+    // ANTHROPIC_AUTH_TOKEN bearer header, or an `ant auth login` profile (which can swap the base URL, or
+    // throw on a missing ANTHROPIC_PROFILE). It resolves that profile inside the constructor, before an object
+    // initializer's setters run — so every value must be in the options passed in, and each one set
+    // explicitly: ApiKey (Validate requires it), AuthToken = null (no bearer header), and BaseUrl (the
+    // Endpoint override, else the public API — never ANTHROPIC_BASE_URL). The one thing config cannot stop is
+    // ANTHROPIC_CUSTOM_HEADERS, which the SDK adds to every request.
+    private AnthropicClient CreateAnthropicClient() => new(new ClientOptions
+    {
+        ApiKey = _options.ApiKey!,
+        AuthToken = null,
+        BaseUrl = string.IsNullOrWhiteSpace(_options.Endpoint) ? EnvironmentUrl.Production : _options.Endpoint,
+    });
 }

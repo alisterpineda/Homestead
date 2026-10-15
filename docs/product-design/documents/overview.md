@@ -207,7 +207,7 @@ The following must be addable later without re-migrating documents, versions, ta
 - **A user-facing field-level change-history view** beyond the activity feed — a per-field diff surface sourced from the existing audit log. No backfill required.
 - **In-document preview, annotation, version diffs, version revert.**
 - **Document-to-document relationships** (supersedes, derived-from, etc.) beyond the party link.
-- **Non-OpenAI-compatible AI backends.** Any OpenAI-compatible endpoint already works today purely by configuration (Azure OpenAI, OpenAI, a local Ollama / llama.cpp server, etc.) — there is no per-provider code path or enum. A backend that does not speak the OpenAI chat API would need a new client behind the `IChatClient` abstraction.
+- **Further non-OpenAI-compatible AI backends.** Any OpenAI-compatible endpoint works purely by configuration (`OpenAiCompatible`: OpenAI, a local Ollama / llama.cpp server, etc.), Azure OpenAI has its own `AzureFoundry` type, and the Claude API has a native `Anthropic` type. Another backend that does not speak the OpenAI chat API needs a new `AiProviderType` with its client behind the `IChatClient` abstraction (and its SDK's exceptions in `AiProviderErrors`).
 - **New AI-suggested fields** (document date, expiry date) via new `DocumentSuggestionField` enum values, prompt updates, and UI — no schema changes needed (tags, name, and parties already use this).
 - **AI-driven tag creation** — v1 limits AI to picking from existing tags; suggesting new tags requires a new prompt strategy and a creation flow.
 - **External-source ingestion** — cloud-storage import, scanner uploads, email forwarding.

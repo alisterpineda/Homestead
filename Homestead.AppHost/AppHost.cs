@@ -45,6 +45,7 @@ var webapi = builder.AddProject<Projects.Homestead_WebApi>("homestead-webapi")
         //   dotnet user-secrets set "Ai:Providers:local:Endpoint" "http://localhost:11434/v1"
         //   dotnet user-secrets set "Ai:Providers:local:Model" "gemma-4-e4b"
         //   dotnet user-secrets set "Ai:DefaultProvider" "local"
+        // or the Claude API: Type "Anthropic" with a Model (e.g. "claude-opus-5-5") and an ApiKey; no Endpoint.
         //
         // Walking "Ai" (not "Ai:Providers") forwards Ai:DefaultProvider and any future Ai:* key in the
         // same statement. Unset -> no providers -> graceful no-op.

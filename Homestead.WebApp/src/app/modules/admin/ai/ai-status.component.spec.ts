@@ -84,6 +84,28 @@ describe('AiStatusComponent', () => {
     expect(html).toContain('ApiKey is required.');
   });
 
+  it('should label an Anthropic provider and show the SDK default when no endpoint is set', () => {
+    api.getAiStatus.mockReturnValue(of<AiProviderStatusResponse[]>([{
+      key: 'claude',
+      type: 'Anthropic',
+      isConfigured: true,
+      configurationError: null,
+      isDefault: true,
+      endpoint: null,
+      model: 'claude-opus-5-5',
+      hasApiKey: true,
+      maxInputChars: 12000,
+    }]));
+
+    const { fixture } = create();
+    fixture.detectChanges();
+    const html: string = fixture.nativeElement.outerHTML;
+
+    expect(html).toContain('Anthropic');
+    expect(html).toContain('SDK default');
+    expect(html).toContain('claude-opus-5-5');
+  });
+
   it('should render the empty state naming the new config keys', () => {
     api.getAiStatus.mockReturnValue(of([]));
 

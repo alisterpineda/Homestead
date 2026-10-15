@@ -1,4 +1,3 @@
-using System.ClientModel;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Homestead.WebApi.Infrastructure.Ai;
@@ -8,7 +7,8 @@ namespace Homestead.WebApi.Modules.Finances.Services;
 
 /// <summary>
 /// AI payee resolver — tiers ②/③. Mirrors <c>AiClassificationService</c>: index-referenced catalog, strict
-/// structured output with a 400-degradation ladder, temperature 0. Deliberately small and non-streaming; the
+/// structured output with a 400-degradation ladder (<see cref="StructuredChatRequest"/>), temperature 0.
+/// Deliberately small and non-streaming; the
 /// long statement-extraction call is a different service and stays streaming.
 /// </summary>
 public class PayeeResolutionService(
@@ -52,7 +52,11 @@ public class PayeeResolutionService(
 
         try
         {
-            var response = await GetResponseWithFallbackAsync(client, messages, ct);
+            var response = await StructuredChatRequest.SendAsync(
+                client, messages, BuildResponseSchema(),
+                schemaName: "payee_resolution",
+                schemaDescription: "Payee suggestions for statement lines.",
+                Temperature, stream: false, "Payee resolution", logger, ct);
             var content = response.Text;
 
             logger.LogTrace("Payee resolution response:\n{Response}", content);
@@ -111,78 +115,6 @@ public class PayeeResolutionService(
         }
 
         return map;
-    }
-
-    // Same degradation ladder as AiClassificationService: an HTTP 400 that implicates temperature or the
-    // strict json_schema drops only that option and retries; any other 400 propagates unchanged.
-    private async Task<ChatResponse> GetResponseWithFallbackAsync(
-        IChatClient client, List<ChatMessage> messages, CancellationToken ct)
-    {
-        const int maxAttempts = 3;
-
-        var schema = BuildResponseSchema();
-        var useStructuredOutput = true;
-        var useTemperature = true;
-        ClientResultException lastError = null!;
-
-        for (var attempt = 1; attempt <= maxAttempts; attempt++)
-        {
-            var options = new ChatOptions
-            {
-                Temperature = useTemperature ? Temperature : null,
-                ResponseFormat = useStructuredOutput
-                    ? ChatResponseFormat.ForJsonSchema(
-                        schema,
-                        schemaName: "payee_resolution",
-                        schemaDescription: "Payee suggestions for statement lines.")
-                    : ChatResponseFormat.Json,
-                // M.E.AI only emits OpenAI's strict:true when this flag is present — ForJsonSchema alone
-                // leaves it unset (see AiClassificationService for the full note).
-                AdditionalProperties = useStructuredOutput
-                    ? new AdditionalPropertiesDictionary { ["strict"] = true }
-                    : null,
-            };
-
-            try
-            {
-                return await client.GetResponseAsync(messages, options, ct);
-            }
-            catch (ClientResultException ex) when (ex.Status == 400)
-            {
-                lastError = ex;
-                var (dropTemperature, dropStructuredOutput) =
-                    DiagnoseUnsupportedOption(ex.Message, useTemperature, useStructuredOutput);
-
-                if (!dropTemperature && !dropStructuredOutput)
-                    throw;
-
-                useTemperature &= !dropTemperature;
-                useStructuredOutput &= !dropStructuredOutput;
-
-                logger.LogWarning(ex,
-                    "Payee resolution request was rejected (HTTP 400). Retrying with reduced options " +
-                    "(structuredOutput={UseStructuredOutput}, customTemperature={UseTemperature}).",
-                    useStructuredOutput, useTemperature);
-            }
-        }
-
-        throw lastError;
-    }
-
-    private static (bool DropTemperature, bool DropStructuredOutput) DiagnoseUnsupportedOption(
-        string? message, bool temperatureEnabled, bool structuredOutputEnabled)
-    {
-        var text = message ?? string.Empty;
-
-        var dropTemperature = temperatureEnabled &&
-            text.Contains("temperature", StringComparison.OrdinalIgnoreCase);
-        var dropStructuredOutput = structuredOutputEnabled &&
-            (text.Contains("response_format", StringComparison.OrdinalIgnoreCase)
-             || text.Contains("json_schema", StringComparison.OrdinalIgnoreCase)
-             || text.Contains("json schema", StringComparison.OrdinalIgnoreCase)
-             || text.Contains("structured output", StringComparison.OrdinalIgnoreCase));
-
-        return (dropTemperature, dropStructuredOutput);
     }
 
     private static string BuildSystemPrompt() =>

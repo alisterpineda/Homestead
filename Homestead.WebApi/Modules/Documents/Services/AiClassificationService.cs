@@ -1,4 +1,3 @@
-using System.ClientModel;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Homestead.WebApi.Infrastructure.Ai;
@@ -95,7 +94,11 @@ public class AiClassificationService(
 
         try
         {
-            var response = await GetResponseWithFallbackAsync(client, messages, scope, documentName, ct);
+            var response = await StructuredChatRequest.SendAsync(
+                client, messages, BuildResponseSchema(scope),
+                schemaName: "document_classification",
+                schemaDescription: "Structured classification of the document.",
+                Temperature, stream: false, $"Classification of document '{documentName}'", logger, ct);
             var content = response.Text;
 
             logger.LogTrace("Classification response:\n{Response}", content);
@@ -144,95 +147,6 @@ public class AiClassificationService(
             logger.LogError(ex, "AI classification failed for document '{Name}'", documentName);
             throw;
         }
-    }
-
-    // We send two options that not every model/endpoint accepts:
-    //   * strict structured outputs (a json_schema response format) — rejected by self-hosted runtimes and older deployments;
-    //   * a custom temperature of 0 — rejected by reasoning (o-series) models, which only allow the default.
-    // Either can come back as an HTTP 400. Rather than fail the classify, we read the error to see which parameter the
-    // model complained about and drop only that one, then retry — so a temperature objection keeps structured outputs
-    // and a schema objection keeps the deterministic temperature. A 400 that does NOT name one of our optional
-    // parameters (context-length, content filter, bad model, malformed request) is left alone and propagates with the
-    // real cause intact — we never silently re-issue an oversized/invalid request. Each retry disables a still-enabled
-    // option, so the loop makes at most three attempts before there is nothing left to relax.
-    private async Task<ChatResponse> GetResponseWithFallbackAsync(
-        IChatClient client, List<ChatMessage> messages, ClassificationScope scope, string documentName, CancellationToken ct)
-    {
-        // Hard cap: with two optional parameters we degrade at most twice, so success or a terminal throw is always
-        // reached within three attempts. The explicit bound guarantees the retry can never spin even if a future
-        // change breaks that invariant.
-        const int maxAttempts = 3;
-
-        var schema = BuildResponseSchema(scope);
-        var useStructuredOutput = true;
-        var useTemperature = true;
-        ClientResultException lastError = null!;
-
-        for (var attempt = 1; attempt <= maxAttempts; attempt++)
-        {
-            var options = new ChatOptions
-            {
-                Temperature = useTemperature ? Temperature : null,
-                ResponseFormat = useStructuredOutput
-                    ? ChatResponseFormat.ForJsonSchema(
-                        schema,
-                        schemaName: "document_classification",
-                        schemaDescription: "Structured classification of the document.")
-                    : ChatResponseFormat.Json,
-                // Microsoft.Extensions.AI only emits OpenAI's strict:true (which makes the schema *enforced* rather
-                // than advisory) when this flag is present — ForJsonSchema alone leaves it unset.
-                AdditionalProperties = useStructuredOutput
-                    ? new AdditionalPropertiesDictionary { ["strict"] = true }
-                    : null
-            };
-
-            try
-            {
-                return await client.GetResponseAsync(messages, options, ct);
-            }
-            catch (ClientResultException ex) when (ex.Status == 400)
-            {
-                lastError = ex;
-                var (dropTemperature, dropStructuredOutput) =
-                    DiagnoseUnsupportedOption(ex.Message, useTemperature, useStructuredOutput);
-
-                // The 400 doesn't implicate (a still-enabled) temperature or structured output — surface the real error.
-                if (!dropTemperature && !dropStructuredOutput)
-                    throw;
-
-                useTemperature &= !dropTemperature;
-                useStructuredOutput &= !dropStructuredOutput;
-
-                logger.LogWarning(ex,
-                    "Classification request was rejected (HTTP 400) for document '{Name}'. Retrying with reduced " +
-                    "options (structuredOutput={UseStructuredOutput}, customTemperature={UseTemperature}).",
-                    documentName, useStructuredOutput, useTemperature);
-            }
-        }
-
-        // Retry budget exhausted while still hitting degradable 400s — not expected given the invariant above, but
-        // surface the last error rather than looping further.
-        throw lastError;
-    }
-
-    // Reads a 400 message to decide which still-enabled option the model rejected. Returns a drop only when the
-    // message positively names that parameter (and only for options still enabled) — an unrecognised 400 returns
-    // (false, false), so the caller propagates it rather than blindly retrying a request that failed for some other
-    // reason. This is deliberately conservative: better to surface "context length exceeded" than to mask it.
-    private static (bool DropTemperature, bool DropStructuredOutput) DiagnoseUnsupportedOption(
-        string? message, bool temperatureEnabled, bool structuredOutputEnabled)
-    {
-        var text = message ?? string.Empty;
-
-        var dropTemperature = temperatureEnabled &&
-            text.Contains("temperature", StringComparison.OrdinalIgnoreCase);
-        var dropStructuredOutput = structuredOutputEnabled &&
-            (text.Contains("response_format", StringComparison.OrdinalIgnoreCase)
-             || text.Contains("json_schema", StringComparison.OrdinalIgnoreCase)
-             || text.Contains("json schema", StringComparison.OrdinalIgnoreCase)
-             || text.Contains("structured output", StringComparison.OrdinalIgnoreCase));
-
-        return (dropTemperature, dropStructuredOutput);
     }
 
     // Maps model-returned catalog positions back to ids against the same order we serialized into the prompt.

@@ -1,7 +1,9 @@
 using System.ClientModel;
 using System.ClientModel.Primitives;
 using System.Net;
+using Anthropic.Exceptions;
 using Azure;
+using Homestead.WebApi.Infrastructure.Ai;
 using Homestead.WebApi.Processing;
 using Microsoft.EntityFrameworkCore;
 using NSubstitute;
@@ -49,6 +51,31 @@ public class JobFailureClassifierTests
         response.Status.Returns(status);
 
         Assert.Equal(expected, JobFailureClassifier.IsTransient(new ClientResultException("x", response)));
+    }
+
+    [Fact]
+    public void AnthropicSdkFailures_AreClassifiedByStatus()
+    {
+        Assert.True(JobFailureClassifier.IsTransient(
+            new AnthropicRateLimitException { StatusCode = HttpStatusCode.TooManyRequests, ResponseBody = "" }));
+        Assert.True(JobFailureClassifier.IsTransient(
+            new Anthropic5xxException { StatusCode = HttpStatusCode.ServiceUnavailable, ResponseBody = "" }));
+        Assert.False(JobFailureClassifier.IsTransient(
+            new AnthropicBadRequestException { StatusCode = HttpStatusCode.BadRequest, ResponseBody = "" }));
+    }
+
+    [Fact]
+    public void AnAnthropicRequestThatGotNoAnswer_IsTransient()
+    {
+        Assert.True(JobFailureClassifier.IsTransient(
+            new AnthropicIOException("connection refused", new HttpRequestException("refused"))));
+    }
+
+    // A refusal or a cut-off reply is the model's answer, not a flaky transport — another attempt gets the same.
+    [Fact]
+    public void AnIncompleteModelReply_IsNot()
+    {
+        Assert.False(JobFailureClassifier.IsTransient(new AiResponseIncompleteException("declined")));
     }
 
     [Theory]

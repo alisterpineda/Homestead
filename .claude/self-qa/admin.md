@@ -15,6 +15,20 @@ AI / Backup).
 | `/admin/ai` | AiStatusComponent — read-only status of providers under `Ai:Providers` |
 | `/admin/backup` | BackupTargetListComponent — below |
 
+## AI (`/admin/ai`)
+
+- **No providers in the default stack.** Define them in AppHost user-secrets
+  (`Ai:Providers:{key}:Type|Endpoint|Model|ApiKey`, `Ai:DefaultProvider`), then do a full
+  `aspire stop` + `aspire start` to pick them up. Record the `Ai:*` secrets first and restore them after.
+  A dummy ApiKey is enough to render a configured card; don't press **Test connection** with one.
+- **No test ids:** match by text.
+- Card per provider: type label (`OpenAI-compatible` / `Azure AI Foundry` / `Anthropic`), "Default" and
+  "Configured" / "Not configured" badges, then Endpoint / Model / API key / Max input rows. A null endpoint
+  (Anthropic without an override) reads a muted **"SDK default"**.
+- Conditional states: the empty state (no providers; names `Ai:Providers` / `Ai:DefaultProvider`); the
+  red "No default provider is selected" warning (two or more providers and no `Ai:DefaultProvider`); and
+  an unavailable provider's reason in red (e.g. "ApiKey is required."), with its Test connection disabled.
+
 ## Backup (`/admin/backup`)
 
 > **Drive targets are not reachable in the default stack.** `Homestead.AppHost` hard-codes exactly one

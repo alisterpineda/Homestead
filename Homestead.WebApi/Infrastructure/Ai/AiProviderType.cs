@@ -11,5 +11,9 @@ public enum AiProviderType
     // An Azure AI Foundry (Azure OpenAI) resource. Endpoint is the resource endpoint, Model is the
     // DEPLOYMENT name, and ApiKey is required — the Azure client sends it as the api-key header and
     // negotiates the api-version, which the plain OpenAI client gets wrong against Azure.
-    AzureFoundry
+    AzureFoundry,
+
+    // The Claude API through the official Anthropic SDK. Endpoint is an optional base-URL override (the SDK
+    // default otherwise), Model is a Claude model ID (e.g. "claude-opus-5-5"), and ApiKey is required.
+    Anthropic
 }

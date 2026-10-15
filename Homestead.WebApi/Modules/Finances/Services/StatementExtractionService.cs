@@ -1,4 +1,3 @@
-using System.ClientModel;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Homestead.WebApi.Infrastructure.Ai;
@@ -8,13 +7,11 @@ using Microsoft.Extensions.AI;
 namespace Homestead.WebApi.Modules.Finances.Services;
 
 /// <summary>
-/// AI-backed statement header extractor. Reuses the strict structured-output pattern proven in
-/// <c>AiClassificationService</c> (json_schema response format + <c>strict:true</c>, temperature 0, and the
-/// HTTP-400 degradation ladder) but with a statement-specific, header-only schema and — critically — the
-/// FULL extracted text rather than the classification head+tail sample (a statement's closing balance can
-/// sit anywhere). The ~50 lines of schema/fallback plumbing are intentionally duplicated here rather than
-/// shared, to keep zero regression risk on classification; a shared Infrastructure/Ai helper is an optional
-/// follow-up.
+/// AI-backed statement header extractor. Sends its request through the shared
+/// <see cref="StructuredChatRequest"/> path (json_schema response format + <c>strict:true</c>, temperature 0,
+/// and the HTTP-400 degradation ladder) with a statement-specific schema and — critically — the FULL
+/// extracted text rather than the classification head+tail sample (a statement's closing balance can sit
+/// anywhere).
 /// </summary>
 public class StatementExtractionService(
     IAiProviderResolver providerResolver,
@@ -57,7 +54,12 @@ public class StatementExtractionService(
         logger.LogTrace("Statement extraction system prompt:\n{SystemPrompt}", systemPrompt);
         logger.LogTrace("Statement extraction user message:\n{UserMessage}", userMessage);
 
-        var response = await GetResponseWithFallbackAsync(client, messages, ct);
+        // Streamed: line-item output grows with the transaction count (see StructuredChatRequest).
+        var response = await StructuredChatRequest.SendAsync(
+            client, messages, BuildResponseSchema(),
+            schemaName: "statement_extraction",
+            schemaDescription: "Structured header of a parsed account statement.",
+            Temperature, stream: true, "Statement extraction", logger, ct);
         var content = response.Text;
 
         logger.LogTrace("Statement extraction response:\n{Response}", content);
@@ -86,86 +88,6 @@ public class StatementExtractionService(
         }
 
         return MapToIr(parsed);
-    }
-
-    // Mirrors AiClassificationService.GetResponseWithFallbackAsync: we send strict structured outputs and a
-    // custom temperature of 0, either of which some endpoints reject with an HTTP 400. Read the error, drop
-    // only the implicated option, and retry — a 400 that names neither propagates unchanged.
-    private async Task<ChatResponse> GetResponseWithFallbackAsync(
-        IChatClient client, List<ChatMessage> messages, CancellationToken ct)
-    {
-        const int maxAttempts = 3;
-
-        var schema = BuildResponseSchema();
-        var useStructuredOutput = true;
-        var useTemperature = true;
-        ClientResultException lastError = null!;
-
-        for (var attempt = 1; attempt <= maxAttempts; attempt++)
-        {
-            var chatOptions = new ChatOptions
-            {
-                Temperature = useTemperature ? Temperature : null,
-                ResponseFormat = useStructuredOutput
-                    ? ChatResponseFormat.ForJsonSchema(
-                        schema,
-                        schemaName: "statement_extraction",
-                        schemaDescription: "Structured header of a parsed account statement.")
-                    : ChatResponseFormat.Json,
-                // M.E.AI only emits OpenAI's strict:true (schema *enforced* rather than advisory) when this
-                // flag is present — ForJsonSchema alone leaves it unset.
-                AdditionalProperties = useStructuredOutput
-                    ? new AdditionalPropertiesDictionary { ["strict"] = true }
-                    : null
-            };
-
-            try
-            {
-                // Streamed to defeat a timeout, not to consume tokens incrementally: line-item output grows
-                // with the transaction count, and the buffered path downloads the whole body under a single
-                // 100s NetworkTimeout. Streaming makes that timeout per-read, so a long parse survives.
-                return await client.GetStreamingResponseAsync(messages, chatOptions, ct)
-                    .ToChatResponseAsync(ct);
-            }
-            catch (ClientResultException ex) when (ex.Status == 400)
-            {
-                lastError = ex;
-                var (dropTemperature, dropStructuredOutput) =
-                    DiagnoseUnsupportedOption(ex.Message, useTemperature, useStructuredOutput);
-
-                if (!dropTemperature && !dropStructuredOutput)
-                    throw;
-
-                useTemperature &= !dropTemperature;
-                useStructuredOutput &= !dropStructuredOutput;
-
-                logger.LogWarning(ex,
-                    "Statement extraction request was rejected (HTTP 400). Retrying with reduced options " +
-                    "(structuredOutput={UseStructuredOutput}, customTemperature={UseTemperature}).",
-                    useStructuredOutput, useTemperature);
-            }
-        }
-
-        throw lastError;
-    }
-
-    // Reads a 400 message to decide which still-enabled option the model rejected. Conservative: returns a
-    // drop only when the message positively names that (still-enabled) parameter; an unrecognised 400
-    // returns (false, false) so the caller propagates the real cause.
-    private static (bool DropTemperature, bool DropStructuredOutput) DiagnoseUnsupportedOption(
-        string? message, bool temperatureEnabled, bool structuredOutputEnabled)
-    {
-        var text = message ?? string.Empty;
-
-        var dropTemperature = temperatureEnabled &&
-            text.Contains("temperature", StringComparison.OrdinalIgnoreCase);
-        var dropStructuredOutput = structuredOutputEnabled &&
-            (text.Contains("response_format", StringComparison.OrdinalIgnoreCase)
-             || text.Contains("json_schema", StringComparison.OrdinalIgnoreCase)
-             || text.Contains("json schema", StringComparison.OrdinalIgnoreCase)
-             || text.Contains("structured output", StringComparison.OrdinalIgnoreCase));
-
-        return (dropTemperature, dropStructuredOutput);
     }
 
     private static string BuildSystemPrompt() =>
@@ -284,10 +206,14 @@ public class StatementExtractionService(
                     ["date"] = Nullable("string"),
                     ["description"] = Nullable("string"),
                     ["amount"] = Nullable("number"),
+                    // A nullable enum as anyOf, not ["string","null"] + an enum holding null: Anthropic's
+                    // validator rejects the latter ("Enum value 'out' does not match declared type"), and
+                    // anyOf is equally valid under OpenAI strict mode.
                     ["direction"] = new JsonObject
                     {
-                        ["type"] = new JsonArray("string", "null"),
-                        ["enum"] = new JsonArray("out", "in", null),
+                        ["anyOf"] = new JsonArray(
+                            new JsonObject { ["type"] = "string", ["enum"] = new JsonArray("out", "in") },
+                            new JsonObject { ["type"] = "null" }),
                     },
                     ["runningBalance"] = Nullable("number"),
                 },

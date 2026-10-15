@@ -1,6 +1,6 @@
-using System.ClientModel;
 using System.Net;
 using Azure;
+using Homestead.WebApi.Infrastructure.Ai;
 using Npgsql;
 using Polly;
 
@@ -44,8 +44,10 @@ public static class JobFailureClassifier
         HttpRequestException { StatusCode: null } => true,
         HttpRequestException { StatusCode: { } status } => IsTransientStatus((int)status),
 
-        // The OpenAI / Azure OpenAI SDKs. Status 0 is the same "no answer at all" as above.
-        ClientResultException { Status: var status } => status == 0 || IsTransientStatus(status),
+        // AI provider SDKs (OpenAI / Azure OpenAI, Anthropic), read through the one mapping that knows their
+        // exception types. Status 0 is the same "no answer at all" as above.
+        _ when AiProviderErrors.TryGetStatus(exception, out var status, out _) =>
+            status == 0 || IsTransientStatus(status),
 
         // Azure SDKs (Document Intelligence).
         RequestFailedException { Status: var status } => status == 0 || IsTransientStatus(status),

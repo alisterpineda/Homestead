@@ -125,10 +125,10 @@ AI-assisted document classification/summarization and statement parsing are opti
 
 | Variable | Default | Description |
 |---|---|---|
-| `Ai__Providers__{name}__Type` | — | **Required** for every provider: `OpenAiCompatible` or `AzureFoundry` |
-| `Ai__Providers__{name}__Endpoint` | — | OpenAI-compatible base URL (e.g. `http://localhost:11434/v1`) or the Azure resource endpoint (e.g. `https://<res>.openai.azure.com`) |
-| `Ai__Providers__{name}__Model` | — | Model tag (e.g. `gemma-4-e4b`) or the Azure **deployment name** |
-| `Ai__Providers__{name}__ApiKey` | — | API key; optional for `OpenAiCompatible` (ignored by Ollama), **required** for `AzureFoundry` |
+| `Ai__Providers__{name}__Type` | — | **Required** for every provider: `OpenAiCompatible`, `AzureFoundry` or `Anthropic` |
+| `Ai__Providers__{name}__Endpoint` | — | OpenAI-compatible base URL (e.g. `http://localhost:11434/v1`) or the Azure resource endpoint (e.g. `https://<res>.openai.azure.com`); optional for `Anthropic` (overrides the Claude API base URL) |
+| `Ai__Providers__{name}__Model` | — | Model tag (e.g. `gemma-4-e4b`), the Azure **deployment name**, or a Claude model ID (e.g. `claude-opus-5-5`) |
+| `Ai__Providers__{name}__ApiKey` | — | API key; optional for `OpenAiCompatible` (ignored by Ollama), **required** for `AzureFoundry` and `Anthropic` |
 | `Ai__Providers__{name}__ImageInput` | `true` | Attach a rendered page-1 image to classify/parse calls (turn off for text-only models) |
 | `Ai__Providers__{name}__ImageRenderMaxEdge` | `1024` | Long-edge pixel budget for that page render (256–4096) |
 | `Ai__Providers__{name}__MaxInputChars` | `12000` | Character budget for document text in the classification prompt |
@@ -149,6 +149,10 @@ dotnet user-secrets set "Ai:Providers:local:Model" "gemma-4-e4b"
 # dotnet user-secrets set "Ai:Providers:foundry:Endpoint" "https://<res>.openai.azure.com"
 # dotnet user-secrets set "Ai:Providers:foundry:ApiKey" "<key>"
 # dotnet user-secrets set "Ai:Providers:foundry:Model" "<deployment-name>"
+# or the Claude API (Anthropic):
+# dotnet user-secrets set "Ai:Providers:claude:Type" "Anthropic"
+# dotnet user-secrets set "Ai:Providers:claude:Model" "claude-opus-5-5"
+# dotnet user-secrets set "Ai:Providers:claude:ApiKey" "<key>"
 dotnet user-secrets set "Ai:DefaultProvider" "local"
 ```
 

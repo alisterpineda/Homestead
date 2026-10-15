@@ -16,13 +16,15 @@ public class AiProviderOptions
 
     // OpenAiCompatible: the API base URL, e.g. http://homeserver:11434/v1.
     // AzureFoundry: the resource endpoint, e.g. https://my-resource.openai.azure.com.
+    // Anthropic: optional base-URL override; blank uses the SDK default (the Claude API).
     public string? Endpoint { get; set; }
 
     // OpenAiCompatible: the model tag, e.g. "gemma-4-e4b". AzureFoundry: the DEPLOYMENT name.
+    // Anthropic: the Claude model ID, e.g. "claude-opus-5-5".
     public string? Model { get; set; }
 
     // Optional for OpenAiCompatible (Ollama ignores it; a dummy key is substituted when blank).
-    // Required for AzureFoundry.
+    // Required for AzureFoundry and Anthropic.
     public string? ApiKey { get; set; }
 
     // --- Per-call knobs. Model/endpoint traits, so they live on the provider, not the app. ---

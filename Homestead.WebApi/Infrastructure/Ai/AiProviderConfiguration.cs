@@ -35,6 +35,7 @@ public static class AiProviderConfiguration
     {
         AiProviderType.OpenAiCompatible => ValidateOpenAiCompatible(options),
         AiProviderType.AzureFoundry => ValidateAzureFoundry(options),
+        AiProviderType.Anthropic => ValidateAnthropic(options),
         // Refuse rather than defaulting to OpenAiCompatible, which would silently run the wrong protocol
         // under the operator's chosen name.
         null => $"Type is required (one of: {string.Join(", ", Enum.GetNames<AiProviderType>())}).",
@@ -72,16 +73,33 @@ public static class AiProviderConfiguration
         return null;
     }
 
-    // Every provider type needs a present, absolute endpoint. The absolute-URI check is a small deliberate
-    // upgrade over the old flat AiOptions probe: a malformed endpoint used to pass IsConfigured and only
-    // blow up when the client was built. Nothing legal is rejected — both clients require an absolute URI.
+    private static string? ValidateAnthropic(AiProviderOptions options)
+    {
+        // The endpoint is only an override of the SDK's default base URL, so blank is fine; a value that is
+        // set must still be usable as one.
+        if (!string.IsNullOrWhiteSpace(options.Endpoint) && !IsAbsoluteUri(options.Endpoint))
+            return "Endpoint must be an absolute URI.";
+        if (string.IsNullOrWhiteSpace(options.ApiKey))
+            return "ApiKey is required.";
+        if (string.IsNullOrWhiteSpace(options.Model))
+            return "Model is required.";
+
+        return null;
+    }
+
+    // The OpenAI-based provider types need a present, absolute endpoint (Anthropic only checks the shape of
+    // one it is given). The absolute-URI check is a small deliberate upgrade over the old flat AiOptions
+    // probe: a malformed endpoint used to pass IsConfigured and only blow up when the client was built.
+    // Nothing legal is rejected — both clients require an absolute URI.
     private static string? ValidateEndpoint(AiProviderOptions options)
     {
         if (string.IsNullOrWhiteSpace(options.Endpoint))
             return "Endpoint is required.";
-        if (!Uri.TryCreate(options.Endpoint, UriKind.Absolute, out _))
+        if (!IsAbsoluteUri(options.Endpoint))
             return "Endpoint must be an absolute URI.";
 
         return null;
     }
+
+    private static bool IsAbsoluteUri(string value) => Uri.TryCreate(value, UriKind.Absolute, out _);
 }

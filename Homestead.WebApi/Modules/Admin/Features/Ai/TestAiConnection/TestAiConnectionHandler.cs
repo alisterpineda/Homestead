@@ -42,11 +42,14 @@ public class TestAiConnectionHandler(IAiProviderResolver providerResolver)
             // still surface as Success=false rather than escaping as an unhandled 500.
             var client = provider.GetChatClient();
 
-            // Deliberately uncapped, matching the production paths (classification and statement
+            // The caller deliberately sets no cap, matching the production paths (classification and statement
             // extraction set no MaxOutputTokens either): Azure reasoning deployments (observed with a real
             // gpt-5.4) reject a cap the reasoning burn + reply can't fit in with an HTTP 400 instead of
             // truncating, so ANY fixed cap can misreport a working deployment as broken. The model stops at
             // EOS after a short answer to "ping", and ProbeTimeout bounds a genuinely runaway response.
+            // (An Anthropic provider still sends a cap — the Claude API requires one: this buffered probe gets
+            // AnthropicChatOptionsClient.NonStreamingMaxOutputTokens, as classification and payee resolution do;
+            // streamed statement extraction gets the larger StreamingMaxOutputTokens.)
             await client.GetResponseAsync(
                 [new ChatMessage(ChatRole.User, "ping")],
                 options: null,

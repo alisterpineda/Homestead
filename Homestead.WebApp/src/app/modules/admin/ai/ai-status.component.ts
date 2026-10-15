@@ -94,7 +94,12 @@ import type { TestAiConnectionResponse } from '@/api/generated/models/test-ai-co
                     <div class="flex flex-col">
                       <div class="flex items-center gap-3 py-1">
                         <span class="w-32 shrink-0 text-sm text-muted-foreground">Endpoint</span>
-                        <span class="min-w-0 flex-1 truncate font-mono text-sm" [title]="p.endpoint ?? ''">{{ p.endpoint }}</span>
+                        @if (p.endpoint) {
+                          <span class="min-w-0 flex-1 truncate font-mono text-sm" [title]="p.endpoint">{{ p.endpoint }}</span>
+                        } @else {
+                          <!-- An Anthropic provider without an Endpoint override uses the SDK's own base URL. -->
+                          <span class="flex-1 text-sm text-muted-foreground">SDK default</span>
+                        }
                       </div>
                       <div class="flex items-center gap-3 py-1">
                         <span class="w-32 shrink-0 text-sm text-muted-foreground">Model</span>
@@ -171,6 +176,7 @@ export class AiStatusComponent implements OnInit {
     switch (type) {
       case 'OpenAiCompatible': return 'OpenAI-compatible';
       case 'AzureFoundry': return 'Azure AI Foundry';
+      case 'Anthropic': return 'Anthropic';
       default: return 'Unknown type';
     }
   }

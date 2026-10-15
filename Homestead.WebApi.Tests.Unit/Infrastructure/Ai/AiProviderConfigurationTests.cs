@@ -70,7 +70,7 @@ public class AiProviderConfigurationTests
             Model = "gemma-4-e4b",
         });
 
-        Assert.Equal("Type is required (one of: OpenAiCompatible, AzureFoundry).", error);
+        Assert.Equal("Type is required (one of: OpenAiCompatible, AzureFoundry, Anthropic).", error);
     }
 
     [Theory]
@@ -119,6 +119,41 @@ public class AiProviderConfigurationTests
         });
 
         Assert.Equal(expected, error);
+    }
+
+    [Theory]
+    [InlineData("not-a-uri", "k", "m", "Endpoint must be an absolute URI.")]
+    [InlineData(null, null, "m", "ApiKey is required.")]
+    [InlineData(null, "   ", "m", "ApiKey is required.")]
+    [InlineData(null, "k", null, "Model is required.")]
+    public void Validate_IncompleteAnthropic_ReportsReason(
+        string? endpoint, string? apiKey, string? model, string expected)
+    {
+        var error = AiProviderConfiguration.Validate("claude", new AiProviderOptions
+        {
+            Type = AiProviderType.Anthropic,
+            Endpoint = endpoint,
+            ApiKey = apiKey,
+            Model = model,
+        });
+
+        Assert.Equal(expected, error);
+    }
+
+    // Endpoint only overrides the SDK's default base URL, so Anthropic is usable without one.
+    [Theory]
+    [InlineData(null)]
+    [InlineData("   ")]
+    [InlineData("https://gateway.example.com")]
+    public void Validate_AnthropicEndpointIsOptional(string? endpoint)
+    {
+        Assert.Null(AiProviderConfiguration.Validate("claude", new AiProviderOptions
+        {
+            Type = AiProviderType.Anthropic,
+            Endpoint = endpoint,
+            ApiKey = "k",
+            Model = "claude-opus-5-5",
+        }));
     }
 
     [Fact]
