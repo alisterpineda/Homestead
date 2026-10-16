@@ -114,6 +114,61 @@ public class GetAiStatusHandlerTests
         Assert.Equal(AiProviderOptions.DefaultMaxInputChars, Assert.Single(result).MaxInputChars);
     }
 
+    // The request-shaping knobs are reported as configured, not resolved: a set Temperature/StructuredOutput
+    // comes through verbatim, and an unset Temperature stays null ("not sent" — the page shows "model
+    // default") with StructuredOutput defaulting on.
+    [Fact]
+    public async Task RequestKnobs_ReportedAsConfigured()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var sut = Sut([
+            Provider("tuned", new AiProviderOptions
+            {
+                Type = AiProviderType.OpenAiCompatible,
+                Endpoint = "http://homeserver:11434/v1",
+                Model = "gemma-4-e4b",
+                Temperature = 0.3f,
+                StructuredOutput = false,
+            }),
+            Provider("untuned"),
+        ]);
+
+        var result = await sut.HandleAsync(ct);
+
+        var tuned = result.Single(r => r.Key == "tuned");
+        Assert.Equal(0.3f, tuned.Temperature);
+        Assert.False(tuned.StructuredOutput);
+        var untuned = result.Single(r => r.Key == "untuned");
+        Assert.Null(untuned.Temperature);
+        Assert.True(untuned.StructuredOutput);
+    }
+
+    // A bound "NaN" or "Infinity" fails validation, and the response says so — but the number itself is left
+    // out: System.Text.Json refuses to write a non-finite float under the app's strict number handling, which
+    // would turn the status page into a 500 for every provider instead of one unavailable row.
+    [Theory]
+    [InlineData(float.NaN)]
+    [InlineData(float.PositiveInfinity)]
+    public async Task NonFiniteTemperature_IsReportedAsNull_WithTheValidationError(float temperature)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var sut = Sut([
+            Provider("broken", new AiProviderOptions
+            {
+                Type = AiProviderType.OpenAiCompatible,
+                Endpoint = "http://homeserver:11434/v1",
+                Model = "gemma-4-e4b",
+                Temperature = temperature,
+            }),
+        ]);
+
+        var broken = Assert.Single(await sut.HandleAsync(ct));
+
+        Assert.Null(broken.Temperature);
+        Assert.False(broken.IsConfigured);
+        Assert.Equal("Temperature must be between 0 and 2.", broken.ConfigurationError);
+    }
+
     // The contract the frontend's "no default selected" warning relies on: multiple providers with no
     // default key produce a list where NOTHING is marked default (and no synthetic row is appended).
     [Fact]

@@ -59,6 +59,87 @@ public class AiProviderConfigurationTests
         Assert.Equal(20_000, options.MaxInputChars);
     }
 
+    // The two request-shaping knobs: an operator states what the endpoint accepts, once, in config.
+    [Fact]
+    public void ReadProviders_TemperatureAndStructuredOutput_Bind()
+    {
+        var providers = AiProviderConfiguration.ReadProviders(Config(new()
+        {
+            ["Ai:Providers:local:Type"] = "OpenAiCompatible",
+            ["Ai:Providers:local:Endpoint"] = "http://homeserver:11434/v1",
+            ["Ai:Providers:local:Model"] = "gemma-4-e4b",
+            ["Ai:Providers:local:Temperature"] = "0",
+            ["Ai:Providers:local:StructuredOutput"] = "false",
+        }));
+
+        var (_, options) = Assert.Single(providers);
+        Assert.Equal(0f, options.Temperature);
+        Assert.False(options.StructuredOutput);
+    }
+
+    // Unset Temperature means "don't send one" (the model's default); unset StructuredOutput means the
+    // endpoint takes a json_schema response format, which most current runtimes do.
+    [Fact]
+    public void ReadProviders_TemperatureAndStructuredOutputAbsent_AreNullAndTrue()
+    {
+        var providers = AiProviderConfiguration.ReadProviders(Config(new()
+        {
+            ["Ai:Providers:claude:Type"] = "Anthropic",
+            ["Ai:Providers:claude:ApiKey"] = "k",
+            ["Ai:Providers:claude:Model"] = "claude-opus-5-5",
+        }));
+
+        var (_, options) = Assert.Single(providers);
+        Assert.Null(options.Temperature);
+        Assert.True(options.StructuredOutput);
+    }
+
+    private static AiProviderOptions ValidOfType(AiProviderType type) => type switch
+    {
+        AiProviderType.OpenAiCompatible => new() { Type = type, Endpoint = "http://homeserver:11434/v1", Model = "m" },
+        AiProviderType.AzureFoundry => new() { Type = type, Endpoint = "https://res.openai.azure.com", ApiKey = "k", Model = "m" },
+        _ => new() { Type = type, ApiKey = "k", Model = "m" },
+    };
+
+    // A value outside the range the provider's API documents (0–2 for the OpenAI-style APIs, 0–1 for Anthropic)
+    // is a typo, and would only surface as a 400 at first use. The message names the range that applies.
+    [Theory]
+    [InlineData(AiProviderType.OpenAiCompatible, -0.1f, "2")]
+    [InlineData(AiProviderType.OpenAiCompatible, 2.1f, "2")]
+    [InlineData(AiProviderType.AzureFoundry, -1f, "2")]
+    [InlineData(AiProviderType.AzureFoundry, 20f, "2")]
+    [InlineData(AiProviderType.Anthropic, -0.5f, "1")]
+    [InlineData(AiProviderType.Anthropic, 1.5f, "1")]
+    [InlineData(AiProviderType.Anthropic, 3f, "1")]
+    [InlineData(AiProviderType.OpenAiCompatible, float.NaN, "2")]
+    [InlineData(AiProviderType.Anthropic, float.NaN, "1")]
+    public void Validate_TemperatureOutOfRange_ReportsReason(AiProviderType type, float temperature, string max)
+    {
+        var options = ValidOfType(type);
+        options.Temperature = temperature;
+
+        Assert.Equal($"Temperature must be between 0 and {max}.", AiProviderConfiguration.Validate("p", options));
+    }
+
+    // In range (both bounds inclusive) or unset is fine for every type — Anthropic included, within its 0–1:
+    // some Claude models accept a temperature, and one that doesn't fails loudly at "Test connection" with the
+    // provider's message.
+    [Theory]
+    [InlineData(AiProviderType.OpenAiCompatible, null)]
+    [InlineData(AiProviderType.OpenAiCompatible, 0f)]
+    [InlineData(AiProviderType.OpenAiCompatible, 2f)]
+    [InlineData(AiProviderType.AzureFoundry, 1f)]
+    [InlineData(AiProviderType.Anthropic, null)]
+    [InlineData(AiProviderType.Anthropic, 0f)]
+    [InlineData(AiProviderType.Anthropic, 1f)]
+    public void Validate_TemperatureInRangeOrUnset_IsValid_ForEveryType(AiProviderType type, float? temperature)
+    {
+        var options = ValidOfType(type);
+        options.Temperature = temperature;
+
+        Assert.Null(AiProviderConfiguration.Validate("p", options));
+    }
+
     // No built-in key means no implied type anywhere: EVERY provider must state its Type, or it reads as
     // unavailable rather than silently binding to default(0) = OpenAiCompatible under the operator's name.
     [Fact]

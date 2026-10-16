@@ -23,7 +23,7 @@ public class AiProviderErrorsTests
         Assert.Contains("json_schema", message);
     }
 
-    // The message carries the response body — that is what the fallback ladder reads.
+    // The message carries the response body — the provider's own account of what it rejected.
     [Fact]
     public void AnthropicBadRequest_ReportsStatusAndBody()
     {

@@ -4,8 +4,9 @@ using Anthropic.Exceptions;
 namespace Homestead.WebApi.Infrastructure.Ai;
 
 // The one place that knows each provider SDK's exception types. Microsoft.Extensions.AI has no common
-// exception, so every SDK throws its own; callers (the structured-output fallback ladder, the job retry
-// classifier) ask here instead of naming SDK types. A new provider type adds its SDK here and nowhere else.
+// exception, so every SDK throws its own; callers (the job retry classifier, which reads the status, and the
+// connection probe, which shows the message) ask here instead of naming SDK types. A new provider type adds
+// its SDK here and nowhere else.
 public static class AiProviderErrors
 {
     // The HTTP status (0 = the request got no answer at all) and message of an exception thrown by a

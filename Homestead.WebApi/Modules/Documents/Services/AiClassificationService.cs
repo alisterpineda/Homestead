@@ -29,10 +29,6 @@ public class AiClassificationService(
     // the gap as if it were contiguous. Only present when truncation actually occurred.
     private const string ElisionMarker = "\n\n[...document text omitted...]\n\n";
 
-    // Extraction/classification is essentially deterministic — pin sampling to 0 so runs are stable
-    // and prompt changes are measurable rather than lost in run-to-run variance.
-    private const float Temperature = 0f;
-
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     public async Task<ClassificationResult?> ClassifyAsync(
@@ -98,7 +94,7 @@ public class AiClassificationService(
                 client, messages, BuildResponseSchema(scope),
                 schemaName: "document_classification",
                 schemaDescription: "Structured classification of the document.",
-                Temperature, stream: false, $"Classification of document '{documentName}'", logger, ct);
+                stream: false, $"Classification of document '{documentName}'", ct);
             var content = response.Text;
 
             logger.LogTrace("Classification response:\n{Response}", content);
@@ -164,8 +160,8 @@ public class AiClassificationService(
 
     // The system prompt is assembled from fragments so it describes only the in-scope fields: each field
     // contributes one numbered instruction, one JSON-schema line, and any guardrail rules. The schema-by-example
-    // block and "valid JSON only" rule are retained deliberately — they are what the JSON-mode fallback relies
-    // on when a provider can't honour the structured-output schema.
+    // block and "valid JSON only" rule are retained deliberately — they are all a provider configured
+    // StructuredOutput=false has to go on, since its request carries JSON mode instead of the enforced schema.
     private static string BuildSystemPrompt(ClassificationScope scope)
     {
         var instructions = new List<string>();

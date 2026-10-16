@@ -8,7 +8,7 @@ namespace Homestead.WebApi.Modules.Finances.Services;
 
 /// <summary>
 /// AI payee resolver — tiers ②/③. Mirrors <c>AiClassificationService</c>: index-referenced catalog, strict
-/// structured output with a 400-degradation ladder (<see cref="StructuredChatRequest"/>), temperature 0.
+/// structured output, one attempt (<see cref="StructuredChatRequest"/>).
 /// Deliberately small and non-streaming; the
 /// long statement-extraction call is a different service and stays streaming.
 /// </summary>
@@ -16,9 +16,6 @@ public class PayeeResolutionService(
     IAiProviderResolver providerResolver, ILogger<PayeeResolutionService> logger)
     : IPayeeResolutionService
 {
-    // Deterministic resolution — pin sampling to 0 so runs are stable (see AiClassificationService).
-    private const float Temperature = 0f;
-
     // A proposed new payee name is capped to the Payee.Name column length.
     private const int MaxNewPayeeNameLength = 128;
 
@@ -62,7 +59,7 @@ public class PayeeResolutionService(
                 client, messages, ResponseSchema,
                 schemaName: "payee_resolution",
                 schemaDescription: "Payee suggestions for statement lines.",
-                Temperature, stream: false, "Payee resolution", logger, ct);
+                stream: false, "Payee resolution", ct);
             var content = response.Text;
 
             logger.LogTrace("Payee resolution response:\n{Response}", content);
@@ -73,8 +70,8 @@ public class PayeeResolutionService(
                 return new Dictionary<int, PayeeResolution>();
             }
 
-            // An explicit "results": null (only possible once the ladder fell back to unenforced JSON) overrides
-            // the initializer, hence the check on Results too.
+            // An explicit "results": null (possible only on a provider configured StructuredOutput=false, where the
+            // schema isn't enforced) overrides the initializer, hence the check on Results too.
             var parsed = JsonSerializer.Deserialize<ResolutionResponse>(content, JsonOptions);
             if (parsed?.Results is null)
             {
@@ -182,9 +179,9 @@ public class PayeeResolutionService(
 
     // PayeeIndex is a plain int: the schema says non-null integer, and [Required] on an int? would still
     // generate a nullable type. [JsonRequired] makes a missing key throw too; otherwise an int would default to 0
-    // and silently match the first catalog payee. A null or missing index can only arrive after the ladder's
-    // plain-JSON fallback. The deserializer then throws for the whole reply, so the batch gets no AI suggestions,
-    // where the old int? fell back to that line's newPayeeName.
+    // and silently match the first catalog payee. A null or missing index can only arrive from a provider
+    // configured StructuredOutput=false (plain JSON mode, schema unenforced). The deserializer then throws for the
+    // whole reply, so the batch gets no AI suggestions, where the old int? fell back to that line's newPayeeName.
     private sealed class ResolutionItem
     {
         [JsonRequired]

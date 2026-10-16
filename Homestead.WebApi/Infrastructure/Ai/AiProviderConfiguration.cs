@@ -31,7 +31,11 @@ public static class AiProviderConfiguration
     }
 
     // Returns null when the instance is usable, else a human-readable reason shown on the admin status page.
-    public static string? Validate(string key, AiProviderOptions options) => options.Type switch
+    // The per-type connection fields are checked first, then the per-call knobs every type shares.
+    public static string? Validate(string key, AiProviderOptions options) =>
+        ValidateType(options) ?? ValidateKnobs(options);
+
+    private static string? ValidateType(AiProviderOptions options) => options.Type switch
     {
         AiProviderType.OpenAiCompatible => ValidateOpenAiCompatible(options),
         AiProviderType.AzureFoundry => ValidateAzureFoundry(options),
@@ -41,6 +45,20 @@ public static class AiProviderConfiguration
         null => $"Type is required (one of: {string.Join(", ", Enum.GetNames<AiProviderType>())}).",
         var type => $"Unknown provider type '{type}'."
     };
+
+    // Temperature: refused outside the range the provider's API documents — 0–2 for the OpenAI-style APIs, 0–1
+    // for Anthropic's Messages API — so a typo fails at startup instead of as a provider 400 at first use. Only
+    // the range is checked: whether a given model accepts a temperature at all (current Claude models don't;
+    // some older ones do) is a (provider, model) fact config can't know, and "Test connection" reports it with
+    // the provider's own message. Written as "not inside" rather than "below or above" so a bound "NaN" is
+    // refused too. Runs after the per-type check, so Type is a known value here.
+    private static string? ValidateKnobs(AiProviderOptions options)
+    {
+        if (options.Temperature is not { } t)
+            return null;
+        var max = options.Type == AiProviderType.Anthropic ? 1f : 2f;
+        return !(t >= 0f && t <= max) ? $"Temperature must be between 0 and {max}." : null;
+    }
 
     // The key side of the resolution chain (no explicit request): the configured default when set — returned
     // VERBATIM even when it names no defined provider, because turning a dangling default into

@@ -9,15 +9,15 @@ using System.Text.Json.Nodes;
 using Anthropic.Exceptions;
 using Homestead.WebApi.Infrastructure.Ai;
 using Microsoft.Extensions.AI;
-using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 
 namespace Homestead.WebApi.Tests.Unit.Infrastructure.Ai;
 
-// The service-level ladder tests (AiClassificationServiceTests) cover the OpenAI SDK's 400 through a real
-// service; these cover the provider-neutral parts: Anthropic's 400s, its parameter names, and the
-// completeness check on a successful reply.
+// The provider-neutral request path: what it asks for (the strict schema, no temperature), that it makes one
+// attempt and lets every provider error through untouched (Anthropic's and the OpenAI SDK's alike), and the
+// completeness check on a successful reply. What the provider pipeline then does to those options is
+// AiProviderTests' concern.
 public class StructuredChatRequestTests
 {
     private readonly IChatClient _client = Substitute.For<IChatClient>();
@@ -31,7 +31,7 @@ public class StructuredChatRequestTests
 
     private Task<ChatResponse> Send(bool stream = false) => StructuredChatRequest.SendAsync(
         _client, [new ChatMessage(ChatRole.User, "hi")], Schema, "test_schema", "A test schema.",
-        temperature: 0f, stream, "Test request", NullLogger.Instance, TestContext.Current.CancellationToken);
+        stream, "Test request", TestContext.Current.CancellationToken);
 
     private static ChatResponse Reply(string text = """{"title":"x"}""", ChatFinishReason? finishReason = null) =>
         new(new ChatMessage(ChatRole.Assistant, text)) { FinishReason = finishReason };
@@ -40,48 +40,42 @@ public class StructuredChatRequestTests
     private static AnthropicBadRequestException AnthropicBadRequest(string body) =>
         new() { StatusCode = HttpStatusCode.BadRequest, ResponseBody = body };
 
-    private static bool IsStructuredOutput(ChatOptions o) =>
-        o.ResponseFormat is ChatResponseFormatJson { Schema: not null };
-
-    private static bool IsJsonMode(ChatOptions o) =>
-        o.ResponseFormat is ChatResponseFormatJson { Schema: null };
-
-    [Fact]
-    public async Task AnthropicTemperature400_RetriesWithoutTemperature_KeepingStructuredOutput()
+    // Callers always ask for exactly what they want — the schema, enforced, and no temperature. Adapting that to
+    // what an endpoint accepts (a configured temperature, JSON mode for one without json_schema) is the provider
+    // pipeline's job (AiProvider.BuildPipeline), never this request's.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Sends_TheStrictSchema_AndNoTemperature(bool stream)
     {
+        ChatOptions? sent = null;
         _client.GetResponseAsync(Arg.Any<IEnumerable<ChatMessage>>(),
-                Arg.Is<ChatOptions>(o => o.Temperature != null), Arg.Any<CancellationToken>())
-            .ThrowsAsync(AnthropicBadRequest("""{"error":{"message":"temperature: unsupported for this model"}}"""));
-        _client.GetResponseAsync(Arg.Any<IEnumerable<ChatMessage>>(),
-                Arg.Is<ChatOptions>(o => o.Temperature == null && IsStructuredOutput(o)), Arg.Any<CancellationToken>())
+                Arg.Do<ChatOptions>(o => sent = o), Arg.Any<CancellationToken>())
             .Returns(Reply());
+        _client.GetStreamingResponseAsync(Arg.Any<IEnumerable<ChatMessage>>(),
+                Arg.Do<ChatOptions>(o => sent = o), Arg.Any<CancellationToken>())
+            .Returns(_ => Updates(new ChatResponseUpdate(ChatRole.Assistant, """{"title":"x"}""")));
 
-        var response = await Send();
+        await Send(stream);
 
-        Assert.Equal("""{"title":"x"}""", response.Text);
+        var format = Assert.IsType<ChatResponseFormatJson>(sent!.ResponseFormat);
+        Assert.True(JsonElement.DeepEquals(Schema, format.Schema!.Value));
+        Assert.Equal("test_schema", format.SchemaName);
+        Assert.Equal("A test schema.", format.SchemaDescription);
+        Assert.Equal(true, sent.AdditionalProperties?["strict"]);
+        Assert.Null(sent.Temperature);
     }
 
-    [Fact]
-    public async Task AnthropicOutputConfig400_FallsBackToJsonMode_KeepingTemperature()
+    // Every 400 is the provider's verdict on the request as configured, and goes back to the caller as-is after a
+    // single attempt — including the ones that name temperature or the schema format, which the request used to
+    // retry without. A wrong Temperature/StructuredOutput in config now fails loudly instead of degrading quietly.
+    [Theory]
+    [InlineData("""{"error":{"message":"temperature: unsupported for this model"}}""")]
+    [InlineData("""{"error":{"message":"output_config.format: schema not supported"}}""")]
+    [InlineData("""{"error":{"message":"prompt is too long"}}""")]
+    public async Task Anthropic400_Propagates_AfterOneAttempt(string body)
     {
-        _client.GetResponseAsync(Arg.Any<IEnumerable<ChatMessage>>(),
-                Arg.Is<ChatOptions>(o => IsStructuredOutput(o)), Arg.Any<CancellationToken>())
-            .ThrowsAsync(AnthropicBadRequest("""{"error":{"message":"output_config.format: schema not supported"}}"""));
-        _client.GetResponseAsync(Arg.Any<IEnumerable<ChatMessage>>(),
-                Arg.Is<ChatOptions>(o => IsJsonMode(o) && o.Temperature == 0f), Arg.Any<CancellationToken>())
-            .Returns(Reply());
-
-        await Send();
-
-        await _client.Received(1).GetResponseAsync(Arg.Any<IEnumerable<ChatMessage>>(),
-            Arg.Is<ChatOptions>(o => IsJsonMode(o) && o.Temperature == 0f), Arg.Any<CancellationToken>());
-    }
-
-    // A 400 that implicates neither optional parameter is the real error — never retried, never masked.
-    [Fact]
-    public async Task AnthropicUnrelated400_Propagates_WithoutRetry()
-    {
-        var error = AnthropicBadRequest("""{"error":{"message":"prompt is too long"}}""");
+        var error = AnthropicBadRequest(body);
         _client.GetResponseAsync(Arg.Any<IEnumerable<ChatMessage>>(), Arg.Any<ChatOptions>(), Arg.Any<CancellationToken>())
             .ThrowsAsync(error);
 
@@ -93,24 +87,24 @@ public class StructuredChatRequestTests
     }
 
     [Fact]
-    public async Task OpenAiSchema400_StillFallsBackToJsonMode()
+    public async Task OpenAiSchema400_Propagates_AfterOneAttempt()
     {
         var pipelineResponse = Substitute.For<PipelineResponse>();
         pipelineResponse.Status.Returns(400);
         // Built before the stub: its constructor reads Status, which NSubstitute would mistake for the call
         // being configured.
         var schemaUnsupported = new ClientResultException("json_schema response format not supported", pipelineResponse);
-        _client.GetResponseAsync(Arg.Any<IEnumerable<ChatMessage>>(),
-                Arg.Is<ChatOptions>(o => IsStructuredOutput(o)), Arg.Any<CancellationToken>())
+        _client.GetResponseAsync(Arg.Any<IEnumerable<ChatMessage>>(), Arg.Any<ChatOptions>(), Arg.Any<CancellationToken>())
             .ThrowsAsync(schemaUnsupported);
-        _client.GetResponseAsync(Arg.Any<IEnumerable<ChatMessage>>(),
-                Arg.Is<ChatOptions>(o => IsJsonMode(o)), Arg.Any<CancellationToken>())
-            .Returns(Reply());
 
-        Assert.Equal("""{"title":"x"}""", (await Send()).Text);
+        var thrown = await Assert.ThrowsAsync<ClientResultException>(() => Send());
+
+        Assert.Same(schemaUnsupported, thrown);
+        await _client.Received(1).GetResponseAsync(
+            Arg.Any<IEnumerable<ChatMessage>>(), Arg.Any<ChatOptions>(), Arg.Any<CancellationToken>());
     }
 
-    // A non-400 provider error (rate limit) is not the ladder's business.
+    // A non-400 provider error (rate limit) propagates the same way; retrying it is the job queue's call.
     [Fact]
     public async Task AnthropicNon400_Propagates_WithoutRetry()
     {

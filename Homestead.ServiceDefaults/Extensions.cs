@@ -19,7 +19,7 @@ public static class Extensions
     private const string AlivenessEndpointPath = "/alive";
 
     // The ActivitySource/Meter name the WebApi's IChatClient pipeline emits GenAI spans and metrics under —
-    // passed explicitly as UseOpenTelemetry's sourceName (AiProvider.BuildClient) so this subscription and the
+    // passed explicitly as UseOpenTelemetry's sourceName (AiProvider.BuildPipeline) so this subscription and the
     // emitter can't drift apart. The value is Microsoft.Extensions.AI's own default, so it stays recognisable.
     public const string MicrosoftExtensionsAiTelemetryName = "Experimental.Microsoft.Extensions.AI";
 
@@ -70,7 +70,7 @@ public static class Extensions
             .WithTracing(tracing =>
             {
                 tracing.AddSource(builder.Environment.ApplicationName)
-                    // GenAI chat spans from the WebApi's IChatClient pipeline (AiProvider.BuildClient).
+                    // GenAI chat spans from the WebApi's IChatClient pipeline (AiProvider.BuildPipeline).
                     .AddSource(MicrosoftExtensionsAiTelemetryName)
                     .AddAspNetCoreInstrumentation(tracing =>
                         // Exclude health check requests from tracing

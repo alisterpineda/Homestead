@@ -29,6 +29,8 @@ public sealed class FakeAiProvider : IAiProvider
     public int StatementMaxInputChars => AiProviderOptions.DefaultStatementMaxInputChars;
     public bool ImageInput => true;
     public int ImageRenderMaxEdge => AiProviderOptions.DefaultImageRenderMaxEdge;
+    public float? Temperature => null;
+    public bool StructuredOutput => true;
 
     public IChatClient GetChatClient() =>
         throw new NotSupportedException("FakeAiProvider.GetChatClient must not be called in tests.");

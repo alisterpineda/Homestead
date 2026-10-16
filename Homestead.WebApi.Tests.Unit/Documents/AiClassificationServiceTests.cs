@@ -41,14 +41,6 @@ public class AiClassificationServiceTests
     private string SystemPrompt => _captured![0].Text;
     private string UserMessage => _captured![1].Text;
 
-    // Arg.Is takes an expression tree, which can't hold an is-pattern — so the format checks live in
-    // plain methods the expression can call. A schema present => structured outputs; absent => JSON mode.
-    private static bool IsStructuredOutput(ChatOptions o) =>
-        o.ResponseFormat is ChatResponseFormatJson { Schema: not null };
-
-    private static bool IsJsonMode(ChatOptions o) =>
-        o.ResponseFormat is ChatResponseFormatJson { Schema: null };
-
     [Fact]
     public async Task ScopeTags_PromptHasOnlyTagFragments_OmitsPartiesBlock()
     {
@@ -223,7 +215,7 @@ public class AiClassificationServiceTests
     }
 
     [Fact]
-    public async Task SetsZeroTemperature_AndPerScopeStructuredOutputSchema()
+    public async Task SendsNoTemperature_AndPerScopeStructuredOutputSchema()
     {
         var ct = TestContext.Current.CancellationToken;
         RespondWith("""{"tagIndexes":[]}""");
@@ -231,8 +223,9 @@ public class AiClassificationServiceTests
 
         await _sut.ClassifyAsync("Doc", "text", null, tags, [], ClassificationScope.Tags, ct);
 
-        // 1.1 — deterministic sampling.
-        Assert.Equal(0f, _capturedOptions!.Temperature);
+        // No temperature of its own: whether one is sent, and which, is the provider's config
+        // (Ai:Providers:{key}:Temperature), applied in its pipeline — some models reject any non-default value.
+        Assert.Null(_capturedOptions!.Temperature);
 
         // 1.2 — strict mode must be explicitly opted in, or Microsoft.Extensions.AI sends the schema as advisory.
         Assert.NotNull(_capturedOptions.AdditionalProperties);
@@ -254,149 +247,32 @@ public class AiClassificationServiceTests
         Assert.Equal(["tagIndexes"], required);
     }
 
-    [Fact]
-    public async Task StructuredOutputRejectedWith400_FallsBackToJsonMode_AndParses()
+    // Every 400 propagates after one attempt — including one naming the schema format, which the request used to
+    // retry in JSON mode. Endpoint capabilities are config (Ai:Providers:{key}:StructuredOutput / Temperature),
+    // not something read out of error text, so a mismatch surfaces instead of degrading quietly.
+    [Theory]
+    [InlineData("This model's maximum context length is 8192 tokens, however you requested 9000 tokens.")]
+    [InlineData("json_schema response format not supported")]
+    public async Task Rejected400_IsNotRetried_AndPropagates(string message)
     {
-        var ct = TestContext.Current.CancellationToken;
-        var tagId = Guid.NewGuid();
-        var tags = new List<TagInfo> { new(tagId, "Finance", "Finance") };
-
-        var response = Substitute.For<PipelineResponse>();
-        response.Status.Returns(400);
-        var schemaUnsupported = new ClientResultException("json_schema response format not supported", response);
-
-        // Strict attempt (schema present) is rejected; the plain JSON-mode retry (no schema) succeeds.
-        _client.GetResponseAsync(
-            Arg.Any<IEnumerable<ChatMessage>>(),
-            Arg.Is<ChatOptions>(o => IsStructuredOutput(o)),
-            Arg.Any<CancellationToken>())
-            .ThrowsAsync(schemaUnsupported);
-
-        _client.GetResponseAsync(
-            Arg.Any<IEnumerable<ChatMessage>>(),
-            Arg.Is<ChatOptions>(o => IsJsonMode(o) && o.Temperature == 0f),
-            Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, """{"tagIndexes":[0]}"""))));
-
-        var result = await _sut.ClassifyAsync("Doc", "some text", null, tags, [], ClassificationScope.Tags, ct);
-
-        Assert.NotNull(result);
-        Assert.Equal([tagId], result!.MatchedTagIds);
-
-        // Both response formats were attempted: strict first, then the JSON-mode fallback — and determinism
-        // (temperature 0) is preserved on the fallback, since only the schema was at fault here.
-        await _client.Received(1).GetResponseAsync(
-            Arg.Any<IEnumerable<ChatMessage>>(),
-            Arg.Is<ChatOptions>(o => IsStructuredOutput(o)),
-            Arg.Any<CancellationToken>());
-        await _client.Received(1).GetResponseAsync(
-            Arg.Any<IEnumerable<ChatMessage>>(),
-            Arg.Is<ChatOptions>(o => IsJsonMode(o) && o.Temperature == 0f),
-            Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task TemperatureRejectedWith400_RetriesWithoutTemperature_KeepingStructuredOutput()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        var tagId = Guid.NewGuid();
-        var tags = new List<TagInfo> { new(tagId, "Finance", "Finance") };
-
-        var response = Substitute.For<PipelineResponse>();
-        response.Status.Returns(400);
-        // o-series-style rejection that names the offending parameter.
-        var temperatureUnsupported = new ClientResultException(
-            "Unsupported value: 'temperature' does not support 0 with this model. Only the default (1) value is supported.",
-            response);
-
-        // Structured output WITH a custom temperature is rejected...
-        _client.GetResponseAsync(
-            Arg.Any<IEnumerable<ChatMessage>>(),
-            Arg.Is<ChatOptions>(o => IsStructuredOutput(o) && o.Temperature != null),
-            Arg.Any<CancellationToken>())
-            .ThrowsAsync(temperatureUnsupported);
-
-        // ...but structured output WITHOUT a temperature succeeds.
-        _client.GetResponseAsync(
-            Arg.Any<IEnumerable<ChatMessage>>(),
-            Arg.Is<ChatOptions>(o => IsStructuredOutput(o) && o.Temperature == null),
-            Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, """{"tagIndexes":[0]}"""))));
-
-        var result = await _sut.ClassifyAsync("Doc", "some text", null, tags, [], ClassificationScope.Tags, ct);
-
-        Assert.NotNull(result);
-        Assert.Equal([tagId], result!.MatchedTagIds);
-
-        // The reasoning-model case: only temperature was dropped — structured outputs were preserved,
-        // and we never degraded all the way to plain JSON mode.
-        await _client.Received(1).GetResponseAsync(
-            Arg.Any<IEnumerable<ChatMessage>>(),
-            Arg.Is<ChatOptions>(o => IsStructuredOutput(o) && o.Temperature == null),
-            Arg.Any<CancellationToken>());
-        await _client.DidNotReceive().GetResponseAsync(
-            Arg.Any<IEnumerable<ChatMessage>>(),
-            Arg.Is<ChatOptions>(o => IsJsonMode(o)),
-            Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task Unrelated400_IsNotRetried_AndPropagates()
-    {
-        // A 400 that names neither temperature nor the response format (here: context-length-exceeded) must NOT be
-        // treated as a capability problem — no silent retry of the same oversized request, and the real error surfaces.
         var ct = TestContext.Current.CancellationToken;
         var tags = new List<TagInfo> { new(Guid.NewGuid(), "Finance", "Finance") };
 
         var response = Substitute.For<PipelineResponse>();
         response.Status.Returns(400);
-        var contextLength = new ClientResultException(
-            "This model's maximum context length is 8192 tokens, however you requested 9000 tokens.", response);
+        var rejected = new ClientResultException(message, response);
 
         _client.GetResponseAsync(
             Arg.Any<IEnumerable<ChatMessage>>(), Arg.Any<ChatOptions>(), Arg.Any<CancellationToken>())
-            .ThrowsAsync(contextLength);
+            .ThrowsAsync(rejected);
 
-        await Assert.ThrowsAsync<ClientResultException>(() =>
+        var thrown = await Assert.ThrowsAsync<ClientResultException>(() =>
             _sut.ClassifyAsync("Doc", "some text", null, tags, [], ClassificationScope.Tags, ct));
+
+        Assert.Same(rejected, thrown);
 
         // Exactly one attempt — the error was surfaced, not masked behind a degraded retry.
         await _client.Received(1).GetResponseAsync(
-            Arg.Any<IEnumerable<ChatMessage>>(), Arg.Any<ChatOptions>(), Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task BothTemperatureAndStructuredOutputRejected_DegradesToJsonModeWithoutTemperature()
-    {
-        // A 400 naming both parameters drops both at once: the single retry is plain JSON mode with the default
-        // temperature. Also pins the retry budget — two calls total, never an unbounded loop.
-        var ct = TestContext.Current.CancellationToken;
-        var tagId = Guid.NewGuid();
-        var tags = new List<TagInfo> { new(tagId, "Finance", "Finance") };
-
-        var response = Substitute.For<PipelineResponse>();
-        response.Status.Returns(400);
-        var bothRejected = new ClientResultException(
-            "Unsupported: 'temperature' and 'response_format' are not supported with this model.", response);
-
-        // Anything that still sets a custom temperature OR structured output is rejected...
-        _client.GetResponseAsync(
-            Arg.Any<IEnumerable<ChatMessage>>(),
-            Arg.Is<ChatOptions>(o => IsStructuredOutput(o) || o.Temperature != null),
-            Arg.Any<CancellationToken>())
-            .ThrowsAsync(bothRejected);
-        // ...only plain JSON mode with the default temperature succeeds.
-        _client.GetResponseAsync(
-            Arg.Any<IEnumerable<ChatMessage>>(),
-            Arg.Is<ChatOptions>(o => IsJsonMode(o) && o.Temperature == null),
-            Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, """{"tagIndexes":[0]}"""))));
-
-        var result = await _sut.ClassifyAsync("Doc", "some text", null, tags, [], ClassificationScope.Tags, ct);
-
-        Assert.NotNull(result);
-        Assert.Equal([tagId], result!.MatchedTagIds);
-        await _client.Received(2).GetResponseAsync(
             Arg.Any<IEnumerable<ChatMessage>>(), Arg.Any<ChatOptions>(), Arg.Any<CancellationToken>());
     }
 
@@ -448,7 +324,7 @@ public class AiClassificationServiceTests
     }
 
     [Fact]
-    public async Task NonSchemaError_IsNotRetried_AndPropagates()
+    public async Task Non400Error_IsNotRetried_AndPropagates()
     {
         var ct = TestContext.Current.CancellationToken;
         var tags = new List<TagInfo> { new(Guid.NewGuid(), "Finance", "Finance") };
@@ -464,7 +340,7 @@ public class AiClassificationServiceTests
         await Assert.ThrowsAsync<ClientResultException>(() =>
             _sut.ClassifyAsync("Doc", "some text", null, tags, [], ClassificationScope.Tags, ct));
 
-        // No JSON-mode fallback for a non-400 error — only the single strict attempt was made.
+        // Retrying a transient error is the job queue's call, not the request's — one attempt.
         await _client.Received(1).GetResponseAsync(
             Arg.Any<IEnumerable<ChatMessage>>(), Arg.Any<ChatOptions>(), Arg.Any<CancellationToken>());
     }
@@ -500,42 +376,5 @@ public class AiClassificationServiceTests
         await _sut.ClassifyAsync("Doc", "some text", null, [], [], ClassificationScope.Name, ct);
 
         Assert.DoesNotContain(_captured![1].Contents, c => c is DataContent);
-    }
-
-    [Fact]
-    public async Task PageImagePresent_StructuredOutput400_StillDegradesToJsonMode_ImageRetained()
-    {
-        // The degradation ladder is image-agnostic: a 400 on the strict attempt still falls back to JSON
-        // mode, and the image rides along on the retry.
-        var ct = TestContext.Current.CancellationToken;
-        var tagId = Guid.NewGuid();
-        var tags = new List<TagInfo> { new(tagId, "Finance", "Finance") };
-        var image = new byte[] { 1, 2, 3, 4 };
-
-        var response = Substitute.For<PipelineResponse>();
-        response.Status.Returns(400);
-        var schemaUnsupported = new ClientResultException("json_schema response format not supported", response);
-
-        _client.GetResponseAsync(
-            Arg.Any<IEnumerable<ChatMessage>>(),
-            Arg.Is<ChatOptions>(o => IsStructuredOutput(o)),
-            Arg.Any<CancellationToken>())
-            .ThrowsAsync(schemaUnsupported);
-        _client.GetResponseAsync(
-            Arg.Any<IEnumerable<ChatMessage>>(),
-            Arg.Is<ChatOptions>(o => IsJsonMode(o)),
-            Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, """{"tagIndexes":[0]}"""))));
-
-        var result = await _sut.ClassifyAsync("Doc", "some text", image, tags, [], ClassificationScope.Tags, ct);
-
-        Assert.NotNull(result);
-        Assert.Equal([tagId], result!.MatchedTagIds);
-
-        // The JSON-mode fallback request still carried the image data part.
-        await _client.Received(1).GetResponseAsync(
-            Arg.Is<IEnumerable<ChatMessage>>(m => m.ToList()[1].Contents.Any(c => c is DataContent)),
-            Arg.Is<ChatOptions>(o => IsJsonMode(o)),
-            Arg.Any<CancellationToken>());
     }
 }

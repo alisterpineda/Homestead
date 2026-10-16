@@ -123,6 +123,8 @@ AI-assisted document classification/summarization and statement parsing are opti
 
 > **Breaking (2026-07):** the flat `AI_ENDPOINT` / `AI_MODEL` / `AI_API_KEY` / `AI_IMAGE_INPUT` / `AI_IMAGE_RENDER_MAX_EDGE` env vars are **no longer read**. Because unconfigured AI is a silent no-op, a deployment that misses this rename keeps running but quietly stops classifying/summarizing new documents — migrate to the variables below.
 
+> **Breaking (2026-10):** the app no longer pins every AI call to temperature `0`, and no longer falls back from a strict `json_schema` response format when an endpoint rejects it with a 400. Which options an endpoint accepts is now stated per provider: set `Ai__Providers__{name}__Temperature` to `0` to keep the old deterministic sampling on an ordinary chat model, and `Ai__Providers__{name}__StructuredOutput` to `false` for an endpoint that was only working through the old fallback (every AI job on it fails with a 400 until you do). **Test connection** on the admin AI page tells you which, with the provider's own message.
+
 | Variable | Default | Description |
 |---|---|---|
 | `Ai__Providers__{name}__Type` | — | **Required** for every provider: `OpenAiCompatible`, `AzureFoundry` or `Anthropic` |
@@ -133,9 +135,11 @@ AI-assisted document classification/summarization and statement parsing are opti
 | `Ai__Providers__{name}__ImageRenderMaxEdge` | `1024` | Long-edge pixel budget for that page render (256–4096) |
 | `Ai__Providers__{name}__MaxInputChars` | `12000` | Character budget for document text in the classification prompt |
 | `Ai__Providers__{name}__StatementMaxInputChars` | `120000` | Hard cap for statement text sent whole to statement parsing |
+| `Ai__Providers__{name}__Temperature` | — (not sent) | Sampling temperature, 0–2 (0–1 for `Anthropic`). Unset = not sent, so the model uses its own default. Leave it unset for Claude (`Anthropic`) and reasoning models, which reject it; set e.g. `0` for ordinary chat models (Ollama, OpenAI non-reasoning) for repeatable replies |
+| `Ai__Providers__{name}__StructuredOutput` | `true` | Request replies as a strict JSON schema. Set `false` only for an endpoint that rejects a `json_schema` response format — requests then use plain JSON mode |
 | `Ai__DefaultProvider` | — | Which provider the app uses. Optional when exactly one provider is defined; required with two or more |
 
-A misconfigured provider never stops the app from starting — it shows as *unavailable, with the reason* on the admin **AI** page, which also has a per-provider **Test connection** probe.
+A misconfigured provider never stops the app from starting — it shows as *unavailable, with the reason* on the admin **AI** page, which also has a per-provider **Test connection** probe. The probe sends a real structured-output request with the provider's `Temperature` / `StructuredOutput` applied, so a setting the endpoint doesn't accept fails there, with the provider's own error message — nothing retries around it at runtime.
 
 For local Aspire dev, set these in **AppHost user-secrets** — AppHost forwards the whole `Ai:` section verbatim as the env vars above:
 
@@ -144,6 +148,7 @@ cd Homestead.AppHost
 dotnet user-secrets set "Ai:Providers:local:Type" "OpenAiCompatible"
 dotnet user-secrets set "Ai:Providers:local:Endpoint" "http://localhost:11434/v1"
 dotnet user-secrets set "Ai:Providers:local:Model" "gemma-4-e4b"
+dotnet user-secrets set "Ai:Providers:local:Temperature" "0"
 # a second provider, e.g. Azure AI Foundry:
 # dotnet user-secrets set "Ai:Providers:foundry:Type" "AzureFoundry"
 # dotnet user-secrets set "Ai:Providers:foundry:Endpoint" "https://<res>.openai.azure.com"

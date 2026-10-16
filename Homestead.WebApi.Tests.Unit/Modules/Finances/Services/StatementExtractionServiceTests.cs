@@ -44,6 +44,24 @@ public class StatementExtractionServiceTests
         Assert.Equal("null", anyOf[1].GetProperty("type").GetString());
     }
 
+    // The service sends no temperature of its own: whether one goes out, and which, is the provider's config
+    // (Ai:Providers:{key}:Temperature), applied in its pipeline — current Claude models reject any non-default value.
+    [Fact]
+    public async Task SendsNoTemperature()
+    {
+        _client.GetStreamingResponseAsync(
+                Arg.Any<IEnumerable<ChatMessage>>(), Arg.Do<ChatOptions>(o => _sent = o), Arg.Any<CancellationToken>())
+            .Returns(Reply("""{"kind":"Bank","lineItems":[]}"""));
+        var sut = new StatementExtractionService(
+            TestAiProviders.Resolver(TestAiProviders.Provider(_client)),
+            NullLogger<StatementExtractionService>.Instance);
+
+        await sut.ExtractAsync("Opening balance 1.00", null, TestContext.Current.CancellationToken);
+
+        Assert.NotNull(_sent);
+        Assert.Null(_sent.Temperature);
+    }
+
     // Golden copy of the whole response schema: the contract both provider families were validated against.
     // Whatever produces the schema (hand-built or generated from the DTO), a change here is a change to what
     // every provider is sent — update this copy deliberately, never to make a refactor pass. Compared
@@ -66,8 +84,9 @@ public class StatementExtractionServiceTests
             $"Response schema drifted from the golden copy. Actual:\n{actual!.ToJsonString(Indented)}");
     }
 
-    // kind and direction are constrained in the schema but parsed tolerantly: a value outside the enum (only
-    // possible once the ladder fell back to unenforced JSON) maps to Unknown / null rather than failing the parse.
+    // kind and direction are constrained in the schema but parsed tolerantly: a value outside the enum (possible
+    // only on a provider configured StructuredOutput=false, where the schema isn't enforced) maps to Unknown / null
+    // rather than failing the parse.
     [Fact]
     public async Task UnrecognisedKind_MapsToUnknown()
     {

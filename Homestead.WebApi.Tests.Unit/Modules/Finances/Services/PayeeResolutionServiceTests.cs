@@ -13,6 +13,29 @@ public class PayeeResolutionServiceTests
     private readonly IChatClient _client = Substitute.For<IChatClient>();
     private ChatOptions? _sent;
 
+    // The service sends no temperature of its own: whether one goes out, and which, is the provider's config
+    // (Ai:Providers:{key}:Temperature), applied in its pipeline — current Claude models reject any non-default value.
+    [Fact]
+    public async Task SendsNoTemperature()
+    {
+        _client.GetResponseAsync(
+                Arg.Any<IEnumerable<ChatMessage>>(), Arg.Do<ChatOptions>(o => _sent = o), Arg.Any<CancellationToken>())
+            .Returns(new ChatResponse(new ChatMessage(ChatRole.Assistant, """{"results":[]}"""))
+            {
+                FinishReason = ChatFinishReason.Stop,
+            });
+        var sut = new PayeeResolutionService(
+            TestAiProviders.Resolver(TestAiProviders.Provider(_client)),
+            NullLogger<PayeeResolutionService>.Instance);
+
+        await sut.ResolveAsync(
+            [new PayeeResolutionInput(0, "COFFEE SHOP #12")], [new PayeeCatalogEntry(Guid.NewGuid(), "Coffee Shop")],
+            TestContext.Current.CancellationToken);
+
+        Assert.NotNull(_sent);
+        Assert.Null(_sent.Temperature);
+    }
+
     // Golden copy of the whole response schema: the contract both provider families were validated against.
     // The descriptions are part of the prompt. Whatever produces the schema (hand-built or generated from the
     // DTO), a change here is a change to what every provider is sent — update this copy deliberately, never to
@@ -40,8 +63,9 @@ public class PayeeResolutionServiceTests
             $"Response schema drifted from the golden copy. Actual:\n{actual!.ToJsonString(Indented)}");
     }
 
-    // payeeIndex is a non-null integer in the schema, so a null can only arrive after the ladder fell back to
-    // unenforced JSON. That reply breaks the contract and fails loudly rather than being half-used.
+    // payeeIndex is a non-null integer in the schema, so a null can only arrive from a provider configured
+    // StructuredOutput=false (plain JSON mode, schema unenforced). That reply breaks the contract and fails loudly
+    // rather than being half-used.
     [Fact]
     public async Task NullPayeeIndex_Throws()
     {

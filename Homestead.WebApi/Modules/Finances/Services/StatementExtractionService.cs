@@ -8,8 +8,8 @@ namespace Homestead.WebApi.Modules.Finances.Services;
 
 /// <summary>
 /// AI-backed statement header extractor. Sends its request through the shared
-/// <see cref="StructuredChatRequest"/> path (json_schema response format + <c>strict:true</c>, temperature 0,
-/// and the HTTP-400 degradation ladder) with a statement-specific schema and — critically — the FULL
+/// <see cref="StructuredChatRequest"/> path (json_schema response format + <c>strict:true</c>, one attempt)
+/// with a statement-specific schema and — critically — the FULL
 /// extracted text rather than the classification head+tail sample (a statement's closing balance can sit
 /// anywhere).
 /// </summary>
@@ -18,9 +18,6 @@ public class StatementExtractionService(
     ILogger<StatementExtractionService> logger)
     : IStatementExtractionService
 {
-    // Deterministic extraction — pin sampling to 0 so runs are stable and prompt changes are measurable.
-    private const float Temperature = 0f;
-
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     // Generated from the reply DTO with the options it is deserialized with, so schema and DTO can't drift.
@@ -65,7 +62,7 @@ public class StatementExtractionService(
             client, messages, ResponseSchema,
             schemaName: "statement_extraction",
             schemaDescription: "Structured header of a parsed account statement.",
-            Temperature, stream: true, "Statement extraction", logger, ct);
+            stream: true, "Statement extraction", ct);
         var content = response.Text;
 
         logger.LogTrace("Statement extraction response:\n{Response}", content);
@@ -241,7 +238,8 @@ public class StatementExtractionService(
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     // Kind and Direction stay strings, not enums: [AllowedValues] puts the enum in the schema while ParseKind /
-    // ParseDirection keep tolerating a value outside it (possible once the ladder falls back to unenforced JSON).
+    // ParseDirection keep tolerating a value outside it (possible only on a provider configured StructuredOutput=false,
+    // where the schema isn't enforced).
     private sealed class StatementExtractionResponse
     {
         [AllowedValues(

@@ -2,10 +2,13 @@ using Microsoft.Extensions.AI;
 
 namespace Homestead.WebApi.Infrastructure.Ai;
 
-// Adapts provider-neutral ChatOptions to what the Claude API accepts, so callers stay unaware of the provider
-// behind their IChatClient. A layer of the Anthropic provider's pipeline (AiProvider.BuildClient explains its
-// position); the caller's ChatOptions instance is never mutated (the fallback ladder builds its options per
-// attempt, but other callers may reuse theirs).
+// Adapts provider-neutral ChatOptions to what the Claude API requires — today only a MaxOutputTokens default —
+// so callers stay unaware of the provider behind their IChatClient. A layer of the Anthropic provider's pipeline
+// (AiProvider.BuildPipeline explains its position). Temperature is deliberately not touched: it is config-driven
+// (Ai:Providers:{key}:Temperature, applied by the provider-options layer outside this one) and unset by default,
+// so a temperature that reaches here was configured on purpose and is sent. A class rather than a
+// ConfigureOptions callback because the buffered and streamed paths need different caps. The caller's
+// ChatOptions instance is never mutated — the adapted copy is what goes on — since callers may reuse theirs.
 public sealed class AnthropicChatOptionsClient(IChatClient inner) : DelegatingChatClient(inner)
 {
     // Anthropic requires max_tokens on every request and the SDK adapter sends 1024 when MaxOutputTokens is
@@ -31,10 +34,6 @@ public sealed class AnthropicChatOptionsClient(IChatClient inner) : DelegatingCh
     private static ChatOptions Adapt(ChatOptions? options, int defaultMaxOutputTokens)
     {
         var adapted = options?.Clone() ?? new ChatOptions();
-
-        // Current Claude models reject any non-default sampling parameter with an HTTP 400. Dropping it here
-        // rather than letting the fallback ladder react to the 400 saves a wasted round-trip on every call.
-        adapted.Temperature = null;
         adapted.MaxOutputTokens ??= defaultMaxOutputTokens;
 
         return adapted;

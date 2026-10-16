@@ -35,6 +35,8 @@ public sealed class AiProvider : IAiProvider
     public int StatementMaxInputChars => _options.ResolveStatementMaxInputChars();
     public bool ImageInput => _options.ImageInput;
     public int ImageRenderMaxEdge => _options.ResolveImageRenderMaxEdge();
+    public float? Temperature => _options.Temperature;
+    public bool StructuredOutput => _options.StructuredOutput;
 
     public IChatClient GetChatClient()
     {
@@ -52,17 +54,29 @@ public sealed class AiProvider : IAiProvider
         return _client ??= BuildClient();
     }
 
-    // Every arm goes through the same M.E.AI pipeline (inner.AsBuilder().Use…().Build()). The first Use is the
-    // outermost layer, so the Anthropic adapter wraps OpenTelemetry rather than the reverse: the spans then
-    // record the options actually sent to the SDK (Temperature dropped, MaxOutputTokens resolved), not the
-    // caller's. Build() without a service provider is enough: UseOpenTelemetry only resolves an optional
-    // ILoggerFactory from it, which spans and metrics don't need.
-    private IChatClient BuildClient()
-    {
-        var builder = BuildSdkClient().AsBuilder();
+    private IChatClient BuildClient() => BuildPipeline(BuildSdkClient(), _options);
 
-        // The Claude API takes temperature and max_tokens differently; the adapter makes callers unaware of it.
-        if (_options.Type == AiProviderType.Anthropic)
+    // Every arm goes through the same M.E.AI pipeline, wrapped around the SDK client. ChatClientBuilder makes the
+    // first layer added the outermost, so a request passes through, in order:
+    //   1. the provider-options layer (every type): config's Temperature and StructuredOutput applied;
+    //   2. the Anthropic adapter (Anthropic only): MaxOutputTokens defaulted per transport;
+    //   3. OpenTelemetry: GenAI spans and metrics;
+    //   4. the SDK client.
+    // Both option layers sit outside OpenTelemetry so the spans record the options actually sent to the SDK
+    // (configured temperature filled in, a schema downgraded to JSON mode, MaxOutputTokens resolved), not the
+    // caller's. Build() without a service provider is enough: UseOpenTelemetry only resolves an optional
+    // ILoggerFactory from it, which spans and metrics don't need. Internal static over the SDK client so tests
+    // can drive the real pipeline against a stand-in SDK and observe what would go on the wire.
+    internal static IChatClient BuildPipeline(IChatClient sdkClient, AiProviderOptions options)
+    {
+        // A callback rather than a DelegatingChatClient because, unlike the Anthropic adapter, nothing here
+        // differs between buffered and streamed calls. ConfigureOptionsChatClient hands the callback a clone of
+        // the caller's options (or a fresh instance when they passed none), so callers never see theirs mutated.
+        var builder = sdkClient.AsBuilder()
+            .ConfigureOptions(o => ApplyProviderOptions(o, options));
+
+        // The Claude API requires max_tokens on every request; the adapter supplies a default per transport.
+        if (options.Type == AiProviderType.Anthropic)
             builder.Use(inner => new AnthropicChatOptionsClient(inner));
 
         // GenAI semantic-convention spans and metrics (model, token counts, finish reason, duration) under the
@@ -78,6 +92,25 @@ public sealed class AiProvider : IAiProvider
             .Build();
     }
 
+    // Callers always ask for what they ideally want — a strict json_schema reply and no temperature — and this
+    // adjusts that request to what the endpoint accepts, as stated once in config (which options an endpoint
+    // takes is a fact about the (provider, model) pair, so it belongs with the provider, not with the callers).
+    // `o` is already the pipeline's own copy (see BuildPipeline), so mutating it is safe.
+    private static void ApplyProviderOptions(ChatOptions o, AiProviderOptions options)
+    {
+        // Unset config leaves it unset (the model's default); a caller's explicit value still wins.
+        o.Temperature ??= options.Temperature;
+
+        // An endpoint without json_schema support gets plain JSON mode instead. "strict" is the OpenAI adapter's
+        // flag for enforcing that schema, meaningless without one, so it goes too. A non-schema format (text,
+        // or JSON mode already) is left as asked.
+        if (!options.StructuredOutput && o.ResponseFormat is ChatResponseFormatJson { Schema: not null })
+        {
+            o.ResponseFormat = ChatResponseFormat.Json;
+            o.AdditionalProperties?.Remove("strict");
+        }
+    }
+
     // The provider SDK's own IChatClient, before the shared pipeline wraps it.
     private IChatClient BuildSdkClient() => _options.Type switch
     {
@@ -89,8 +122,8 @@ public sealed class AiProvider : IAiProvider
             .AsIChatClient(),
 
         // AzureOpenAIClient subclasses OpenAIClient, so everything downstream (M.E.AI pipeline, strict
-        // structured output, the 400 degradation ladder) is identical — it only changes auth (api-key
-        // header) and api-version negotiation, which the plain client gets wrong against Azure.
+        // structured output, the config-driven Temperature/StructuredOutput) is identical — it only changes
+        // auth (api-key header) and api-version negotiation, which the plain client gets wrong against Azure.
         // Endpoint/ApiKey/Model are non-null here: Validate requires all three for this type, and the
         // IsConfigured guard runs before BuildClient.
         AiProviderType.AzureFoundry => new AzureOpenAIClient(
@@ -100,8 +133,8 @@ public sealed class AiProvider : IAiProvider
 
         // The Anthropic SDK's own IChatClient adapter maps the system prompt, the page-render DataContent, and
         // a ForJsonSchema response format (to output_config.format, forcing additionalProperties:false — the
-        // schema is enforced, so the OpenAI-only "strict" flag is simply ignored). BuildClient wraps it in
-        // AnthropicChatOptionsClient for the two options the Claude API treats differently.
+        // schema is enforced, so the OpenAI-only "strict" flag is simply ignored). BuildPipeline wraps it in
+        // AnthropicChatOptionsClient for the max_tokens the Claude API requires on every request.
         AiProviderType.Anthropic => CreateAnthropicClient().AsIChatClient(_options.Model),
 
         // Unreachable behind the IsConfigured guard (a null/unknown Type always carries a ConfigurationError).

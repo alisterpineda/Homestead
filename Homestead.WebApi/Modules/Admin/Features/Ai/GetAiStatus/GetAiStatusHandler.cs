@@ -36,5 +36,9 @@ public class GetAiStatusHandler(IEnumerable<IAiProvider> providers, IAiProviderR
         Endpoint: p.Endpoint,
         Model: p.Model,
         HasApiKey: p.HasApiKey,
-        MaxInputChars: p.MaxInputChars);
+        MaxInputChars: p.MaxInputChars,
+        // A bound "NaN"/"Infinity" is refused by validation (ConfigurationError says so), but the HTTP JSON
+        // options write numbers strictly, so serialising it would turn the whole status page into a 500.
+        Temperature: p.Temperature is { } t && float.IsFinite(t) ? t : null,
+        StructuredOutput: p.StructuredOutput);
 }

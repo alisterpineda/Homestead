@@ -34,13 +34,24 @@ public class AnthropicChatOptionsClientTests
     [Theory]
     [InlineData(false, AnthropicChatOptionsClient.NonStreamingMaxOutputTokens)]
     [InlineData(true, AnthropicChatOptionsClient.StreamingMaxOutputTokens)]
-    public async Task DropsTemperature_AndCapsByTransport(bool stream, int expectedCap)
+    public async Task CapsByTransport(bool stream, int expectedCap)
+    {
+        await Call(stream, new ChatOptions());
+
+        Assert.NotNull(_sent);
+        Assert.Equal(expectedCap, _sent!.MaxOutputTokens);
+    }
+
+    // Temperature is config's business (AiProvider's provider-options layer, outside this one): a temperature
+    // that reaches the adapter was configured on purpose and is sent, not silently dropped.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task PassesTemperatureThrough(bool stream)
     {
         await Call(stream, new ChatOptions { Temperature = 0f });
 
-        Assert.NotNull(_sent);
-        Assert.Null(_sent!.Temperature);
-        Assert.Equal(expectedCap, _sent.MaxOutputTokens);
+        Assert.Equal(0f, _sent!.Temperature);
     }
 
     [Theory]
@@ -68,8 +79,8 @@ public class AnthropicChatOptionsClientTests
         Assert.NotSame(options, _sent);
     }
 
-    // Only Temperature and MaxOutputTokens are adapted; everything else — the structured-output schema above
-    // all — must reach the SDK unchanged.
+    // Only MaxOutputTokens is adapted; everything else — the structured-output schema above all — must reach
+    // the SDK unchanged.
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -90,7 +101,7 @@ public class AnthropicChatOptionsClientTests
         Assert.Equal(true, _sent.AdditionalProperties?["strict"]);
     }
 
-    // The connection probe passes no options at all; the cap must still be sent.
+    // A caller may pass no options at all; the cap must still be sent.
     [Theory]
     [InlineData(false, AnthropicChatOptionsClient.NonStreamingMaxOutputTokens)]
     [InlineData(true, AnthropicChatOptionsClient.StreamingMaxOutputTokens)]

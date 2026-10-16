@@ -17,6 +17,8 @@ const LOCAL: AiProviderStatusResponse = {
   model: 'gemma-4-e4b',
   hasApiKey: true,
   maxInputChars: 12000,
+  temperature: null,
+  structuredOutput: true,
 };
 
 const BROKEN_FOUNDRY: AiProviderStatusResponse = {
@@ -29,7 +31,16 @@ const BROKEN_FOUNDRY: AiProviderStatusResponse = {
   model: 'gpt-5-mini',
   hasApiKey: false,
   maxInputChars: 12000,
+  temperature: null,
+  structuredOutput: true,
 };
+
+// The value cell beside a provider-detail label (e.g. "Temperature"), so assertions pin the value to its row
+// rather than matching a bare "0" or "On" anywhere on the page.
+function detailValue(root: HTMLElement, label: string): string | undefined {
+  const labelEl = Array.from(root.querySelectorAll('span')).find(el => el.textContent?.trim() === label);
+  return labelEl?.nextElementSibling?.textContent?.trim();
+}
 
 describe('AiStatusComponent', () => {
   const api = {
@@ -95,6 +106,8 @@ describe('AiStatusComponent', () => {
       model: 'claude-opus-5-5',
       hasApiKey: true,
       maxInputChars: 12000,
+      temperature: null,
+      structuredOutput: true,
     }]));
 
     const { fixture } = create();
@@ -104,6 +117,29 @@ describe('AiStatusComponent', () => {
     expect(html).toContain('Anthropic');
     expect(html).toContain('SDK default');
     expect(html).toContain('claude-opus-5-5');
+  });
+
+  it('should show the configured temperature and structured output off', () => {
+    // 0 is the common deterministic setting and falsy — it must render as "0", not "model default".
+    api.getAiStatus.mockReturnValue(of([{ ...LOCAL, temperature: 0, structuredOutput: false }]));
+
+    const { fixture } = create();
+    fixture.detectChanges();
+    const root: HTMLElement = fixture.nativeElement;
+
+    expect(detailValue(root, 'Temperature')).toBe('0');
+    expect(detailValue(root, 'Structured output')).toBe('Off');
+  });
+
+  it('should show "model default" for an unset temperature and structured output on', () => {
+    api.getAiStatus.mockReturnValue(of([LOCAL]));
+
+    const { fixture } = create();
+    fixture.detectChanges();
+    const root: HTMLElement = fixture.nativeElement;
+
+    expect(detailValue(root, 'Temperature')).toBe('model default');
+    expect(detailValue(root, 'Structured output')).toBe('On');
   });
 
   it('should render the empty state naming the new config keys', () => {

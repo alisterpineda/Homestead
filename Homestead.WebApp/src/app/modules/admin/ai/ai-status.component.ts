@@ -113,6 +113,20 @@ import type { TestAiConnectionResponse } from '@/api/generated/models/test-ai-co
                         <span class="w-32 shrink-0 text-sm text-muted-foreground">Max input</span>
                         <span class="flex-1 font-mono text-sm">{{ p.maxInputChars }} chars</span>
                       </div>
+                      <div class="flex items-center gap-3 py-1">
+                        <span class="w-32 shrink-0 text-sm text-muted-foreground">Temperature</span>
+                        @if (p.temperature != null) {
+                          <span class="flex-1 font-mono text-sm">{{ p.temperature }}</span>
+                        } @else {
+                          <!-- Unset means the request carries no temperature, so the model's own default applies. -->
+                          <span class="flex-1 text-sm text-muted-foreground">model default</span>
+                        }
+                      </div>
+                      <div class="flex items-center gap-3 py-1">
+                        <span class="w-32 shrink-0 text-sm text-muted-foreground">Structured output</span>
+                        <!-- Off: schema requests are downgraded to plain JSON mode, so replies aren't schema-enforced. -->
+                        <span class="flex-1 text-sm">{{ p.structuredOutput ? 'On' : 'Off' }}</span>
+                      </div>
                     </div>
                   } @else {
                     <p class="text-sm text-destructive">{{ p.configurationError ?? 'Unavailable.' }}</p>

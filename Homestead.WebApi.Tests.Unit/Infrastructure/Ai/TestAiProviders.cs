@@ -39,6 +39,8 @@ public static class TestAiProviders
         provider.StatementMaxInputChars.Returns(_ => opts.ResolveStatementMaxInputChars());
         provider.ImageInput.Returns(_ => opts.ImageInput);
         provider.ImageRenderMaxEdge.Returns(_ => opts.ResolveImageRenderMaxEdge());
+        provider.Temperature.Returns(_ => opts.Temperature);
+        provider.StructuredOutput.Returns(_ => opts.StructuredOutput);
         provider.GetChatClient().Returns(client ?? Substitute.For<IChatClient>());
         return provider;
     }

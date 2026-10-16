@@ -11,5 +11,7 @@ export interface AiProviderStatusResponse {
   key: string;
   maxInputChars: number;
   model: (string | null);
+  structuredOutput: boolean;
+  temperature: (number | null);
   type: (null | AiProviderType);
 }

@@ -49,6 +49,8 @@ public sealed class AiProviderResolver : IAiProviderResolver
         public int StatementMaxInputChars => AiProviderOptions.DefaultStatementMaxInputChars;
         public bool ImageInput => false;
         public int ImageRenderMaxEdge => AiProviderOptions.DefaultImageRenderMaxEdge;
+        public float? Temperature => null;
+        public bool StructuredOutput => true;
 
         public IChatClient GetChatClient() =>
             throw new InvalidOperationException($"AI provider '{key}' is unavailable: {ConfigurationError}");

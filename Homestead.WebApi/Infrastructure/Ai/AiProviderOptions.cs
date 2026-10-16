@@ -32,6 +32,22 @@ public class AiProviderOptions
     // Optional override for the document-text character budget embedded in the classification prompt.
     public int? MaxInputChars { get; set; }
 
+    // Sampling temperature sent with every call. Unset = not sent, so the model samples at its own default.
+    // Leave it unset for Anthropic (current Claude models reject any non-default sampling parameter with a
+    // 400) and for reasoning models (o-series, gpt-5.x deployments); set it, e.g. to 0, for ordinary chat
+    // models (Ollama, OpenAI non-reasoning) to make replies repeatable. Deliberately no per-type default and
+    // no model-name guessing: which models take it changes with every release, so the operator states it.
+    // Applied by AiProvider's pipeline, so a caller's explicit value still wins. Validated to the API's documented
+    // range: 0–2, or 0–1 for Anthropic.
+    public float? Temperature { get; set; }
+
+    // Whether the endpoint accepts a json_schema response format (strict structured output). Defaults on —
+    // most current runtimes take it, recent Ollama included. Flip to false only for an endpoint that rejects
+    // it: AiProvider's pipeline then downgrades the request to plain JSON mode and drops the OpenAI "strict"
+    // flag, so the reply's shape rests on the prompt's example and its "valid JSON only" rule rather than on
+    // an enforced schema. A wrong value is not discovered at runtime; it fails at "Test connection".
+    public bool StructuredOutput { get; set; } = true;
+
     // Default character budget for the document text embedded in the classification prompt, applied when
     // MaxInputChars is unset. The model is sent a head+tail sample of the extracted text capped at this many
     // characters.
