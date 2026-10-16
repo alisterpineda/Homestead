@@ -31,9 +31,10 @@ public interface IAiProvider
     bool ImageInput { get; }
     int ImageRenderMaxEdge { get; }
 
-    // The request-shaping knobs, as configured (no resolution: null Temperature means "not sent"). Exposed for
-    // the admin status page only — the provider's own pipeline applies them, so callers never read these to
-    // build a request.
+    // The request-shaping knobs, as configured (no resolution: null Temperature means "not sent"). The provider's
+    // own pipeline applies them, so callers never read these to build a request; they are read only for display
+    // (the admin status page) and as identity (the eval harness folds them into its response-cache key, so a
+    // change here changes those keys).
     float? Temperature { get; }
     bool StructuredOutput { get; }
 
