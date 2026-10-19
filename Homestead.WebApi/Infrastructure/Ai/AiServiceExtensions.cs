@@ -4,19 +4,29 @@ public static class AiServiceExtensions
 {
     public static IServiceCollection AddAiServices(this IServiceCollection services, IConfiguration configuration)
     {
-        // One registration per configured instance, enumerable rather than keyed: MS DI cannot enumerate
-        // keyed registrations, and enumeration is what feeds the admin status page — config stays the
-        // single source of truth for what providers exist. An instance with an unusable Type still
-        // registers (as unavailable-with-reason) so one typo cannot take the app down; the resolver and
-        // status page surface the reason instead.
-        foreach (var (key, options) in AiProviderConfiguration.ReadProviders(configuration))
-            services.AddSingleton<IAiProvider>(new AiProvider(key, options));
+        // One provider over static config. A misconfigured (or absent) section still registers — as
+        // unavailable-with-reason — so one typo cannot take the app down; Availability and the status page carry
+        // the reason instead.
+        var options = configuration.GetSection(AiOptions.SectionName).Get<AiOptions>() ?? new AiOptions();
+        var legacyKeysPresent = AiConfiguration.LegacyKeysPresent(configuration);
 
-        var defaultProviderKey = AiProviderConfiguration.ReadDefaultProviderKey(configuration);
-        services.AddSingleton<IAiProviderResolver>(sp =>
-            new AiProviderResolver(sp.GetServices<IAiProvider>(), defaultProviderKey));
+        services.AddSingleton(options);
+        services.AddSingleton(AiInputSettings.From(options));
+        services.AddSingleton<AiTelemetry>();
+        services.AddSingleton<IAiProvider>(sp => new AnthropicAiProvider(options, legacyKeysPresent,
+            sp.GetRequiredService<ILogger<AnthropicAiProvider>>(), sp.GetRequiredService<AiTelemetry>()));
 
         return services;
+    }
+
+    // Unconfigured AI is a silent no-op, so config that is there but cannot run (a typo, the retired
+    // Ai:Providers shape) gets one warning at startup rather than only a line on the admin page.
+    public static void LogAiAvailability(this IServiceProvider services)
+    {
+        var availability = services.GetRequiredService<IAiProvider>().Availability;
+        if (availability is { IsPresent: true, IsConfigured: false })
+            services.GetRequiredService<ILoggerFactory>().CreateLogger(typeof(AiServiceExtensions))
+                .LogWarning("AI is configured but unavailable: {Reason}", availability.Reason);
     }
 
     // The dedicated AI page-render path (renderer + cache service), mirroring AddThumbnails. Singletons:

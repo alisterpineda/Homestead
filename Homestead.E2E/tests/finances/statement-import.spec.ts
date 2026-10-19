@@ -12,7 +12,7 @@ function makeStatementCsv(baseName: string, uid: string): FilePayload {
 }
 
 // Statement parsing is AI-only (there is no deterministic CSV/OFX parser), and the E2E stack runs
-// without an AI provider. These tests therefore cover how the import dialog explains each
+// without AI configured. These tests therefore cover how the import dialog explains each
 // rejection; the review → commit flow needs an AI stub in the stack to be testable end to end.
 test.describe('Finances — statement import', () => {
   test('a CSV statement is rejected inline because it has no text to import', async ({

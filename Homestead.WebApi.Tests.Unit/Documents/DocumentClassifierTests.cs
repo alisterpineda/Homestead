@@ -1,4 +1,6 @@
+using System.Net;
 using System.Text.Json;
+using Anthropic.Exceptions;
 using Homestead.WebApi.Domain.Auditing;
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Domain.Parties;
@@ -10,44 +12,60 @@ using Homestead.WebApi.Modules.Documents.Services;
 using Homestead.WebApi.Tests.Unit.Infrastructure.Ai;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
+using NSubstitute.ExceptionExtensions;
 
 namespace Homestead.WebApi.Tests.Unit.Documents;
 
 public class DocumentClassifierTests : IDisposable
 {
     private readonly TestAppDbContext _db;
-    private readonly IAiProviderResolver _providerResolver;
+    // Ready by default; tests flip its Availability to exercise the gate.
+    private readonly IAiProvider _aiProvider = TestAiProviders.Provider();
     private readonly IAiClassificationService _classificationService;
     private readonly AiPageRenderService _aiPageRenderService;
-    // The provider substitute reads this bag lazily, so tests mutate it (ImageInput) after construction.
-    private readonly AiProviderOptions _aiOptions = TestAiProviders.Options();
     private readonly DocumentClassifier _sut;
 
-    private const string MediaPath = "/media";
+    // A real directory: the PDF-mode tests write a PDF under it, which the classifier opens and reads.
+    private readonly string _mediaPath = Path.Combine(Path.GetTempPath(), $"doc-classifier-test-{Guid.NewGuid()}");
 
     private readonly Guid _documentId = Guid.NewGuid();
 
     public DocumentClassifierTests()
     {
         _db = TestAppDbContext.Create();
-        _providerResolver = TestAiProviders.Resolver(TestAiProviders.Provider(options: _aiOptions));
         _classificationService = Substitute.For<IAiClassificationService>();
         // GetOrCreateAsync is virtual; substitute it to assert the scope/config gate without real I/O.
         _aiPageRenderService = Substitute.For<AiPageRenderService>(
             Substitute.For<IDocumentPageRenderer>(),
-            Options.Create(new FileStorageOptions { MediaPath = MediaPath, CachePath = "/cache" }),
+            Options.Create(new FileStorageOptions { MediaPath = _mediaPath, CachePath = "/cache" }),
             Substitute.For<ILogger<AiPageRenderService>>());
-        _sut = new DocumentClassifier(
-            _db, _providerResolver, _classificationService,
-            _aiPageRenderService,
-            Options.Create(new FileStorageOptions { MediaPath = MediaPath, CachePath = "/cache" }));
+        // PDF input off for the base suite, so the text/render-path tests don't hinge on the seeded (never written)
+        // file failing to open; the PDF-mode tests build their sut with it on.
+        _sut = CreateSut(TestAiProviders.Settings(pdfInput: false));
     }
+
+    // The input settings are an immutable record, so a test needing other knobs (ImageInput) builds its own sut.
+    private DocumentClassifier CreateSut(AiInputSettings settings) =>
+        new(_db, _aiProvider, settings, _classificationService,
+            _aiPageRenderService,
+            Options.Create(new FileStorageOptions { MediaPath = _mediaPath, CachePath = "/cache" }),
+            NullLogger<DocumentClassifier>.Instance);
+
+    // Matches a text-path input (no PDF) by name and text, and — in the second form — the exact page image.
+    private static ClassificationInput Input(string name, string? text) =>
+        Arg.Is<ClassificationInput>(i => i.DocumentName == name && i.ExtractedText == text && i.Pdf == null);
+
+    private static ClassificationInput Input(string name, string? text, byte[]? image) =>
+        Arg.Is<ClassificationInput>(i =>
+            i.DocumentName == name && i.ExtractedText == text && i.Pdf == null && i.PageImage == image);
 
     public void Dispose()
     {
         _db.Dispose();
+        try { Directory.Delete(_mediaPath, recursive: true); } catch { }
         GC.SuppressFinalize(this);
     }
 
@@ -63,8 +81,8 @@ public class DocumentClassifierTests : IDisposable
         SeedTag(tagId, "Finance", "Finance");
 
         _classificationService.ClassifyAsync(
-            "Test Doc", "extracted text here",
-            Arg.Any<byte[]?>(), Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
+            Input("Test Doc", "extracted text here"),
+            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
             .Returns(new ClassificationResult([tagId], [], "A summary", "Better Title"));
 
         var result = await _sut.ClassifyAsync(_documentId, "Test Doc", ClassificationScope.All, ct);
@@ -78,36 +96,33 @@ public class DocumentClassifierTests : IDisposable
     }
 
     [Fact]
-    public async Task ClassifyAsync_Unresolved_ReturnsNull()
+    public async Task ClassifyAsync_AiAbsent_ReturnsNull()
     {
         var ct = TestContext.Current.CancellationToken;
 
-        _providerResolver.Resolve(Arg.Any<string?>()).Returns((IAiProvider?)null);
+        _aiProvider.Availability.Returns(AiAvailability.Absent);
 
         var result = await _sut.ClassifyAsync(_documentId, "Test Doc", ClassificationScope.All, ct);
 
         Assert.Null(result);
         await _classificationService.DidNotReceive().ClassifyAsync(
-            Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<byte[]?>(),
+            Arg.Any<ClassificationInput>(),
             Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), Arg.Any<CancellationToken>());
     }
 
-    // A defined-but-broken provider (misconfigured, or a dangling default resolving to the synthetic
-    // unavailable instance) gates exactly like the unconfigured state.
+    // Present-but-misconfigured AI config gates exactly like the absent state.
     [Fact]
-    public async Task ClassifyAsync_UnavailableProvider_ReturnsNull()
+    public async Task ClassifyAsync_AiUnavailable_ReturnsNull()
     {
         var ct = TestContext.Current.CancellationToken;
 
-        // Built before .Returns — configuring one substitute inside another's Returns trips NSubstitute.
-        var unavailable = TestAiProviders.UnavailableProvider();
-        _providerResolver.Resolve(Arg.Any<string?>()).Returns(unavailable);
+        _aiProvider.Availability.Returns(AiAvailability.Unavailable("Ai:ApiKey is required."));
 
         var result = await _sut.ClassifyAsync(_documentId, "Test Doc", ClassificationScope.All, ct);
 
         Assert.Null(result);
         await _classificationService.DidNotReceive().ClassifyAsync(
-            Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<byte[]?>(),
+            Arg.Any<ClassificationInput>(),
             Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), Arg.Any<CancellationToken>());
     }
 
@@ -119,8 +134,8 @@ public class DocumentClassifierTests : IDisposable
         SeedDocumentWithVersion("some text");
 
         _classificationService.ClassifyAsync(
-            "Test Doc", "some text",
-            Arg.Any<byte[]?>(), Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
+            Input("Test Doc", "some text"),
+            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
             .Returns((ClassificationResult?)null);
 
         var result = await _sut.ClassifyAsync(_documentId, "Test Doc", ClassificationScope.All, ct);
@@ -166,16 +181,16 @@ public class DocumentClassifierTests : IDisposable
         await _db.SaveChangesAsync(ct);
 
         _classificationService.ClassifyAsync(
-            "Test Doc", "latest text",
-            Arg.Any<byte[]?>(), Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
+            Input("Test Doc", "latest text"),
+            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
             .Returns(new ClassificationResult([], [], "summary", "title"));
 
         var result = await _sut.ClassifyAsync(_documentId, "Test Doc", ClassificationScope.All, ct);
 
         Assert.NotNull(result);
         await _classificationService.Received(1).ClassifyAsync(
-            "Test Doc", "latest text",
-            Arg.Any<byte[]?>(), Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct);
+            Input("Test Doc", "latest text"),
+            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct);
     }
 
     [Fact]
@@ -185,29 +200,33 @@ public class DocumentClassifierTests : IDisposable
         var ct = TestContext.Current.CancellationToken;
 
         _classificationService.ClassifyAsync(
-            "Upload Name", "in-memory text",
-            Arg.Any<byte[]?>(), Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
+            Input("Upload Name", "in-memory text"),
+            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
             .Returns(new ClassificationResult([], [], "summary", "title"));
 
         var result = await _sut.ClassifyAsync("Upload Name", "in-memory text", null, ClassificationScope.All, ct);
 
         Assert.NotNull(result);
         await _classificationService.Received(1).ClassifyAsync(
-            "Upload Name", "in-memory text",
-            Arg.Any<byte[]?>(), Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct);
+            Input("Upload Name", "in-memory text"),
+            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct);
     }
 
     [Fact]
-    public async Task ClassifyAsync_Unresolved_InMemoryOverload_ReturnsNull()
+    public async Task ClassifyAsync_AiAbsent_InMemoryOverload_ReturnsNull()
     {
         var ct = TestContext.Current.CancellationToken;
-        _providerResolver.Resolve(Arg.Any<string?>()).Returns((IAiProvider?)null);
+        _aiProvider.Availability.Returns(AiAvailability.Absent);
+        var file = new ClassificationFile("hash", Path.Combine(_mediaPath, "upload.png"), "image/png", 100);
 
-        var result = await _sut.ClassifyAsync("Upload Name", "in-memory text", null, ClassificationScope.All, ct);
+        var result = await _sut.ClassifyAsync("Upload Name", "in-memory text", file, ClassificationScope.All, ct);
 
         Assert.Null(result);
+        // AI unconfigured -> no render (and no cache write) for a classify that would no-op anyway.
+        await _aiPageRenderService.DidNotReceive().GetOrCreateAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
         await _classificationService.DidNotReceive().ClassifyAsync(
-            Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<byte[]?>(),
+            Arg.Any<ClassificationInput>(),
             Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), Arg.Any<CancellationToken>());
     }
 
@@ -219,24 +238,23 @@ public class DocumentClassifierTests : IDisposable
         var ct = TestContext.Current.CancellationToken;
         SeedDocumentWithVersion("text");
         var image = new byte[] { 1, 2, 3 };
-        _aiOptions.ImageInput = true;
         _aiPageRenderService.GetOrCreateAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>(), ct).Returns(image);
         _classificationService.ClassifyAsync(
-            Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<byte[]?>(),
+            Arg.Any<ClassificationInput>(),
             Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
             .Returns(new ClassificationResult([], [], "s", "t"));
 
         await _sut.ClassifyAsync(_documentId, "Test Doc", ClassificationScope.All, ct);
 
         // Render keyed by the latest version's FileHash + physical path + content type, at the resolved
-        // provider's ImageRenderMaxEdge (default bag -> 1024).
+        // settings' ImageRenderMaxEdge (default -> 1024).
         await _aiPageRenderService.Received(1).GetOrCreateAsync(
-            "abc123", Path.Combine(MediaPath, "test/file.pdf"), "application/pdf",
-            AiProviderOptions.DefaultImageRenderMaxEdge, ct);
+            "abc123", Path.Combine(_mediaPath, "test/file.pdf"), "application/pdf",
+            AiOptions.DefaultImageRenderMaxEdge, ct);
         // The rendered bytes reach the AI service.
         await _classificationService.Received(1).ClassifyAsync(
-            "Test Doc", "text", image,
+            Input("Test Doc", "text", image: image),
             Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), ClassificationScope.All, ct);
     }
 
@@ -245,9 +263,8 @@ public class DocumentClassifierTests : IDisposable
     {
         var ct = TestContext.Current.CancellationToken;
         SeedDocumentWithVersion("text");
-        _aiOptions.ImageInput = true;
         _classificationService.ClassifyAsync(
-            Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<byte[]?>(),
+            Arg.Any<ClassificationInput>(),
             Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
             .Returns(new ClassificationResult([], [], "", "Test Doc"));
 
@@ -257,7 +274,7 @@ public class DocumentClassifierTests : IDisposable
         await _aiPageRenderService.DidNotReceive().GetOrCreateAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
         await _classificationService.Received(1).ClassifyAsync(
-            "Test Doc", "text", null,
+            Input("Test Doc", "text", image: null),
             Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), ClassificationScope.Tags, ct);
     }
 
@@ -266,19 +283,19 @@ public class DocumentClassifierTests : IDisposable
     {
         var ct = TestContext.Current.CancellationToken;
         SeedDocumentWithVersion("text");
-        _aiOptions.ImageInput = false;
+        var sut = CreateSut(TestAiProviders.Settings(imageInput: false));
         _classificationService.ClassifyAsync(
-            Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<byte[]?>(),
+            Arg.Any<ClassificationInput>(),
             Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
             .Returns(new ClassificationResult([], [], "s", "t"));
 
-        await _sut.ClassifyAsync(_documentId, "Test Doc", ClassificationScope.All, ct);
+        await sut.ClassifyAsync(_documentId, "Test Doc", ClassificationScope.All, ct);
 
         // Kill-switch off -> no render even though the scope (All) would otherwise attach an image.
         await _aiPageRenderService.DidNotReceive().GetOrCreateAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
         await _classificationService.Received(1).ClassifyAsync(
-            "Test Doc", "text", null,
+            Input("Test Doc", "text", image: null),
             Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), ClassificationScope.All, ct);
     }
 
@@ -289,9 +306,8 @@ public class DocumentClassifierTests : IDisposable
         // never runs on a synchronous request, even though the scope (All) would otherwise attach one.
         var ct = TestContext.Current.CancellationToken;
         SeedDocumentWithVersion("text");
-        _aiOptions.ImageInput = true;
         _classificationService.ClassifyAsync(
-            Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<byte[]?>(),
+            Arg.Any<ClassificationInput>(),
             Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
             .Returns(new ClassificationResult([], [], "s", "t"));
 
@@ -300,28 +316,239 @@ public class DocumentClassifierTests : IDisposable
         await _aiPageRenderService.DidNotReceive().GetOrCreateAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
         await _classificationService.Received(1).ClassifyAsync(
-            "Test Doc", "text", null,
+            Input("Test Doc", "text", image: null),
             Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), ClassificationScope.All, ct);
     }
 
     [Fact]
-    public async Task ClassifyAsync_InMemoryOverload_ForwardsProvidedPageImage_WithoutRendering()
+    public async Task ClassifyAsync_InMemoryOverload_RendersTheProvidedFile_AndForwardsBytes()
     {
+        // The upload path: the file isn't a persisted version yet, so the caller names it (hash, staged path, type).
         var ct = TestContext.Current.CancellationToken;
         var image = new byte[] { 9, 8, 7 };
+        var path = Path.Combine(_mediaPath, "upload.png");
+        _aiPageRenderService.GetOrCreateAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>(), ct).Returns(image);
         _classificationService.ClassifyAsync(
-            Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<byte[]?>(),
+            Arg.Any<ClassificationInput>(),
             Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
             .Returns(new ClassificationResult([], [], "s", "t"));
 
-        await _sut.ClassifyAsync("Upload Name", "in-memory text", image, ClassificationScope.All, ct);
+        await _sut.ClassifyAsync(
+            "Upload Name", "in-memory text", new ClassificationFile("uphash", path, "image/png", 100),
+            ClassificationScope.All, ct);
 
-        // The in-memory overload renders nothing; it forwards the caller-provided bytes verbatim.
+        await _aiPageRenderService.Received(1).GetOrCreateAsync(
+            "uphash", path, "image/png", AiOptions.DefaultImageRenderMaxEdge, ct);
+        await _classificationService.Received(1).ClassifyAsync(
+            Input("Upload Name", "in-memory text", image: image),
+            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), ClassificationScope.All, ct);
+    }
+
+    // ---- PDF input (ClassificationInputSelector decides; the classifier reads the file) -----------
+
+    private const string RealPdfPath = "test/real.pdf";
+
+    // Writes a real PDF under the media path and seeds a version pointing at it (its true size, so the byte cap
+    // sees the real number).
+    private byte[] SeedDocumentWithPdf(string? extractedText, int pages = 1)
+    {
+        var bytes = TestPdfs.Write(Path.Combine(_mediaPath, RealPdfPath), pages);
+        SeedDocumentWithVersion(extractedText, RealPdfPath, bytes.Length);
+        return bytes;
+    }
+
+    // Records every input the service is sent, answering each with an empty result.
+    private List<ClassificationInput> CaptureInputs()
+    {
+        var inputs = new List<ClassificationInput>();
+        _classificationService.ClassifyAsync(
+            Arg.Do<ClassificationInput>(inputs.Add),
+            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), Arg.Any<CancellationToken>())
+            .Returns(new ClassificationResult([], [], "s", "t"));
+        return inputs;
+    }
+
+    [Fact]
+    public async Task ClassifyAsync_ById_QualifyingPdf_SendsThePdf_WithoutTextOrRender()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var pdf = SeedDocumentWithPdf("ocr text");
+        var inputs = CaptureInputs();
+
+        await CreateSut(TestAiProviders.Settings()).ClassifyAsync(_documentId, "Test Doc", ClassificationScope.All, ct);
+
+        // The PDF replaces the OCR text (Claude reads it itself) and the render — no render is even made.
+        var input = Assert.Single(inputs);
+        Assert.Equal(pdf, input.Pdf);
+        Assert.Null(input.ExtractedText);
+        Assert.Null(input.PageImage);
         await _aiPageRenderService.DidNotReceive().GetOrCreateAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ClassifyAsync_ById_AttachImageFalse_QualifyingPdf_SendsTextOnly()
+    {
+        // The synchronous summarize endpoint opts out of document-carrying classification: no file is offered, so
+        // neither the PDF nor a render goes out, whatever the selector would have picked.
+        var ct = TestContext.Current.CancellationToken;
+        SeedDocumentWithPdf("ocr text");
+        var inputs = CaptureInputs();
+
+        await CreateSut(TestAiProviders.Settings())
+            .ClassifyAsync(_documentId, "Test Doc", ClassificationScope.All, ct, attachImage: false);
+
+        var input = Assert.Single(inputs);
+        Assert.Null(input.Pdf);
+        Assert.Null(input.PageImage);
+        Assert.Equal("ocr text", input.ExtractedText);
+        await _aiPageRenderService.DidNotReceive().GetOrCreateAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ClassifyAsync_ById_PdfOverThePageCap_FallsToTextAndRender()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        SeedDocumentWithPdf("ocr text", pages: 3);
+        var image = new byte[] { 1, 2, 3 };
+        _aiPageRenderService.GetOrCreateAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>(), ct).Returns(image);
+        var inputs = CaptureInputs();
+
+        await CreateSut(TestAiProviders.Settings(pdfInputMaxPages: 2))
+            .ClassifyAsync(_documentId, "Test Doc", ClassificationScope.All, ct);
+
+        var input = Assert.Single(inputs);
+        Assert.Null(input.Pdf);
+        Assert.Equal("ocr text", input.ExtractedText);
+        Assert.Same(image, input.PageImage);
+        await _aiPageRenderService.Received(1).GetOrCreateAsync(
+            "abc123", Path.Combine(_mediaPath, RealPdfPath), "application/pdf", AiOptions.DefaultImageRenderMaxEdge, ct);
+    }
+
+    // A PDF the API refuses (a 4xx a retry can't fix) doesn't fail the classify: one retry on the text + render
+    // path, with the OCR text back.
+    [Fact]
+    public async Task ClassifyAsync_PdfRejectedWith400_RetriesOnceWithTextAndRender()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        SeedDocumentWithPdf("ocr text");
+        var image = new byte[] { 4, 5, 6 };
+        _aiPageRenderService.GetOrCreateAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>(), ct).Returns(image);
+        var inputs = new List<ClassificationInput>();
+        _classificationService.ClassifyAsync(
+            Arg.Do<ClassificationInput>(inputs.Add),
+            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
+            .Returns(
+                _ => throw new AnthropicBadRequestException
+                {
+                    StatusCode = HttpStatusCode.BadRequest, ResponseBody = "The PDF could not be processed.",
+                },
+                _ => new ClassificationResult([], [], "s", "t"));
+
+        var result = await CreateSut(TestAiProviders.Settings())
+            .ClassifyAsync(_documentId, "Test Doc", ClassificationScope.All, ct);
+
+        Assert.NotNull(result);
+        Assert.Collection(inputs,
+            first => Assert.NotNull(first.Pdf),
+            retry =>
+            {
+                Assert.Null(retry.Pdf);
+                Assert.Equal("ocr text", retry.ExtractedText);
+                Assert.Same(image, retry.PageImage);
+            });
+        await _aiPageRenderService.Received(1).GetOrCreateAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>(), ct);
+    }
+
+    // The retry honours the image kill-switch like the normal text path: with ImageInput off it goes back on text
+    // alone, rendering nothing.
+    [Fact]
+    public async Task ClassifyAsync_PdfRejectedWithImageInputOff_RetriesOnTextAlone()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        SeedDocumentWithPdf("ocr text");
+        var inputs = new List<ClassificationInput>();
+        _classificationService.ClassifyAsync(
+            Arg.Do<ClassificationInput>(inputs.Add),
+            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
+            .Returns(
+                _ => throw new AnthropicBadRequestException
+                {
+                    StatusCode = HttpStatusCode.BadRequest, ResponseBody = "The PDF could not be processed.",
+                },
+                _ => new ClassificationResult([], [], "s", "t"));
+
+        var result = await CreateSut(TestAiProviders.Settings(imageInput: false))
+            .ClassifyAsync(_documentId, "Test Doc", ClassificationScope.All, ct);
+
+        Assert.NotNull(result);
+        Assert.Collection(inputs,
+            first => Assert.NotNull(first.Pdf),
+            retry =>
+            {
+                Assert.Null(retry.Pdf);
+                Assert.Null(retry.PageImage);
+                Assert.Equal("ocr text", retry.ExtractedText);
+            });
+        await _aiPageRenderService.DidNotReceiveWithAnyArgs().GetOrCreateAsync(default!, default!, default!, default, default);
+    }
+
+    // Auth failures would fail the text path the same way, and a rate limit is the job retry policy's business — so
+    // in PDF mode neither is retried here; the error propagates after one attempt, with no render.
+    [Theory]
+    [InlineData(401)]
+    [InlineData(429)]
+    public async Task ClassifyAsync_PdfModeAuthOrRateLimitError_IsNotRetried_AndPropagates(int status)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        SeedDocumentWithPdf("ocr text");
+        AnthropicApiException error = status == 401
+            ? new AnthropicUnauthorizedException { StatusCode = HttpStatusCode.Unauthorized, ResponseBody = "" }
+            : new AnthropicRateLimitException { StatusCode = HttpStatusCode.TooManyRequests, ResponseBody = "" };
+        _classificationService.ClassifyAsync(
+            Arg.Any<ClassificationInput>(),
+            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
+            .ThrowsAsync(error);
+
+        var thrown = await Assert.ThrowsAsync(error.GetType(), () =>
+            CreateSut(TestAiProviders.Settings()).ClassifyAsync(_documentId, "Test Doc", ClassificationScope.All, ct));
+
+        Assert.Same(error, thrown);
         await _classificationService.Received(1).ClassifyAsync(
-            "Upload Name", "in-memory text", image,
-            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), ClassificationScope.All, ct);
+            Arg.Any<ClassificationInput>(),
+            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct);
+        await _aiPageRenderService.DidNotReceive().GetOrCreateAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
+    }
+
+    // The rejection rule on its own: a non-transient, non-auth 4xx from the AI SDK only.
+    [Theory]
+    [InlineData(400, true)]
+    [InlineData(404, false)]
+    [InlineData(413, true)]
+    [InlineData(422, true)]
+    [InlineData(401, false)]
+    [InlineData(403, false)]
+    [InlineData(408, false)]
+    [InlineData(429, false)]
+    [InlineData(500, false)]
+    public void IsPdfRejection_OnlyForANonTransientNonAuth4xx(int status, bool expected)
+    {
+        var error = new AnthropicUnexpectedStatusCodeException { StatusCode = (HttpStatusCode)status, ResponseBody = "" };
+
+        Assert.Equal(expected, DocumentClassifier.IsPdfRejection(error, out var reported));
+        Assert.Equal(status, reported);
+    }
+
+    [Fact]
+    public void IsPdfRejection_IgnoresExceptionsFromOutsideTheAiSdk()
+    {
+        Assert.False(DocumentClassifier.IsPdfRejection(new InvalidOperationException("x"), out _));
     }
 
     // ---- ApplyAsync (net-diff onto a tracked/new document; no save, no audit) ----------------------
@@ -728,7 +955,7 @@ public class DocumentClassifierTests : IDisposable
         .Include(d => d.Suggestions)
         .First(d => d.Id == _documentId);
 
-    private void SeedDocumentWithVersion(string? extractedText)
+    private void SeedDocumentWithVersion(string? extractedText, string filePath = "test/file.pdf", long fileSize = 100)
     {
         _db.Documents.Add(new Document
         {
@@ -743,8 +970,8 @@ public class DocumentClassifierTests : IDisposable
             VersionNumber = 1,
             ExtractedText = extractedText,
             ContentType = "application/pdf",
-            FileSize = 100,
-            FilePath = "test/file.pdf",
+            FileSize = fileSize,
+            FilePath = filePath,
             FileHash = "abc123",
             FileExtension = ".pdf"
         });

@@ -18,10 +18,13 @@ public static class Extensions
     private const string HealthEndpointPath = "/health";
     private const string AlivenessEndpointPath = "/alive";
 
-    // The ActivitySource/Meter name the WebApi's IChatClient pipeline emits GenAI spans and metrics under —
-    // passed explicitly as UseOpenTelemetry's sourceName (AiProvider.BuildPipeline) so this subscription and the
-    // emitter can't drift apart. The value is Microsoft.Extensions.AI's own default, so it stays recognisable.
-    public const string MicrosoftExtensionsAiTelemetryName = "Experimental.Microsoft.Extensions.AI";
+    // The ActivitySource the Anthropic SDK emits its spans under (one per Claude API call; the WebApi pins them to
+    // metadata only, see AnthropicAiProvider). The SDK emits no metrics.
+    public const string AnthropicSdkTelemetrySource = "com.anthropic.sdk.csharp";
+
+    // The Meter the WebApi's AI token and request metrics are recorded under (AiTelemetry reads this constant, so
+    // the emitter and this subscription can't drift apart).
+    public const string HomesteadAiMeterName = "Homestead.Ai";
 
     public static TBuilder AddServiceDefaults<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
@@ -64,14 +67,14 @@ public static class Extensions
                 metrics.AddAspNetCoreInstrumentation()
                     .AddHttpClientInstrumentation()
                     .AddRuntimeInstrumentation()
-                    // GenAI token-usage and operation-duration histograms (see the tracing source below).
-                    .AddMeter(MicrosoftExtensionsAiTelemetryName);
+                    // AI token, request and duration metrics (AiTelemetry).
+                    .AddMeter(HomesteadAiMeterName);
             })
             .WithTracing(tracing =>
             {
                 tracing.AddSource(builder.Environment.ApplicationName)
-                    // GenAI chat spans from the WebApi's IChatClient pipeline (AiProvider.BuildPipeline).
-                    .AddSource(MicrosoftExtensionsAiTelemetryName)
+                    // One span per Claude API call, from the Anthropic SDK.
+                    .AddSource(AnthropicSdkTelemetrySource)
                     .AddAspNetCoreInstrumentation(tracing =>
                         // Exclude health check requests from tracing
                         tracing.Filter = context =>

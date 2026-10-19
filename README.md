@@ -119,47 +119,42 @@ All three of `OIDC_AUTHORITY`, `OIDC_CLIENT_ID`, and `OIDC_CLIENT_SECRET` must b
 
 #### AI (optional)
 
-AI-assisted document classification/summarization and statement parsing are optional — define no providers and the features are a graceful no-op. AI providers are **named config instances** under `Ai:Providers:{name}` (same shape as the OCR engines), selected via `Ai:DefaultProvider`.
+AI-assisted document classification/summarization, statement parsing and payee suggestions run on the **Claude API** (Anthropic) and are optional — leave `Ai__ApiKey` / `Ai__Model` unset and the features are a graceful no-op.
 
-> **Breaking (2026-07):** the flat `AI_ENDPOINT` / `AI_MODEL` / `AI_API_KEY` / `AI_IMAGE_INPUT` / `AI_IMAGE_RENDER_MAX_EDGE` env vars are **no longer read**. Because unconfigured AI is a silent no-op, a deployment that misses this rename keeps running but quietly stops classifying/summarizing new documents — migrate to the variables below.
-
-> **Breaking (2026-10):** the app no longer pins every AI call to temperature `0`, and no longer falls back from a strict `json_schema` response format when an endpoint rejects it with a 400. Which options an endpoint accepts is now stated per provider: set `Ai__Providers__{name}__Temperature` to `0` to keep the old deterministic sampling on an ordinary chat model, and `Ai__Providers__{name}__StructuredOutput` to `false` for an endpoint that was only working through the old fallback (every AI job on it fails with a 400 until you do). **Test connection** on the admin AI page tells you which, with the provider's own message.
+> **Breaking (2026-10):** AI is Claude-only, configured by one `Ai:*` section. The named-provider shape — `Ai__Providers__{name}__*` and `Ai__DefaultProvider` — is **no longer read**, and with it the OpenAI-compatible and Azure provider types and the `Temperature` / `StructuredOutput` knobs. Migrate by setting `Ai__ApiKey` and `Ai__Model`. Because unconfigured AI is a silent no-op, the app detects the old keys: while they are set and the new ones aren't, the admin **AI** page shows *Legacy AI config found* and the WebApi logs a warning at startup. Both shapes can be set side by side during the move (the new keys win), so keep the old ones until you're happy.
+>
+> (The older flat `AI_ENDPOINT` / `AI_MODEL` / `AI_API_KEY` / `AI_IMAGE_INPUT` / `AI_IMAGE_RENDER_MAX_EDGE` vars, retired in 2026-07, are not read either.)
 
 | Variable | Default | Description |
 |---|---|---|
-| `Ai__Providers__{name}__Type` | — | **Required** for every provider: `OpenAiCompatible`, `AzureFoundry` or `Anthropic` |
-| `Ai__Providers__{name}__Endpoint` | — | OpenAI-compatible base URL (e.g. `http://localhost:11434/v1`) or the Azure resource endpoint (e.g. `https://<res>.openai.azure.com`); optional for `Anthropic` (overrides the Claude API base URL) |
-| `Ai__Providers__{name}__Model` | — | Model tag (e.g. `gemma-4-e4b`), the Azure **deployment name**, or a Claude model ID (e.g. `claude-opus-5-5`) |
-| `Ai__Providers__{name}__ApiKey` | — | API key; optional for `OpenAiCompatible` (ignored by Ollama), **required** for `AzureFoundry` and `Anthropic` |
-| `Ai__Providers__{name}__ImageInput` | `true` | Attach a rendered page-1 image to classify/parse calls (turn off for text-only models) |
-| `Ai__Providers__{name}__ImageRenderMaxEdge` | `1024` | Long-edge pixel budget for that page render (256–4096) |
-| `Ai__Providers__{name}__MaxInputChars` | `12000` | Character budget for document text in the classification prompt |
-| `Ai__Providers__{name}__StatementMaxInputChars` | `120000` | Hard cap for statement text sent whole to statement parsing |
-| `Ai__Providers__{name}__Temperature` | — (not sent) | Sampling temperature, 0–2 (0–1 for `Anthropic`). Unset = not sent, so the model uses its own default. Leave it unset for Claude (`Anthropic`) and reasoning models, which reject it; set e.g. `0` for ordinary chat models (Ollama, OpenAI non-reasoning) for repeatable replies |
-| `Ai__Providers__{name}__StructuredOutput` | `true` | Request replies as a strict JSON schema. Set `false` only for an endpoint that rejects a `json_schema` response format — requests then use plain JSON mode |
-| `Ai__DefaultProvider` | — | Which provider the app uses. Optional when exactly one provider is defined; required with two or more |
+| `Ai__ApiKey` | — | **Required.** A Claude API key |
+| `Ai__Model` | — | **Required.** A Claude model ID, e.g. `claude-opus-5-5` |
+| `Ai__Endpoint` | — | Optional base-URL override (an absolute URI); unset uses the Claude API |
+| `Ai__Effort` | `medium` | How much the model thinks per request: `low`, `medium`, `high`, `xhigh` or `max`. Lowering it to `low` is the first thing to try if cost matters |
+| `Ai__RefusalFallback` | `true` | When the model declines a request (a safety-classifier refusal), re-run it on a fallback model chosen by Anthropic, inside the same call. Both attempts are billed. `false` makes a refusal final |
+| `Ai__ImageInput` | `true` | Attach a rendered page-1 image to classify/parse calls (the image is most of a classify's input tokens) |
+| `Ai__ImageRenderMaxEdge` | `1024` | Long-edge pixel budget for that page render (256–4096) |
+| `Ai__MaxInputChars` | `12000` | Character budget for document text in the classification prompt |
+| `Ai__StatementMaxInputChars` | `120000` | Hard cap for statement text sent whole to statement parsing |
+| `Ai__PdfInput` | `true` | Classify a PDF by sending the PDF itself (Claude reads every page's text and layout) instead of the OCR text and page image. Only for background classifies whose scope includes name, parties or summary, and only within the two caps below; anything else — and a PDF the API rejects — uses the OCR text + page image. Watch the token meter on your first bulk classify |
+| `Ai__PdfInputMaxPages` | `20` | Longest PDF sent as a PDF (1–100; pages drive tokens) |
+| `Ai__PdfInputMaxBytes` | `4194304` (4 MiB) | Largest PDF sent as a PDF (64 KiB–20 MiB). Kept modest because a PDF request holds roughly 20× the file size in memory while it is sent |
 
-A misconfigured provider never stops the app from starting — it shows as *unavailable, with the reason* on the admin **AI** page, which also has a per-provider **Test connection** probe. The probe sends a real structured-output request with the provider's `Temperature` / `StructuredOutput` applied, so a setting the endpoint doesn't accept fails there, with the provider's own error message — nothing retries around it at runtime.
+A misconfigured section never stops the app from starting — it shows as *unavailable, with the reason* on the admin **AI** page, which also has a **Test connection** probe. The probe sends a real structured-output request at the configured effort, so a wrong key or model ID fails there with the API's own message.
+
+**Cost.** Every classify, summary, statement parse and payee pass is a paid call. Put a **workspace spend limit** on the key in the Anthropic Console — that is the real guard; the Console is also the authoritative usage view. The Aspire dashboard shows per-call token counts (`homestead.ai.tokens`) for a quick look.
 
 For local Aspire dev, set these in **AppHost user-secrets** — AppHost forwards the whole `Ai:` section verbatim as the env vars above:
 
 ```bash
 cd Homestead.AppHost
-dotnet user-secrets set "Ai:Providers:local:Type" "OpenAiCompatible"
-dotnet user-secrets set "Ai:Providers:local:Endpoint" "http://localhost:11434/v1"
-dotnet user-secrets set "Ai:Providers:local:Model" "gemma-4-e4b"
-dotnet user-secrets set "Ai:Providers:local:Temperature" "0"
-# a second provider, e.g. Azure AI Foundry:
-# dotnet user-secrets set "Ai:Providers:foundry:Type" "AzureFoundry"
-# dotnet user-secrets set "Ai:Providers:foundry:Endpoint" "https://<res>.openai.azure.com"
-# dotnet user-secrets set "Ai:Providers:foundry:ApiKey" "<key>"
-# dotnet user-secrets set "Ai:Providers:foundry:Model" "<deployment-name>"
-# or the Claude API (Anthropic):
-# dotnet user-secrets set "Ai:Providers:claude:Type" "Anthropic"
-# dotnet user-secrets set "Ai:Providers:claude:Model" "claude-opus-5-5"
-# dotnet user-secrets set "Ai:Providers:claude:ApiKey" "<key>"
-dotnet user-secrets set "Ai:DefaultProvider" "local"
+dotnet user-secrets set "Ai:ApiKey" "<key>"
+dotnet user-secrets set "Ai:Model" "claude-opus-5-5"
+# optional:
+# dotnet user-secrets set "Ai:Effort" "low"
 ```
+
+In Docker, keep the key out of the compose file: put `Ai__ApiKey` in an `env_file` that is not committed (or a secrets mechanism that ends up as that env var).
 
 #### Other
 

@@ -16,25 +16,31 @@ public record DocumentClassificationOutput(
     ClassificationResult Classification,
     List<TagInfo> AvailableTags);
 
+// The stored file behind a classify call, from which DocumentClassifier picks the input (the PDF itself, a page-1
+// render, or neither — ClassificationInputSelector).
+public record ClassificationFile(string FileHash, string PhysicalPath, string ContentType, long FileSize);
+
 public interface IDocumentClassifier
 {
     /// <summary>
     /// Classifies an existing document by loading its latest version's extracted text. Pure — performs
     /// no document writes. Returns null when AI is not configured or the model produced nothing.
-    /// Attaches the page-1 image when <paramref name="attachImage"/> is true and the scope/config allow it;
-    /// synchronous callers (the interactive preview / summarize endpoints) pass <c>false</c> so the slow
-    /// vision prefill only ever runs on the background-job path.
+    /// When <paramref name="attachImage"/> is true and the scope/config allow it, sends the PDF itself or the
+    /// page-1 image (see <see cref="ClassificationInputSelector"/>); synchronous callers (the synchronous
+    /// summarize endpoint) pass <c>false</c> so the slow document prefill only ever runs on the background-job path.
     /// </summary>
     Task<DocumentClassificationOutput?> ClassifyAsync(
         Guid documentId, string documentName, ClassificationScope scope, CancellationToken ct,
         bool attachImage = true);
 
     /// <summary>
-    /// Classifies from an in-memory document name + extracted text (+ an optional pre-rendered page image)
-    /// — used during upload, before the document exists. Pure — performs no document writes.
+    /// Classifies from an in-memory document name + extracted text and the stored file (from which the PDF or a
+    /// page render is taken, as for the overload above) — used during upload, before the document exists. Pure —
+    /// performs no document writes.
     /// </summary>
     Task<DocumentClassificationOutput?> ClassifyAsync(
-        string documentName, string? extractedText, byte[]? pageImage, ClassificationScope scope, CancellationToken ct);
+        string documentName, string? extractedText, ClassificationFile? file, ClassificationScope scope,
+        CancellationToken ct);
 
     /// <summary>
     /// Applies a classification result to a tracked (or newly-constructed) document as a net diff —
@@ -53,10 +59,12 @@ public interface IDocumentClassifier
 
 public class DocumentClassifier(
     AppDbContext db,
-    IAiProviderResolver providerResolver,
+    IAiProvider aiProvider,
+    AiInputSettings aiSettings,
     IAiClassificationService classificationService,
     AiPageRenderService aiPageRenderService,
-    IOptions<FileStorageOptions> storageOptions) : IDocumentClassifier
+    IOptions<FileStorageOptions> storageOptions,
+    ILogger<DocumentClassifier> logger) : IDocumentClassifier
 {
     private readonly FileStorageOptions _storageOptions = storageOptions.Value;
 
@@ -64,9 +72,9 @@ public class DocumentClassifier(
         Guid documentId, string documentName, ClassificationScope scope, CancellationToken ct,
         bool attachImage = true)
     {
-        // Gate on the resolved provider being available before touching the database so an unconfigured
-        // (or broken) AI integration short-circuits without loading the latest version.
-        if (providerResolver.Resolve() is not { IsConfigured: true } provider)
+        // Gate on AI being available before touching the database so an unconfigured (or broken) AI
+        // integration short-circuits without loading the latest version.
+        if (!aiProvider.Availability.IsConfigured)
             return null;
 
         var latestVersion = await db.DocumentVersions
@@ -74,35 +82,33 @@ public class DocumentClassifier(
             .OrderByDescending(v => v.VersionNumber)
             .FirstOrDefaultAsync(ct);
 
-        // Attach the page-1 render when the caller allows it (synchronous endpoints opt out — image-carrying
-        // classification must stay on the background path), the image is enabled, and the scope benefits
-        // from it (Name/Parties/Summary). GetOrCreateAsync caches by FileHash + edge, so re-classify reuses
-        // an upload-warmed render.
-        byte[]? pageImage = null;
-        if (attachImage && latestVersion is not null && provider.ImageInput && scope.ShouldAttachImage())
-        {
-            pageImage = await aiPageRenderService.GetOrCreateAsync(
+        // The file is offered only when the caller allows it (synchronous endpoints opt out — document-carrying
+        // classification must stay on the background path); whether the PDF or a render is then sent is the
+        // selector's call.
+        var file = attachImage && latestVersion is not null
+            ? new ClassificationFile(
                 latestVersion.FileHash,
                 latestVersion.GetPhysicalPath(_storageOptions.MediaPath),
                 latestVersion.ContentType,
-                provider.ImageRenderMaxEdge,
-                ct);
-        }
+                latestVersion.FileSize)
+            : null;
 
-        return await ClassifyCoreAsync(documentName, latestVersion?.ExtractedText, pageImage, scope, ct);
+        return await ClassifyCoreAsync(documentName, latestVersion?.ExtractedText, file, scope, ct);
     }
 
     public async Task<DocumentClassificationOutput?> ClassifyAsync(
-        string documentName, string? extractedText, byte[]? pageImage, ClassificationScope scope, CancellationToken ct)
+        string documentName, string? extractedText, ClassificationFile? file, ClassificationScope scope,
+        CancellationToken ct)
     {
-        if (providerResolver.Resolve() is not { IsConfigured: true })
+        if (!aiProvider.Availability.IsConfigured)
             return null;
 
-        return await ClassifyCoreAsync(documentName, extractedText, pageImage, scope, ct);
+        return await ClassifyCoreAsync(documentName, extractedText, file, scope, ct);
     }
 
     private async Task<DocumentClassificationOutput?> ClassifyCoreAsync(
-        string documentName, string? extractedText, byte[]? pageImage, ClassificationScope scope, CancellationToken ct)
+        string documentName, string? extractedText, ClassificationFile? file, ClassificationScope scope,
+        CancellationToken ct)
     {
         // Only load a catalog when its field is in scope — mirrors the service omitting it from the prompt.
         var allTags = scope.HasFlag(ClassificationScope.Tags)
@@ -119,14 +125,61 @@ public class DocumentClassifier(
                 .ToListAsync(ct)
             : [];
 
-        var result = await classificationService.ClassifyAsync(
-            documentName, extractedText, pageImage, allTags, allParties, scope, ct);
+        var mode = file is null ? ClassificationInputMode.Text : SelectInputMode(file, scope);
+
+        // In PDF mode the bytes are read from disk and no render is made (so the render cache isn't warmed for a
+        // later statement import — harmless, it renders then). Otherwise the page-1 render is cached by FileHash +
+        // edge, so a re-classify reuses an upload-warmed one.
+        var pdf = mode == ClassificationInputMode.Pdf ? await File.ReadAllBytesAsync(file!.PhysicalPath, ct) : null;
+        var pageImage = mode == ClassificationInputMode.TextAndImage ? await RenderAsync(file!, ct) : null;
+
+        ClassificationResult? result;
+        try
+        {
+            // PDF mode sends no OCR text: the PDF replaces it.
+            result = await classificationService.ClassifyAsync(
+                new ClassificationInput(documentName, pdf is null ? extractedText : null, pageImage, pdf),
+                allTags, allParties, scope, ct);
+        }
+        catch (Exception ex) when (pdf is not null && IsPdfRejection(ex, out var status))
+        {
+            // The API refused this PDF (a 4xx that a retry can't fix — e.g. a document it can't parse). Retry once
+            // on the text + render path, which copes with anything OCR managed, rather than failing the classify.
+            logger.LogWarning(ex,
+                "PDF input for document '{Name}' was rejected ({Status}); retrying once on extracted text and the page render",
+                documentName, status);
+            var fallback = ClassificationInputSelector.SelectWithoutPdf(aiSettings, scope);
+            pageImage = fallback == ClassificationInputMode.TextAndImage ? await RenderAsync(file!, ct) : null;
+            result = await classificationService.ClassifyAsync(
+                new ClassificationInput(documentName, extractedText, pageImage, null), allTags, allParties, scope, ct);
+        }
 
         if (result is null)
             return null;
 
         return new DocumentClassificationOutput(result, allTags);
     }
+
+    // The cheap gates first, so only a PDF that could qualify is opened for its page count and encryption flag.
+    private ClassificationInputMode SelectInputMode(ClassificationFile file, ClassificationScope scope)
+    {
+        if (!ClassificationInputSelector.IsPdfCandidate(aiSettings, scope, file.ContentType, file.FileSize))
+            return ClassificationInputSelector.Select(aiSettings, scope, file.ContentType, file.FileSize, null, false);
+
+        var facts = ClassificationInputSelector.ReadPdfFacts(file.PhysicalPath);
+        return ClassificationInputSelector.Select(
+            aiSettings, scope, file.ContentType, file.FileSize, facts?.PageCount, facts?.IsEncrypted ?? false);
+    }
+
+    private Task<byte[]?> RenderAsync(ClassificationFile file, CancellationToken ct) =>
+        aiPageRenderService.GetOrCreateAsync(
+            file.FileHash, file.PhysicalPath, file.ContentType, aiSettings.ImageRenderMaxEdge, ct);
+
+    // A 4xx the API won't change its mind about. Excluded: auth and not-found (401/403/404 — a bad key, model ID or
+    // endpoint fails the text path the same way), and the transient 408/429, which the job's retry policy handles.
+    internal static bool IsPdfRejection(Exception exception, out int status) =>
+        AiProviderErrors.TryGetStatus(exception, out status, out _)
+        && status is >= 400 and < 500 and not (401 or 403 or 404 or 408 or 429);
 
     public async Task ApplyAsync(
         Document document, ClassificationResult classification, ClassificationScope scope,

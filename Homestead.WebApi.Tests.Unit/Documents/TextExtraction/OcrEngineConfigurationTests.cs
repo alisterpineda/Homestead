@@ -271,8 +271,8 @@ public class OcrEngineConfigurationTests
         })));
     }
 
-    // The key side of the resolution chain: configured default -> built-in. No sole-instance arm (contrast
-    // AiProviderConfiguration): the built-in engine always exists, so "unset" already has an answer. A
+    // The key side of the resolution chain: configured default -> built-in. No sole-instance arm: the built-in
+    // engine always exists, so "unset" already has an answer. A
     // dangling default is returned VERBATIM — the fallback with provenance is TextExtractionHelper's job.
     [Fact]
     public void ResolveDefaultKey_Null_IsBuiltIn_Configured_ReturnedVerbatim()

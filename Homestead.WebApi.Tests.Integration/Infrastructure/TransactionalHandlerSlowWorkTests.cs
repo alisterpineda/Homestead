@@ -1,4 +1,5 @@
 using System.Reflection;
+using Homestead.WebApi.Infrastructure.Ai;
 using Homestead.WebApi.Modules.Documents.Services;
 using Homestead.WebApi.Processing;
 using Microsoft.AspNetCore.Http;
@@ -81,9 +82,16 @@ public class TransactionalHandlerSlowWorkTests(PostgresFixture fixture)
     [Fact]
     public void TransactionalHandlers_DoNotDependOn_SlowWorkServices()
     {
-        var banned = new[] { typeof(IAiClassificationService), typeof(HttpClient), typeof(IHttpClientFactory) };
+        var banned = new[]
+        {
+            typeof(IAiClassificationService), typeof(IAiProvider), typeof(HttpClient), typeof(IHttpClientFactory),
+        };
+        // TestAiConnectionHandler calls IAiProvider behind a POST (so it counts as transactional) but never
+        // writes, so the lazy command transaction never opens and no connection is held.
+        var allowlist = new HashSet<string> { "TestAiConnectionHandler" };
 
         var violations = TransactionalHandlers()
+            .Where(t => !allowlist.Contains(t.Name))
             .Where(t => ConstructorParameterTypes(t).Any(banned.Contains))
             .Select(t => t.Name)
             .ToList();
@@ -99,17 +107,16 @@ public class TransactionalHandlerSlowWorkTests(PostgresFixture fixture)
         // These legitimately inject IDocumentClassifier:
         //  - ApplyClassificationHandler / CreateDocumentFromUploadHandler use ApplyAsync only (fast persist;
         //    the slow ClassifyAsync now runs upstream in the job scope).
-        //  - SummarizeDocumentHandler still calls ClassifyAsync because Summarize stays synchronous. The
+        //  - SummarizeDocumentHandler still calls ClassifyAsync: the synchronous summarize endpoint is the one
+        //    sanctioned slow synchronous handler, kept because IdleInTransactionTests uses it as the acceptance
+        //    test that a slow AI call before the first flush holds no connection idle-in-transaction. The
         //    guardrail therefore does NOT protect the one handler most likely to regress — CLAUDE.md + code
-        //    review are its cover. This is the accepted cost of keeping Summarize synchronous.
-        //  - ClassifyPreviewHandler calls ClassifyAsync behind a POST but never writes, so the lazy command
-        //    transaction never opens and no connection is held.
+        //    review are its cover.
         var allowlist = new HashSet<string>
         {
             "ApplyClassificationHandler",
             "CreateDocumentFromUploadHandler",
-            "SummarizeDocumentHandler",
-            "ClassifyPreviewHandler"
+            "SummarizeDocumentHandler"
         };
 
         var violations = TransactionalHandlers()

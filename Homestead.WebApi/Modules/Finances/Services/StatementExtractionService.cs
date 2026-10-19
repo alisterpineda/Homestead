@@ -2,19 +2,18 @@ using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
 using Homestead.WebApi.Infrastructure.Ai;
 using Homestead.WebApi.Modules.Finances.Processing.Statements;
-using Microsoft.Extensions.AI;
 
 namespace Homestead.WebApi.Modules.Finances.Services;
 
 /// <summary>
-/// AI-backed statement header extractor. Sends its request through the shared
-/// <see cref="StructuredChatRequest"/> path (json_schema response format + <c>strict:true</c>, one attempt)
+/// AI-backed statement header extractor. Sends one structured-output request through <see cref="IAiProvider"/>
 /// with a statement-specific schema and — critically — the FULL
 /// extracted text rather than the classification head+tail sample (a statement's closing balance can sit
 /// anywhere).
 /// </summary>
 public class StatementExtractionService(
-    IAiProviderResolver providerResolver,
+    IAiProvider aiProvider,
+    AiInputSettings settings,
     ILogger<StatementExtractionService> logger)
     : IStatementExtractionService
 {
@@ -22,48 +21,32 @@ public class StatementExtractionService(
 
     // Generated from the reply DTO with the options it is deserialized with, so schema and DTO can't drift.
     // Every property is required and optional ones are ["type","null"] unions (strict mode); the nullable
-    // direction enum comes out as an anyOf (see StructuredChatRequest.CreateStrictSchema).
+    // direction enum comes out as an anyOf (see AiJsonSchema.CreateStrict).
     private static readonly JsonElement ResponseSchema =
-        StructuredChatRequest.CreateStrictSchema(typeof(StatementExtractionResponse), JsonOptions);
+        AiJsonSchema.CreateStrict(typeof(StatementExtractionResponse), JsonOptions);
 
     public async Task<StatementIr> ExtractAsync(string extractedText, byte[]? pageImage, CancellationToken ct)
     {
-        // This service does not gate on availability (callers do); an unresolved or broken provider is a
-        // caller bug and throws with the reason. The provider owns and reuses the client (app-lifetime,
-        // connection-pooled), so do not dispose it here.
-        var provider = providerResolver.Resolve()
-            ?? throw new InvalidOperationException("AI is not configured (no provider under Ai:Providers resolves).");
-        var client = provider.GetChatClient();
+        // No availability guard of its own: callers gate on IAiProvider.Availability, and SendAsync throws with
+        // the reason (AiAvailability.EnsureConfigured) if one doesn't.
 
         var systemPrompt = BuildSystemPrompt();
-        var userMessage = BuildUserMessage(extractedText, provider.StatementMaxInputChars);
+        var userMessage = BuildUserMessage(extractedText, settings.StatementMaxInputChars);
 
-        // When a page render is supplied (scanned statement), send a multimodal user turn so the model can
-        // read layout cues OCR flattens (summary boxes, columns). Otherwise keep the plain-text turn.
-        var userTurn = pageImage is not null
-            ? new ChatMessage(ChatRole.User, new List<AIContent>
-            {
-                new TextContent(userMessage),
-                new DataContent(pageImage, "image/png")
-            })
-            : new ChatMessage(ChatRole.User, userMessage);
-
-        var messages = new List<ChatMessage>
-        {
-            new(ChatRole.System, systemPrompt),
-            userTurn
-        };
+        // When a page render is supplied (scanned statement), attach it so the model can read layout cues OCR
+        // flattens (summary boxes, columns).
+        List<AiContentPart> userContent = pageImage is not null
+            ? [new AiImagePart(pageImage, "image/png"), new AiTextPart(userMessage)]
+            : [new AiTextPart(userMessage)];
 
         logger.LogTrace("Statement extraction system prompt:\n{SystemPrompt}", systemPrompt);
         logger.LogTrace("Statement extraction user message:\n{UserMessage}", userMessage);
 
-        // Streamed: line-item output grows with the transaction count (see StructuredChatRequest).
-        var response = await StructuredChatRequest.SendAsync(
-            client, messages, ResponseSchema,
-            schemaName: "statement_extraction",
-            schemaDescription: "Structured header of a parsed account statement.",
-            stream: true, "Statement extraction", ct);
-        var content = response.Text;
+        // LongOutput: line-item output grows with the transaction count, so the provider streams.
+        var reply = await aiProvider.SendAsync(new AiRequest(
+            AiFeature.StatementExtraction, settings.Effort, systemPrompt, userContent, ResponseSchema,
+            LongOutput: true, "Statement extraction"), ct);
+        var content = reply.Json;
 
         logger.LogTrace("Statement extraction response:\n{Response}", content);
 
@@ -121,7 +104,7 @@ public class StatementExtractionService(
              account-holder's perspective; if the row is ambiguous, use null.
            - runningBalance — the running/ledger balance printed on that row, or null if none is printed.
 
-        Respond with a JSON object in exactly this shape:
+        A filled-in reply looks like this:
         {
           "kind": "Bank",
           "institution": "Example Bank",
@@ -138,7 +121,6 @@ public class StatementExtractionService(
         }
 
         Rules:
-        - Always respond with valid JSON only, no additional text.
         - Use null for any field the statement does not state; never guess.
         - Do not sum, net, or otherwise derive balances — transcribe the printed values only.
         - Transcribe EVERY transaction row faithfully; do not skip, merge, or deduplicate lines. amount is
@@ -238,8 +220,8 @@ public class StatementExtractionService(
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     // Kind and Direction stay strings, not enums: [AllowedValues] puts the enum in the schema while ParseKind /
-    // ParseDirection keep tolerating a value outside it (possible only on a provider configured StructuredOutput=false,
-    // where the schema isn't enforced).
+    // ParseDirection keep tolerating a value outside it (defensive: the enforced schema makes one unreachable, but a
+    // junk value then degrades to Unknown / null rather than failing the whole parse).
     private sealed class StatementExtractionResponse
     {
         [AllowedValues(

@@ -41,8 +41,6 @@ export type { BulkRestoreDocuments$Params as BulkRestoreDocuments$Params } from 
 export { bulkRestoreDocuments as bulkRestoreDocuments } from './fn/documents/bulk-restore-documents';
 export type { RestoreDocument$Params as RestoreDocument$Params } from './fn/documents/restore-document';
 export { restoreDocument as restoreDocument } from './fn/documents/restore-document';
-export type { ClassifyPreview$Params as ClassifyPreview$Params } from './fn/documents/classify-preview';
-export { classifyPreview as classifyPreview } from './fn/documents/classify-preview';
 export type { SummarizeDocument$Params as SummarizeDocument$Params } from './fn/documents/summarize-document';
 export { summarizeDocument as summarizeDocument } from './fn/documents/summarize-document';
 export type { GetTextExtractionEngines$Params as GetTextExtractionEngines$Params } from './fn/documents/get-text-extraction-engines';

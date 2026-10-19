@@ -33,8 +33,8 @@ requirement everything else follows from: the mirror is readable by a person wit
   goes in that shard's `_versions/` folder with a ` (vN)` suffix.
 - **Mirror deletes**, guarded by a bulk-delete circuit breaker (see below). The mirror converges on the
   library; it does not accumulate forever.
-- **Targets are config instances** under `Backup:Targets:{key}` — the same shape as `Ocr:Engines` and
-  `Ai:Providers` — not in-app CRUD. In Phase 1 the only kind is `Local` (a directory the WebApi process
+- **Targets are config instances** under `Backup:Targets:{key}` — the same shape as `Ocr:Engines` —
+  not in-app CRUD. In Phase 1 the only kind is `Local` (a directory the WebApi process
   can write to: local disk, mounted NAS share, bind-mounted volume); Phase 2 adds `GoogleDrive` (see
   [Phase 2 — the Google Drive target](#phase-2--the-google-drive-target)).
 - **What gets mirrored where is an admin decision**, made in-app: an admin adds a *backup* — one source
@@ -230,7 +230,7 @@ The **card** carries what belongs to the destination:
 
 - Config (key, kind) and an availability badge. A misconfigured target reads as
   **unavailable, because &lt;reason&gt;** rather than preventing the app from booting — the same
-  error-string posture the OCR engines and AI providers use.
+  error-string posture the OCR engines and AI config use.
 - **Where the mirror is** — the configured directory for a local target; for Drive, the root folder as
   *actually created*, rendered as a link to it. Never the configured value once something exists there:
   a card that names a location the mirror does not live at is worse than no card. When config and the

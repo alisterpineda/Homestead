@@ -1,213 +1,145 @@
 using Homestead.WebApi.Infrastructure.Ai;
 using Homestead.WebApi.Modules.Admin.Features.Ai.GetAiStatus;
+using NSubstitute;
 
 namespace Homestead.WebApi.Tests.Unit.Admin.Ai;
 
-// Built over real AiProvider instances + the real AiProviderResolver (both directly newable) so the list
-// shape, default marking, and error surfacing are pinned end-to-end rather than against substitutes.
+// Built over the real AiConfiguration.Validate verdict and real AiInputSettings.From resolution (only the provider
+// is a substitute, standing in for the Availability it would compute), so state, error surfacing and the resolved
+// knobs are pinned end-to-end rather than against hand-picked values.
 public class GetAiStatusHandlerTests
 {
-    private static AiProvider Provider(string key, AiProviderOptions? options = null) =>
-        new(key, options ?? new AiProviderOptions
-        {
-            Type = AiProviderType.OpenAiCompatible,
-            Endpoint = "http://homeserver:11434/v1",
-            Model = "gemma-4-e4b",
-        });
+    private static AiOptions Configured() => new() { ApiKey = "sk-ant-test", Model = "claude-opus-5-5" };
 
-    private static GetAiStatusHandler Sut(List<AiProvider> providers, string? defaultKey = null) =>
-        new(providers, new AiProviderResolver(providers, defaultKey));
-
-    [Fact]
-    public async Task Providers_ListedOrderedByKey_WithDefaultMarked()
+    private static GetAiStatusHandler Sut(AiOptions options, bool legacyKeysPresent = false)
     {
-        var ct = TestContext.Current.CancellationToken;
-        var sut = Sut([Provider("local"), Provider("foundry", new AiProviderOptions
-        {
-            Type = AiProviderType.AzureFoundry,
-            Endpoint = "https://res.openai.azure.com",
-            ApiKey = "k",
-            Model = "gpt-5-mini",
-        })], defaultKey: "foundry");
-
-        var result = await sut.HandleAsync(ct);
-
-        Assert.Equal(["foundry", "local"], result.Select(r => r.Key));
-        Assert.Collection(result,
-            r =>
-            {
-                Assert.True(r.IsDefault);
-                Assert.True(r.IsConfigured);
-                Assert.Equal(AiProviderType.AzureFoundry, r.Type);
-                Assert.Equal("gpt-5-mini", r.Model);
-            },
-            r => Assert.False(r.IsDefault));
+        var provider = Substitute.For<IAiProvider>();
+        provider.Availability.Returns(AiConfiguration.Validate(options, legacyKeysPresent));
+        return new GetAiStatusHandler(provider, options, AiInputSettings.From(options));
     }
 
     [Fact]
-    public async Task SoleProvider_IsMarkedDefault_WithoutAnyDefaultKey()
+    public async Task Configured_ReportsReady_WithModelAndDefaults()
     {
         var ct = TestContext.Current.CancellationToken;
-        var sut = Sut([Provider("local")]);
 
-        var result = await sut.HandleAsync(ct);
+        var result = await Sut(Configured()).HandleAsync(ct);
 
-        var row = Assert.Single(result);
-        Assert.True(row.IsDefault);
+        Assert.True(result.IsConfigured);
+        Assert.True(result.IsPresent);
+        Assert.Null(result.ConfigurationError);
+        Assert.Equal("claude-opus-5-5", result.Model);
+        Assert.Null(result.Endpoint);   // unset -> the Claude API's default base URL
+        Assert.Equal("medium", result.Effort);
+        Assert.True(result.RefusalFallback);
+        Assert.True(result.ImageInput);
+        Assert.Equal(AiOptions.DefaultImageRenderMaxEdge, result.ImageRenderMaxEdge);
+        Assert.Equal(AiOptions.DefaultStatementMaxInputChars, result.StatementMaxInputChars);
+        Assert.True(result.PdfInput);
+        Assert.Equal(AiOptions.DefaultPdfInputMaxPages, result.PdfInputMaxPages);
+        Assert.Equal(AiOptions.DefaultPdfInputMaxBytes, result.PdfInputMaxBytes);
     }
 
     [Fact]
-    public async Task UnavailableProvider_SurfacesItsReason()
+    public async Task NoAiConfig_ReportsNotPresent_WithNoError()
     {
         var ct = TestContext.Current.CancellationToken;
-        // Type present but nothing else -> "Endpoint is required."; also a provider with no Type at all.
-        var sut = Sut([
-            Provider("half", new AiProviderOptions { Type = AiProviderType.AzureFoundry }),
-            Provider("typeless", new AiProviderOptions { Endpoint = "http://x/v1", Model = "m" }),
-        ]);
 
-        var result = await sut.HandleAsync(ct);
+        var result = await Sut(new AiOptions()).HandleAsync(ct);
 
-        Assert.Equal("Endpoint is required.", result.Single(r => r.Key == "half").ConfigurationError);
-        var typeless = result.Single(r => r.Key == "typeless");
-        Assert.Null(typeless.Type);
-        Assert.False(typeless.IsConfigured);
-        Assert.StartsWith("Type is required", typeless.ConfigurationError);
+        Assert.False(result.IsConfigured);
+        Assert.False(result.IsPresent);
+        Assert.Null(result.ConfigurationError);
+        Assert.Null(result.Model);
+        Assert.False(result.HasApiKey);
+    }
+
+    [Fact]
+    public async Task MisconfiguredAi_SurfacesItsReason()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        var result = await Sut(new AiOptions { Model = "claude-opus-5-5" }).HandleAsync(ct);
+
+        Assert.False(result.IsConfigured);
+        Assert.True(result.IsPresent);
+        Assert.Equal("Ai:ApiKey is required.", result.ConfigurationError);
+    }
+
+    // The retired multi-provider shape alone is "present but unusable", so the operator who upgraded without
+    // renaming sees why AI went quiet instead of a silent off.
+    [Fact]
+    public async Task LegacyConfigOnly_SurfacesTheLegacyReason()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        var result = await Sut(new AiOptions(), legacyKeysPresent: true).HandleAsync(ct);
+
+        Assert.False(result.IsConfigured);
+        Assert.True(result.IsPresent);
+        Assert.Equal(AiConfiguration.LegacyConfigReason, result.ConfigurationError);
     }
 
     [Fact]
     public async Task ApiKey_NeverEchoed_OnlyPresenceReported()
     {
         var ct = TestContext.Current.CancellationToken;
-        const string secret = "sk-super-secret-value";
-        var sut = Sut([Provider("foundry", new AiProviderOptions
-        {
-            Type = AiProviderType.AzureFoundry,
-            Endpoint = "https://res.openai.azure.com",
-            ApiKey = secret,
-            Model = "gpt-5-mini",
-        })]);
+        const string secret = "sk-ant-super-secret-value";
+        var options = Configured();
+        options.ApiKey = secret;
 
-        var result = await sut.HandleAsync(ct);
+        var result = await Sut(options).HandleAsync(ct);
 
-        var row = Assert.Single(result);
-        Assert.True(row.HasApiKey);
+        Assert.True(result.HasApiKey);
         // The raw key must never appear anywhere on the response — ToString() spans every field, so this
         // would catch a regression that added the key value to the response shape.
-        Assert.DoesNotContain(secret, row.ToString());
+        Assert.DoesNotContain(secret, result.ToString());
     }
 
     [Fact]
     public async Task MaxInputChars_IsTheResolvedBudget()
     {
         var ct = TestContext.Current.CancellationToken;
-        var options = new AiProviderOptions
-        {
-            Type = AiProviderType.OpenAiCompatible,
-            Endpoint = "http://homeserver:11434/v1",
-            Model = "gemma-4-e4b",
-            MaxInputChars = AiProviderOptions.MinInputChars - 1, // below floor -> default
-        };
+        var options = Configured();
+        options.MaxInputChars = AiOptions.MinInputChars - 1; // below floor -> default
 
-        var result = await Sut([Provider("local", options)]).HandleAsync(ct);
+        var result = await Sut(options).HandleAsync(ct);
 
-        Assert.Equal(AiProviderOptions.DefaultMaxInputChars, Assert.Single(result).MaxInputChars);
+        Assert.Equal(AiOptions.DefaultMaxInputChars, result.MaxInputChars);
     }
 
-    // The request-shaping knobs are reported as configured, not resolved: a set Temperature/StructuredOutput
-    // comes through verbatim, and an unset Temperature stays null ("not sent" — the page shows "model
-    // default") with StructuredOutput defaulting on.
+    // Effort is reported as the resolved wire value, whatever casing config used; the endpoint override is trimmed.
     [Fact]
-    public async Task RequestKnobs_ReportedAsConfigured()
+    public async Task Effort_IsTheResolvedWireValue_AndEndpointIsTrimmed()
     {
         var ct = TestContext.Current.CancellationToken;
-        var sut = Sut([
-            Provider("tuned", new AiProviderOptions
-            {
-                Type = AiProviderType.OpenAiCompatible,
-                Endpoint = "http://homeserver:11434/v1",
-                Model = "gemma-4-e4b",
-                Temperature = 0.3f,
-                StructuredOutput = false,
-            }),
-            Provider("untuned"),
-        ]);
+        var options = Configured();
+        options.Effort = "XHigh";
+        options.Endpoint = "  https://gateway.example/anthropic  ";
+        options.RefusalFallback = false;
 
-        var result = await sut.HandleAsync(ct);
+        var result = await Sut(options).HandleAsync(ct);
 
-        var tuned = result.Single(r => r.Key == "tuned");
-        Assert.Equal(0.3f, tuned.Temperature);
-        Assert.False(tuned.StructuredOutput);
-        var untuned = result.Single(r => r.Key == "untuned");
-        Assert.Null(untuned.Temperature);
-        Assert.True(untuned.StructuredOutput);
+        Assert.True(result.IsConfigured);
+        Assert.Equal("xhigh", result.Effort);
+        Assert.Equal("https://gateway.example/anthropic", result.Endpoint);
+        Assert.False(result.RefusalFallback);
     }
 
-    // A bound "NaN" or "Infinity" fails validation, and the response says so — but the number itself is left
-    // out: System.Text.Json refuses to write a non-finite float under the app's strict number handling, which
-    // would turn the status page into a 500 for every provider instead of one unavailable row.
-    [Theory]
-    [InlineData(float.NaN)]
-    [InlineData(float.PositiveInfinity)]
-    public async Task NonFiniteTemperature_IsReportedAsNull_WithTheValidationError(float temperature)
-    {
-        var ct = TestContext.Current.CancellationToken;
-        var sut = Sut([
-            Provider("broken", new AiProviderOptions
-            {
-                Type = AiProviderType.OpenAiCompatible,
-                Endpoint = "http://homeserver:11434/v1",
-                Model = "gemma-4-e4b",
-                Temperature = temperature,
-            }),
-        ]);
-
-        var broken = Assert.Single(await sut.HandleAsync(ct));
-
-        Assert.Null(broken.Temperature);
-        Assert.False(broken.IsConfigured);
-        Assert.Equal("Temperature must be between 0 and 2.", broken.ConfigurationError);
-    }
-
-    // The contract the frontend's "no default selected" warning relies on: multiple providers with no
-    // default key produce a list where NOTHING is marked default (and no synthetic row is appended).
+    // The PDF knobs are reported as resolved: the switch verbatim, the caps after their floor/ceiling.
     [Fact]
-    public async Task MultipleProviders_NoDefaultKey_MarksNoneDefault()
+    public async Task PdfInput_ReportsTheResolvedKnobs()
     {
         var ct = TestContext.Current.CancellationToken;
-        var sut = Sut([Provider("local"), Provider("other")]);
+        var options = Configured();
+        options.PdfInput = false;
+        options.PdfInputMaxPages = 0;                       // below floor -> default
+        options.PdfInputMaxBytes = 50L * 1024 * 1024;       // above ceiling -> clamped
 
-        var result = await sut.HandleAsync(ct);
+        var result = await Sut(options).HandleAsync(ct);
 
-        Assert.Equal(2, result.Count);
-        Assert.DoesNotContain(result, r => r.IsDefault);
-    }
-
-    [Fact]
-    public async Task NoProviders_EmptyList()
-    {
-        var ct = TestContext.Current.CancellationToken;
-
-        var result = await Sut([]).HandleAsync(ct);
-
-        Assert.Empty(result);
-    }
-
-    // A dangling Ai:DefaultProvider still shows up — as an unavailable row marked default — because the
-    // admin page is where an operator debugs exactly this typo.
-    [Fact]
-    public async Task DanglingDefault_AppendedAsUnavailableDefaultRow()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        var sut = Sut([Provider("local")], defaultKey: "typo");
-
-        var result = await sut.HandleAsync(ct);
-
-        Assert.Equal(2, result.Count);
-        Assert.False(result.Single(r => r.Key == "local").IsDefault);
-        var dangling = result.Single(r => r.Key == "typo");
-        Assert.True(dangling.IsDefault);
-        Assert.False(dangling.IsConfigured);
-        Assert.Equal("AI provider 'typo' is not defined under Ai:Providers.", dangling.ConfigurationError);
+        Assert.False(result.PdfInput);
+        Assert.Equal(AiOptions.DefaultPdfInputMaxPages, result.PdfInputMaxPages);
+        Assert.Equal(AiOptions.MaxPdfInputMaxBytes, result.PdfInputMaxBytes);
     }
 }

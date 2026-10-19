@@ -4,7 +4,7 @@ using Homestead.WebApi.Modules.Documents.Services;
 namespace Homestead.WebApi.Tests.Unit.Documents;
 
 // Direct unit tests for the head+tail document-text sampler (Tier 3). SampleText is internal-static and
-// pure, so it is exercised here without the IChatClient seam — the boundary/surrogate logic is the part
+// pure, so it is exercised here without the IAiProvider seam — the boundary/surrogate logic is the part
 // most worth pinning. The elision marker is matched by its distinctive inner substring (the const itself
 // is private to the service).
 public class AiClassificationSamplerTests

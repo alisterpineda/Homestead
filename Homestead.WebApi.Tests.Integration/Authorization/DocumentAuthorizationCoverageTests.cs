@@ -41,7 +41,8 @@ public class DocumentAuthorizationCoverageTests(PostgresFixture fixture)
             .ToList();
 
         // Guards the guard: if DocumentsPrefix stopped matching the Documents group, the assertion below would
-        // pass vacuously. 18 is the number of document-id endpoints that authorize at the route today.
+        // pass vacuously. 17 document-id endpoints authorize at the route today; the allowlisted routes are
+        // counted too, so 18 stays a safe floor.
         Assert.True(documentIdRoutes.Count >= 18,
             $"Expected at least 18 Documents endpoints with a document id in the route, found {documentIdRoutes.Count}.");
 
@@ -71,9 +72,9 @@ public class DocumentAuthorizationCoverageTests(PostgresFixture fixture)
             .Where(x => x.Auth is not null)
             .ToList();
 
-        // Guards the guard: the same 18 endpoints the coverage test requires to carry the metadata.
-        Assert.True(authorized.Count >= 18,
-            $"Expected at least 18 endpoints with document authorization, found {authorized.Count}.");
+        // Guards the guard: the 17 endpoints that carry the metadata today (the coverage test above requires it).
+        Assert.True(authorized.Count >= 17,
+            $"Expected at least 17 endpoints with document authorization, found {authorized.Count}.");
 
         var mismatched = authorized
             .Select(x =>

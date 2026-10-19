@@ -1,12 +1,11 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Homestead.WebApi.Infrastructure.Ai;
-using Microsoft.Extensions.AI;
 
 namespace Homestead.WebApi.Modules.Documents.Services;
 
 public class AiClassificationService(
-    IAiProviderResolver providerResolver, ILogger<AiClassificationService> logger)
+    IAiProvider aiProvider, AiInputSettings settings, ILogger<AiClassificationService> logger)
     : IAiClassificationService
 {
     private const int MaxPartyDescriptionLength = 200;
@@ -32,14 +31,14 @@ public class AiClassificationService(
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     public async Task<ClassificationResult?> ClassifyAsync(
-        string documentName,
-        string? extractedText,
-        byte[]? pageImage,
+        ClassificationInput input,
         List<TagInfo> availableTags,
         List<PartyInfo> availableParties,
         ClassificationScope scope,
         CancellationToken ct)
     {
+        var documentName = input.DocumentName;
+
         // Nothing in scope (e.g. a malformed Fields request that maps to no known field) -> no-op,
         // never call the model with a degenerate empty-schema prompt.
         if (scope == ClassificationScope.None)
@@ -47,42 +46,34 @@ public class AiClassificationService(
 
         // Scope-aware early return: skip the model call when nothing in scope could produce a useful result.
         // A tag/party field is only useful if there is a catalog to match against; Name/Summary need a
-        // source signal — extracted text OR a page image (the image is the whole point when OCR is empty,
-        // e.g. a scanned PDF/photo, so a render alone is enough to justify the call).
-        var hasText = !string.IsNullOrWhiteSpace(extractedText);
-        var hasImage = pageImage is not null;
+        // source signal — extracted text, a page image or the PDF itself (an image or PDF is the whole point when
+        // OCR is empty, e.g. a scan, so either alone is enough to justify the call).
+        var hasText = !string.IsNullOrWhiteSpace(input.ExtractedText);
+        var hasDocument = input.PageImage is not null || input.Pdf is not null;
         var tagsUseful = scope.HasFlag(ClassificationScope.Tags) && availableTags.Count > 0;
         var partiesUseful = scope.HasFlag(ClassificationScope.Parties) && availableParties.Count > 0;
-        if (!hasText && !hasImage && !tagsUseful && !partiesUseful)
+        if (!hasText && !hasDocument && !tagsUseful && !partiesUseful)
             return null;
 
-        // This service does not gate on availability (callers do); an unresolved or broken provider is a
-        // caller bug and throws with the reason. The provider owns and reuses the client (app-lifetime,
-        // connection-pooled), so do not dispose it here.
-        var provider = providerResolver.Resolve()
-            ?? throw new InvalidOperationException("AI is not configured (no provider under Ai:Providers resolves).");
-        var client = provider.GetChatClient();
+        // No availability guard of its own: callers gate on IAiProvider.Availability, and SendAsync throws with
+        // the reason (AiAvailability.EnsureConfigured) if one doesn't.
 
-        var systemPrompt = BuildSystemPrompt(scope);
-        var budget = provider.MaxInputChars;
-        var userMessage = BuildUserMessage(documentName, extractedText, availableTags, availableParties, scope, budget);
+        // The service stays "dumb" about inputs: it sends what it is given, and the decision (PDF, text + render,
+        // text) is made upstream by ClassificationInputSelector. Production's PDF mode passes no extracted text —
+        // the PDF replaces it, since Claude reads every page's text and layout itself — so the text block is
+        // dropped exactly then (the eval's PdfAndText mode sends both, to measure that choice). A supplied page
+        // render lets the model read layout cues OCR flattens (letterheads, title blocks, columns).
+        var pdfOnly = input.Pdf is not null && input.ExtractedText is null;
+        var systemPrompt = BuildSystemPrompt(scope, input.Pdf is not null, pdfOnly);
+        var userMessage = BuildUserMessage(
+            documentName, pdfOnly ? null : input.ExtractedText ?? "", availableTags, availableParties, scope,
+            settings.MaxInputChars);
 
-        // When a page render is supplied, send a multimodal user turn (text + PNG) so the model can read
-        // layout cues OCR flattens (letterheads, title blocks, columns). Otherwise keep the plain-text turn.
-        // The service stays "dumb": image in -> attach it; the scope gate that decides whether to render
-        // lives upstream in DocumentClassifier.
-        var userTurn = pageImage is not null
-            ? new ChatMessage(ChatRole.User, new List<AIContent>
-            {
-                new TextContent(userMessage),
-                new DataContent(pageImage, "image/png")
-            })
-            : new ChatMessage(ChatRole.User, userMessage);
-
-        var messages = new List<ChatMessage>
+        List<AiContentPart> userContent = input switch
         {
-            new(ChatRole.System, systemPrompt),
-            userTurn
+            { Pdf: { } pdf } => [new AiPdfPart(pdf), new AiTextPart(userMessage)],
+            { PageImage: { } image } => [new AiImagePart(image, "image/png"), new AiTextPart(userMessage)],
+            _ => [new AiTextPart(userMessage)],
         };
 
         logger.LogTrace("Classification system prompt:\n{SystemPrompt}", systemPrompt);
@@ -90,12 +81,10 @@ public class AiClassificationService(
 
         try
         {
-            var response = await StructuredChatRequest.SendAsync(
-                client, messages, BuildResponseSchema(scope),
-                schemaName: "document_classification",
-                schemaDescription: "Structured classification of the document.",
-                stream: false, $"Classification of document '{documentName}'", ct);
-            var content = response.Text;
+            var reply = await aiProvider.SendAsync(new AiRequest(
+                AiFeature.Classification, settings.Effort, systemPrompt, userContent, BuildResponseSchema(scope),
+                LongOutput: false, $"Classification of document '{documentName}'"), ct);
+            var content = reply.Json;
 
             logger.LogTrace("Classification response:\n{Response}", content);
 
@@ -159,66 +148,57 @@ public class AiClassificationService(
     }
 
     // The system prompt is assembled from fragments so it describes only the in-scope fields: each field
-    // contributes one numbered instruction, one JSON-schema line, and any guardrail rules. The schema-by-example
-    // block and "valid JSON only" rule are retained deliberately — they are all a provider configured
-    // StructuredOutput=false has to go on, since its request carries JSON mode instead of the enforced schema.
-    private static string BuildSystemPrompt(ClassificationScope scope)
+    // contributes one numbered instruction, led by the reply field it fills, and any guardrail rules. The reply's
+    // shape itself is enforced by the response schema (BuildResponseSchema), so the prompt carries no JSON example.
+    private static string BuildSystemPrompt(ClassificationScope scope, bool hasPdf, bool pdfOnly)
     {
         var instructions = new List<string>();
-        var schemaLines = new List<string>();
         var rules = new List<string>();
 
         if (scope.HasFlag(ClassificationScope.Tags))
         {
-            instructions.Add("Select applicable tags from the provided tag list by their index. Only select tags that are clearly relevant to the document content. Do not create new tags.");
-            schemaLines.Add("  \"tagIndexes\": [0, 1]");
+            instructions.Add("tagIndexes: Select applicable tags from the provided tag list by their index. Only select tags that are clearly relevant to the document content. Do not create new tags.");
             rules.Add("- Only use tag indexes that appear in the provided list");
             rules.Add("- If no tags match, return an empty tagIndexes array");
         }
 
         if (scope.HasFlag(ClassificationScope.Parties))
         {
-            instructions.Add("Select applicable parties (people or organisations the document concerns) from the provided party list by their index. Only select parties that are clearly relevant to the document content. Do not create new parties.");
-            schemaLines.Add("  \"partyIndexes\": [0, 1]");
+            instructions.Add("partyIndexes: Select applicable parties (people or organisations the document concerns) from the provided party list by their index. Only select parties that are clearly relevant to the document content. Do not create new parties.");
             rules.Add("- Only use party indexes that appear in the provided list");
             rules.Add("- If no parties match, return an empty partyIndexes array");
         }
 
         if (scope.HasFlag(ClassificationScope.Summary))
         {
-            instructions.Add("Write a concise 2-3 sentence summary of the document.");
-            schemaLines.Add("  \"summary\": \"A brief summary of the document.\"");
+            instructions.Add("summary: Write a concise 2-3 sentence summary of the document.");
             rules.Add("- The summary should capture the key information in the document");
         }
 
         if (scope.HasFlag(ClassificationScope.Name))
         {
-            instructions.Add("Suggest a clear, descriptive title for the document.");
-            schemaLines.Add("  \"suggestedTitle\": \"A descriptive title\"");
+            instructions.Add("suggestedTitle: Suggest a clear, descriptive title for the document.");
             rules.Add("- The suggested title should be human-readable and descriptive");
         }
 
-        rules.Add("- Always respond with valid JSON only, no additional text");
-
         var numberedInstructions = string.Join(
             "\n", instructions.Select((text, i) => $"{i + 1}. {text}"));
-        var schemaBlock = string.Join(",\n", schemaLines);
         var rulesBlock = string.Join("\n", rules);
 
         return
-            "You are a document classification assistant. Given a document's name and extracted text content, you must:\n\n" +
+            (pdfOnly
+                ? "You are a document classification assistant. Given a document (attached) and its name, you must:\n\n"
+                : hasPdf
+                    ? "You are a document classification assistant. Given a document (attached), its name and its extracted text content, you must:\n\n"
+                    : "You are a document classification assistant. Given a document's name and extracted text content, you must:\n\n") +
             numberedInstructions + "\n\n" +
-            "Respond with a JSON object in this exact format:\n" +
-            "{\n" +
-            schemaBlock + "\n" +
-            "}\n\n" +
             "Rules:\n" +
             rulesBlock;
     }
 
-    // Builds a JSON schema describing exactly the in-scope response fields. Shaped for OpenAI strict-mode
-    // structured outputs: an object with additionalProperties:false and every property listed in "required"
-    // (the model still satisfies "required" with empty arrays / empty strings when nothing applies).
+    // Builds a JSON schema describing exactly the in-scope response fields, in the strict shape structured output
+    // needs: an object with additionalProperties:false and every property listed in "required" (the model still
+    // satisfies "required" with empty arrays / empty strings when nothing applies).
     private static JsonElement BuildResponseSchema(ClassificationScope scope)
     {
         var properties = new JsonObject();
@@ -282,7 +262,7 @@ public class AiClassificationService(
     // for many household documents the classifying signal (parties, totals, dates, signatures) lives at the
     // end, which a leading-only window never sees. Slice boundaries snap to whitespace for clean word edges
     // and never split a UTF-16 surrogate pair (a raw substring can orphan half a pair → U+FFFD downstream).
-    // Precondition: budget >= a few hundred chars (guaranteed by AiProviderOptions.MinInputChars upstream).
+    // Precondition: budget >= a few hundred chars (guaranteed by AiOptions.MinInputChars upstream).
     internal static string SampleText(string? extractedText, int budget)
     {
         var text = extractedText ?? string.Empty;
@@ -362,19 +342,20 @@ public class AiClassificationService(
         return -1;
     }
 
+    // extractedText null = PDF-only input: the attached PDF is the source, so only the name goes in the text.
     private static string BuildUserMessage(
         string documentName, string? extractedText, List<TagInfo> tags, List<PartyInfo> parties,
         ClassificationScope scope, int budget)
     {
-        var text = SampleText(extractedText, budget);
+        // Every field needs the source, so name + extracted text (or the attached PDF) are always present.
+        var message = extractedText is null
+            ? $"Document name: {documentName}"
+            : $"""
+                Document name: {documentName}
 
-        // Every field needs the source, so name + extracted text are always present.
-        var message = $"""
-            Document name: {documentName}
-
-            Extracted text:
-            {text}
-            """;
+                Extracted text:
+                {SampleText(extractedText, budget)}
+                """;
 
         // The catalogs are only sent for the fields that consume them — this is the real token saving.
         // Items are keyed by a short positional index rather than their GUID: indexes are cheap to emit and

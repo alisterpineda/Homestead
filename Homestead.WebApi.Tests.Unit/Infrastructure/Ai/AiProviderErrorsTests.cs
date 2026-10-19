@@ -1,28 +1,12 @@
-using System.ClientModel;
-using System.ClientModel.Primitives;
 using System.Net;
 using Anthropic.Exceptions;
+using Anthropic.Models;
 using Homestead.WebApi.Infrastructure.Ai;
-using NSubstitute;
 
 namespace Homestead.WebApi.Tests.Unit.Infrastructure.Ai;
 
 public class AiProviderErrorsTests
 {
-    [Theory]
-    [InlineData(400)]
-    [InlineData(0)]
-    public void OpenAiSdk_ReportsItsStatus(int status)
-    {
-        var response = Substitute.For<PipelineResponse>();
-        response.Status.Returns(status);
-
-        Assert.True(AiProviderErrors.TryGetStatus(
-            new ClientResultException("json_schema not supported", response), out var actual, out var message));
-        Assert.Equal(status, actual);
-        Assert.Contains("json_schema", message);
-    }
-
     // The message carries the response body — the provider's own account of what it rejected.
     [Fact]
     public void AnthropicBadRequest_ReportsStatusAndBody()
@@ -51,6 +35,31 @@ public class AiProviderErrorsTests
     {
         Assert.True(AiProviderErrors.TryGetStatus(
             new AnthropicIOException("connection refused", new HttpRequestException("refused")), out var status, out _));
+        Assert.Equal(0, status);
+    }
+
+    // An error event after the HTTP 200 of a streamed reply: the event's type stands in for a status, so a mid-stream
+    // overload still reads as transient.
+    [Theory]
+    [InlineData(ErrorType.OverloadedError, 529)]
+    [InlineData(ErrorType.ApiError, 500)]
+    [InlineData(ErrorType.RateLimitError, 429)]
+    [InlineData(ErrorType.InvalidRequestError, 0)]
+    [InlineData(null, 0)]
+    public void AnthropicStreamErrorEvent_ReportsAStatusFromItsType(ErrorType? type, int expected)
+    {
+        var ex = new AnthropicSseException("Overloaded") { ErrorType = type };
+
+        Assert.True(AiProviderErrors.TryGetStatus(ex, out var status, out var message));
+        Assert.Equal(expected, status);
+        Assert.Contains("Overloaded", message);
+    }
+
+    [Fact]
+    public void AnthropicCutOffStream_IsNoAnswer()
+    {
+        Assert.True(AiProviderErrors.TryGetStatus(
+            new AnthropicInvalidDataException("stream ended early"), out var status, out _));
         Assert.Equal(0, status);
     }
 

@@ -4,39 +4,46 @@ import { of, throwError, Subject } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { AiStatusComponent } from './ai-status.component';
 import { AdminApiService } from '@/api/services/admin-api.service';
-import type { AiProviderStatusResponse } from '@/api/generated/models/ai-provider-status-response';
+import type { AiStatusResponse } from '@/api/generated/models/ai-status-response';
 import type { TestAiConnectionResponse } from '@/api/generated/models/test-ai-connection-response';
 
-const LOCAL: AiProviderStatusResponse = {
-  key: 'local',
-  type: 'OpenAiCompatible',
+const READY: AiStatusResponse = {
   isConfigured: true,
+  isPresent: true,
   configurationError: null,
-  isDefault: true,
-  endpoint: 'http://homeserver:11434/v1',
-  model: 'gemma-4-e4b',
+  model: 'claude-opus-5-5',
+  endpoint: null,
   hasApiKey: true,
+  effort: 'medium',
+  refusalFallback: true,
   maxInputChars: 12000,
-  temperature: null,
-  structuredOutput: true,
+  statementMaxInputChars: 120000,
+  imageInput: true,
+  imageRenderMaxEdge: 1024,
+  pdfInput: true,
+  pdfInputMaxPages: 20,
+  pdfInputMaxBytes: 4194304,
 };
 
-const BROKEN_FOUNDRY: AiProviderStatusResponse = {
-  key: 'foundry-gpt5',
-  type: 'AzureFoundry',
+const ABSENT: AiStatusResponse = {
+  ...READY,
   isConfigured: false,
-  configurationError: 'ApiKey is required.',
-  isDefault: false,
-  endpoint: 'https://res.openai.azure.com',
-  model: 'gpt-5-mini',
+  isPresent: false,
+  model: null,
   hasApiKey: false,
-  maxInputChars: 12000,
-  temperature: null,
-  structuredOutput: true,
 };
 
-// The value cell beside a provider-detail label (e.g. "Temperature"), so assertions pin the value to its row
-// rather than matching a bare "0" or "On" anywhere on the page.
+const LEGACY_REASON =
+  'Legacy AI config found (Ai:Providers / Ai:DefaultProvider are no longer read) — set Ai:ApiKey and Ai:Model.';
+
+const LEGACY: AiStatusResponse = {
+  ...ABSENT,
+  isPresent: true,
+  configurationError: LEGACY_REASON,
+};
+
+// The value cell beside a detail label (e.g. "Effort"), so assertions pin the value to its row rather than
+// matching a bare "On" anywhere on the page.
 function detailValue(root: HTMLElement, label: string): string | undefined {
   const labelEl = Array.from(root.querySelectorAll('span')).find(el => el.textContent?.trim() === label);
   return labelEl?.nextElementSibling?.textContent?.trim();
@@ -58,7 +65,7 @@ describe('AiStatusComponent', () => {
   beforeEach(() => {
     api.getAiStatus.mockReset();
     api.testAiConnection.mockReset();
-    api.getAiStatus.mockReturnValue(of([LOCAL, BROKEN_FOUNDRY]));
+    api.getAiStatus.mockReturnValue(of(READY));
     api.testAiConnection.mockReturnValue(of<TestAiConnectionResponse>({
       success: true, message: 'Connection successful.', latencyMs: 42,
     }));
@@ -73,141 +80,79 @@ describe('AiStatusComponent', () => {
     expect(component).toBeTruthy();
   });
 
-  it('should load the provider list', () => {
+  it('should load the status', () => {
     const { component } = create();
 
     expect(component.loading()).toBe(false);
     expect(component.error()).toBe(false);
-    expect(component.providers()?.map(p => p.key)).toEqual(['local', 'foundry-gpt5']);
+    expect(component.status()?.model).toBe('claude-opus-5-5');
   });
 
-  it('should render every provider with default badge and unavailable reason', () => {
+  it('should render the configured card with every setting', () => {
     const { fixture } = create();
     fixture.detectChanges();
-    const html: string = fixture.nativeElement.outerHTML;
+    const root: HTMLElement = fixture.nativeElement;
 
-    expect(html).toContain('local');
-    expect(html).toContain('foundry-gpt5');
-    expect(html).toContain('Default');
-    expect(html).toContain('OpenAI-compatible');
-    expect(html).toContain('Azure AI Foundry');
-    // The broken provider surfaces its reason on the row, not a bare "Not configured".
-    expect(html).toContain('ApiKey is required.');
+    expect(root.outerHTML).toContain('Configured');
+    expect(detailValue(root, 'Model')).toBe('claude-opus-5-5');
+    expect(detailValue(root, 'Endpoint')).toBe('Claude API default');
+    expect(detailValue(root, 'API key')).toBe('Set');
+    expect(detailValue(root, 'Effort')).toBe('medium');
+    expect(detailValue(root, 'Refusal fallback')).toBe('On');
+    expect(detailValue(root, 'Page image')).toBe('On (1024 px)');
+    expect(detailValue(root, 'PDF input')).toBe('On (up to 20 pages, 4 MB)');
   });
 
-  it('should label an Anthropic provider and show the SDK default when no endpoint is set', () => {
-    api.getAiStatus.mockReturnValue(of<AiProviderStatusResponse[]>([{
-      key: 'claude',
-      type: 'Anthropic',
-      isConfigured: true,
-      configurationError: null,
-      isDefault: true,
-      endpoint: null,
-      model: 'claude-opus-5-5',
-      hasApiKey: true,
-      maxInputChars: 12000,
-      temperature: null,
-      structuredOutput: true,
-    }]));
-
-    const { fixture } = create();
-    fixture.detectChanges();
-    const html: string = fixture.nativeElement.outerHTML;
-
-    expect(html).toContain('Anthropic');
-    expect(html).toContain('SDK default');
-    expect(html).toContain('claude-opus-5-5');
-  });
-
-  it('should show the configured temperature and structured output off', () => {
-    // 0 is the common deterministic setting and falsy — it must render as "0", not "model default".
-    api.getAiStatus.mockReturnValue(of([{ ...LOCAL, temperature: 0, structuredOutput: false }]));
+  it('should show an endpoint override and the knobs turned off', () => {
+    api.getAiStatus.mockReturnValue(of<AiStatusResponse>({
+      ...READY, endpoint: 'https://proxy.example.com', refusalFallback: false, imageInput: false, effort: 'low',
+      pdfInput: false,
+    }));
 
     const { fixture } = create();
     fixture.detectChanges();
     const root: HTMLElement = fixture.nativeElement;
 
-    expect(detailValue(root, 'Temperature')).toBe('0');
-    expect(detailValue(root, 'Structured output')).toBe('Off');
+    expect(detailValue(root, 'Endpoint')).toBe('https://proxy.example.com');
+    expect(detailValue(root, 'Refusal fallback')).toBe('Off');
+    expect(detailValue(root, 'Page image')).toBe('Off');
+    expect(detailValue(root, 'Effort')).toBe('low');
+    expect(detailValue(root, 'PDF input')).toBe('Off');
   });
 
-  it('should show "model default" for an unset temperature and structured output on', () => {
-    api.getAiStatus.mockReturnValue(of([LOCAL]));
+  it('should show a fractional PDF size cap', () => {
+    api.getAiStatus.mockReturnValue(of<AiStatusResponse>({ ...READY, pdfInputMaxPages: 5, pdfInputMaxBytes: 1572864 }));
+
+    const { fixture } = create();
+    fixture.detectChanges();
+
+    expect(detailValue(fixture.nativeElement, 'PDF input')).toBe('On (up to 5 pages, 1.5 MB)');
+  });
+
+  it('should render the empty state naming the config keys when AI is absent', () => {
+    api.getAiStatus.mockReturnValue(of(ABSENT));
+
+    const { fixture } = create();
+    fixture.detectChanges();
+    const html: string = fixture.nativeElement.outerHTML;
+
+    expect(html).toContain('AI is not configured');
+    expect(html).toContain('Ai:ApiKey');
+    expect(html).toContain('Ai:Model');
+    expect(html).not.toContain('Test connection');
+  });
+
+  it('should show the legacy-config reason and disable the test', () => {
+    api.getAiStatus.mockReturnValue(of(LEGACY));
 
     const { fixture } = create();
     fixture.detectChanges();
     const root: HTMLElement = fixture.nativeElement;
 
-    expect(detailValue(root, 'Temperature')).toBe('model default');
-    expect(detailValue(root, 'Structured output')).toBe('On');
-  });
-
-  it('should render the empty state naming the new config keys', () => {
-    api.getAiStatus.mockReturnValue(of([]));
-
-    const { fixture, component } = create();
-    fixture.detectChanges();
-    const html: string = fixture.nativeElement.outerHTML;
-
-    expect(component.providers()).toEqual([]);
-    expect(html).toContain('No AI providers configured');
-    expect(html).toContain('Ai:Providers');
-    expect(html).toContain('Ai:DefaultProvider');
-  });
-
-  it('should warn when multiple providers exist but none is default (AI silently off)', () => {
-    api.getAiStatus.mockReturnValue(of([
-      { ...LOCAL, isDefault: false },
-      { ...BROKEN_FOUNDRY, isConfigured: true, configurationError: null },
-    ]));
-
-    const { fixture, component } = create();
-    fixture.detectChanges();
-
-    expect(component.noDefault()).toBe(true);
-    expect(fixture.nativeElement.outerHTML).toContain('Ai:DefaultProvider');
-  });
-
-  it('should not warn when a default is marked or only one provider exists', () => {
-    const { fixture: withDefault, component: c1 } = create();
-    withDefault.detectChanges();
-    expect(c1.noDefault()).toBe(false);
-    expect(withDefault.nativeElement.outerHTML).not.toContain('No default provider is selected');
-
-    api.getAiStatus.mockReturnValue(of([{ ...LOCAL, isDefault: false }]));
-    const { component: c2 } = create();
-    // A sole provider is auto-resolved by the backend chain even unmarked — no warning.
-    expect(c2.noDefault()).toBe(false);
-  });
-
-  it('should clear a provider prior result when a re-test starts, and not restore it on error', () => {
-    const { component } = create();
-    component.test('local');
-    expect(component.testResults()['local']?.success).toBe(true);
-
-    // Re-test that fails at the HTTP level: the stale success must not survive.
-    api.testAiConnection.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 500 })));
-    component.test('local');
-
-    expect(component.testResults()['local']).toBeUndefined();
-    expect(component.testingKey()).toBeNull();
-  });
-
-  it('should clear only the re-tested provider result while a probe is in flight', () => {
-    const { component } = create();
-    component.test('local');
-    component.test('foundry-gpt5');
-
-    const subject = new Subject<TestAiConnectionResponse>();
-    api.testAiConnection.mockReturnValue(subject.asObservable());
-    component.test('local');
-
-    // Stale 'local' result gone during the probe; the other provider's result untouched.
-    expect(component.testResults()['local']).toBeUndefined();
-    expect(component.testResults()['foundry-gpt5']?.success).toBe(true);
-    subject.next({ success: true, message: 'Connection successful.', latencyMs: 9 });
-    subject.complete();
-    expect(component.testResults()['local']?.latencyMs).toBe(9);
+    expect(root.outerHTML).toContain('Unavailable');
+    expect(root.outerHTML).toContain(LEGACY_REASON);
+    const button = Array.from(root.querySelectorAll('button')).find(b => b.textContent?.includes('Test connection'));
+    expect(button?.disabled).toBe(true);
   });
 
   it('should surface a load error', () => {
@@ -217,67 +162,58 @@ describe('AiStatusComponent', () => {
 
     expect(component.error()).toBe(true);
     expect(component.loading()).toBe(false);
-    expect(component.providers()).toBeNull();
+    expect(component.status()).toBeNull();
   });
 
-  it('should test a specific provider and record its result under its key', () => {
+  it('should test the connection and record the result', () => {
     const { component } = create();
 
-    component.test('local');
+    component.test();
 
-    expect(api.testAiConnection).toHaveBeenCalledWith('local');
-    expect(component.testResults()['local']?.success).toBe(true);
-    expect(component.testResults()['local']?.latencyMs).toBe(42);
-    expect(component.testResults()['foundry-gpt5']).toBeUndefined();
-    expect(component.testingKey()).toBeNull();
-  });
-
-  it('should keep results per provider across successive tests', () => {
-    const { component } = create();
-
-    component.test('local');
-    api.testAiConnection.mockReturnValue(of<TestAiConnectionResponse>({
-      success: false, message: "AI provider 'foundry-gpt5' is unavailable: ApiKey is required.", latencyMs: null,
-    }));
-    component.test('foundry-gpt5');
-
-    expect(component.testResults()['local']?.success).toBe(true);
-    expect(component.testResults()['foundry-gpt5']?.success).toBe(false);
+    expect(api.testAiConnection).toHaveBeenCalledWith();
+    expect(component.testResult()?.success).toBe(true);
+    expect(component.testResult()?.latencyMs).toBe(42);
+    expect(component.testing()).toBe(false);
   });
 
   it('should record a failed test result returned in the body (HTTP 200)', () => {
     api.testAiConnection.mockReturnValue(of<TestAiConnectionResponse>({
-      success: false, message: 'Connection timed out.', latencyMs: null,
+      success: false, message: 'AI is unavailable: Ai:ApiKey is required.', latencyMs: null,
     }));
 
     const { component } = create();
-    component.test('local');
+    component.test();
 
-    expect(component.testResults()['local']?.success).toBe(false);
-    expect(component.testResults()['local']?.message).toBe('Connection timed out.');
-    expect(component.testingKey()).toBeNull();
+    expect(component.testResult()?.success).toBe(false);
+    expect(component.testResult()?.message).toBe('AI is unavailable: Ai:ApiKey is required.');
+    expect(component.testing()).toBe(false);
   });
 
-  it('should track the in-flight provider key across the call', () => {
+  it('should clear the prior result when a re-test starts, and not restore it on error', () => {
+    const { component } = create();
+    component.test();
+    expect(component.testResult()?.success).toBe(true);
+
+    // Re-test that fails at the HTTP level: the stale success must not survive.
+    api.testAiConnection.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 500 })));
+    component.test();
+
+    expect(component.testResult()).toBeNull();
+    expect(component.testing()).toBe(false);
+  });
+
+  it('should track the in-flight test across the call', () => {
     const subject = new Subject<TestAiConnectionResponse>();
     api.testAiConnection.mockReturnValue(subject.asObservable());
 
     const { component } = create();
-    component.test('local');
-    expect(component.testingKey()).toBe('local');
+    component.test();
+    expect(component.testing()).toBe(true);
+    expect(component.testResult()).toBeNull();
 
     subject.next({ success: true, message: 'Connection successful.', latencyMs: 10 });
     subject.complete();
-    expect(component.testingKey()).toBeNull();
-  });
-
-  it('should reset the in-flight key on a 5xx test error', () => {
-    api.testAiConnection.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 500 })));
-
-    const { component } = create();
-    component.test('local');
-
-    expect(component.testingKey()).toBeNull();
-    expect(component.testResults()['local']).toBeUndefined();
+    expect(component.testing()).toBe(false);
+    expect(component.testResult()?.latencyMs).toBe(10);
   });
 });

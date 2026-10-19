@@ -2,43 +2,32 @@ using Homestead.WebApi.Infrastructure.Ai;
 
 namespace Homestead.WebApi.Modules.Admin.Features.Ai.GetAiStatus;
 
-// Pure read off the static provider registrations — no DB access. A query, not a command, so it never
-// opens the UnitOfWork transaction.
-public class GetAiStatusHandler(IEnumerable<IAiProvider> providers, IAiProviderResolver resolver)
+// Pure read off static config — no DB access. A query, not a command, so it never opens the UnitOfWork
+// transaction. State comes from the provider's Availability; the displayed values from the options and the
+// resolved input settings.
+public class GetAiStatusHandler(IAiProvider aiProvider, AiOptions options, AiInputSettings settings)
 {
-    public Task<List<AiProviderStatusResponse>> HandleAsync(CancellationToken ct)
+    public Task<AiStatusResponse> HandleAsync(CancellationToken ct)
     {
-        // For a DEFINED default the resolver returns the canonical registered instance (the same
-        // singletons DI enumerates here), so default-ness is reference identity — no string re-matching
-        // that could drift from the resolver's own key semantics. A DANGLING Ai:DefaultProvider resolves
-        // to a fresh synthetic instance that is never in the list.
-        var defaultProvider = resolver.Resolve();
+        var availability = aiProvider.Availability;
 
-        var response = providers
-            .OrderBy(p => p.Key, StringComparer.OrdinalIgnoreCase)
-            .Select(p => ToResponse(p, IsDefault: ReferenceEquals(p, defaultProvider)))
-            .ToList();
-
-        // Append the dangling default as its own row (unavailable, marked default) rather than leaving the
-        // list with no default marked — the admin page is where an operator debugs exactly this typo.
-        if (defaultProvider is not null && !providers.Contains(defaultProvider))
-            response.Add(ToResponse(defaultProvider, IsDefault: true));
-
-        return Task.FromResult(response);
+        return Task.FromResult(new AiStatusResponse(
+            IsConfigured: availability.IsConfigured,
+            IsPresent: availability.IsPresent,
+            ConfigurationError: availability.Reason,
+            Model: Blank(options.Model),
+            Endpoint: Blank(options.Endpoint),
+            HasApiKey: !string.IsNullOrWhiteSpace(options.ApiKey),
+            Effort: AiConfiguration.ToWire(settings.Effort),
+            RefusalFallback: options.RefusalFallback,
+            MaxInputChars: settings.MaxInputChars,
+            StatementMaxInputChars: settings.StatementMaxInputChars,
+            ImageInput: settings.ImageInput,
+            ImageRenderMaxEdge: settings.ImageRenderMaxEdge,
+            PdfInput: settings.PdfInput,
+            PdfInputMaxPages: settings.PdfInputMaxPages,
+            PdfInputMaxBytes: settings.PdfInputMaxBytes));
     }
 
-    private static AiProviderStatusResponse ToResponse(IAiProvider p, bool IsDefault) => new(
-        Key: p.Key,
-        Type: p.Type,
-        IsConfigured: p.IsConfigured,
-        ConfigurationError: p.ConfigurationError,
-        IsDefault: IsDefault,
-        Endpoint: p.Endpoint,
-        Model: p.Model,
-        HasApiKey: p.HasApiKey,
-        MaxInputChars: p.MaxInputChars,
-        // A bound "NaN"/"Infinity" is refused by validation (ConfigurationError says so), but the HTTP JSON
-        // options write numbers strictly, so serialising it would turn the whole status page into a 500.
-        Temperature: p.Temperature is { } t && float.IsFinite(t) ? t : null,
-        StructuredOutput: p.StructuredOutput);
+    private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

@@ -41,28 +41,29 @@ public sealed class FakeAiClassificationService : IAiClassificationService
         _release = null;
     }
 
-    // Captures the pageImage of the most recent classify call so image-augmentation tests can assert the
-    // classifier received non-null render bytes. Static for the same reason as the gate (scoped service,
-    // serial suite); reset via ResetLastCall in a finally when a test inspects it.
+    // Captures the page image and PDF of the most recent classify call so input-mode tests can assert what the
+    // classifier received. Static for the same reason as the gate (scoped service, serial suite); reset via
+    // ResetLastCall in a finally when a test inspects it.
     public static byte[]? LastPageImage { get; private set; }
+    public static byte[]? LastPdf { get; private set; }
     public static ClassificationScope? LastScope { get; private set; }
 
     public static void ResetLastCall()
     {
         LastPageImage = null;
+        LastPdf = null;
         LastScope = null;
     }
 
     public async Task<ClassificationResult?> ClassifyAsync(
-        string documentName,
-        string? extractedText,
-        byte[]? pageImage,
+        ClassificationInput input,
         List<TagInfo> availableTags,
         List<PartyInfo> availableParties,
         ClassificationScope scope,
         CancellationToken ct)
     {
-        LastPageImage = pageImage;
+        LastPageImage = input.PageImage;
+        LastPdf = input.Pdf;
         LastScope = scope;
 
         // Gate ONLY the dedicated summarize path (the one the idle-in-transaction acceptance test arms
@@ -86,6 +87,6 @@ public sealed class FakeAiClassificationService : IAiClassificationService
         }
 
         var summary = scope.HasFlag(ClassificationScope.Summary) ? GeneratedSummary : string.Empty;
-        return new ClassificationResult([], [], summary, documentName);
+        return new ClassificationResult([], [], summary, input.DocumentName);
     }
 }

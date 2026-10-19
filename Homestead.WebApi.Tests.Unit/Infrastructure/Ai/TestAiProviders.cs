@@ -1,78 +1,69 @@
 using Homestead.WebApi.Infrastructure.Ai;
-using Microsoft.Extensions.AI;
 using NSubstitute;
 
 namespace Homestead.WebApi.Tests.Unit.Infrastructure.Ai;
 
-// Shared scaffolding for suites that consume AI (classification, statements, admin probes) and care about
-// what a handler does with the resolved provider rather than about providers themselves. Mirrors
-// TestTextExtraction's role for the OCR engine registry.
+// Shared scaffolding for suites that consume AI (classification, statements, admin probes) and care about what a
+// handler does with the provider rather than about the provider itself. Mirrors TestTextExtraction's role for the
+// OCR engine registry.
 public static class TestAiProviders
 {
-    public const string DefaultKey = "test-ai";
+    // The production defaults, optionally with knobs overridden — the record literal every consumer is handed.
+    public static AiInputSettings Settings(
+        AiEffort effort = AiEffort.Medium, int? maxInputChars = null, int? statementMaxInputChars = null,
+        bool imageInput = true, int? imageRenderMaxEdge = null,
+        bool pdfInput = true, int? pdfInputMaxPages = null, long? pdfInputMaxBytes = null) =>
+        AiInputSettings.Default with
+        {
+            Effort = effort,
+            MaxInputChars = maxInputChars ?? AiInputSettings.Default.MaxInputChars,
+            StatementMaxInputChars = statementMaxInputChars ?? AiInputSettings.Default.StatementMaxInputChars,
+            ImageInput = imageInput,
+            ImageRenderMaxEdge = imageRenderMaxEdge ?? AiInputSettings.Default.ImageRenderMaxEdge,
+            PdfInput = pdfInput,
+            PdfInputMaxPages = pdfInputMaxPages ?? AiInputSettings.Default.PdfInputMaxPages,
+            PdfInputMaxBytes = pdfInputMaxBytes ?? AiInputSettings.Default.PdfInputMaxBytes,
+        };
 
-    // A valid OpenAiCompatible bag — the baseline every substitute derives its knob values from.
-    public static AiProviderOptions Options() => new()
+    // A ready provider whose SendAsync answers with the given JSON (served by "test-model"). Tests that need a
+    // different answer reconfigure SendAsync themselves.
+    public static IAiProvider Provider(string replyJson = "{}")
     {
-        Type = AiProviderType.OpenAiCompatible,
-        Endpoint = "http://localhost:11434/v1",
-        Model = "test-model"
-    };
-
-    // A configured provider substitute whose knobs are computed from a real options bag (so floor/default
-    // resolution stays honest) and whose GetChatClient returns the given substituted chat client. The knob
-    // Returns are lazy over the bag, so a test may mutate the bag after SUT construction (the
-    // DocumentClassifier suite's ImageInput toggling idiom) and the provider reflects it.
-    public static IAiProvider Provider(
-        IChatClient? client = null, AiProviderOptions? options = null, string key = DefaultKey)
-    {
-        var opts = options ?? Options();
         var provider = Substitute.For<IAiProvider>();
-        provider.Key.Returns(key);
-        provider.Type.Returns(_ => opts.Type ?? AiProviderType.OpenAiCompatible);
-        provider.IsConfigured.Returns(true);
-        provider.ConfigurationError.Returns((string?)null);
-        provider.Endpoint.Returns(_ => opts.Endpoint);
-        provider.Model.Returns(_ => opts.Model);
-        provider.HasApiKey.Returns(_ => !string.IsNullOrWhiteSpace(opts.ApiKey));
-        provider.MaxInputChars.Returns(_ => opts.ResolveMaxInputChars());
-        provider.StatementMaxInputChars.Returns(_ => opts.ResolveStatementMaxInputChars());
-        provider.ImageInput.Returns(_ => opts.ImageInput);
-        provider.ImageRenderMaxEdge.Returns(_ => opts.ResolveImageRenderMaxEdge());
-        provider.Temperature.Returns(_ => opts.Temperature);
-        provider.StructuredOutput.Returns(_ => opts.StructuredOutput);
-        provider.GetChatClient().Returns(client ?? Substitute.For<IChatClient>());
+        provider.Availability.Returns(AiAvailability.Ready);
+        provider.SendAsync(Arg.Any<AiRequest>(), Arg.Any<CancellationToken>())
+            .Returns(Reply(replyJson));
         return provider;
     }
 
-    // An unavailable provider — defined as an instance, but not usable. What the resolver hands back for a
-    // misconfigured (or, synthetically, undefined) key; GetChatClient throws like the real one.
-    public static IAiProvider UnavailableProvider(
-        string key = "broken", string error = "Endpoint is required.")
+    public static AiReply Reply(string json) => new(json, "test-model", AiUsage.None);
+
+    // Config that is there but cannot run; SendAsync throws like the real one.
+    public static IAiProvider Unconfigured(string reason = "Ai:ApiKey is required.") =>
+        WithAvailability(AiAvailability.Unavailable(reason), $"AI is unavailable: {reason}");
+
+    // No Ai:* config at all.
+    public static IAiProvider Absent() => WithAvailability(AiAvailability.Absent, "AI is not configured.");
+
+    // Records every request the provider is sent; the returned function reads the latest (null before any).
+    public static IAiProvider Capture(this IAiProvider provider, out Func<AiRequest?> lastRequest)
     {
-        var provider = Substitute.For<IAiProvider>();
-        provider.Key.Returns(key);
-        provider.Type.Returns(AiProviderType.OpenAiCompatible);
-        provider.IsConfigured.Returns(false);
-        provider.ConfigurationError.Returns(error);
-        provider.GetChatClient().Returns(_ =>
-            throw new InvalidOperationException($"AI provider '{key}' is unavailable: {error}"));
+        AiRequest? captured = null;
+        provider.SendAsync(Arg.Do<AiRequest>(r => captured = r), Arg.Any<CancellationToken>());
+        lastRequest = () => captured;
         return provider;
     }
 
-    // A resolver that answers every request (any key, or none) with the given provider.
-    public static IAiProviderResolver Resolver(IAiProvider provider)
-    {
-        var resolver = Substitute.For<IAiProviderResolver>();
-        resolver.Resolve(Arg.Any<string?>()).Returns(provider);
-        return resolver;
-    }
+    // The concatenated text parts of a request — what the services' "user message" assertions read.
+    public static string UserText(this AiRequest request) =>
+        string.Concat(request.UserContent.OfType<AiTextPart>().Select(p => p.Text));
 
-    // The unconfigured state: no provider resolves at all.
-    public static IAiProviderResolver Unresolved()
+    private static IAiProvider WithAvailability(AiAvailability availability, string message)
     {
-        var resolver = Substitute.For<IAiProviderResolver>();
-        resolver.Resolve(Arg.Any<string?>()).Returns((IAiProvider?)null);
-        return resolver;
+        var provider = Substitute.For<IAiProvider>();
+        provider.Availability.Returns(availability);
+        provider.SendAsync(Arg.Any<AiRequest>(), Arg.Any<CancellationToken>())
+            .Returns<AiReply>(_ => throw new InvalidOperationException(message));
+        return provider;
     }
 }

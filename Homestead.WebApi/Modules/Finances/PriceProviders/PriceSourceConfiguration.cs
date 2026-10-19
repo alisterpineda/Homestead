@@ -5,7 +5,7 @@ using Homestead.WebApi.Modules.Finances.PriceProviders.BankOfCanada;
 namespace Homestead.WebApi.Modules.Finances.PriceProviders;
 
 // Reads the "PriceSources:{Source}" section for each external price source and validates it per provider
-// (mirrors AiProviderConfiguration). Validation returns an error string rather than throwing: there is
+// (mirrors OcrEngineConfiguration). Validation returns an error string rather than throwing: there is
 // deliberately no ValidateOnStart — an enabled-but-invalid source must not stop the app from booting. The
 // cost is that config errors surface at first use; the mitigation is that ConfigurationError is exposed on
 // the source's page, so a source that cannot import reads as "not configured, because <reason>".

@@ -14,7 +14,7 @@ public class OcrEngineOptions
     public const string SectionName = "Ocr:Engines";
 
     // Which engine uploads and un-pinned reprocess runs use — an "Ocr:Engines:{key}" name. Unset means
-    // the built-in engine. Deployment config, like the engines themselves (contrast Ai:DefaultProvider).
+    // the built-in engine. Deployment config, like the engines themselves.
     public const string DefaultEngineConfigKey = "Ocr:DefaultEngine";
 
     // The always-present engine. It is the terminus of the resolution chain (explicit key ->

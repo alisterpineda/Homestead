@@ -39,16 +39,13 @@ var webapi = builder.AddProject<Projects.Homestead_WebApi>("homestead-webapi")
         context.EnvironmentVariables["OIDC_ROLE_CLAIM"] = "groups";
         context.EnvironmentVariables["OIDC_ADMIN_CLAIM_VALUES"] = "homestead-admin";
 
-        // Optional AI providers (off by default). Sourced from AppHost user-secrets so no endpoint or
-        // key is committed, e.g.
-        //   dotnet user-secrets set "Ai:Providers:local:Type" "OpenAiCompatible"
-        //   dotnet user-secrets set "Ai:Providers:local:Endpoint" "http://localhost:11434/v1"
-        //   dotnet user-secrets set "Ai:Providers:local:Model" "gemma-4-e4b"
-        //   dotnet user-secrets set "Ai:DefaultProvider" "local"
-        // or the Claude API: Type "Anthropic" with a Model (e.g. "claude-opus-5-5") and an ApiKey; no Endpoint.
+        // Optional AI — the Claude API (off by default). Sourced from AppHost user-secrets so no key is
+        // committed, e.g.
+        //   dotnet user-secrets set "Ai:ApiKey" "<key>"
+        //   dotnet user-secrets set "Ai:Model" "claude-opus-5-5"
+        // plus, optionally, Ai:Effort (low|medium|high|xhigh|max), Ai:RefusalFallback and the input knobs.
         //
-        // Walking "Ai" (not "Ai:Providers") forwards Ai:DefaultProvider and any future Ai:* key in the
-        // same statement. Unset -> no providers -> graceful no-op.
+        // Walking the whole "Ai" section forwards every Ai:* key in the same statement. Unset -> graceful no-op.
         foreach (var (path, value) in LeafSettings(builder.Configuration.GetSection("Ai")))
             context.EnvironmentVariables[path.Replace(":", "__")] = value;
 

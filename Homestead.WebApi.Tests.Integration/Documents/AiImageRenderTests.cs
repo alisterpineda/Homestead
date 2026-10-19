@@ -35,9 +35,42 @@ public class AiImageRenderTests : IntegrationTestBase
             Assert.True(Directory.Exists(aiRendersDir), "ai-renders cache directory was not created");
             var renders = Directory.GetFiles(aiRendersDir, "*.png", SearchOption.AllDirectories);
             Assert.NotEmpty(renders);
+            // PDF input is off in the test host by default (TestAiSettings), so this is the text + render path.
+            Assert.Null(FakeAiClassificationService.LastPdf);
         }
         finally
         {
+            FakeAiClassificationService.ResetLastCall();
+        }
+    }
+
+    [Fact]
+    public async Task UploadWithAutoClassify_PdfInputOn_SendsThePdf_AndNoRender()
+    {
+        var client = await CreateAdminClientAsync();
+
+        var setResponse = await SendJsonPatchAsync(client, "/api/v1/documents/settings", new[]
+        {
+            new { op = "replace", path = "/autoClassifyOnUpload", value = (object)true }
+        });
+        Assert.Equal(HttpStatusCode.OK, setResponse.StatusCode);
+
+        FakeAiClassificationService.ResetLastCall();
+        TestAiSettings.Current = TestAiSettings.Default with { PdfInput = true };
+        try
+        {
+            await UploadAndWaitAsync(client, "pdf-classify.pdf");
+
+            // A one-page, unencrypted PDF well under the caps passes the gate: the classifier gets the PDF's
+            // bytes (a PDF file starts with "%PDF") in place of a page render.
+            Assert.Equal(ClassificationScope.All, FakeAiClassificationService.LastScope);
+            Assert.NotNull(FakeAiClassificationService.LastPdf);
+            Assert.Equal("%PDF"u8.ToArray(), FakeAiClassificationService.LastPdf![..4]);
+            Assert.Null(FakeAiClassificationService.LastPageImage);
+        }
+        finally
+        {
+            TestAiSettings.Reset();
             FakeAiClassificationService.ResetLastCall();
         }
     }

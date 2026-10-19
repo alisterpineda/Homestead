@@ -148,7 +148,7 @@ Each enum value falls into one of three **kinds** (a property of the value, not 
 
 **System values** (`Transaction`, `Manual`) are always enabled, never disable-able, and have no configuration. They have **no settings row** — the lookup just always considers them in scope.
 
-**External values** split their knobs by what kind of fact each is, the same rule as text-extraction engines and AI providers (see [documents/versions.md](../documents/versions.md#text-extraction-engine)):
+**External values** split their knobs by what kind of fact each is, the same rule as text-extraction engines (see [documents/versions.md](../documents/versions.md#text-extraction-engine)):
 
 - **Enablement and credentials are deployment configuration**, under `PriceSources:{Source}:*` keyed by the enum name — `Enabled` (bool, default `false`), plus per-provider fields (`ApiKey`, `BaseUrl`). Endpoints and API keys are deployment facts that belong in env vars / user-secrets, so there is no secret masking and no API keys in a `pg_dump`. Two derived readouts: **`IsEnabled`** is the flag; **`ConfigurationError`** is the per-provider validation verdict, independent of the flag; **`IsConfigured`** is `IsEnabled && ConfigurationError is null`. Validation is an error string, never a startup failure — an enabled-but-broken source shows "not configured, with reason" rather than stopping the app.
 - **Product data** lives in the settings table:

@@ -86,7 +86,7 @@ Bulk reprocess is the recovery path when the extraction engine has been swapped,
 Both facts about engines are deployment configuration, not data:
 
 - **Which engines exist** is defined in config under `Ocr:Engines:{key}`, where `{key}` is an arbitrary instance name. Endpoints and API keys are deployment facts that belong in env vars / user-secrets, where the existing secret tooling already works — so there is no engines table, no admin CRUD, no secret masking, and no API keys in a `pg_dump`.
-- **Which engine to use** is also configuration: `Ocr:DefaultEngine` names the default (a config instance key, e.g. `azure-layout`), exactly as `Ai:DefaultProvider` does for AI. The Documents settings page reports the engine list and the default **read-only**; a per-run override can still be pinned on either reprocess path.
+- **Which engine to use** is also configuration: `Ocr:DefaultEngine` names the default (a config instance key, e.g. `azure-layout`). The Documents settings page reports the engine list and the default **read-only**; a per-run override can still be pinned on either reprocess path.
 
 Engines are *named instances* selected by string key, not one-per-type: a single Azure resource serves several meaningfully different models, so `azure-layout` (`prebuilt-layout`) and `azure-read` (`prebuilt-read`) are both legitimate engines over the same credentials.
 

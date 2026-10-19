@@ -1,37 +1,17 @@
 using Homestead.WebApi.Infrastructure.Ai;
-using Microsoft.Extensions.AI;
 
 namespace Homestead.WebApi.Tests.Integration.Infrastructure;
 
 /// <summary>
-/// Stand-in <see cref="IAiProvider"/> that reports itself configured, so the resolved-provider gates in
-/// <c>DocumentClassifier</c> / <c>ParseAccountStatementJobHandler</c> open without any live endpoint. The
-/// real chat client is never built — classify/summarize/statement flows run through
-/// <see cref="FakeAiClassificationService"/> and <see cref="FakeStatementExtractionService"/> — so
-/// <see cref="GetChatClient"/> throws if it is ever reached. Knobs are the production defaults.
+/// Stand-in <see cref="IAiProvider"/> that reports itself ready, so the availability gates in
+/// <c>DocumentClassifier</c> / <c>ParseAccountStatementJobHandler</c> open without any live endpoint. No model is
+/// ever called — classify/summarize/statement flows run through <see cref="FakeAiClassificationService"/> and
+/// <see cref="FakeStatementExtractionService"/> — so <see cref="SendAsync"/> throws if it is ever reached.
 /// </summary>
 public sealed class FakeAiProvider : IAiProvider
 {
-    // Also pinned as Ai:DefaultProvider by HomesteadApiFactory so this fake resolves explicitly,
-    // regardless of any real providers leaking in from environment config.
-    public const string ProviderKey = "fake-ai";
+    public AiAvailability Availability => AiAvailability.Ready;
 
-    public string Key => ProviderKey;
-    public AiProviderType? Type => AiProviderType.OpenAiCompatible;
-    public bool IsConfigured => true;
-    public string? ConfigurationError => null;
-
-    public string? Endpoint => "http://fake-ai.test/v1";
-    public string? Model => "fake-model";
-    public bool HasApiKey => false;
-
-    public int MaxInputChars => AiProviderOptions.DefaultMaxInputChars;
-    public int StatementMaxInputChars => AiProviderOptions.DefaultStatementMaxInputChars;
-    public bool ImageInput => true;
-    public int ImageRenderMaxEdge => AiProviderOptions.DefaultImageRenderMaxEdge;
-    public float? Temperature => null;
-    public bool StructuredOutput => true;
-
-    public IChatClient GetChatClient() =>
-        throw new NotSupportedException("FakeAiProvider.GetChatClient must not be called in tests.");
+    public Task<AiReply> SendAsync(AiRequest request, CancellationToken ct) =>
+        throw new NotSupportedException("FakeAiProvider.SendAsync must not be called in tests.");
 }

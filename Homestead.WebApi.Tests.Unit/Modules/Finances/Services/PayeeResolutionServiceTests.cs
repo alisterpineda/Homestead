@@ -1,86 +1,62 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Homestead.WebApi.Infrastructure.Ai;
 using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Tests.Unit.Infrastructure.Ai;
-using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging.Abstractions;
-using NSubstitute;
 
 namespace Homestead.WebApi.Tests.Unit.Modules.Finances.Services;
 
 public class PayeeResolutionServiceTests
 {
-    private readonly IChatClient _client = Substitute.For<IChatClient>();
-    private ChatOptions? _sent;
+    private static PayeeResolutionService Sut(IAiProvider provider, AiInputSettings? settings = null) =>
+        new(provider, settings ?? TestAiProviders.Settings(), NullLogger<PayeeResolutionService>.Instance);
 
-    // The service sends no temperature of its own: whether one goes out, and which, is the provider's config
-    // (Ai:Providers:{key}:Temperature), applied in its pipeline — current Claude models reject any non-default value.
+    // A short reply (one small entry per line, so no streaming); the effort comes from the input settings, never a
+    // service default.
     [Fact]
-    public async Task SendsNoTemperature()
+    public async Task SendsShortPayeeRequest_WithSettingsEffort()
     {
-        _client.GetResponseAsync(
-                Arg.Any<IEnumerable<ChatMessage>>(), Arg.Do<ChatOptions>(o => _sent = o), Arg.Any<CancellationToken>())
-            .Returns(new ChatResponse(new ChatMessage(ChatRole.Assistant, """{"results":[]}"""))
-            {
-                FinishReason = ChatFinishReason.Stop,
-            });
-        var sut = new PayeeResolutionService(
-            TestAiProviders.Resolver(TestAiProviders.Provider(_client)),
-            NullLogger<PayeeResolutionService>.Instance);
+        var provider = TestAiProviders.Provider("""{"results":[]}""").Capture(out var sent);
 
-        await sut.ResolveAsync(
+        await Sut(provider, TestAiProviders.Settings(effort: AiEffort.High)).ResolveAsync(
             [new PayeeResolutionInput(0, "COFFEE SHOP #12")], [new PayeeCatalogEntry(Guid.NewGuid(), "Coffee Shop")],
             TestContext.Current.CancellationToken);
 
-        Assert.NotNull(_sent);
-        Assert.Null(_sent.Temperature);
+        var request = sent()!;
+        Assert.Equal(AiFeature.PayeeResolution, request.Feature);
+        Assert.Equal(AiEffort.High, request.Effort);
+        Assert.False(request.LongOutput);
+        Assert.Contains("COFFEE SHOP #12", request.UserText());
     }
 
-    // Golden copy of the whole response schema: the contract both provider families were validated against.
+    // Golden copy of the whole response schema: the contract the provider was validated against.
     // The descriptions are part of the prompt. Whatever produces the schema (hand-built or generated from the
-    // DTO), a change here is a change to what every provider is sent — update this copy deliberately, never to
+    // DTO), a change here is a change to what the model is sent — update this copy deliberately, never to
     // make a refactor pass. Compared structurally, so key order doesn't matter but array order does.
     [Fact]
     public async Task ResponseSchema_MatchesGoldenCopy()
     {
-        _client.GetResponseAsync(
-                Arg.Any<IEnumerable<ChatMessage>>(), Arg.Do<ChatOptions>(o => _sent = o), Arg.Any<CancellationToken>())
-            .Returns(new ChatResponse(new ChatMessage(ChatRole.Assistant, """{"results":[]}"""))
-            {
-                FinishReason = ChatFinishReason.Stop,
-            });
-        var sut = new PayeeResolutionService(
-            TestAiProviders.Resolver(TestAiProviders.Provider(_client)),
-            NullLogger<PayeeResolutionService>.Instance);
+        var provider = TestAiProviders.Provider("""{"results":[]}""").Capture(out var sent);
 
-        await sut.ResolveAsync(
+        await Sut(provider).ResolveAsync(
             [new PayeeResolutionInput(0, "COFFEE SHOP #12")], [new PayeeCatalogEntry(Guid.NewGuid(), "Coffee Shop")],
             TestContext.Current.CancellationToken);
 
-        var schema = Assert.IsType<ChatResponseFormatJson>(_sent!.ResponseFormat).Schema!.Value;
-        var actual = JsonNode.Parse(schema.GetRawText());
+        var actual = JsonNode.Parse(sent()!.Schema.GetRawText());
         Assert.True(JsonNode.DeepEquals(JsonNode.Parse(GoldenSchema), actual),
             $"Response schema drifted from the golden copy. Actual:\n{actual!.ToJsonString(Indented)}");
     }
 
-    // payeeIndex is a non-null integer in the schema, so a null can only arrive from a provider configured
-    // StructuredOutput=false (plain JSON mode, schema unenforced). That reply breaks the contract and fails loudly
-    // rather than being half-used.
+    // payeeIndex is a non-null integer in the enforced schema, so a null can only arrive in a reply that escapes it.
+    // That reply breaks the contract and fails loudly rather than being half-used.
     [Fact]
     public async Task NullPayeeIndex_Throws()
     {
-        _client.GetResponseAsync(
-                Arg.Any<IEnumerable<ChatMessage>>(), Arg.Any<ChatOptions>(), Arg.Any<CancellationToken>())
-            .Returns(new ChatResponse(new ChatMessage(ChatRole.Assistant,
-                """{"results":[{"lineIndex":0,"payeeIndex":null,"newPayeeName":"Coffee Shop"}]}"""))
-            {
-                FinishReason = ChatFinishReason.Stop,
-            });
-        var sut = new PayeeResolutionService(
-            TestAiProviders.Resolver(TestAiProviders.Provider(_client)),
-            NullLogger<PayeeResolutionService>.Instance);
+        var provider = TestAiProviders.Provider(
+            """{"results":[{"lineIndex":0,"payeeIndex":null,"newPayeeName":"Coffee Shop"}]}""");
 
-        await Assert.ThrowsAsync<JsonException>(() => sut.ResolveAsync(
+        await Assert.ThrowsAsync<JsonException>(() => Sut(provider).ResolveAsync(
             [new PayeeResolutionInput(0, "COFFEE SHOP #12")], [],
             TestContext.Current.CancellationToken));
     }
@@ -90,18 +66,10 @@ public class PayeeResolutionServiceTests
     [Fact]
     public async Task MissingPayeeIndex_Throws()
     {
-        _client.GetResponseAsync(
-                Arg.Any<IEnumerable<ChatMessage>>(), Arg.Any<ChatOptions>(), Arg.Any<CancellationToken>())
-            .Returns(new ChatResponse(new ChatMessage(ChatRole.Assistant,
-                """{"results":[{"lineIndex":0,"newPayeeName":"Blue Bottle Coffee"}]}"""))
-            {
-                FinishReason = ChatFinishReason.Stop,
-            });
-        var sut = new PayeeResolutionService(
-            TestAiProviders.Resolver(TestAiProviders.Provider(_client)),
-            NullLogger<PayeeResolutionService>.Instance);
+        var provider = TestAiProviders.Provider(
+            """{"results":[{"lineIndex":0,"newPayeeName":"Blue Bottle Coffee"}]}""");
 
-        await Assert.ThrowsAsync<JsonException>(() => sut.ResolveAsync(
+        await Assert.ThrowsAsync<JsonException>(() => Sut(provider).ResolveAsync(
             [new PayeeResolutionInput(0, "BLUE BOTTLE #4")], [new PayeeCatalogEntry(Guid.NewGuid(), "Coffee Shop")],
             TestContext.Current.CancellationToken));
     }

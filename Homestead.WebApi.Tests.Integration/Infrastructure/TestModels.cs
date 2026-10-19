@@ -42,11 +42,6 @@ internal record SummarizeResult(string? Summary);
 
 internal record DocumentSuggestionItem(Guid Id, string Field, string Status, string SuggestedValue, string? OriginalValue);
 
-internal record ClassifyPreviewResult(
-    string? SuggestedTitle, string? Summary, IReadOnlyList<ClassifyPreviewTagItem> Tags);
-
-internal record ClassifyPreviewTagItem(Guid Id, string Name, string Path, string? Color, string? EffectiveColor);
-
 internal record DocumentDetailItem(
     Guid Id, string Name, string? Summary,
     IReadOnlyList<DocumentSuggestionItem>? Suggestions = null);

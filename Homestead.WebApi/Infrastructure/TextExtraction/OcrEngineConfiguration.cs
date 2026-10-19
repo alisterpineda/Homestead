@@ -42,8 +42,8 @@ public static class OcrEngineConfiguration
     // The key side of the resolution chain (no explicit request): the configured default when set —
     // returned VERBATIM even when it names no defined engine, because turning a dangling default into a
     // recorded fallback is TextExtractionHelper's job and substituting here would be silent — else the
-    // built-in engine. Unlike AiProviderConfiguration.ResolveDefaultKey there is no sole-instance
-    // convenience: the built-in engine always exists, so "unset" already has a well-defined answer.
+    // built-in engine. There is no sole-instance convenience: the built-in engine always exists, so "unset"
+    // already has a well-defined answer.
     public static string ResolveDefaultKey(string? configuredDefault) =>
         configuredDefault ?? OcrEngineOptions.BuiltInTesseractKey;
 

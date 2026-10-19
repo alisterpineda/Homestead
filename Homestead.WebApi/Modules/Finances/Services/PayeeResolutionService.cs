@@ -2,18 +2,17 @@ using System.ComponentModel;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Homestead.WebApi.Infrastructure.Ai;
-using Microsoft.Extensions.AI;
 
 namespace Homestead.WebApi.Modules.Finances.Services;
 
 /// <summary>
 /// AI payee resolver — tiers ②/③. Mirrors <c>AiClassificationService</c>: index-referenced catalog, strict
-/// structured output, one attempt (<see cref="StructuredChatRequest"/>).
+/// structured output, one attempt through <see cref="IAiProvider"/>.
 /// Deliberately small and non-streaming; the
 /// long statement-extraction call is a different service and stays streaming.
 /// </summary>
 public class PayeeResolutionService(
-    IAiProviderResolver providerResolver, ILogger<PayeeResolutionService> logger)
+    IAiProvider aiProvider, AiInputSettings settings, ILogger<PayeeResolutionService> logger)
     : IPayeeResolutionService
 {
     // A proposed new payee name is capped to the Payee.Name column length.
@@ -24,7 +23,7 @@ public class PayeeResolutionService(
     // Generated from the reply DTO with the options it is deserialized with, so schema and DTO can't drift.
     // The [Description]s on the DTO are part of the prompt contract.
     private static readonly JsonElement ResponseSchema =
-        StructuredChatRequest.CreateStrictSchema(typeof(ResolutionResponse), JsonOptions);
+        AiJsonSchema.CreateStrict(typeof(ResolutionResponse), JsonOptions);
 
     public async Task<IReadOnlyDictionary<int, PayeeResolution>> ResolveAsync(
         IReadOnlyList<PayeeResolutionInput> lines,
@@ -35,32 +34,21 @@ public class PayeeResolutionService(
         if (lines.Count == 0)
             return new Dictionary<int, PayeeResolution>();
 
-        // This service does not gate on availability (the caller does); an unresolved/broken provider is a
-        // caller bug and throws with the reason. The provider owns and reuses the client — do not dispose it.
-        var provider = providerResolver.Resolve()
-            ?? throw new InvalidOperationException("AI is not configured (no provider under Ai:Providers resolves).");
-        var client = provider.GetChatClient();
+        // No availability guard of its own: callers gate on IAiProvider.Availability, and SendAsync throws with
+        // the reason (AiAvailability.EnsureConfigured) if one doesn't.
 
         var systemPrompt = BuildSystemPrompt();
         var userMessage = BuildUserMessage(lines, catalog);
-
-        var messages = new List<ChatMessage>
-        {
-            new(ChatRole.System, systemPrompt),
-            new(ChatRole.User, userMessage),
-        };
 
         logger.LogTrace("Payee resolution system prompt:\n{SystemPrompt}", systemPrompt);
         logger.LogTrace("Payee resolution user message:\n{UserMessage}", userMessage);
 
         try
         {
-            var response = await StructuredChatRequest.SendAsync(
-                client, messages, ResponseSchema,
-                schemaName: "payee_resolution",
-                schemaDescription: "Payee suggestions for statement lines.",
-                stream: false, "Payee resolution", ct);
-            var content = response.Text;
+            var reply = await aiProvider.SendAsync(new AiRequest(
+                AiFeature.PayeeResolution, settings.Effort, systemPrompt, [new AiTextPart(userMessage)], ResponseSchema,
+                LongOutput: false, "Payee resolution"), ct);
+            var content = reply.Json;
 
             logger.LogTrace("Payee resolution response:\n{Response}", content);
 
@@ -70,8 +58,8 @@ public class PayeeResolutionService(
                 return new Dictionary<int, PayeeResolution>();
             }
 
-            // An explicit "results": null (possible only on a provider configured StructuredOutput=false, where the
-            // schema isn't enforced) overrides the initializer, hence the check on Results too.
+            // Defensive: the enforced schema makes an explicit "results": null unreachable, but one would override
+            // the initializer, hence the check on Results too.
             var parsed = JsonSerializer.Deserialize<ResolutionResponse>(content, JsonOptions);
             if (parsed?.Results is null)
             {
@@ -136,7 +124,7 @@ public class PayeeResolutionService(
         3. If the line is generic boilerplate (e.g. "POS PURCHASE", "INTERAC", a bare reference number) or you
            are unsure, set "payeeIndex" to -1 and leave "newPayeeName" empty.
 
-        Respond with a JSON object of the exact form:
+        A filled-in reply looks like this:
         {
           "results": [
             { "lineIndex": 0, "payeeIndex": 3, "newPayeeName": "" },
@@ -149,7 +137,6 @@ public class PayeeResolutionService(
         - Only use payeeIndex values that appear in the provided catalog, or -1.
         - Prefer matching an existing catalog payee over proposing a new one.
         - Never invent a payee for generic/boilerplate lines.
-        - Always respond with valid JSON only, no additional text.
         """;
 
     private static string BuildUserMessage(
@@ -179,9 +166,8 @@ public class PayeeResolutionService(
 
     // PayeeIndex is a plain int: the schema says non-null integer, and [Required] on an int? would still
     // generate a nullable type. [JsonRequired] makes a missing key throw too; otherwise an int would default to 0
-    // and silently match the first catalog payee. A null or missing index can only arrive from a provider
-    // configured StructuredOutput=false (plain JSON mode, schema unenforced). The deserializer then throws for the
-    // whole reply, so the batch gets no AI suggestions, where the old int? fell back to that line's newPayeeName.
+    // and silently match the first catalog payee. The enforced schema makes a null or missing index unreachable;
+    // should one arrive anyway, the deserializer throws for the whole reply and the batch gets no AI suggestions.
     private sealed class ResolutionItem
     {
         [JsonRequired]

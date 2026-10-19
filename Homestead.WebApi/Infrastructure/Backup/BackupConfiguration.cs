@@ -6,7 +6,7 @@ namespace Homestead.WebApi.Infrastructure.Backup;
 // Reads the "Backup:Targets" section into named target instances and validates each per its Kind.
 //
 // Validation returns an error string rather than throwing: there is deliberately no ValidateOnStart
-// (mirroring AiProviderConfiguration and OcrEngineConfiguration) — a misconfigured target must not stop
+// (mirroring OcrEngineConfiguration) — a misconfigured target must not stop
 // the app from booting: the build-time OpenAPI generator boots the host with no meaningful config, and
 // backup is optional anyway. The cost is that config errors surface at first use; the mitigation is that
 // ConfigurationError is exposed on /admin/backup, so a target that cannot run reads as "unavailable,

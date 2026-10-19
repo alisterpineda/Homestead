@@ -18,7 +18,6 @@ import { getMyGroups } from '@/api/generated/fn/documents/get-my-groups';
 import { getTextExtractionEngines } from '@/api/generated/fn/documents/get-text-extraction-engines';
 import { getDocumentSettings } from '@/api/generated/fn/documents/get-document-settings';
 import { patchDocumentSettings } from '@/api/generated/fn/documents/patch-document-settings';
-import { classifyPreview } from '@/api/generated/fn/documents/classify-preview';
 import { bulkClassifyDocuments } from '@/api/generated/fn/documents/bulk-classify-documents';
 import { summarizeDocument } from '@/api/generated/fn/documents/summarize-document';
 import { bulkSummarizeDocuments } from '@/api/generated/fn/documents/bulk-summarize-documents';
@@ -39,7 +38,6 @@ import type { PermanentlyDeleteDocumentsResponse } from '@/api/generated/models/
 import type { EmptyTrashResponse } from '@/api/generated/models/empty-trash-response';
 import type { GetMyGroupsResponse } from '@/api/generated/models/get-my-groups-response';
 import type { DocumentSettingsResponse } from '@/api/generated/models/document-settings-response';
-import type { ClassifyPreviewResponse } from '@/api/generated/models/classify-preview-response';
 import type { BulkClassifyDocumentsResponse } from '@/api/generated/models/bulk-classify-documents-response';
 import type { SummarizeDocumentResponse } from '@/api/generated/models/summarize-document-response';
 
@@ -56,7 +54,6 @@ export type { BulkPermanentlyDeleteDocuments$Params } from '@/api/generated/fn/d
 export type { EmptyTrash$Params } from '@/api/generated/fn/documents/empty-trash';
 export type { GetMyGroups$Params } from '@/api/generated/fn/documents/get-my-groups';
 export type { PatchDocumentSettings$Params } from '@/api/generated/fn/documents/patch-document-settings';
-export type { ClassifyPreview$Params } from '@/api/generated/fn/documents/classify-preview';
 export type { BulkClassifyDocuments$Params } from '@/api/generated/fn/documents/bulk-classify-documents';
 export type { SummarizeDocument$Params } from '@/api/generated/fn/documents/summarize-document';
 export type { BulkSummarizeDocuments$Params } from '@/api/generated/fn/documents/bulk-summarize-documents';
@@ -128,10 +125,6 @@ export class DocumentApiService {
 
   patchDocumentSettings(params: Parameters<typeof patchDocumentSettings>[2]): Observable<DocumentSettingsResponse> {
     return patchDocumentSettings(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
-  }
-
-  classifyPreview(params: Parameters<typeof classifyPreview>[2]): Observable<ClassifyPreviewResponse> {
-    return classifyPreview(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
   }
 
   bulkClassifyDocuments(params: Parameters<typeof bulkClassifyDocuments>[2]): Observable<BulkClassifyDocumentsResponse> {

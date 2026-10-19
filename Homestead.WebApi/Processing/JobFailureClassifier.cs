@@ -44,8 +44,8 @@ public static class JobFailureClassifier
         HttpRequestException { StatusCode: null } => true,
         HttpRequestException { StatusCode: { } status } => IsTransientStatus((int)status),
 
-        // AI provider SDKs (OpenAI / Azure OpenAI, Anthropic), read through the one mapping that knows their
-        // exception types. Status 0 is the same "no answer at all" as above.
+        // The AI SDK (Anthropic, including a streamed reply's mid-stream error event), read through the one mapping
+        // that knows its exception types. Status 0 is the same "no answer at all" as above.
         _ when AiProviderErrors.TryGetStatus(exception, out var status, out _) =>
             status == 0 || IsTransientStatus(status),
 

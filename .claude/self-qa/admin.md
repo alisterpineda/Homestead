@@ -12,22 +12,27 @@ AI / Backup).
 | `/admin/jobs` | JobListComponent |
 | `/admin/schedules` | ScheduleListComponent |
 | `/admin/settings` | SystemSettingsComponent — runtime log-level controls; `GET`/`PATCH /api/v1/admin/settings/system` |
-| `/admin/ai` | AiStatusComponent — read-only status of providers under `Ai:Providers` |
+| `/admin/ai` | AiStatusComponent — read-only status of the Claude API config (`Ai:*`) |
 | `/admin/backup` | BackupTargetListComponent — below |
 
 ## AI (`/admin/ai`)
 
-- **No providers in the default stack.** Define them in AppHost user-secrets
-  (`Ai:Providers:{key}:Type|Endpoint|Model|ApiKey`, `Ai:DefaultProvider`), then do a full
+- **AI is absent in the default stack.** Set `Ai:ApiKey` + `Ai:Model` in AppHost user-secrets, then do a full
   `aspire stop` + `aspire start` to pick them up. Record the `Ai:*` secrets first and restore them after.
   A dummy ApiKey is enough to render a configured card; don't press **Test connection** with one.
 - **No test ids:** match by text.
-- Card per provider: type label (`OpenAI-compatible` / `Azure AI Foundry` / `Anthropic`), "Default" and
-  "Configured" / "Not configured" badges, then Endpoint / Model / API key / Max input rows. A null endpoint
-  (Anthropic without an override) reads a muted **"SDK default"**.
-- Conditional states: the empty state (no providers; names `Ai:Providers` / `Ai:DefaultProvider`); the
-  red "No default provider is selected" warning (two or more providers and no `Ai:DefaultProvider`); and
-  an unavailable provider's reason in red (e.g. "ApiKey is required."), with its Test connection disabled.
+- Three states: **absent** (no `Ai:*` keys) → an empty state titled "AI is not configured" naming `Ai:ApiKey` /
+  `Ai:Model`, no Test connection button; **unavailable** (keys present but unusable) → the card with an
+  "Unavailable" badge and the reason in red (e.g. "Ai:ApiKey is required.", or the *Legacy AI config found*
+  reason when only the retired `Ai:Providers:*` / `Ai:DefaultProvider` keys are set), Test connection disabled;
+  **configured** → "Configured" badge.
+- Card rows: Model / Endpoint / API key / Effort / Refusal fallback / Max input / Statement input / PDF input /
+  Page image. PDF input reads e.g. "On (up to 20 pages, 4 MB)". A null endpoint reads a muted
+  **"Claude API default"**.
+- A successful probe reads "Connection successful. (N ms)". Token metrics are on the dashboard Metrics page under
+  meter `Homestead.Ai` (`homestead.ai.tokens` by feature/kind/model); the SDK's spans (`anthropic.messages.create`,
+  source `com.anthropic.sdk.csharp`) via `aspire otel spans homestead-webapi --format Json` — they must carry no
+  prompt or response text.
 
 ## Backup (`/admin/backup`)
 

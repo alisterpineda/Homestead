@@ -101,10 +101,11 @@ if (!string.IsNullOrEmpty(oidcAuthority))
     MapCsvEnvToConfigArray("OIDC_ADDITIONAL_SCOPES", "Oidc:AdditionalScopes");
 }
 
-// AI providers need no env-var mapping (contrast the OIDC_* block above): they are configured with stock
-// .NET config env vars — Ai__Providers__{key}__{field} plus Ai__DefaultProvider — exactly like the OCR
-// engines. Leaving them all unset keeps AI a graceful no-op. (Breaking: the old flat AI_ENDPOINT /
-// AI_MODEL / AI_API_KEY / AI_IMAGE_INPUT / AI_IMAGE_RENDER_MAX_EDGE vars are no longer read.)
+// AI needs no env-var mapping (contrast the OIDC_* block above): it is configured with stock .NET config env
+// vars — Ai__ApiKey, Ai__Model, and the optional Ai__Effort / Ai__RefusalFallback / input knobs. Leaving them all
+// unset keeps AI a graceful no-op. (Breaking: the Ai__Providers__* / Ai__DefaultProvider shape and the older
+// flat AI_ENDPOINT / AI_MODEL / AI_API_KEY vars are no longer read; the retired Ai__Providers__* keys are detected
+// and reported as unavailable-with-reason.)
 
 void MapCsvEnvToConfigArray(string envVar, string configPrefix)
 {
@@ -313,6 +314,8 @@ builder.Services.AddOpenApi("v1", options =>
 builder.Services.AddHostedService<Homestead.WebApi.Authentication.OidcStartupValidator>();
 
 var app = builder.Build();
+
+app.Services.LogAiAvailability();
 
 app.MapDefaultEndpoints();
 

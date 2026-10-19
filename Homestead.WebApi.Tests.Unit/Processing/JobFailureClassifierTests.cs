@@ -1,12 +1,10 @@
-using System.ClientModel;
-using System.ClientModel.Primitives;
 using System.Net;
 using Anthropic.Exceptions;
+using Anthropic.Models;
 using Azure;
 using Homestead.WebApi.Infrastructure.Ai;
 using Homestead.WebApi.Processing;
 using Microsoft.EntityFrameworkCore;
-using NSubstitute;
 
 namespace Homestead.WebApi.Tests.Unit.Processing;
 
@@ -39,29 +37,38 @@ public class JobFailureClassifierTests
         Assert.True(JobFailureClassifier.IsTransient(new HttpRequestException("Connection refused")));
     }
 
+    // 529 is Anthropic's "overloaded" — a 5xx like any other, so it retries.
     [Theory]
-    [InlineData(0, true)]
-    [InlineData(429, true)]
-    [InlineData(503, true)]
     [InlineData(400, false)]
-    [InlineData(401, false)]
-    public void AiSdkFailures_AreClassifiedByStatus(int status, bool expected)
+    [InlineData(429, true)]
+    [InlineData(500, true)]
+    [InlineData(529, true)]
+    public void AnthropicSdkFailures_AreClassifiedByStatus(int status, bool expected)
     {
-        var response = Substitute.For<PipelineResponse>();
-        response.Status.Returns(status);
+        AnthropicApiException exception = status switch
+        {
+            400 => new AnthropicBadRequestException { StatusCode = HttpStatusCode.BadRequest, ResponseBody = "" },
+            429 => new AnthropicRateLimitException { StatusCode = HttpStatusCode.TooManyRequests, ResponseBody = "" },
+            _ => new Anthropic5xxException { StatusCode = (HttpStatusCode)status, ResponseBody = "" },
+        };
 
-        Assert.Equal(expected, JobFailureClassifier.IsTransient(new ClientResultException("x", response)));
+        Assert.Equal(expected, JobFailureClassifier.IsTransient(exception));
     }
 
+    // An overload reported as an error event mid-stream (after the HTTP 200) has no status of its own; its error
+    // type stands in for one, so it retries like the 529 it is.
     [Fact]
-    public void AnthropicSdkFailures_AreClassifiedByStatus()
+    public void AnAnthropicMidStreamOverload_IsTransient()
     {
         Assert.True(JobFailureClassifier.IsTransient(
-            new AnthropicRateLimitException { StatusCode = HttpStatusCode.TooManyRequests, ResponseBody = "" }));
-        Assert.True(JobFailureClassifier.IsTransient(
-            new Anthropic5xxException { StatusCode = HttpStatusCode.ServiceUnavailable, ResponseBody = "" }));
-        Assert.False(JobFailureClassifier.IsTransient(
-            new AnthropicBadRequestException { StatusCode = HttpStatusCode.BadRequest, ResponseBody = "" }));
+            new AnthropicSseException("Overloaded") { ErrorType = ErrorType.OverloadedError }));
+    }
+
+    // A stream cut off part-way got no usable answer — the same "no answer at all" as a refused connection.
+    [Fact]
+    public void AnAnthropicCutOffStream_IsTransient()
+    {
+        Assert.True(JobFailureClassifier.IsTransient(new AnthropicInvalidDataException("stream ended early")));
     }
 
     [Fact]

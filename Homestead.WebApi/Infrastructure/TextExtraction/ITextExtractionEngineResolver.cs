@@ -3,7 +3,7 @@ namespace Homestead.WebApi.Infrastructure.TextExtraction;
 // Turns "which engine should this run use?" into a concrete engine key. Chain: explicit key ->
 // Ocr:DefaultEngine -> the built-in "tesseract".
 //
-// Lives in Infrastructure as a singleton (like IAiProviderResolver): both an engine's DEFINITION and the
+// Lives in Infrastructure as a singleton: both an engine's DEFINITION and the
 // CHOICE of default are deployment config, so there is no settings read and no DbContext. The Documents
 // settings page only REPORTS the default; it cannot change it.
 public interface ITextExtractionEngineResolver

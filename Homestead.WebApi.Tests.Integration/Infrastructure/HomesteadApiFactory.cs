@@ -122,13 +122,6 @@ public class HomesteadApiFactory : WebApplicationFactory<Program>
         builder.UseSetting("Processing:RetryBackoff:0", "00:00:00.2");
         builder.UseSetting("Processing:RetryBackoff:1", "01:00:00");
 
-        // Pin the AI default to the fake registered below. Without this the fake would only resolve via
-        // the resolver's sole-provider arm — which silently breaks the moment ANY real Ai:Providers config
-        // leaks in (e.g. Ai__Providers__* env vars exported in a dev/CI shell reach the in-process host via
-        // the stock env-var provider, exactly like the Ocr__ var above). An explicit default keeps the
-        // fake resolving — through the real resolver's explicit-default arm — no matter what else registers.
-        builder.UseSetting("Ai:DefaultProvider", FakeAiProvider.ProviderKey);
-
         // Enable the Bank of Canada source (its provider is swapped for a network-free fake below) so the
         // import-pipeline and Run-now tests have an enabled + configured external source. AlphaVantage is
         // deliberately left unset: disabled AND not configured (no ApiKey), which the 400 tests rely on.
@@ -185,13 +178,16 @@ public class HomesteadApiFactory : WebApplicationFactory<Program>
             services.RemoveAll<IAiClassificationService>();
             services.AddScoped<IAiClassificationService, FakeAiClassificationService>();
 
-            // AI is gated by the resolved IAiProvider being available (config-driven). Deliberately
-            // ADDITIVE, not RemoveAll: the real AiProviderResolver stays under test and resolves this fake
-            // through its explicit-default arm — Ai:DefaultProvider is pinned to the fake's key above, so
-            // stray real providers (leaked env config) can register without stealing resolution or turning
-            // AI off. Auto-classify on upload still needs its own setting on, so this doesn't classify
-            // uploads that don't ask.
+            // AI is gated by IAiProvider.Availability (config-driven). Replace the real provider with the
+            // always-ready fake, and pin the input settings (TestAiSettings: production defaults with PDF input
+            // off), so real Ai:* config leaking in from a dev/CI shell (Ai__* env vars reach the in-process host
+            // via the stock env-var provider, exactly like the Ocr__ var above) can neither turn AI off nor change
+            // the knobs. Transient so a test can swap TestAiSettings.Current for one call. Auto-classify on upload
+            // still needs its own setting on, so this doesn't classify uploads that don't ask.
+            services.RemoveAll<IAiProvider>();
             services.AddSingleton<IAiProvider, FakeAiProvider>();
+            services.RemoveAll<AiInputSettings>();
+            services.AddTransient(_ => TestAiSettings.Current);
 
             // Substitute the statement extractor so the import spine is deterministic and never calls a live
             // model — the ParseAccountStatement job handler resolves this fake and gets a canned StatementIr.

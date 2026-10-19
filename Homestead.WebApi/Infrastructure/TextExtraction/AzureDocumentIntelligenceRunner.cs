@@ -5,7 +5,7 @@ using Azure.AI.DocumentIntelligence;
 namespace Homestead.WebApi.Infrastructure.TextExtraction;
 
 // One runner per configured Azure engine instance, holding that instance's credentials. The client is
-// built once and reused (mirroring AiProvider.GetChatClient): DocumentIntelligenceClient is a stateless,
+// built once and reused (mirroring AnthropicAiProvider's client): DocumentIntelligenceClient is a stateless,
 // thread-safe HTTP wrapper, so rebuilding per call would mean a fresh TLS handshake per extraction under
 // bulk reprocess. The benign init race just discards a redundant, never-used build.
 //
