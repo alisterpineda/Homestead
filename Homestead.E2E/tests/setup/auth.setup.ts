@@ -1,22 +1,10 @@
-import type { Page } from '@playwright/test';
 import { test as setup, expect } from '../../fixtures/auth.fixture';
 import { AUTH_STATE, DISPLAY_CURRENCY, KEYCLOAK_ADMIN, KEYCLOAK_USER } from '../../e2e.config';
 import { findCurrencyId, setDisplayCurrencyViaApi } from '../../helpers/api/finances';
 import { LoginPage } from '../../pages/auth/login.page';
 
-/**
- * Finances masks balances by default, which is right for real users but hides the numbers the
- * specs assert on. A revealed-at anchor is needed too — FinancesPrivacyAutoMaskService treats a
- * missing or >5-min-old anchor as stale and re-masks on cold start — so it is stamped far in the
- * future to stay fresh however long the run takes.
- */
-async function revealFinanceBalances(page: Page): Promise<void> {
-  await page.localStorage.setItem('homestead-finances-privacy-masked', 'false');
-  await page.localStorage.setItem(
-    'homestead-finances-privacy-revealed-at',
-    JSON.stringify(Date.now() + 365 * 24 * 60 * 60 * 1000),
-  );
-}
+// Keep the saved storage states sign-in only: tests reveal finance values per tab (base.fixture).
+setup.use({ revealFinances: false });
 
 // The first user to sign in to a fresh database is auto-activated as the admin, so this must be
 // the run's first sign-in — which is why every other project depends on this one.
@@ -24,7 +12,6 @@ setup('sign in the admin and set household defaults', async ({ page, loginPage }
   await loginPage.signIn(KEYCLOAK_ADMIN);
   await expect(page).toHaveURL(/\/documents/);
 
-  await revealFinanceBalances(page);
   await page.context().storageState({ path: AUTH_STATE.admin });
 
   const cadId = await findCurrencyId(page.request, DISPLAY_CURRENCY);
@@ -61,7 +48,6 @@ setup('provision, activate and sign in the contributor', async ({ browser, page,
   await userLogin.oidcButton.click();
   await expect(userPage).toHaveURL(/\/documents/);
 
-  await revealFinanceBalances(userPage);
   await userContext.storageState({ path: AUTH_STATE.contributor });
   await userContext.close();
 });

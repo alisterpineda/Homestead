@@ -14,6 +14,14 @@ type BaseFixtures = {
   adminRequest: APIRequestContext;
   /** An axe-core scanner for the current page, preconfigured for WCAG 2.1 A and AA. */
   makeAxeBuilder: () => AxeBuilder;
+  /**
+   * Option: start every tab with finance values revealed, as a user who just un-hid them would.
+   * Default true, since specs assert on amounts; a spec exercising the privacy mask itself sets it
+   * false to get the app's masked-by-default behaviour.
+   */
+  revealFinances: boolean;
+  /** Automatic: applies `revealFinances` (see below). */
+  revealFinanceValues: void;
   /** Automatic: lets clicks pass through toasts (see below). */
   clickThroughToasts: void;
 };
@@ -27,6 +35,25 @@ export const test = base.extend<BaseFixtures>({
     await use(context);
     await context.dispose();
   },
+  revealFinances: [true, { option: true }],
+  // Finances masks values by default and re-masks once its revealed-at anchor is 5 min old, so the
+  // reveal is stamped fresh when each tab first loads the app — never carried in storageState,
+  // where it would go stale partway through a long run. The sessionStorage marker makes it once
+  // per tab, so a reload (or the test toggling the mask) keeps the app's real behaviour.
+  revealFinanceValues: [
+    async ({ context, baseURL, revealFinances }, use) => {
+      if (revealFinances) {
+        await context.addInitScript((appOrigin) => {
+          if (location.origin !== appOrigin || sessionStorage.getItem('e2e-finances-revealed')) return;
+          sessionStorage.setItem('e2e-finances-revealed', 'true');
+          localStorage.setItem('homestead-finances-privacy-masked', 'false');
+          localStorage.setItem('homestead-finances-privacy-revealed-at', JSON.stringify(Date.now()));
+        }, new URL(baseURL!).origin);
+      }
+      await use();
+    },
+    { auto: true },
+  ],
   // Every test signs in as the same admin, so each page also receives the "processed
   // successfully" toasts for every other test's uploads. On a phone that stack covers the bottom of
   // the screen and swallows clicks on whatever sits under it — noise no real user sees. Toasts stay
