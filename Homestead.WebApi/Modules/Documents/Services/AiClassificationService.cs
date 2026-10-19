@@ -102,9 +102,9 @@ public class AiClassificationService(
             }
 
             // Gate each field by scope so out-of-scope model output is neutralized to a no-op downstream:
-            // tag/party lists -> [], summary -> "", title -> the unchanged document name. The model
-            // references catalog items by position, so we map the returned indexes back to ids here —
-            // out-of-range indexes (a hallucinated position) are dropped, mirroring the old id safety net.
+            // tag/party lists -> [], summary -> "", title -> the unchanged document name, dates -> null.
+            // The model references catalog items by position, so we map the returned indexes back to ids
+            // here — out-of-range indexes (a hallucinated position) are dropped, mirroring the old id safety net.
             var matchedTagIds = scope.HasFlag(ClassificationScope.Tags)
                 ? MapIndexes(parsed.TagIndexes, availableTags.Select(t => t.Id).ToList())
                 : [];
@@ -121,11 +121,21 @@ public class AiClassificationService(
                 ? parsed.SuggestedTitle ?? documentName
                 : documentName;
 
+            var documentDate = scope.HasFlag(ClassificationScope.DocumentDate)
+                ? ParseDate(parsed.DocumentDate, "documentDate", documentName)
+                : null;
+
+            var expiryDate = scope.HasFlag(ClassificationScope.ExpiryDate)
+                ? ParseDate(parsed.ExpiryDate, "expiryDate", documentName)
+                : null;
+
             return new ClassificationResult(
                 matchedTagIds,
                 matchedPartyIds,
                 summary,
-                suggestedTitle);
+                suggestedTitle,
+                documentDate,
+                expiryDate);
         }
         catch (Exception ex)
         {
@@ -145,6 +155,23 @@ public class AiClassificationService(
             .Select(i => catalogIds[i])
             .Distinct()
             .ToList();
+    }
+
+    // A date the model returns must be an ISO yyyy-MM-dd date in a plausible range; anything else (a locale
+    // format the schema couldn't stop, an impossible month, a misread year) is dropped rather than guessed at.
+    private DateOnly? ParseDate(string? value, string field, string documentName)
+    {
+        if (value is null)
+            return null;
+
+        var date = SuggestionDate.Parse(value);
+        if (date is { } d && SuggestionDate.IsPlausible(d))
+            return d;
+
+        logger.LogDebug(
+            "Dropping unusable {Field} '{Value}' from AI classification of document '{Name}'",
+            field, value, documentName);
+        return null;
     }
 
     // The system prompt is assembled from fragments so it describes only the in-scope fields: each field
@@ -179,6 +206,22 @@ public class AiClassificationService(
         {
             instructions.Add("suggestedTitle: Suggest a clear, descriptive title for the document.");
             rules.Add("- The suggested title should be human-readable and descriptive");
+        }
+
+        if (scope.HasFlag(ClassificationScope.DocumentDate))
+        {
+            instructions.Add("documentDate: The date the document was issued or written, such as an invoice date, letter date, or statement closing date. Not a due date, a transaction date, or a printed or received date.");
+        }
+
+        if (scope.HasFlag(ClassificationScope.ExpiryDate))
+        {
+            instructions.Add("expiryDate: The date the document itself stops being valid, such as an ID or licence expiry, the end of a policy or coverage period, the end of a warranty, or the end of a contract term. Only when explicitly stated. A payment due date is not an expiry.");
+        }
+
+        if (scope.HasFlag(ClassificationScope.DocumentDate) || scope.HasFlag(ClassificationScope.ExpiryDate))
+        {
+            rules.Add("- Write dates as YYYY-MM-DD");
+            rules.Add("- Return null for a date that is not stated, or that is ambiguous (for example 03/04/2025 with no locale cue); never guess");
         }
 
         var numberedInstructions = string.Join(
@@ -244,6 +287,28 @@ public class AiClassificationService(
                 ["description"] = "A clear, human-readable title for the document."
             };
             required.Add("suggestedTitle");
+        }
+
+        // Nullable dates use the same ["string","null"] union AiJsonSchema.CreateStrict produces. No "format"
+        // keyword: the server validates the value itself (SuggestionDate), so the schema only describes it.
+        if (scope.HasFlag(ClassificationScope.DocumentDate))
+        {
+            properties["documentDate"] = new JsonObject
+            {
+                ["type"] = new JsonArray("string", "null"),
+                ["description"] = "The date the document was issued or written, as YYYY-MM-DD, or null when none is stated."
+            };
+            required.Add("documentDate");
+        }
+
+        if (scope.HasFlag(ClassificationScope.ExpiryDate))
+        {
+            properties["expiryDate"] = new JsonObject
+            {
+                ["type"] = new JsonArray("string", "null"),
+                ["description"] = "The date the document stops being valid, as YYYY-MM-DD, or null when none is explicitly stated."
+            };
+            required.Add("expiryDate");
         }
 
         var schema = new JsonObject
@@ -404,6 +469,8 @@ public class AiClassificationService(
         public List<int>? PartyIndexes { get; set; }
         public string? Summary { get; set; }
         public string? SuggestedTitle { get; set; }
+        public string? DocumentDate { get; set; }
+        public string? ExpiryDate { get; set; }
     }
 }
 

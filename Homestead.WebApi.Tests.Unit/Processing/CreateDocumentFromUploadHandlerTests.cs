@@ -92,6 +92,45 @@ public class CreateDocumentFromUploadHandlerTests : IDisposable
     }
 
     [Fact]
+    public async Task Handle_FoldsClassificationDatesIntoCreation_SingleCreated_PendingDateSuggestions()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        var command = new CreateDocumentFromUploadCommand
+        {
+            Name = "invoice.pdf",
+            ContentType = "application/pdf",
+            FileSize = 1024,
+            FileHash = "hash-3",
+            FileExtension = ".pdf",
+            ExtractedText = "extracted",
+            Classification = new ClassificationResult(
+                [], [], "", "invoice.pdf", DocumentDate: new DateOnly(2025, 3, 15), ExpiryDate: new DateOnly(2026, 3, 15)),
+            ActorUserId = _userId
+        };
+
+        await _sut.HandleAsync(command, ct);
+        await _db.SaveChangesAsync(ct);
+
+        var doc = await _db.Documents.FirstAsync(ct);
+        Assert.Equal(new DateOnly(2025, 3, 15), doc.DocumentDate);
+        Assert.Equal(new DateOnly(2026, 3, 15), doc.ExpiryDate);
+        Assert.Null(doc.UpdatedByUserId);
+
+        // A new document has no dates, so each suggestion records an empty original.
+        var suggestions = _db.DocumentSuggestions.Where(s => s.DocumentId == doc.Id).ToList();
+        var documentDate = Assert.Single(suggestions, s => s.Field == DocumentSuggestionField.DocumentDate);
+        Assert.Equal("2025-03-15", documentDate.SuggestedValue);
+        Assert.Null(documentDate.OriginalValue);
+        Assert.Equal(DocumentSuggestionStatus.Pending, documentDate.Status);
+        Assert.Single(suggestions, s => s.Field == DocumentSuggestionField.ExpiryDate);
+
+        _audit.Received(1).Created("Document", doc.Id, null);
+        _audit.DidNotReceive().Track<DocumentSnapshot, Document>(
+            Arg.Any<Document>(), Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<Guid?>());
+    }
+
+    [Fact]
     public async Task Handle_NoClassification_CreatesPlainDocument_SingleCreated()
     {
         var ct = TestContext.Current.CancellationToken;

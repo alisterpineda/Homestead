@@ -44,7 +44,8 @@ internal record DocumentSuggestionItem(Guid Id, string Field, string Status, str
 
 internal record DocumentDetailItem(
     Guid Id, string Name, string? Summary,
-    IReadOnlyList<DocumentSuggestionItem>? Suggestions = null);
+    IReadOnlyList<DocumentSuggestionItem>? Suggestions = null,
+    DateOnly? DocumentDate = null, DateOnly? ExpiryDate = null);
 
 internal record SystemSettingsItem();
 

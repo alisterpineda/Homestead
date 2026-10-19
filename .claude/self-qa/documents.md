@@ -37,3 +37,32 @@ happen until the Metadata tab has been activated once; the latch survives a brea
 - `remote-link-{id}` is **Drive-only** — never renders on the default (local-target) stack.
 - API: `GET /api/v1/admin/backup/documents/{documentId}` — 403 for a contributor, 404 for an unknown
   or trashed document.
+
+## AI suggestions (Info tab)
+
+Pending AI suggestions render inline where each value is shown; an "AI suggestions (n)" bar heads the
+Info tab whenever any suggestion is pending (its Approve all / Decline all buttons need two or more).
+
+- **Name, Document Date, Expiry Date** each show an "AI Suggested" badge in the field label and ✓/✗
+  buttons inside the input — `aria-label` `Approve name suggestion` / `Decline name suggestion`,
+  `Approve document date suggestion` / `Decline document date suggestion`, `Approve expiry date
+  suggestion` / `Decline expiry date suggestion`. On a date the ✓/✗ replace the picker's `Clear date`
+  button (`Open calendar` stays).
+- Hovering the input shows `Original: …` (e.g. `Original: Jan 1, 2025`, or `Original: (none)` when
+  the field was empty). It opens on hover or keyboard focus of the input (like Name's). The tooltip lives in
+  a CDK overlay that `find` doesn't see; read it after hovering with
+  `--raw eval "[...document.querySelectorAll('.cdk-overlay-container ng-component')].map(e=>e.textContent.trim())"`.
+- Decline restores the original (an empty original clears the date); approve keeps the value and
+  drops the badge. A manual date edit + Save auto-declines that date's suggestion.
+- The Classify dialog (header "More actions" ⋮ menu → Classify) has five checkboxes, all ticked by default: Tags, Parties,
+  Name, Document date, Expiry date. The choice persists in `localStorage`
+  (`homestead-classify-fields`).
+- **Getting a pending suggestion:** run Classify with AI configured (`/admin/ai` reads Configured),
+  or insert a row directly and set the field to match, e.g.
+  `INSERT INTO documents.document_suggestions ("Id","DocumentId","Field","Status","SuggestedValue","OriginalValue","IsApplied","CreatedAt") VALUES (gen_random_uuid(), '<doc id>', 'DocumentDate', 'Pending', '2025-03-15', NULL, true, now());`
+  plus `UPDATE documents.documents SET "DocumentDate" = '2025-03-15' WHERE "Id" = '<doc id>';`.
+  Suggestion `Field` values are strings (`Tags`, `Name`, `Parties`, `DocumentDate`, `ExpiryDate`).
+  Run SQL with `docker exec <pg> sh -c 'PGPASSWORD=$POSTGRES_PASSWORD psql -U postgres -h localhost -d postgresdb -c "..."'`.
+- Unsaved detail-page edits are restored from `sessionStorage` across reloads: a reload with pending edits
+  raises a `beforeunload` prompt (`dialog-accept`), and a suggestion seeded under an old draft shows the
+  draft's value under the badge.

@@ -25,9 +25,9 @@ describe('ClassifyOptionsDialogComponent', () => {
     vi.unstubAllGlobals();
   });
 
-  it('defaults all three fields checked and enables confirm', () => {
+  it('defaults all five fields checked and enables confirm', () => {
     const c = setup().componentInstance;
-    expect(c.fields()).toEqual({ tags: true, parties: true, name: true });
+    expect(c.fields()).toEqual({ tags: true, parties: true, name: true, documentDate: true, expiryDate: true });
     expect(c.confirmDisabled()).toBe(false);
   });
 
@@ -36,13 +36,16 @@ describe('ClassifyOptionsDialogComponent', () => {
     c.setField('tags', false);
     c.setField('parties', false);
     c.setField('name', false);
+    expect(c.noFieldsSelected()).toBe(false); // the dates are still ticked
+    c.setField('documentDate', false);
+    c.setField('expiryDate', false);
     expect(c.noFieldsSelected()).toBe(true);
     expect(c.confirmDisabled()).toBe(true);
   });
 
   it('emits the selected fields on confirm', () => {
     const c = setup().componentInstance;
-    c.setField('parties', false); // leaves Tags + Name
+    c.setField('parties', false); // leaves Tags + Name + the dates
 
     let emitted: { fields: string[] } | undefined;
     c.confirmed.subscribe(v => (emitted = v));
@@ -51,13 +54,41 @@ describe('ClassifyOptionsDialogComponent', () => {
     c.confirm({ close });
 
     expect(close).toHaveBeenCalled();
-    expect(emitted).toEqual({ fields: ['Tags', 'Name'] });
+    expect(emitted).toEqual({ fields: ['Tags', 'Name', 'DocumentDate', 'ExpiryDate'] });
+  });
+
+  it('emits only the date fields when only they are selected', () => {
+    const c = setup().componentInstance;
+    c.setField('tags', false);
+    c.setField('parties', false);
+    c.setField('name', false);
+    c.setField('expiryDate', false);
+
+    let emitted: { fields: string[] } | undefined;
+    c.confirmed.subscribe(v => (emitted = v));
+    c.confirm({ close: vi.fn() });
+
+    expect(emitted).toEqual({ fields: ['DocumentDate'] });
   });
 
   it('restores the remembered field choice from storage', () => {
+    storage['homestead-classify-fields'] = JSON.stringify({
+      tags: false, parties: true, name: false, documentDate: false, expiryDate: true,
+    });
+    const c = setup().componentInstance;
+    expect(c.fields()).toEqual({ tags: false, parties: true, name: false, documentDate: false, expiryDate: true });
+  });
+
+  it('restores a legacy three-key selection with the dates ticked', () => {
     storage['homestead-classify-fields'] = JSON.stringify({ tags: false, parties: true, name: false });
     const c = setup().componentInstance;
-    expect(c.fields()).toEqual({ tags: false, parties: true, name: false });
+    expect(c.fields()).toEqual({ tags: false, parties: true, name: false, documentDate: true, expiryDate: true });
+  });
+
+  it('falls back to the defaults when a stored date key is not a boolean', () => {
+    storage['homestead-classify-fields'] = JSON.stringify({ tags: false, parties: true, name: false, documentDate: 'yes' });
+    const c = setup().componentInstance;
+    expect(c.fields()).toEqual({ tags: true, parties: true, name: true, documentDate: true, expiryDate: true });
   });
 
   it('emits empty fields and is never gated when showFields is false (summarize)', () => {

@@ -4,4 +4,6 @@ public record ClassificationResult(
     List<Guid> MatchedTagIds,
     List<Guid> MatchedPartyIds,
     string Summary,
-    string SuggestedTitle);
+    string SuggestedTitle,
+    DateOnly? DocumentDate = null,
+    DateOnly? ExpiryDate = null);

@@ -12,14 +12,32 @@ interface ClassifyFieldSelection {
   tags: boolean;
   parties: boolean;
   name: boolean;
+  documentDate: boolean;
+  expiryDate: boolean;
 }
 
-function isFieldSelection(value: unknown): value is ClassifyFieldSelection {
+// Selections stored before the date fields existed have only the first three keys.
+type StoredFieldSelection = Pick<ClassifyFieldSelection, 'tags' | 'parties' | 'name'> &
+  Partial<Pick<ClassifyFieldSelection, 'documentDate' | 'expiryDate'>>;
+
+const DEFAULT_FIELDS: ClassifyFieldSelection = {
+  tags: true,
+  parties: true,
+  name: true,
+  documentDate: true,
+  expiryDate: true,
+};
+
+function isFieldSelection(value: unknown): value is StoredFieldSelection {
+  if (typeof value !== 'object' || value === null) return false;
+  const v = value as Record<string, unknown>;
+  const isOptionalBoolean = (x: unknown) => x === undefined || typeof x === 'boolean';
   return (
-    typeof value === 'object' && value !== null &&
-    typeof (value as ClassifyFieldSelection).tags === 'boolean' &&
-    typeof (value as ClassifyFieldSelection).parties === 'boolean' &&
-    typeof (value as ClassifyFieldSelection).name === 'boolean'
+    typeof v['tags'] === 'boolean' &&
+    typeof v['parties'] === 'boolean' &&
+    typeof v['name'] === 'boolean' &&
+    isOptionalBoolean(v['documentDate']) &&
+    isOptionalBoolean(v['expiryDate'])
   );
 }
 
@@ -64,6 +82,14 @@ function isFieldSelection(value: unknown): value is ClassifyFieldSelection {
                 <hlm-checkbox [checked]="fields().name" (checkedChange)="setField('name', $event)" [aria-label]="'Name'" />
                 <span>Name</span>
               </label>
+              <label class="flex items-center gap-2 text-sm cursor-pointer">
+                <hlm-checkbox [checked]="fields().documentDate" (checkedChange)="setField('documentDate', $event)" [aria-label]="'Document date'" />
+                <span>Document date</span>
+              </label>
+              <label class="flex items-center gap-2 text-sm cursor-pointer">
+                <hlm-checkbox [checked]="fields().expiryDate" (checkedChange)="setField('expiryDate', $event)" [aria-label]="'Expiry date'" />
+                <span>Expiry date</span>
+              </label>
               @if (noFieldsSelected()) {
                 <p class="text-sm text-muted-foreground">Select at least one field.</p>
               }
@@ -92,16 +118,16 @@ export class ClassifyOptionsDialogComponent {
   confirmed = output<{ fields: DocumentSuggestionField[] }>();
 
   // Remembered across surfaces (single/bulk classify) and sessions.
-  fields = persistedSignal<ClassifyFieldSelection>({
+  private readonly storedFields = persistedSignal<StoredFieldSelection>({
     key: 'homestead-classify-fields',
-    defaultValue: { tags: true, parties: true, name: true },
+    defaultValue: DEFAULT_FIELDS,
     validate: isFieldSelection,
   });
 
-  noFieldsSelected = computed(() => {
-    const f = this.fields();
-    return !f.tags && !f.parties && !f.name;
-  });
+  // Fields missing from an older stored selection fall back to their (ticked) defaults.
+  fields = computed<ClassifyFieldSelection>(() => ({ ...DEFAULT_FIELDS, ...this.storedFields() }));
+
+  noFieldsSelected = computed(() => Object.values(this.fields()).every(checked => !checked));
   confirmDisabled = computed(() => this.showFields() && this.noFieldsSelected());
 
   private readonly verb = computed(() => (this.showFields() ? 'Classify' : 'Summarize'));
@@ -136,7 +162,7 @@ export class ClassifyOptionsDialogComponent {
   }
 
   setField(field: keyof ClassifyFieldSelection, checked: boolean): void {
-    this.fields.update(f => ({ ...f, [field]: checked }));
+    this.storedFields.set({ ...this.fields(), [field]: checked });
   }
 
   confirm(ctx: { close: () => void }): void {
@@ -148,6 +174,8 @@ export class ClassifyOptionsDialogComponent {
       if (f.tags) fields.push('Tags');
       if (f.parties) fields.push('Parties');
       if (f.name) fields.push('Name');
+      if (f.documentDate) fields.push('DocumentDate');
+      if (f.expiryDate) fields.push('ExpiryDate');
     }
 
     ctx.close();

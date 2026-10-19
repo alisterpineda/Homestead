@@ -910,6 +910,206 @@ public class DocumentClassifierTests : IDisposable
         Assert.Empty(nameSuggestions);
     }
 
+    // ---- ApplyAsync: dates (overwrite like Name; the original rides on the pending suggestion) -------
+
+    private static readonly DateOnly Jan1 = new(2025, 1, 1);
+    private static readonly DateOnly Mar15 = new(2025, 3, 15);
+    private static readonly DateOnly Jun30 = new(2025, 6, 30);
+
+    private Task ApplyDocumentDateAsync(Document document, DateOnly? documentDate, CancellationToken ct) =>
+        _sut.ApplyAsync(document, new ClassificationResult([], [], "", "Test Doc", DocumentDate: documentDate),
+            ClassificationScope.DocumentDate, actorUserId: null, stampSummaryMetadata: false, ct);
+
+    private void SeedDocumentDate(DateOnly? date)
+    {
+        var doc = _db.Documents.First(d => d.Id == _documentId);
+        doc.DocumentDate = date;
+        _db.SaveChanges();
+    }
+
+    private void SeedPendingSuggestion(DocumentSuggestionField field, string suggested, string? original)
+    {
+        _db.DocumentSuggestions.Add(new DocumentSuggestion
+        {
+            DocumentId = _documentId,
+            Field = field,
+            Status = DocumentSuggestionStatus.Pending,
+            SuggestedValue = suggested,
+            OriginalValue = original,
+            CreatedAt = DateTimeOffset.UtcNow
+        });
+        _db.SaveChanges();
+    }
+
+    private List<DocumentSuggestion> PendingSuggestions(DocumentSuggestionField field) => _db.DocumentSuggestions
+        .Where(s => s.DocumentId == _documentId && s.Field == field && s.Status == DocumentSuggestionStatus.Pending)
+        .ToList();
+
+    [Fact]
+    public async Task ApplyAsync_DocumentDate_EmptyDate_IsApplied_SuggestionHasNullOriginal()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        SeedDocumentWithVersion("some text");
+        var document = LoadDocument();
+
+        await ApplyDocumentDateAsync(document, Mar15, ct);
+        await _db.SaveChangesAsync(ct);
+
+        Assert.Equal(Mar15, document.DocumentDate);
+        var suggestion = Assert.Single(PendingSuggestions(DocumentSuggestionField.DocumentDate));
+        Assert.Equal("2025-03-15", suggestion.SuggestedValue);
+        Assert.Null(suggestion.OriginalValue);
+    }
+
+    [Fact]
+    public async Task ApplyAsync_DocumentDate_ExistingDate_IsOverwritten_SuggestionHoldsOriginal()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        SeedDocumentWithVersion("some text");
+        SeedDocumentDate(Jan1);
+        var document = LoadDocument();
+
+        await ApplyDocumentDateAsync(document, Mar15, ct);
+        await _db.SaveChangesAsync(ct);
+
+        Assert.Equal(Mar15, document.DocumentDate);
+        var suggestion = Assert.Single(PendingSuggestions(DocumentSuggestionField.DocumentDate));
+        Assert.Equal("2025-03-15", suggestion.SuggestedValue);
+        Assert.Equal("2025-01-01", suggestion.OriginalValue);
+    }
+
+    [Fact]
+    public async Task ApplyAsync_ExpiryDate_IsApplied_ToItsOwnField()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        SeedDocumentWithVersion("some text");
+        var document = LoadDocument();
+
+        await _sut.ApplyAsync(document, new ClassificationResult([], [], "", "Test Doc", ExpiryDate: Jun30),
+            ClassificationScope.ExpiryDate, actorUserId: null, stampSummaryMetadata: false, ct);
+        await _db.SaveChangesAsync(ct);
+
+        Assert.Equal(Jun30, document.ExpiryDate);
+        Assert.Null(document.DocumentDate);
+        var suggestion = Assert.Single(PendingSuggestions(DocumentSuggestionField.ExpiryDate));
+        Assert.Equal("2025-06-30", suggestion.SuggestedValue);
+        Assert.Empty(PendingSuggestions(DocumentSuggestionField.DocumentDate));
+    }
+
+    [Fact]
+    public async Task ApplyAsync_DocumentDate_NullAnswer_KeepsExistingDate_NoSuggestion()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        SeedDocumentWithVersion("some text");
+        SeedDocumentDate(Jan1);
+        var document = LoadDocument();
+
+        await ApplyDocumentDateAsync(document, null, ct);
+        await _db.SaveChangesAsync(ct);
+
+        Assert.Equal(Jan1, document.DocumentDate);
+        Assert.Empty(PendingSuggestions(DocumentSuggestionField.DocumentDate));
+    }
+
+    [Fact]
+    public async Task ApplyAsync_DocumentDate_EqualDate_NoSuggestion()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        SeedDocumentWithVersion("some text");
+        SeedDocumentDate(Jan1);
+        var document = LoadDocument();
+
+        await ApplyDocumentDateAsync(document, Jan1, ct);
+        await _db.SaveChangesAsync(ct);
+
+        Assert.Equal(Jan1, document.DocumentDate);
+        Assert.Empty(PendingSuggestions(DocumentSuggestionField.DocumentDate));
+    }
+
+    [Fact]
+    public async Task ApplyAsync_DocumentDate_Reclassify_RecoversOriginal_FromPendingSuggestion()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        SeedDocumentWithVersion("some text");
+        SeedDocumentDate(Mar15); // the earlier AI value
+        SeedPendingSuggestion(DocumentSuggestionField.DocumentDate, "2025-03-15", "2025-01-01");
+        var document = LoadDocument();
+
+        await ApplyDocumentDateAsync(document, Jun30, ct);
+        await _db.SaveChangesAsync(ct);
+
+        Assert.Equal(Jun30, document.DocumentDate);
+        var suggestion = Assert.Single(PendingSuggestions(DocumentSuggestionField.DocumentDate));
+        Assert.Equal("2025-06-30", suggestion.SuggestedValue);
+        Assert.Equal("2025-01-01", suggestion.OriginalValue); // the true original, not the earlier AI value
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("2025-03-15")] // equal to the earlier AI value — but the original is empty, so not "unchanged"
+    public async Task ApplyAsync_DocumentDate_Reclassify_EmptyOriginal_IsRecovered(string? answer)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        SeedDocumentWithVersion("some text");
+        SeedDocumentDate(Mar15);
+        SeedPendingSuggestion(DocumentSuggestionField.DocumentDate, "2025-03-15", original: null);
+        var document = LoadDocument();
+
+        await ApplyDocumentDateAsync(document, SuggestionDate.Parse(answer), ct);
+        await _db.SaveChangesAsync(ct);
+
+        if (answer is null)
+        {
+            // A null answer restores the empty original and leaves nothing to review.
+            Assert.Null(document.DocumentDate);
+            Assert.Empty(PendingSuggestions(DocumentSuggestionField.DocumentDate));
+        }
+        else
+        {
+            // The same AI date against an empty original is still a change: re-applied, with a fresh suggestion.
+            Assert.Equal(Mar15, document.DocumentDate);
+            var suggestion = Assert.Single(PendingSuggestions(DocumentSuggestionField.DocumentDate));
+            Assert.Null(suggestion.OriginalValue);
+        }
+    }
+
+    [Fact]
+    public async Task ApplyAsync_DocumentDate_Reclassify_EqualToOriginal_RevertsAndClearsSuggestion()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        SeedDocumentWithVersion("some text");
+        SeedDocumentDate(Mar15);
+        SeedPendingSuggestion(DocumentSuggestionField.DocumentDate, "2025-03-15", "2025-01-01");
+        var document = LoadDocument();
+
+        await ApplyDocumentDateAsync(document, Jan1, ct);
+        await _db.SaveChangesAsync(ct);
+
+        Assert.Equal(Jan1, document.DocumentDate);
+        Assert.Empty(PendingSuggestions(DocumentSuggestionField.DocumentDate));
+    }
+
+    [Fact]
+    public async Task ApplyAsync_ScopedToDocumentDate_LeavesPendingNameAndExpirySuggestionsUntouched()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        SeedDocumentWithVersion("some text");
+        SeedPendingSuggestion(DocumentSuggestionField.Name, "Old AI Name", "Test Doc");
+        SeedPendingSuggestion(DocumentSuggestionField.ExpiryDate, "2030-01-01", null);
+        var document = LoadDocument();
+
+        await _sut.ApplyAsync(document,
+            new ClassificationResult([], [], "", "New Title", DocumentDate: Mar15, ExpiryDate: Jun30),
+            ClassificationScope.DocumentDate, actorUserId: null, stampSummaryMetadata: false, ct);
+        await _db.SaveChangesAsync(ct);
+
+        Assert.Equal("Test Doc", document.Name);
+        Assert.Null(document.ExpiryDate);
+        Assert.Equal("Old AI Name", Assert.Single(PendingSuggestions(DocumentSuggestionField.Name)).SuggestedValue);
+        Assert.Equal("2030-01-01", Assert.Single(PendingSuggestions(DocumentSuggestionField.ExpiryDate)).SuggestedValue);
+        Assert.Single(PendingSuggestions(DocumentSuggestionField.DocumentDate));
+    }
+
     // ---- IsAutoClassifyEnabledAsync ---------------------------------------------------------------
 
     [Fact]

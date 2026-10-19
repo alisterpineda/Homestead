@@ -4,11 +4,14 @@ namespace Homestead.WebApi.Tests.Unit.Documents;
 
 public class ClassificationScopeImageGateTests
 {
-    // Name / Parties / Summary benefit from the page image -> attach. Tags-only and None skip it.
+    // Name / Parties / Summary / the dates benefit from the page image -> attach. Tags-only and None skip it.
     [Theory]
     [InlineData(ClassificationScope.Name, true)]
     [InlineData(ClassificationScope.Parties, true)]
     [InlineData(ClassificationScope.Summary, true)]
+    [InlineData(ClassificationScope.DocumentDate, true)]
+    [InlineData(ClassificationScope.ExpiryDate, true)]
+    [InlineData(ClassificationScope.Tags | ClassificationScope.DocumentDate, true)]
     [InlineData(ClassificationScope.Tags, false)]
     [InlineData(ClassificationScope.None, false)]
     [InlineData(ClassificationScope.All, true)]

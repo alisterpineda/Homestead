@@ -13,6 +13,7 @@ import { DocumentApiService } from '@/api/services/document-api.service';
 import { DocumentVersionApiService } from '@/api/services/document-version-api.service';
 import { AdminBackupApiService } from '@/api/services/admin-backup-api.service';
 import type { GetDocumentResponse } from '@/api/generated/models/get-document-response';
+import type { DocumentSuggestionDto } from '@/api/generated/models/document-suggestion-dto';
 import type { TextExtractionProvenanceResponse } from '@/api/generated/models/text-extraction-provenance-response';
 import type { GetDocumentVersionDto } from '@/api/generated/models/get-document-version-dto';
 import type { GetDocumentVersionResponse } from '@/api/generated/models/get-document-version-response';
@@ -350,6 +351,8 @@ describe('DocumentDetailPageComponent — edit-state guards on refresh', () => {
       patchDocument: ReturnType<typeof vi.fn>;
       bulkClassifyDocuments: ReturnType<typeof vi.fn>;
       bulkSummarizeDocuments: ReturnType<typeof vi.fn>;
+      approveSuggestion: ReturnType<typeof vi.fn>;
+      declineSuggestion: ReturnType<typeof vi.fn>;
     };
     let guardVersionApi: {
       getDocumentVersion: ReturnType<typeof vi.fn>;
@@ -462,6 +465,8 @@ describe('DocumentDetailPageComponent — edit-state guards on refresh', () => {
         patchDocument: vi.fn(() => of(null)),
         bulkClassifyDocuments: vi.fn(() => of({ jobIds: ['job-1'] })),
         bulkSummarizeDocuments: vi.fn(() => of({ jobIds: ['job-1'] })),
+        approveSuggestion: vi.fn(() => of(null)),
+        declineSuggestion: vi.fn(() => of(null)),
       };
 
       guardVersionApi = {
@@ -787,6 +792,83 @@ describe('DocumentDetailPageComponent — edit-state guards on refresh', () => {
       });
     });
 
+    describe('AI date suggestions', () => {
+      function makeSuggestion(overrides: Partial<DocumentSuggestionDto>): DocumentSuggestionDto {
+        return {
+          id: 'sug-1',
+          field: 'DocumentDate',
+          status: 'Pending',
+          suggestedValue: '2025-03-15',
+          originalValue: null,
+          createdAt: '2026-01-01T00:00:00Z',
+          ...overrides,
+        };
+      }
+
+      it('exposes the pending date suggestions per field, ignoring resolved ones', () => {
+        docResponse = makeDoc({
+          suggestions: [
+            makeSuggestion({ id: 'sug-doc', field: 'DocumentDate' }),
+            makeSuggestion({ id: 'sug-exp-old', field: 'ExpiryDate', status: 'Declined' }),
+            makeSuggestion({ id: 'sug-name', field: 'Name', suggestedValue: 'AI Name' }),
+          ],
+        });
+        setGuardDocumentId('doc-1');
+        guardFixture.detectChanges();
+
+        expect(guardComponent.pendingDocumentDateSuggestion()?.id).toBe('sug-doc');
+        expect(guardComponent.pendingExpiryDateSuggestion()).toBeUndefined();
+        expect(guardComponent.pendingNameSuggestion()?.id).toBe('sug-name');
+      });
+
+      it('formats a suggestion original for the tooltip, (none) when it was empty', () => {
+        expect(guardComponent.formatSuggestionOriginal(null)).toBe('(none)');
+        expect(guardComponent.formatSuggestionOriginal(undefined)).toBe('(none)');
+        expect(guardComponent.formatSuggestionOriginal('2025-01-01')).toBe('Jan 1, 2025');
+      });
+
+      it('labels the tooltip only while a suggestion is pending', () => {
+        expect(guardComponent.suggestionOriginalLabel(undefined)).toBeNull();
+        expect(guardComponent.suggestionOriginalLabel(makeSuggestion({ originalValue: '2025-01-01' })))
+          .toBe('Original: Jan 1, 2025');
+        expect(guardComponent.suggestionOriginalLabel(makeSuggestion({ originalValue: null })))
+          .toBe('Original: (none)');
+      });
+
+      it('approving a date suggestion calls the API with its id and refetches', () => {
+        docResponse = makeDoc({ suggestions: [makeSuggestion({ id: 'sug-doc' })] });
+        setGuardDocumentId('doc-1');
+        guardFixture.detectChanges();
+        guardDocumentApi.getDocument.mockClear();
+
+        guardComponent.approveSuggestion(guardComponent.pendingDocumentDateSuggestion()!.id);
+        guardFixture.detectChanges();
+
+        expect(guardDocumentApi.approveSuggestion).toHaveBeenCalledWith({ documentId: 'doc-1', suggestionId: 'sug-doc' });
+        expect(guardDocumentApi.getDocument).toHaveBeenCalled();
+      });
+
+      it('declining a date suggestion calls the API with its id and re-seeds the date from the server', () => {
+        docResponse = makeDoc({
+          documentDate: '2025-03-15',
+          suggestions: [makeSuggestion({ id: 'sug-doc', originalValue: '2025-01-01' })],
+        });
+        setGuardDocumentId('doc-1');
+        guardFixture.detectChanges();
+        guardDocumentApi.getDocument.mockClear();
+
+        // The server restores the original on decline.
+        docResponse = makeDoc({ documentDate: '2025-01-01', suggestions: [] });
+        guardComponent.declineSuggestion('sug-doc');
+        guardFixture.detectChanges();
+
+        expect(guardDocumentApi.declineSuggestion).toHaveBeenCalledWith({ documentId: 'doc-1', suggestionId: 'sug-doc' });
+        expect(guardDocumentApi.getDocument).toHaveBeenCalled();
+        expect(guardComponent.editDocumentDate()).toEqual(new Date(2025, 0, 1));
+        expect(guardComponent.pendingDocumentDateSuggestion()).toBeUndefined();
+      });
+    });
+
     describe('classify and summarize enqueue async jobs', () => {
       it('enqueues a single-document bulk classify with the selected fields and waits on the job', () => {
         docResponse = makeDoc({ name: 'Original' });
@@ -1054,5 +1136,155 @@ describe('DocumentDetailPageComponent — backup state', () => {
     const element = backupFixture.nativeElement as HTMLElement;
     expect(element.querySelector('[data-testid="document-backup-state"]')).toBeTruthy();
     expect(element.querySelector('[data-testid="refresh-backup-state"]')).toBeTruthy();
+  });
+});
+
+// --- AI date suggestion controls (real template) ----------------------------------------------------
+//
+// The date fields' approve/decline wiring lives in the page template, so these render it for real: a
+// copy-paste slip between the two date blocks (wrong suggestion, wrong field) only shows up here.
+describe('DocumentDetailPageComponent — AI date suggestion controls', () => {
+  let dateFixture: ComponentFixture<DocumentDetailPageComponent>;
+  let dateDocumentApi: {
+    getDocument: ReturnType<typeof vi.fn>;
+    getDocumentFile: ReturnType<typeof vi.fn>;
+    patchDocument: ReturnType<typeof vi.fn>;
+    approveSuggestion: ReturnType<typeof vi.fn>;
+    declineSuggestion: ReturnType<typeof vi.fn>;
+  };
+
+  function documentWithPendingExpiry(): GetDocumentResponse {
+    return {
+      id: 'doc-1',
+      name: 'Doc 1',
+      contentType: 'application/pdf',
+      fileExtension: '.pdf',
+      fileHash: 'hash',
+      fileSize: 100,
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+      expiryDate: '2030-06-30',
+      parties: [],
+      tags: [],
+      suggestions: [
+        {
+          id: 'sug-expiry',
+          field: 'ExpiryDate',
+          status: 'Pending',
+          suggestedValue: '2030-06-30',
+          originalValue: null,
+          createdAt: '2026-01-01T00:00:00Z',
+        },
+      ],
+      versions: [
+        {
+          id: 'ver-1',
+          contentType: 'application/pdf',
+          fileExtension: '.pdf',
+          fileSize: 100,
+          createdAt: '2026-01-01T00:00:00Z',
+          updatedAt: '2026-01-01T00:00:00Z',
+          versionNumber: 1,
+        },
+      ],
+    };
+  }
+
+  beforeEach(async () => {
+    vi.stubGlobal('localStorage', { getItem: vi.fn(() => null), setItem: vi.fn(), removeItem: vi.fn() });
+    vi.stubGlobal('sessionStorage', { getItem: vi.fn(() => null), setItem: vi.fn(), removeItem: vi.fn() });
+
+    const paramMap = new BehaviorSubject(convertToParamMap({}));
+    dateDocumentApi = {
+      getDocument: vi.fn(() => of(documentWithPendingExpiry())),
+      getDocumentFile: vi.fn(() => EMPTY),
+      patchDocument: vi.fn(() => of(null)),
+      approveSuggestion: vi.fn(() => of(null)),
+      declineSuggestion: vi.fn(() => of(null)),
+    };
+
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideRouter([{ path: 'documents', component: DummyComponent }]),
+        PageHeaderService,
+        { provide: AuthService, useValue: { canWrite: signal(true), isAdmin: signal(false) } },
+        { provide: AdminBackupApiService, useValue: { getDocumentBackupState: vi.fn(() => EMPTY) } },
+        {
+          provide: OpenDocumentsService,
+          useValue: {
+            addDocument: vi.fn(),
+            removeDocument: vi.fn(),
+            getPrevDocumentId: vi.fn(() => null),
+            getNextDocumentId: vi.fn(() => null),
+            openDocuments: signal([]) as unknown as OpenDocumentsService['openDocuments'],
+          },
+        },
+        {
+          provide: DocumentEditStateService,
+          useValue: {
+            saveState: vi.fn(),
+            getState: vi.fn(() => null),
+            clearState: vi.fn(),
+            clearAll: vi.fn(),
+            discardChanges: vi.fn(),
+            setActiveHasChanges: vi.fn(),
+          },
+        },
+        { provide: DocumentApiService, useValue: dateDocumentApi },
+        {
+          provide: DocumentVersionApiService,
+          useValue: {
+            getDocumentVersion: vi.fn(() => EMPTY),
+            getDocumentActivity: vi.fn(() => of({ items: [] })),
+          },
+        },
+        {
+          provide: ProcessingHubService,
+          useValue: { jobCompleted$: new Subject(), waitForJob: vi.fn(() => new Promise(() => {})) },
+        },
+        {
+          provide: ActivatedRoute,
+          useValue: { paramMap: paramMap.asObservable(), snapshot: { paramMap: convertToParamMap({}) } },
+        },
+      ],
+    });
+
+    dateFixture = TestBed.createComponent(DocumentDetailPageComponent);
+    dateFixture.detectChanges();
+    paramMap.next(convertToParamMap({ id: 'doc-1' }));
+    dateFixture.detectChanges();
+    await dateFixture.whenStable();
+    dateFixture.detectChanges();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    TestBed.resetTestingModule();
+  });
+
+  function button(label: string): HTMLButtonElement | null {
+    return (dateFixture.nativeElement as HTMLElement).querySelector(`button[aria-label="${label}"]`);
+  }
+
+  it('shows approve/decline only on the field whose suggestion is pending', () => {
+    expect(button('Approve expiry date suggestion')).not.toBeNull();
+    expect(button('Decline expiry date suggestion')).not.toBeNull();
+    expect(button('Approve document date suggestion')).toBeNull();
+    expect(button('Decline document date suggestion')).toBeNull();
+  });
+
+  it('decline on the expiry date declines the expiry suggestion', () => {
+    button('Decline expiry date suggestion')!.click();
+
+    expect(dateDocumentApi.declineSuggestion).toHaveBeenCalledWith({ documentId: 'doc-1', suggestionId: 'sug-expiry' });
+    expect(dateDocumentApi.approveSuggestion).not.toHaveBeenCalled();
+  });
+
+  it('approve on the expiry date approves the expiry suggestion', () => {
+    button('Approve expiry date suggestion')!.click();
+
+    expect(dateDocumentApi.approveSuggestion).toHaveBeenCalledWith({ documentId: 'doc-1', suggestionId: 'sug-expiry' });
+    expect(dateDocumentApi.declineSuggestion).not.toHaveBeenCalled();
   });
 });

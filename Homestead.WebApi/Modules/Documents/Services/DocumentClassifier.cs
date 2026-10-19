@@ -47,8 +47,10 @@ public interface IDocumentClassifier
     /// adds only newly-desired tags/parties and removes only AI tags/parties no longer matched, never
     /// remove-then-re-adding the same key (which would collide on the DocumentTag composite key). Sets
     /// the DocumentTag.Tag navigation on added links so an in-memory <c>DocumentSnapshot</c> diff resolves
-    /// Tag.Path without a re-read. Records pending suggestions for AI-applied values. Does not save or
-    /// audit — the caller's command handler owns the commit (and the Created/Updated audit decision).
+    /// Tag.Path without a re-read. The name and the two dates are overwritten when the model proposes a
+    /// value different from the original (the user's value), which is kept on the pending suggestion so a
+    /// decline can restore it. A null date never clears a user's date, but reverts a still-pending AI date. Records pending suggestions for AI-applied values. Does not
+    /// save or audit — the caller's command handler owns the commit (and the Created/Updated audit decision).
     /// </summary>
     Task ApplyAsync(
         Document document, ClassificationResult classification, ClassificationScope scope,
@@ -202,6 +204,12 @@ public class DocumentClassifier(
             ApplyName(document, classification.SuggestedTitle);
         if (scope.HasFlag(ClassificationScope.Summary))
             ApplySummary(document, classification.Summary, actorUserId, stampSummaryMetadata);
+        if (scope.HasFlag(ClassificationScope.DocumentDate))
+            ApplyDate(document, DocumentSuggestionField.DocumentDate, classification.DocumentDate,
+                d => d.DocumentDate, (d, v) => d.DocumentDate = v);
+        if (scope.HasFlag(ClassificationScope.ExpiryDate))
+            ApplyDate(document, DocumentSuggestionField.ExpiryDate, classification.ExpiryDate,
+                d => d.ExpiryDate, (d, v) => d.ExpiryDate = v);
     }
 
     public async Task<bool> IsAutoClassifyEnabledAsync(CancellationToken ct)
@@ -352,6 +360,42 @@ public class DocumentClassifier(
             Status = DocumentSuggestionStatus.Pending,
             SuggestedValue = suggestedTitle,
             OriginalValue = originalName,
+            CreatedAt = DateTimeOffset.UtcNow
+        });
+    }
+
+    private void ApplyDate(
+        Document document, DocumentSuggestionField field, DateOnly? suggested,
+        Func<Document, DateOnly?> get, Action<Document, DateOnly?> set)
+    {
+        // Unlike Name, a null OriginalValue means the original date was empty: every date suggestion records
+        // its original, so any pending one carries the true original and the current value is the AI's.
+        var oldSuggestions = document.Suggestions
+            .Where(s => s.Field == field && s.Status == DocumentSuggestionStatus.Pending)
+            .ToList();
+
+        var original = oldSuggestions.Count > 0
+            ? SuggestionDate.Parse(oldSuggestions[0].OriginalValue)
+            : get(document);
+        foreach (var s in oldSuggestions)
+            db.DocumentSuggestions.Remove(s);
+
+        set(document, original);
+
+        // The field now holds the user's value. A null answer leaves it (so it never clears a user's date, but
+        // does revert a still-pending AI one), and an answer equal to it needs no review.
+        if (suggested is null || suggested == original)
+            return;
+
+        set(document, suggested);
+
+        db.DocumentSuggestions.Add(new DocumentSuggestion
+        {
+            DocumentId = document.Id,
+            Field = field,
+            Status = DocumentSuggestionStatus.Pending,
+            SuggestedValue = SuggestionDate.Format(suggested)!,
+            OriginalValue = SuggestionDate.Format(original),
             CreatedAt = DateTimeOffset.UtcNow
         });
     }

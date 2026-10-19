@@ -17,6 +17,19 @@ public class PatchDocumentHandler(AppDbContext db,
     IDocumentMetadataService metadataService, IDocumentQueryService queryService,
     ICurrentUserAccessor currentUser, IUnitOfWork unitOfWork)
 {
+    // A patch op on one of these (lower-cased) paths is a manual edit of an AI-suggestible field, which
+    // auto-declines that field's pending suggestions. Every DocumentSuggestionField needs an entry
+    // (SuggestionFieldCoverageTests).
+    internal static readonly IReadOnlyDictionary<string, DocumentSuggestionField> SuggestionFieldsByPatchPath =
+        new Dictionary<string, DocumentSuggestionField>
+    {
+        ["tagpaths"] = DocumentSuggestionField.Tags,
+        ["partyids"] = DocumentSuggestionField.Parties,
+        ["name"] = DocumentSuggestionField.Name,
+        ["documentdate"] = DocumentSuggestionField.DocumentDate,
+        ["expirydate"] = DocumentSuggestionField.ExpiryDate
+    };
+
     public async Task<PatchDocumentResponse> HandleAsync(Guid id, JsonPatchDocument<PatchDocumentModel> patchDoc, CancellationToken ct)
     {
         var document = await db.Documents
@@ -94,34 +107,15 @@ public class PatchDocumentHandler(AppDbContext db,
             .Where(p => p is not null)
             .ToHashSet();
 
-        if (patchPaths.Contains("tagpaths"))
-        {
-            foreach (var s in document.Suggestions
-                .Where(s => s.Field == DocumentSuggestionField.Tags).ToList())
-            {
-                s.Status = DocumentSuggestionStatus.Declined;
-                s.ResolvedAt = DateTimeOffset.UtcNow;
-            }
-        }
+        var changedFields = SuggestionFieldsByPatchPath
+            .Where(kv => patchPaths.Contains(kv.Key))
+            .Select(kv => kv.Value)
+            .ToHashSet();
 
-        if (patchPaths.Contains("partyids"))
+        foreach (var s in document.Suggestions.Where(s => changedFields.Contains(s.Field)))
         {
-            foreach (var s in document.Suggestions
-                .Where(s => s.Field == DocumentSuggestionField.Parties).ToList())
-            {
-                s.Status = DocumentSuggestionStatus.Declined;
-                s.ResolvedAt = DateTimeOffset.UtcNow;
-            }
-        }
-
-        if (patchPaths.Contains("name"))
-        {
-            foreach (var s in document.Suggestions
-                .Where(s => s.Field == DocumentSuggestionField.Name).ToList())
-            {
-                s.Status = DocumentSuggestionStatus.Declined;
-                s.ResolvedAt = DateTimeOffset.UtcNow;
-            }
+            s.Status = DocumentSuggestionStatus.Declined;
+            s.ResolvedAt = DateTimeOffset.UtcNow;
         }
 
         await unitOfWork.SaveChangesAsync(ct);

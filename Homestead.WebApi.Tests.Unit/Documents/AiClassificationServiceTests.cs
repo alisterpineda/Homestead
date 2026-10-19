@@ -121,7 +121,8 @@ public class AiClassificationServiceTests
 
         // Model returns everything, but only Tags is in scope.
         RespondWith("""
-            {"tagIndexes":[0],"partyIndexes":[0],"summary":"S","suggestedTitle":"New Title"}
+            {"tagIndexes":[0],"partyIndexes":[0],"summary":"S","suggestedTitle":"New Title",
+             "documentDate":"2025-01-15","expiryDate":"2026-01-15"}
             """);
 
         var tags = new List<TagInfo> { new(tagId, "Finance", "Finance") };
@@ -136,6 +137,99 @@ public class AiClassificationServiceTests
         Assert.Empty(result.MatchedPartyIds);                 // Parties out of scope -> []
         Assert.Equal(string.Empty, result.Summary);            // Summary out of scope -> ""
         Assert.Equal("Original Name", result.SuggestedTitle);  // Name out of scope -> unchanged name
+        Assert.Null(result.DocumentDate);                      // Dates out of scope -> null
+        Assert.Null(result.ExpiryDate);
+    }
+
+    [Fact]
+    public async Task DateScopes_AddTheirPromptFragments_AndOnlyTheirSchemaKeys()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        RespondWith("""{"documentDate":null}""");
+
+        await _sut.ClassifyAsync(
+            new ClassificationInput("Doc", "some text", null, null), [], [], ClassificationScope.DocumentDate, ct);
+
+        Assert.Contains("documentDate: The date the document was issued", SystemPrompt);
+        Assert.DoesNotContain("expiryDate", SystemPrompt);
+        Assert.Contains("YYYY-MM-DD", SystemPrompt);
+        Assert.Contains("never guess", SystemPrompt);
+
+        var properties = _captured!.Schema.GetProperty("properties");
+        Assert.Equal(["documentDate"], properties.EnumerateObject().Select(p => p.Name));
+        var required = _captured.Schema.GetProperty("required").EnumerateArray().Select(e => e.GetString());
+        Assert.Equal(["documentDate"], required);
+    }
+
+    [Fact]
+    public async Task DateSchemaProperties_AreNullableStrings_AndRequired()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        RespondWith("""{"documentDate":null,"expiryDate":null}""");
+
+        await _sut.ClassifyAsync(
+            new ClassificationInput("Doc", "some text", null, null), [], [],
+            ClassificationScope.DocumentDate | ClassificationScope.ExpiryDate, ct);
+
+        Assert.Contains("expiryDate: The date the document itself stops being valid", SystemPrompt);
+        var schema = _captured!.Schema;
+        foreach (var key in new[] { "documentDate", "expiryDate" })
+        {
+            var property = schema.GetProperty("properties").GetProperty(key);
+            Assert.Equal(["string", "null"], property.GetProperty("type").EnumerateArray().Select(e => e.GetString()));
+            Assert.False(property.TryGetProperty("format", out _));
+        }
+        var required = schema.GetProperty("required").EnumerateArray().Select(e => e.GetString()).ToList();
+        Assert.Equal(["documentDate", "expiryDate"], required);
+    }
+
+    [Fact]
+    public async Task ValidIsoDates_AreParsed()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        RespondWith("""{"documentDate":"2025-03-04","expiryDate":"2030-12-31"}""");
+
+        var result = await _sut.ClassifyAsync(
+            new ClassificationInput("Doc", "some text", null, null), [], [],
+            ClassificationScope.DocumentDate | ClassificationScope.ExpiryDate, ct);
+
+        Assert.Equal(new DateOnly(2025, 3, 4), result!.DocumentDate);
+        Assert.Equal(new DateOnly(2030, 12, 31), result.ExpiryDate);
+    }
+
+    [Theory]
+    [InlineData("1900-01-01")]
+    [InlineData("2199-12-31")]
+    public async Task PlausibleYearBounds_AreAccepted(string value)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        RespondWith($$"""{"documentDate":"{{value}}"}""");
+
+        var result = await _sut.ClassifyAsync(
+            new ClassificationInput("Doc", "some text", null, null), [], [], ClassificationScope.DocumentDate, ct);
+
+        Assert.Equal(DateOnly.Parse(value), result!.DocumentDate);
+    }
+
+    [Theory]
+    [InlineData("\"2025-13-01\"")]
+    [InlineData("\"03/04/2025\"")]
+    [InlineData("\"1850-06-01\"")]
+    [InlineData("\"1899-12-31\"")]
+    [InlineData("\"2200-01-01\"")]
+    [InlineData("null")]
+    public async Task UnusableDates_AreDroppedToNull(string value)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        RespondWith($$"""{"documentDate":{{value}},"expiryDate":{{value}}}""");
+
+        var result = await _sut.ClassifyAsync(
+            new ClassificationInput("Doc", "some text", null, null), [], [],
+            ClassificationScope.DocumentDate | ClassificationScope.ExpiryDate, ct);
+
+        Assert.NotNull(result);
+        Assert.Null(result!.DocumentDate);
+        Assert.Null(result.ExpiryDate);
     }
 
     [Fact]

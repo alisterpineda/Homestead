@@ -4,8 +4,9 @@ namespace Homestead.WebApi.Tests.Integration.Infrastructure;
 
 /// <summary>
 /// Deterministic stand-in for the real AI service so integration tests can exercise the
-/// classify/summarize flows without a live model. Returns only a canned summary (gated by scope)
-/// and an unchanged title — no tag/party matches, keeping results FK-safe regardless of the DB.
+/// classify/summarize flows without a live model. Returns only a canned summary (gated by scope),
+/// an unchanged title and — when a test opts in via <see cref="SetCannedDates"/> — canned dates (gated by
+/// scope); no tag/party matches, keeping results FK-safe regardless of the DB.
 /// Reached whenever classify/summarize runs, since <see cref="FakeAiProvider"/> reports AI configured.
 /// </summary>
 public sealed class FakeAiClassificationService : IAiClassificationService
@@ -55,6 +56,19 @@ public sealed class FakeAiClassificationService : IAiClassificationService
         LastScope = null;
     }
 
+    // Opt-in canned dates, returned only for in-scope date fields. Static for the same reason as the gate;
+    // default null = no dates, so every other test is unaffected. Reset via ResetCannedDates in a finally.
+    private static DateOnly? _documentDate;
+    private static DateOnly? _expiryDate;
+
+    public static void SetCannedDates(DateOnly? documentDate, DateOnly? expiryDate)
+    {
+        _documentDate = documentDate;
+        _expiryDate = expiryDate;
+    }
+
+    public static void ResetCannedDates() => SetCannedDates(null, null);
+
     public async Task<ClassificationResult?> ClassifyAsync(
         ClassificationInput input,
         List<TagInfo> availableTags,
@@ -69,7 +83,7 @@ public sealed class FakeAiClassificationService : IAiClassificationService
         // Gate ONLY the dedicated summarize path (the one the idle-in-transaction acceptance test arms
         // around). Both summarize entry points pass EXACTLY ClassificationScope.Summary, so an exact-equality
         // check excludes every other path that might resolve a provider during the armed window: classify/
-        // bulk-classify (FromFields → Tags|Parties|Name, never Summary) AND upload auto-classify
+        // bulk-classify (FromFields → Tags|Parties|Name|DocumentDate|ExpiryDate, never Summary) AND upload auto-classify
         // (ClassificationScope.All — which would satisfy HasFlag(Summary) but not equality). That keeps a
         // background job from entering the gate from the wrong call and snapshotting pg_stat_activity at the
         // wrong moment. (The summary-return below still uses HasFlag so composite scopes like All keep
@@ -87,6 +101,9 @@ public sealed class FakeAiClassificationService : IAiClassificationService
         }
 
         var summary = scope.HasFlag(ClassificationScope.Summary) ? GeneratedSummary : string.Empty;
-        return new ClassificationResult([], [], summary, input.DocumentName);
+        return new ClassificationResult(
+            [], [], summary, input.DocumentName,
+            scope.HasFlag(ClassificationScope.DocumentDate) ? _documentDate : null,
+            scope.HasFlag(ClassificationScope.ExpiryDate) ? _expiryDate : null);
     }
 }

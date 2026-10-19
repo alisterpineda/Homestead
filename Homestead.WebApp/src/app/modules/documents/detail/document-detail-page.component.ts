@@ -57,7 +57,8 @@ import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { HlmSeparatorImports } from '@/shared/components/spartan/separator';
 import { HlmScrollAreaImports } from '@/shared/components/spartan/scroll-area';
 import { HlmInputGroupImports } from '@/shared/components/spartan/input-group';
-import { HlmDatePicker, HlmDatePickerInput } from '@/shared/components/spartan/date-picker';
+import { HlmDatePicker } from '@/shared/components/spartan/date-picker';
+import { formatPickerDate } from '@/shared/utils/date-picker-config';
 import { injectIsNarrowViewport } from '@/shared/utils/viewport';
 import { NgScrollbar } from 'ngx-scrollbar';
 import { HlmTooltipImports } from '@/shared/components/spartan/tooltip';
@@ -68,6 +69,7 @@ import { AddVersionDialogComponent } from './add-version-dialog/add-version-dial
 import { ReprocessDialogComponent } from './reprocess-dialog/reprocess-dialog.component';
 import { TextExtractionProvenanceComponent } from './text-extraction-provenance/text-extraction-provenance.component';
 import { DocumentBackupStateComponent } from './backup-state/document-backup-state.component';
+import { AiDatePickerInputComponent } from './ai-date-picker-input/ai-date-picker-input.component';
 import { ClassifyOptionsDialogComponent } from '../shared/classify-options-dialog/classify-options-dialog.component';
 import { formatBytes, parseDate, toIsoDateString, datesEqual, triggerDownload } from '@/shared/utils';
 import { DocumentApiService } from '@/api/services/document-api.service';
@@ -79,6 +81,7 @@ import type { GetDocumentResponse } from '@/api/generated/models/get-document-re
 import type { GetDocumentVersionResponse } from '@/api/generated/models/get-document-version-response';
 import type { GetActivityResponse } from '@/api/generated/models/get-activity-response';
 import type { DocumentSuggestionField } from '@/api/generated/models/document-suggestion-field';
+import type { DocumentSuggestionDto } from '@/api/generated/models/document-suggestion-dto';
 import { AuthService } from '@/shared/services/auth.service';
 import { ProcessingHubService } from '@/shared/services/processing-hub.service';
 import { PageHeaderService } from '@/shared/services/page-header.service';
@@ -121,7 +124,7 @@ import { toast } from '@spartan-ng/brain/sonner';
     HlmBadge,
     HlmEmptyImports,
     HlmDatePicker,
-    HlmDatePickerInput,
+    AiDatePickerInputComponent,
     RouterLink,
   ],
   providers: [
@@ -477,30 +480,64 @@ import { toast } from '@spartan-ng/brain/sonner';
           </div>
 
           <!-- Document Date -->
-          <div class="space-y-2">
-            <label hlmLabel for="doc-document-date">Document Date</label>
+          <hlm-field>
+            <label hlmFieldLabel for="doc-document-date">
+              Document Date
+              @if (pendingDocumentDateSuggestion()) {
+                <span hlmBadge class="ml-auto bg-ai/10 text-ai border-transparent dark:bg-ai/20">
+                  <ng-icon name="lucideSparkles" class="text-[length:--spacing(3)]" />
+                  AI Suggested
+                </span>
+              }
+            </label>
             <hlm-date-picker
               class="w-full"
               captionLayout="dropdown"
               [date]="editDocumentDate() ?? undefined"
               (dateChange)="editDocumentDate.set($event ?? null)"
             >
-              <hlm-date-picker-input inputId="doc-document-date" placeholder="Select date" />
+              <app-ai-date-picker-input
+                inputId="doc-document-date"
+                placeholder="Select date"
+                [aiPending]="!!pendingDocumentDateSuggestion()"
+                approveLabel="Approve document date suggestion"
+                declineLabel="Decline document date suggestion"
+                (approve)="approveSuggestion(pendingDocumentDateSuggestion()!.id)"
+                (decline)="declineSuggestion(pendingDocumentDateSuggestion()!.id)"
+                [originalLabel]="suggestionOriginalLabel(pendingDocumentDateSuggestion())"
+              />
             </hlm-date-picker>
-          </div>
+          </hlm-field>
 
           <!-- Expiry Date -->
-          <div class="space-y-2">
-            <label hlmLabel for="doc-expiry-date">Expiry Date</label>
+          <hlm-field>
+            <label hlmFieldLabel for="doc-expiry-date">
+              Expiry Date
+              @if (pendingExpiryDateSuggestion()) {
+                <span hlmBadge class="ml-auto bg-ai/10 text-ai border-transparent dark:bg-ai/20">
+                  <ng-icon name="lucideSparkles" class="text-[length:--spacing(3)]" />
+                  AI Suggested
+                </span>
+              }
+            </label>
             <hlm-date-picker
               class="w-full"
               captionLayout="dropdown"
               [date]="editExpiryDate() ?? undefined"
               (dateChange)="editExpiryDate.set($event ?? null)"
             >
-              <hlm-date-picker-input inputId="doc-expiry-date" placeholder="Select date" />
+              <app-ai-date-picker-input
+                inputId="doc-expiry-date"
+                placeholder="Select date"
+                [aiPending]="!!pendingExpiryDateSuggestion()"
+                approveLabel="Approve expiry date suggestion"
+                declineLabel="Decline expiry date suggestion"
+                (approve)="approveSuggestion(pendingExpiryDateSuggestion()!.id)"
+                (decline)="declineSuggestion(pendingExpiryDateSuggestion()!.id)"
+                [originalLabel]="suggestionOriginalLabel(pendingExpiryDateSuggestion())"
+              />
             </hlm-date-picker>
-          </div>
+          </hlm-field>
 
           <!-- Notes -->
           <div class="space-y-2">
@@ -1195,6 +1232,12 @@ export class DocumentDetailPageComponent implements OnDestroy {
   pendingNameSuggestion = computed(() =>
     this.pendingSuggestions().find(s => s.field === 'Name'),
   );
+  pendingDocumentDateSuggestion = computed(() =>
+    this.pendingSuggestions().find(s => s.field === 'DocumentDate'),
+  );
+  pendingExpiryDateSuggestion = computed(() =>
+    this.pendingSuggestions().find(s => s.field === 'ExpiryDate'),
+  );
   pendingTagSuggestions = computed(() => {
     const suggestions = this.pendingSuggestions().filter(s => s.field === 'Tags');
     const tags = this.document()?.tags ?? [];
@@ -1499,6 +1542,19 @@ export class DocumentDetailPageComponent implements OnDestroy {
     });
   }
 
+  /** A date suggestion's original for the "Original: …" tooltip — '(none)' when the date was empty, as for
+   *  Name. Uses the picker's own en-US short format, matching what the input shows; formatDate is the
+   *  long, browser-locale style and parses with `new Date()`, which reads a date-only value as UTC. */
+  formatSuggestionOriginal(value?: string | null): string {
+    const date = parseDate(value);
+    return date ? formatPickerDate(date) : '(none)';
+  }
+
+  /** The "Original: …" tooltip for a date input, or null (no tooltip) when no suggestion is pending. */
+  suggestionOriginalLabel(suggestion: DocumentSuggestionDto | undefined): string | null {
+    return suggestion ? `Original: ${this.formatSuggestionOriginal(suggestion.originalValue)}` : null;
+  }
+
   asInputValue(event: Event): string {
     return (event.target as HTMLInputElement).value;
   }
@@ -1615,7 +1671,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
               // finished, do nothing — re-seeding/refreshing here would clobber the now-current document's
               // unsaved edits. The classified doc's pending suggestions are persisted and show on next visit.
               if (this.documentId() !== id) return;
-              // Classify applies the AI name/tags/parties to the document server-side; re-seed the edit
+              // Classify applies the AI name/tags/parties/dates to the document server-side; re-seed the edit
               // form from the refreshed server state (mirroring approve/decline) so the Name field and the
               // tag/party inputs reflect the applied values rather than the stale pre-classify ones.
               this.initializedDocId = null;

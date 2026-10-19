@@ -1,5 +1,6 @@
 using Homestead.WebApi.Domain.Auditing;
 using Homestead.WebApi.Domain.Documents;
+using Homestead.WebApi.Modules.Documents.Services;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Tests.Integration.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -71,5 +72,44 @@ public class BulkClassifyTests : IntegrationTestBase
             .FirstOrDefaultAsync(CT);
         Assert.NotNull(auditRow);
         Assert.Contains("TagPaths", auditRow!.Changes);
+    }
+
+    [Fact]
+    public async Task BulkClassify_DateFields_AppliesDates_AndReturnsPendingDateSuggestions()
+    {
+        var client = await CreateAdminClientAsync();
+        var docId = await UploadAndWaitAsync(client, "bulk-classify-dates.pdf");
+
+        FakeAiClassificationService.ResetLastCall();
+        FakeAiClassificationService.SetCannedDates(new DateOnly(2025, 3, 15), new DateOnly(2026, 3, 15));
+        try
+        {
+            var response = await client.PostAsJsonAsync("/api/v1/documents/bulk-classify",
+                new { ids = new[] { docId }, fields = new[] { "DocumentDate", "ExpiryDate" } }, CT);
+
+            Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+            var body = await response.Content.ReadFromJsonAsync<BulkClassifyResult>(CT);
+            await WaitForJobCompletionAsync(Assert.Single(body!.JobIds));
+
+            // The requested fields reach the job as its scope — not the default, which also has both dates.
+            Assert.Equal(
+                ClassificationScope.DocumentDate | ClassificationScope.ExpiryDate,
+                FakeAiClassificationService.LastScope);
+        }
+        finally
+        {
+            FakeAiClassificationService.ResetCannedDates();
+            FakeAiClassificationService.ResetLastCall();
+        }
+
+        var doc = await client.GetFromJsonAsync<DocumentDetailItem>($"/api/v1/documents/{docId}", CT);
+        Assert.Equal(new DateOnly(2025, 3, 15), doc!.DocumentDate);
+        Assert.Equal(new DateOnly(2026, 3, 15), doc.ExpiryDate);
+
+        var documentDate = Assert.Single(doc.Suggestions!, s => s.Field == "DocumentDate");
+        Assert.Equal("Pending", documentDate.Status);
+        Assert.Equal("2025-03-15", documentDate.SuggestedValue);
+        Assert.Null(documentDate.OriginalValue);
+        Assert.Single(doc.Suggestions!, s => s.Field == "ExpiryDate");
     }
 }
