@@ -161,6 +161,31 @@ public class AiClassificationServiceTests
         Assert.Equal(["documentDate"], required);
     }
 
+    // Pins the load-bearing rules of the product-defined title style (overview.md, "Suggested title style"); the
+    // opt-in eval project is report-only, so this is the only gate on the prompt keeping them.
+    [Fact]
+    public async Task NameScope_AddsTitleStyleFragments_AndSchemaDescription()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        RespondWith("""{"suggestedTitle":"T"}""");
+
+        await _sut.ClassifyAsync(
+            new ClassificationInput("Doc", "some text", null, null), [], [], ClassificationScope.Name, ct);
+
+        Assert.Contains("\"Issuer Type - Detail - Period\"", SystemPrompt);
+        Assert.Contains("never from the tag or party lists", SystemPrompt);
+        Assert.Contains("only when the document covers a stated period", SystemPrompt);
+        Assert.Contains("add no parts beyond issuer and type, detail and period", SystemPrompt);
+        Assert.Contains("Never put account, card, policy, SIN or licence numbers in the title", SystemPrompt);
+        Assert.Contains("return the current document name unchanged", SystemPrompt);
+
+        var properties = _captured!.Schema.GetProperty("properties");
+        Assert.Equal(["suggestedTitle"], properties.EnumerateObject().Select(p => p.Name));
+        Assert.Contains(
+            "\"Issuer Type - Detail - Period\"",
+            properties.GetProperty("suggestedTitle").GetProperty("description").GetString());
+    }
+
     [Fact]
     public async Task DateSchemaProperties_AreNullableStrings_AndRequired()
     {

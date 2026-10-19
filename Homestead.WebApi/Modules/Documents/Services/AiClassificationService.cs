@@ -204,8 +204,24 @@ public class AiClassificationService(
 
         if (scope.HasFlag(ClassificationScope.Name))
         {
-            instructions.Add("suggestedTitle: Suggest a clear, descriptive title for the document.");
-            rules.Add("- The suggested title should be human-readable and descriptive");
+            // The title style is product-defined (docs/product-design/documents/overview.md, "Suggested title
+            // style"). It is built from the document alone — never the tag/party catalogs — so a title reads the
+            // same whichever other fields are in scope. The examples deliberately name no eval fixture's issuer or
+            // subject (Homestead.WebApi.Tests.Eval/Fixtures), so the eval can't score the prompt's own answers.
+            instructions.Add("""
+                suggestedTitle: A title of the form "Issuer Type - Detail - Period", in Title Case, ideally 60 characters or fewer. Build it from the document and its current name only, never from the tag or party lists.
+                   - Issuer: the most prominent name printed on the document (logo or letterhead). Title Case it if printed in capitals, and drop legal suffixes such as Ltd., Inc. or Corp.
+                   - Type: prefer one of Invoice, Receipt, Bill, Statement, Pay Stub, Policy, Notice of Assessment, Tax Return, Contract, Warranty, Manual, Letter, Licence; use another short term only when none fits.
+                   - Detail: a single phrase saying what the document is for, such as "Honda Civic Brake Repair" (not "Brake Repair - Honda Civic"). For a document about one person (an ID, pay stub or medical record), that person's full name instead. No names on a document shared by several people. An invoice or order number only when there is no clear subject. Leave the detail out when nothing useful remains.
+                   - Period: only when the document covers a stated period (a billing, statement, pay or policy period, or a tax year), written at the document's own granularity: "March 2025", "2024", "2025–2026", "Mar 1–15, 2025". Leave it out for one-off documents.
+                   - Examples: "Midas Invoice - Honda Civic Brake Repair", "Hydro One Bill - March 2025", "Acme Pay Stub - Jane Doe - March 2025", "TD Joint Chequing Statement - March 2025", "Amazon Order - #702-1234567".
+                """);
+            rules.Add("- Separate title parts with \" - \" (a plain hyphen between spaces), and add no parts beyond issuer and type, detail and period");
+            rules.Add("- If the title runs long, shorten the detail first; never drop the issuer, type or period");
+            rules.Add("- Never put account, card, policy, SIN or licence numbers in the title, not even their last digits");
+            rules.Add("- Write the title in English, keeping names as printed (for example Hydro-Québec)");
+            rules.Add("- Rewrite the current name into this style even when it is already descriptive");
+            rules.Add("- If you cannot tell what the document is, return the current document name unchanged");
         }
 
         if (scope.HasFlag(ClassificationScope.DocumentDate))
@@ -284,7 +300,7 @@ public class AiClassificationService(
             properties["suggestedTitle"] = new JsonObject
             {
                 ["type"] = "string",
-                ["description"] = "A clear, human-readable title for the document."
+                ["description"] = "A title of the form \"Issuer Type - Detail - Period\", such as \"Hydro One Bill - March 2025\"; the current document name unchanged when the document cannot be identified."
             };
             required.Add("suggestedTitle");
         }
