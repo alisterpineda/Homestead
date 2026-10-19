@@ -138,9 +138,12 @@ AI-assisted document classification/summarization, statement parsing and payee s
 | `Ai__StatementMaxInputChars` | `120000` | Hard cap for statement text sent whole to statement parsing |
 | `Ai__PdfInput` | `true` | Classify a PDF by sending the PDF itself (Claude reads every page's text and layout) instead of the OCR text and page image. Only for background classifies whose scope includes name, parties or summary, and only within the two caps below; anything else — and a PDF the API rejects — uses the OCR text + page image. Watch the token meter on your first bulk classify |
 | `Ai__PdfInputMaxPages` | `20` | Longest PDF sent as a PDF (1–100; pages drive tokens) |
-| `Ai__PdfInputMaxBytes` | `4194304` (4 MiB) | Largest PDF sent as a PDF (64 KiB–20 MiB). Kept modest because a PDF request holds roughly 20× the file size in memory while it is sent |
+| `Ai__PdfUpload` | `true` | Send a PDF by uploading it to the Claude API's Files API and referencing it, instead of base64 inside the request. The upload is deleted after the call and set to expire after an hour in case the delete never runs. Turn it off for an `Ai__Endpoint` proxy that doesn't serve `/v1/files` (with it on, such a proxy makes every PDF classify fall back to the OCR text + page image, with a warning), or if you rely on zero data retention (see *Privacy of uploaded PDFs* below). An inline PDF holds roughly 20× the file size in memory while it is sent |
+| `Ai__PdfInputMaxBytes` | 20 MiB uploaded, 4 MiB inline | Largest PDF sent as a PDF (64 KiB–20 MiB). Unset, it follows `Ai__PdfUpload`: the inline default stays small because of that memory cost |
 
 A misconfigured section never stops the app from starting — it shows as *unavailable, with the reason* on the admin **AI** page, which also has a **Test connection** probe. The probe sends a real structured-output request at the configured effort, so a wrong key or model ID fails there with the API's own message.
+
+**Privacy of uploaded PDFs.** An uploaded PDF sits in the Files API storage of the key's Anthropic workspace for the length of the call (an hour at most, if the delete fails), where any other API key in that workspace could reference it. Give Homestead's key a workspace of its own. Files API storage is not covered by zero-data-retention arrangements; inline PDFs are.
 
 **Cost.** Every classify, summary, statement parse and payee pass is a paid call. Put a **workspace spend limit** on the key in the Anthropic Console — that is the real guard; the Console is also the authoritative usage view. The Aspire dashboard shows per-call token counts (`homestead.ai.tokens`) for a quick look.
 

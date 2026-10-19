@@ -177,9 +177,18 @@ public class DocumentClassifier(
 
     // A 4xx the API won't change its mind about. Excluded: auth and not-found (401/403/404 — a bad key, model ID or
     // endpoint fails the text path the same way), and the transient 408/429, which the job's retry policy handles.
-    internal static bool IsPdfRejection(Exception exception, out int status) =>
-        AiProviderErrors.TryGetStatus(exception, out status, out _)
-        && status is >= 400 and < 500 and not (401 or 403 or 404 or 408 or 429);
+    // The provider's own AiPdfRejectedException (no upload route at the endpoint) always qualifies.
+    internal static bool IsPdfRejection(Exception exception, out int status)
+    {
+        if (exception is AiPdfRejectedException rejected)
+        {
+            status = rejected.Status;
+            return true;
+        }
+
+        return AiProviderErrors.TryGetStatus(exception, out status, out _)
+            && status is >= 400 and < 500 and not (401 or 403 or 404 or 408 or 429);
+    }
 
     public async Task ApplyAsync(
         Document document, ClassificationResult classification, ClassificationScope scope,

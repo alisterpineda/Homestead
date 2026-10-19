@@ -25,6 +25,7 @@ public class GetAiStatusHandler(IAiProvider aiProvider, AiOptions options, AiInp
             ImageInput: settings.ImageInput,
             ImageRenderMaxEdge: settings.ImageRenderMaxEdge,
             PdfInput: settings.PdfInput,
+            PdfUpload: options.PdfUpload,
             PdfInputMaxPages: settings.PdfInputMaxPages,
             PdfInputMaxBytes: settings.PdfInputMaxBytes));
     }

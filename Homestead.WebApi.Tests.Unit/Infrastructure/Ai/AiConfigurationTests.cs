@@ -99,13 +99,13 @@ public class AiConfigurationTests
 
         Assert.Equal(new AiInputSettings(AiEffort.Medium, AiOptions.DefaultMaxInputChars,
             AiOptions.DefaultStatementMaxInputChars, true, AiOptions.DefaultImageRenderMaxEdge,
-            true, AiOptions.DefaultPdfInputMaxPages, AiOptions.DefaultPdfInputMaxBytes), settings);
+            true, AiOptions.DefaultPdfInputMaxPages, AiOptions.DefaultUploadPdfInputMaxBytes), settings);
     }
 
     // A page cap below 1 and a byte cap below the 64 KiB floor fall back to their defaults, like the other knobs; a
     // byte cap above 20 MiB and a page cap above 100 clamp down to those ceilings.
     [Theory]
-    [InlineData(0, 1_000, AiOptions.DefaultPdfInputMaxPages, AiOptions.DefaultPdfInputMaxBytes)]
+    [InlineData(0, 1_000, AiOptions.DefaultPdfInputMaxPages, AiOptions.DefaultUploadPdfInputMaxBytes)]
     [InlineData(-5, 50L * 1024 * 1024, AiOptions.DefaultPdfInputMaxPages, AiOptions.MaxPdfInputMaxBytes)]
     [InlineData(1, AiOptions.MinPdfInputMaxBytes, 1, AiOptions.MinPdfInputMaxBytes)]
     [InlineData(100, 5L * 1024 * 1024, 100, 5L * 1024 * 1024)]
@@ -121,6 +121,30 @@ public class AiConfigurationTests
         Assert.False(settings.PdfInput);
         Assert.Equal(expectedPages, settings.PdfInputMaxPages);
         Assert.Equal(expectedBytes, settings.PdfInputMaxBytes);
+    }
+
+    // Unset, the byte cap follows PdfUpload: 20 MiB when uploading, 4 MiB inline (where a PDF request holds ~20x
+    // the file in memory). A configured value wins either way, clamped to the ceiling (checked inline, where the
+    // default differs from the ceiling, so a clamp can't pass as a fall-back to the default).
+    [Theory]
+    [InlineData(true, null, AiOptions.DefaultUploadPdfInputMaxBytes)]
+    [InlineData(false, null, AiOptions.DefaultInlinePdfInputMaxBytes)]
+    [InlineData(false, 1_000L, AiOptions.DefaultInlinePdfInputMaxBytes)]
+    [InlineData(false, 8L * 1024 * 1024, 8L * 1024 * 1024)]
+    [InlineData(true, 2L * 1024 * 1024, 2L * 1024 * 1024)]
+    [InlineData(false, 50L * 1024 * 1024, AiOptions.MaxPdfInputMaxBytes)]
+    public void InputSettings_PdfByteCapDefault_FollowsPdfUpload(bool upload, long? maxBytes, long expected)
+    {
+        var settings = AiInputSettings.From(new AiOptions { PdfUpload = upload, PdfInputMaxBytes = maxBytes });
+
+        Assert.Equal(expected, settings.PdfInputMaxBytes);
+    }
+
+    [Fact]
+    public void PdfUpload_DefaultsOn_AndBindsOff()
+    {
+        Assert.True(Bind(Config()).PdfUpload);
+        Assert.False(Bind(Config(("Ai:PdfUpload", "false"))).PdfUpload);
     }
 
     [Fact]

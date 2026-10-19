@@ -429,9 +429,12 @@ public class DocumentClassifierTests : IDisposable
     }
 
     // A PDF the API refuses (a 4xx a retry can't fix) doesn't fail the classify: one retry on the text + render
-    // path, with the OCR text back.
-    [Fact]
-    public async Task ClassifyAsync_PdfRejectedWith400_RetriesOnceWithTextAndRender()
+    // path, with the OCR text back. Likewise an endpoint with no upload route (the provider's
+    // AiPdfRejectedException, from a 404 that would otherwise not qualify).
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ClassifyAsync_PdfRejected_RetriesOnceWithTextAndRender(bool noUploadRoute)
     {
         var ct = TestContext.Current.CancellationToken;
         SeedDocumentWithPdf("ocr text");
@@ -443,10 +446,13 @@ public class DocumentClassifierTests : IDisposable
             Arg.Do<ClassificationInput>(inputs.Add),
             Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
             .Returns(
-                _ => throw new AnthropicBadRequestException
-                {
-                    StatusCode = HttpStatusCode.BadRequest, ResponseBody = "The PDF could not be processed.",
-                },
+                _ => throw (noUploadRoute
+                    ? new AiPdfRejectedException("no upload route", 404,
+                        new AnthropicNotFoundException { StatusCode = HttpStatusCode.NotFound, ResponseBody = "" })
+                    : new AnthropicBadRequestException
+                    {
+                        StatusCode = HttpStatusCode.BadRequest, ResponseBody = "The PDF could not be processed.",
+                    }),
                 _ => new ClassificationResult([], [], "s", "t"));
 
         var result = await CreateSut(TestAiProviders.Settings())
@@ -543,6 +549,15 @@ public class DocumentClassifierTests : IDisposable
 
         Assert.Equal(expected, DocumentClassifier.IsPdfRejection(error, out var reported));
         Assert.Equal(status, reported);
+    }
+
+    [Fact]
+    public void IsPdfRejection_AlwaysForTheProvidersPdfRejection()
+    {
+        var error = new AiPdfRejectedException("no upload route", 405, new InvalidOperationException());
+
+        Assert.True(DocumentClassifier.IsPdfRejection(error, out var status));
+        Assert.Equal(405, status);
     }
 
     [Fact]

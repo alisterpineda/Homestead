@@ -6,7 +6,7 @@ using System.Text.Json;
 using Anthropic.Core;
 using Anthropic.Exceptions;
 using Homestead.WebApi.Infrastructure.Ai;
-using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Logging;
 
 namespace Homestead.WebApi.Tests.Unit.Infrastructure.Ai;
 
@@ -26,16 +26,30 @@ public sealed class AnthropicAiProviderTests : IDisposable
         additionalProperties = false,
     });
 
-    private AnthropicAiProvider Provider(string? endpoint = null) =>
-        new(new AiOptions { ApiKey = "sk-test", Model = _model, Endpoint = endpoint }, false,
-            NullLogger<AnthropicAiProvider>.Instance, _telemetry, new HttpClient(_handler));
+    private readonly CapturingLogger _logger = new();
 
-    private static AiRequest Request(bool longOutput = false) =>
-        new(AiFeature.Classification, AiEffort.Medium, "system", [new AiTextPart(Prompt)], Schema, longOutput,
-            "Test request");
+    private AnthropicAiProvider Provider(string? endpoint = null, bool pdfUpload = true, TimeSpan? deleteTimeout = null) =>
+        new(new AiOptions { ApiKey = "sk-test", Model = _model, Endpoint = endpoint, PdfUpload = pdfUpload }, false,
+            _logger, _telemetry, new HttpClient(_handler))
+        {
+            DeleteTimeout = deleteTimeout ?? TimeSpan.FromSeconds(10),
+        };
+
+    private static AiRequest Request(bool longOutput = false, params AiPdfPart[] pdfs) =>
+        new(AiFeature.Classification, AiEffort.Medium, "system", [.. pdfs, new AiTextPart(Prompt)], Schema,
+            longOutput, "Test request");
 
     private Task<AiReply> Send(AnthropicAiProvider provider, bool longOutput = false) =>
         provider.SendAsync(Request(longOutput), TestContext.Current.CancellationToken);
+
+    private static readonly AiPdfPart Pdf = new("%PDF-SENTINEL-ONE"u8.ToArray());
+    private static readonly AiPdfPart Pdf2 = new("%PDF-SENTINEL-TWO"u8.ToArray());
+
+    private Task<AiReply> SendPdf(AnthropicAiProvider provider, bool longOutput = false, CancellationToken? ct = null,
+        params AiPdfPart[] pdfs) =>
+        provider.SendAsync(Request(longOutput, pdfs.Length == 0 ? [Pdf] : pdfs),
+            ct ?? TestContext.Current.CancellationToken);
+
 
     private string Message(string stopReason = "end_turn", string? model = null, string usageExtra = "") => $$"""
         {
@@ -144,14 +158,7 @@ public sealed class AnthropicAiProviderTests : IDisposable
     [Fact]
     public async Task LongOutput_Streams_AndAssemblesTheReply()
     {
-        _handler.RespondStream(
-            """{"type":"message_start","message":{"id":"msg_1","type":"message","role":"assistant","model":""" + "\"" + _model + "\"" + ""","content":[],"stop_reason":null,"stop_sequence":null,"stop_details":null,"container":null,"context_management":null,"usage":{"input_tokens":50,"output_tokens":1}}}""",
-            """{"type":"content_block_start","index":0,"content_block":{"type":"text","text":"","citations":null}}""",
-            """{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"{\"ok\":"}}""",
-            """{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"true}"}}""",
-            """{"type":"content_block_stop","index":0}""",
-            """{"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null,"stop_details":null,"container":null},"context_management":null,"usage":{"input_tokens":50,"output_tokens":9,"cache_read_input_tokens":null,"cache_creation_input_tokens":null,"server_tool_use":null}}""",
-            """{"type":"message_stop"}""");
+        _handler.RespondStream(StreamedReply());
 
         var reply = await Send(Provider(), longOutput: true);
 
@@ -205,19 +212,260 @@ public sealed class AnthropicAiProviderTests : IDisposable
         Assert.Single(_handler.Requests);
     }
 
+    // ---- PDFs through the Files API -----------------------------------------------------------------------------
+
+    [Fact]
+    public async Task Pdf_IsUploaded_ReferencedByFileId_ThenDeleted()
+    {
+        _handler.Respond(Message());
+
+        var reply = await SendPdf(Provider());
+
+        Assert.Equal("""{"ok":true}""", reply.Json);
+        Assert.Equal(
+            ["POST /v1/files", "POST /v1/messages?beta=true", "DELETE /v1/files/file_1"],
+            _handler.Requests.Select(r => r.Route));
+
+        // The upload: the PDF bytes, a neutral filename (the Console lists it), the one-hour expiry backstop, and
+        // no files beta header (the Files API is GA; the beta shapes differ).
+        var upload = _handler.Requests[0];
+        var form = upload.Body.Replace("\"", "");
+        Assert.Contains("%PDF-SENTINEL-ONE", form);
+        Assert.Contains($"filename={AnthropicAiProvider.UploadFileName}", form);
+        Assert.Contains("name=expires_in_seconds", form);
+        Assert.Contains($"\r\n\r\n{AnthropicAiProvider.UploadExpirySeconds}\r\n", form);
+        Assert.Contains("Content-Type: application/pdf", form);
+        Assert.DoesNotContain("files-api", upload.Beta);
+
+        // The messages call references the upload and carries no bytes.
+        var messages = _handler.Requests[1];
+        Assert.DoesNotContain("base64", messages.Body);
+        using var body = JsonDocument.Parse(messages.Body);
+        var source = body.RootElement.GetProperty("messages")[0].GetProperty("content")[0].GetProperty("source");
+        Assert.Equal("file", source.GetProperty("type").GetString());
+        Assert.Equal("file_1", source.GetProperty("file_id").GetString());
+        Assert.Empty(_logger.Warnings);
+    }
+
+    [Fact]
+    public async Task Pdf_Streamed_IsDeletedAfterTheStreamIsAssembled()
+    {
+        _handler.RespondStream(StreamedReply());
+
+        var reply = await SendPdf(Provider(), longOutput: true);
+
+        Assert.Equal("""{"ok":true}""", reply.Json);
+        Assert.Equal(
+            ["POST /v1/files", "POST /v1/messages?beta=true", "DELETE /v1/files/file_1"],
+            _handler.Requests.Select(r => r.Route));
+    }
+
+    [Fact]
+    public async Task Pdfs_AreUploadedInPartOrder_AndAllDeleted()
+    {
+        _handler.Respond(Message());
+
+        await SendPdf(Provider(), pdfs: [Pdf, Pdf2]);
+
+        Assert.Equal(
+            ["POST /v1/files", "POST /v1/files", "POST /v1/messages?beta=true",
+                "DELETE /v1/files/file_1", "DELETE /v1/files/file_2"],
+            _handler.Requests.Select(r => r.Route));
+        Assert.Contains("SENTINEL-ONE", _handler.Requests[0].Body);
+        Assert.Contains("SENTINEL-TWO", _handler.Requests[1].Body);
+    }
+
+    [Fact]
+    public async Task Pdf_IsDeleted_WhenTheMessagesCallFails()
+    {
+        _handler.Respond("""{"type":"error","error":{"type":"invalid_request_error","message":"bad"}}""",
+            HttpStatusCode.BadRequest);
+        using var meter = new MeterCapture(_model);
+
+        await Assert.ThrowsAsync<AnthropicBadRequestException>(() => SendPdf(Provider()));
+
+        Assert.Equal("DELETE /v1/files/file_1", _handler.Requests[^1].Route);
+        Assert.Equal(["error"], meter.Outcomes);
+    }
+
+    [Fact]
+    public async Task Pdf_IsDeleted_WhenTheReplyIsCutOff()
+    {
+        _handler.Respond(Message("max_tokens"));
+
+        await Assert.ThrowsAsync<AiResponseIncompleteException>(() => SendPdf(Provider()));
+
+        Assert.Equal("DELETE /v1/files/file_1", _handler.Requests[^1].Route);
+    }
+
+    // The caller's cancellation must not cancel the cleanup.
+    [Fact]
+    public async Task Pdf_IsDeleted_WhenTheCallerCancels()
+    {
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        _handler.OnMessages = () => cts.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => SendPdf(Provider(), ct: cts.Token));
+
+        Assert.Equal("DELETE /v1/files/file_1", _handler.Requests[^1].Route);
+    }
+
+    // The reply already succeeded and the upload expires on its own: a failed delete is a warning, not an error.
+    [Fact]
+    public async Task FailedDelete_IsLogged_AndTheReplyStillReturned()
+    {
+        _handler.Respond(Message());
+        _handler.DeleteStatus = HttpStatusCode.NotFound;
+
+        var reply = await SendPdf(Provider());
+
+        Assert.Equal("""{"ok":true}""", reply.Json);
+        var warning = Assert.Single(_logger.Warnings);
+        Assert.Contains("file_1", warning);
+    }
+
+    // One failed delete doesn't stop the next: each is tried on its own.
+    [Fact]
+    public async Task FailedDeletes_AreEachTried_AndEachLogged()
+    {
+        _handler.Respond(Message());
+        _handler.DeleteStatus = HttpStatusCode.NotFound;
+
+        await SendPdf(Provider(), pdfs: [Pdf, Pdf2]);
+
+        Assert.Equal(["DELETE /v1/files/file_1", "DELETE /v1/files/file_2"],
+            _handler.Requests.Select(r => r.Route).Where(r => r.StartsWith("DELETE", StringComparison.Ordinal)));
+        Assert.Equal(2, _logger.Warnings.Count);
+    }
+
+    // A delete that hangs is abandoned at the timeout: the reply still comes back, with a warning.
+    [Fact]
+    public async Task HangingDelete_IsAbandonedAtTheTimeout()
+    {
+        _handler.Respond(Message());
+        _handler.DeleteHangs = true;
+
+        var reply = await SendPdf(Provider(deleteTimeout: TimeSpan.FromMilliseconds(200)));
+
+        Assert.Equal("""{"ok":true}""", reply.Json);
+        Assert.Contains("file_1", Assert.Single(_logger.Warnings));
+    }
+
+    // No upload route at the endpoint (a proxy that only serves messages): a PDF rejection the caller can fall
+    // back from, unlike the 404 a bad model ID gets from the messages call.
+    [Theory]
+    [InlineData(HttpStatusCode.NotFound)]
+    [InlineData(HttpStatusCode.MethodNotAllowed)]
+    public async Task MissingUploadRoute_IsAPdfRejection(HttpStatusCode status)
+    {
+        _handler.UploadStatuses(status);
+        using var meter = new MeterCapture(_model);
+
+        var ex = await Assert.ThrowsAsync<AiPdfRejectedException>(() => SendPdf(Provider()));
+
+        Assert.Equal((int)status, ex.Status);
+        Assert.Contains("Ai:PdfUpload", ex.Message);
+        Assert.Equal(["POST /v1/files"], _handler.Requests.Select(r => r.Route));
+        Assert.Equal(["error"], meter.Outcomes);
+    }
+
+    // A rejected upload propagates with its status (so DocumentClassifier's PDF-rejection fallback sees a 400), is
+    // metered as an error, and sends nothing else.
+    [Fact]
+    public async Task FailedUpload_Propagates_WithoutAMessagesCallOrDelete()
+    {
+        _handler.UploadStatuses(HttpStatusCode.BadRequest);
+        using var meter = new MeterCapture(_model);
+
+        var ex = await Assert.ThrowsAsync<AnthropicBadRequestException>(() => SendPdf(Provider()));
+
+        Assert.True(AiProviderErrors.TryGetStatus(ex, out var status, out _));
+        Assert.Equal(400, status);
+        Assert.Equal(["POST /v1/files"], _handler.Requests.Select(r => r.Route));
+        Assert.Equal(["error"], meter.Outcomes);
+    }
+
+    // The upload is built from the byte array, so the SDK's retry re-sends the whole file (a stream would be
+    // spent by the first attempt and never retried).
+    [Fact]
+    public async Task UploadRetry_ResendsTheWholeFile()
+    {
+        _handler.Respond(Message());
+        _handler.UploadStatuses(HttpStatusCode.ServiceUnavailable, HttpStatusCode.OK);
+
+        await SendPdf(Provider());
+
+        Assert.Equal(
+            ["POST /v1/files", "POST /v1/files", "POST /v1/messages?beta=true", "DELETE /v1/files/file_1"],
+            _handler.Requests.Select(r => r.Route));
+        Assert.Contains("%PDF-SENTINEL-ONE", _handler.Requests[1].Body);
+    }
+
+    // A second upload failing still deletes the first.
+    [Fact]
+    public async Task PartialUpload_DeletesWhatWasUploaded()
+    {
+        _handler.UploadStatuses(HttpStatusCode.OK, HttpStatusCode.BadRequest);
+
+        await Assert.ThrowsAsync<AnthropicBadRequestException>(() => SendPdf(Provider(), pdfs: [Pdf, Pdf2]));
+
+        Assert.Equal(["POST /v1/files", "POST /v1/files", "DELETE /v1/files/file_1"],
+            _handler.Requests.Select(r => r.Route));
+    }
+
+    [Fact]
+    public async Task PdfUploadOff_SendsThePdfInline_WithNoFileCalls()
+    {
+        _handler.Respond(Message());
+
+        await SendPdf(Provider(pdfUpload: false));
+
+        var request = Assert.Single(_handler.Requests);
+        using var body = JsonDocument.Parse(request.Body);
+        var source = body.RootElement.GetProperty("messages")[0].GetProperty("content")[0].GetProperty("source");
+        Assert.Equal("base64", source.GetProperty("type").GetString());
+        Assert.Equal(Convert.ToBase64String(Pdf.Bytes), source.GetProperty("data").GetString());
+    }
+
+    private string[] StreamedReply() =>
+    [
+        """{"type":"message_start","message":{"id":"msg_1","type":"message","role":"assistant","model":""" + "\"" + _model + "\"" + ""","content":[],"stop_reason":null,"stop_sequence":null,"stop_details":null,"container":null,"context_management":null,"usage":{"input_tokens":50,"output_tokens":1}}}""",
+        """{"type":"content_block_start","index":0,"content_block":{"type":"text","text":"","citations":null}}""",
+        """{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"{\"ok\":"}}""",
+        """{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"true}"}}""",
+        """{"type":"content_block_stop","index":0}""",
+        """{"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null,"stop_details":null,"container":null},"context_management":null,"usage":{"input_tokens":50,"output_tokens":9,"cache_read_input_tokens":null,"cache_creation_input_tokens":null,"server_tool_use":null}}""",
+        """{"type":"message_stop"}""",
+    ];
+
     public void Dispose() => _telemetry.Dispose();
 
+    // Messages calls get the canned reply; the Files API routes answer on their own (uploads hand out file_1,
+    // file_2, ...), so a PDF test only sets what it is about.
     private sealed class StubHandler : HttpMessageHandler
     {
         private Func<HttpResponseMessage> _respond = () => new HttpResponseMessage(HttpStatusCode.InternalServerError);
+        private int _uploads;
 
-        public List<(Uri Uri, string Body, string Beta)> Requests { get; } = [];
+        public List<(string Route, Uri Uri, string Body, string Beta)> Requests { get; } = [];
+
+        private readonly Queue<HttpStatusCode> _uploadStatuses = [];
+
+        // One status per upload attempt, in order; OK once they run out.
+        public void UploadStatuses(params HttpStatusCode[] statuses)
+        {
+            foreach (var status in statuses)
+                _uploadStatuses.Enqueue(status);
+        }
+
+        public HttpStatusCode DeleteStatus { get; set; } = HttpStatusCode.OK;
+
+        public bool DeleteHangs { get; set; }
+
+        public Action? OnMessages { get; set; }
 
         public void Respond(string json, HttpStatusCode status = HttpStatusCode.OK) =>
-            _respond = () => new HttpResponseMessage(status)
-            {
-                Content = new StringContent(json, Encoding.UTF8, "application/json"),
-            };
+            _respond = () => Json(json, status);
 
         public void RespondStream(params string[] events) =>
             _respond = () => new HttpResponseMessage(HttpStatusCode.OK)
@@ -230,10 +478,69 @@ public sealed class AnthropicAiProviderTests : IDisposable
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         {
+            // A cancelled request never reaches the network, so it isn't recorded.
+            ct.ThrowIfCancellationRequested();
             var body = request.Content is null ? "" : await request.Content.ReadAsStringAsync(ct);
             var beta = request.Headers.TryGetValues("anthropic-beta", out var values) ? string.Join(",", values) : "";
-            lock (Requests) Requests.Add((request.RequestUri!, body, beta));
+            var route = $"{request.Method} {request.RequestUri!.PathAndQuery}";
+            lock (Requests) Requests.Add((route, request.RequestUri!, body, beta));
+
+            if (request.RequestUri.AbsolutePath == "/v1/files")
+            {
+                var status = _uploadStatuses.TryDequeue(out var s) ? s : HttpStatusCode.OK;
+                if (status != HttpStatusCode.OK)
+                    return Error(status);
+                var id = $"file_{Interlocked.Increment(ref _uploads)}";
+                return Json($$"""
+                    {"id":"{{id}}","type":"file","filename":"homestead-document.pdf","mime_type":"application/pdf",
+                     "size_bytes":17,"created_at":"2026-10-19T00:00:00Z","downloadable":false,
+                     "expires_at":"2026-10-19T01:00:00Z"}
+                    """);
+            }
+
+            if (request.Method == HttpMethod.Delete && DeleteHangs)
+                await Task.Delay(Timeout.Infinite, ct);
+
+            if (request.Method == HttpMethod.Delete)
+                return DeleteStatus == HttpStatusCode.OK
+                    ? Json($$"""{"id":"{{request.RequestUri.Segments[^1]}}","type":"file_deleted"}""")
+                    : Error(DeleteStatus);
+
+            if (OnMessages is { } onMessages)
+            {
+                onMessages();
+                ct.ThrowIfCancellationRequested();
+            }
             return _respond();
+        }
+
+        private static HttpResponseMessage Json(string json, HttpStatusCode status = HttpStatusCode.OK) =>
+            new(status) { Content = new StringContent(json, Encoding.UTF8, "application/json") };
+
+        // retry-after-ms keeps the SDK's retry of a 5xx from sleeping through its default backoff.
+        private static HttpResponseMessage Error(HttpStatusCode status)
+        {
+            var response = Json("""{"type":"error","error":{"type":"api_error","message":"stub"}}""", status);
+            response.Headers.Add("retry-after-ms", "1");
+            return response;
+        }
+    }
+
+    private sealed class CapturingLogger : ILogger<AnthropicAiProvider>
+    {
+        private readonly List<string> _warnings = [];
+
+        public IReadOnlyList<string> Warnings { get { lock (_warnings) return _warnings.ToList(); } }
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            if (logLevel >= LogLevel.Warning)
+                lock (_warnings) _warnings.Add(formatter(state, exception));
         }
     }
 

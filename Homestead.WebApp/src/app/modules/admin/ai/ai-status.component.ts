@@ -112,9 +112,10 @@ import type { TestAiConnectionResponse } from '@/api/generated/models/test-ai-co
                 </div>
                 <div class="flex items-center gap-3 py-1">
                   <span class="w-36 shrink-0 text-sm text-muted-foreground">PDF input</span>
-                  <!-- On: classification sends a qualifying PDF itself instead of the OCR text and page image. -->
+                  <!-- On: classification sends a qualifying PDF itself instead of the OCR text and page image —
+                       uploaded through the Files API and deleted after the call, or inline in the request. -->
                   <span class="flex-1 text-sm">
-                    {{ s.pdfInput ? 'On (up to ' + s.pdfInputMaxPages + ' pages, ' + pdfMegabytes(s.pdfInputMaxBytes) + ' MB)' : 'Off' }}
+                    {{ s.pdfInput ? 'On (up to ' + s.pdfInputMaxPages + ' pages, ' + pdfMegabytes(s.pdfInputMaxBytes) + ' MB, ' + (s.pdfUpload ? 'uploaded' : 'inline') + ')' : 'Off' }}
                   </span>
                 </div>
                 <div class="flex items-center gap-3 py-1">

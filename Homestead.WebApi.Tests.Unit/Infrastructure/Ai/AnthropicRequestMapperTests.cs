@@ -134,6 +134,30 @@ public class AnthropicRequestMapperTests
             b => Assert.Equal("second text", Assert.IsType<BetaTextBlockParam>(b.Value).Text));
     }
 
+    // Uploaded PDFs are referenced by file ID, in part order, and never carry their bytes.
+    [Fact]
+    public void PdfFileIds_ReferenceTheUploads_InPartOrder()
+    {
+        var p = AnthropicRequestMapper.ToParams(
+            Request(AiEffort.Medium, false,
+                new AiPdfPart([1]), new AiTextPart("text"), new AiPdfPart([2])),
+            Options(), ["file_a", "file_b"]);
+
+        Assert.True(Assert.Single(p.Messages).Content.TryPickBetaContentBlockParams(out var blocks));
+        Assert.Equal(["file_a", "file_b"], blocks.Take(2).Select(b =>
+        {
+            Assert.True(b.TryPickRequestDocumentBlock(out var doc));
+            Assert.True(doc.Source.TryPickBetaFileDocument(out var file));
+            return file.FileID;
+        }));
+        Assert.DoesNotContain("base64", JsonSerializer.Serialize(p.RawBodyData));
+    }
+
+    [Fact]
+    public void PdfFileIds_MustMatchThePdfParts() =>
+        Assert.Throws<ArgumentException>(() => AnthropicRequestMapper.ToParams(
+            Request(AiEffort.Medium, false, new AiPdfPart([1])), Options(), ["file_a", "file_b"]));
+
     [Fact]
     public void BytePart_ToString_NeverPrintsTheBytes()
     {

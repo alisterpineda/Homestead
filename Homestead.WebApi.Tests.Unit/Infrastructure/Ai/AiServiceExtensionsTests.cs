@@ -53,6 +53,26 @@ public class AiServiceExtensionsTests
         Assert.DoesNotContain(logs, l => l.Level >= LogLevel.Warning);
     }
 
+    // Uploading PDFs to workspace storage is said once at startup, not only in the README; nothing is said when no
+    // PDF would be uploaded.
+    [Theory]
+    [InlineData(true, true, true, true)]
+    [InlineData(true, true, false, false)]
+    [InlineData(true, false, true, false)]
+    [InlineData(false, true, true, false)]
+    public void PdfUploads_AreAnnouncedOnce_OnlyWhenTheyWillHappen(
+        bool configured, bool pdfInput, bool pdfUpload, bool announced)
+    {
+        var (services, logs) = Build(
+            ("Ai:ApiKey", configured ? "sk-test" : ""), ("Ai:Model", "m"),
+            ("Ai:PdfInput", pdfInput.ToString()), ("Ai:PdfUpload", pdfUpload.ToString()));
+        using var _ = services;
+
+        services.LogAiAvailability();
+
+        Assert.Equal(announced ? 1 : 0, logs.Count(l => l.Message.Contains("Files API")));
+    }
+
     [Fact]
     public void Settings_AndOptions_AreRegisteredFromTheSameSection()
     {

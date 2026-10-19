@@ -27,7 +27,7 @@ AI / Backup).
   reason when only the retired `Ai:Providers:*` / `Ai:DefaultProvider` keys are set), Test connection disabled;
   **configured** → "Configured" badge.
 - Card rows: Model / Endpoint / API key / Effort / Refusal fallback / Max input / Statement input / PDF input /
-  Page image. PDF input reads e.g. "On (up to 20 pages, 4 MB)". A null endpoint reads a muted
+  Page image. PDF input reads e.g. "On (up to 20 pages, 20 MB, uploaded)" ("inline" with `Ai:PdfUpload` off). A null endpoint reads a muted
   **"Claude API default"**.
 - A successful probe reads "Connection successful. (N ms)". Token metrics are on the dashboard Metrics page under
   meter `Homestead.Ai` (`homestead.ai.tokens` by feature/kind/model); the SDK's spans (`anthropic.messages.create`,

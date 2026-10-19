@@ -15,6 +15,7 @@ export interface AiStatusResponse {
   pdfInput: boolean;
   pdfInputMaxBytes: number;
   pdfInputMaxPages: number;
+  pdfUpload: boolean;
   refusalFallback: boolean;
   statementMaxInputChars: number;
 }

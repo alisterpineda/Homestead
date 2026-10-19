@@ -36,8 +36,9 @@ public class GetAiStatusHandlerTests
         Assert.Equal(AiOptions.DefaultImageRenderMaxEdge, result.ImageRenderMaxEdge);
         Assert.Equal(AiOptions.DefaultStatementMaxInputChars, result.StatementMaxInputChars);
         Assert.True(result.PdfInput);
+        Assert.True(result.PdfUpload);
         Assert.Equal(AiOptions.DefaultPdfInputMaxPages, result.PdfInputMaxPages);
-        Assert.Equal(AiOptions.DefaultPdfInputMaxBytes, result.PdfInputMaxBytes);
+        Assert.Equal(AiOptions.DefaultUploadPdfInputMaxBytes, result.PdfInputMaxBytes);
     }
 
     [Fact]
@@ -141,5 +142,19 @@ public class GetAiStatusHandlerTests
         Assert.False(result.PdfInput);
         Assert.Equal(AiOptions.DefaultPdfInputMaxPages, result.PdfInputMaxPages);
         Assert.Equal(AiOptions.MaxPdfInputMaxBytes, result.PdfInputMaxBytes);
+    }
+
+    // Uploads off: the switch is reported, and the unset byte cap resolves to the inline default.
+    [Fact]
+    public async Task PdfUploadOff_ReportsTheSwitch_AndTheInlineCap()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var options = Configured();
+        options.PdfUpload = false;
+
+        var result = await Sut(options).HandleAsync(ct);
+
+        Assert.False(result.PdfUpload);
+        Assert.Equal(AiOptions.DefaultInlinePdfInputMaxBytes, result.PdfInputMaxBytes);
     }
 }

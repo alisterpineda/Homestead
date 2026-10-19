@@ -21,8 +21,9 @@ const READY: AiStatusResponse = {
   imageInput: true,
   imageRenderMaxEdge: 1024,
   pdfInput: true,
+  pdfUpload: true,
   pdfInputMaxPages: 20,
-  pdfInputMaxBytes: 4194304,
+  pdfInputMaxBytes: 20971520,
 };
 
 const ABSENT: AiStatusResponse = {
@@ -100,7 +101,7 @@ describe('AiStatusComponent', () => {
     expect(detailValue(root, 'Effort')).toBe('medium');
     expect(detailValue(root, 'Refusal fallback')).toBe('On');
     expect(detailValue(root, 'Page image')).toBe('On (1024 px)');
-    expect(detailValue(root, 'PDF input')).toBe('On (up to 20 pages, 4 MB)');
+    expect(detailValue(root, 'PDF input')).toBe('On (up to 20 pages, 20 MB, uploaded)');
   });
 
   it('should show an endpoint override and the knobs turned off', () => {
@@ -126,7 +127,16 @@ describe('AiStatusComponent', () => {
     const { fixture } = create();
     fixture.detectChanges();
 
-    expect(detailValue(fixture.nativeElement, 'PDF input')).toBe('On (up to 5 pages, 1.5 MB)');
+    expect(detailValue(fixture.nativeElement, 'PDF input')).toBe('On (up to 5 pages, 1.5 MB, uploaded)');
+  });
+
+  it('should say when PDFs are sent inline rather than uploaded', () => {
+    api.getAiStatus.mockReturnValue(of<AiStatusResponse>({ ...READY, pdfUpload: false, pdfInputMaxBytes: 4194304 }));
+
+    const { fixture } = create();
+    fixture.detectChanges();
+
+    expect(detailValue(fixture.nativeElement, 'PDF input')).toBe('On (up to 20 pages, 4 MB, inline)');
   });
 
   it('should render the empty state naming the config keys when AI is absent', () => {

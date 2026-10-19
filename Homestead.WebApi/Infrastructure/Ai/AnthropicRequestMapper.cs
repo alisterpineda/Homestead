@@ -23,7 +23,10 @@ internal static class AnthropicRequestMapper
     public static bool ShouldStream(AiRequest request) =>
         request.LongOutput || request.Effort is AiEffort.XHigh or AiEffort.Max;
 
-    public static MessageCreateParams ToParams(AiRequest request, AiOptions options)
+    // pdfFileIds: the Files API IDs of the request's PDF parts, in part order, when the provider uploaded them;
+    // null sends each PDF inline as base64.
+    public static MessageCreateParams ToParams(
+        AiRequest request, AiOptions options, IReadOnlyList<string>? pdfFileIds = null)
     {
         var stream = ShouldStream(request);
 
@@ -34,7 +37,7 @@ internal static class AnthropicRequestMapper
             Model = options.Model!,
             MaxTokens = stream ? StreamedMaxTokens : BufferedMaxTokens,
             System = request.SystemPrompt,
-            Messages = [new BetaMessageParam { Role = Role.User, Content = ToContent(request.UserContent) }],
+            Messages = [new BetaMessageParam { Role = Role.User, Content = ToContent(request.UserContent, pdfFileIds) }],
             OutputConfig = new BetaOutputConfig
             {
                 // The wire string through ApiEnum's implicit conversion, rather than guessing the enum member's casing.
@@ -53,13 +56,20 @@ internal static class AnthropicRequestMapper
 
     // Documents and images go before the text that refers to them (the Claude API's documented best order),
     // whatever order the caller listed them in; relative order within each kind is kept.
-    private static List<BetaContentBlockParam> ToContent(IReadOnlyList<AiContentPart> parts)
+    private static List<BetaContentBlockParam> ToContent(
+        IReadOnlyList<AiContentPart> parts, IReadOnlyList<string>? pdfFileIds)
     {
         var blocks = new List<BetaContentBlockParam>(parts.Count);
-        foreach (var part in parts.OfType<AiPdfPart>())
+        var pdfs = parts.OfType<AiPdfPart>().ToList();
+        if (pdfFileIds is not null && pdfFileIds.Count != pdfs.Count)
+            throw new ArgumentException(
+                $"{pdfFileIds.Count} file IDs for {pdfs.Count} PDF parts.", nameof(pdfFileIds));
+        for (var i = 0; i < pdfs.Count; i++)
             blocks.Add(new BetaRequestDocumentBlock
             {
-                Source = new BetaBase64PdfSource { Data = Convert.ToBase64String(part.Bytes) },
+                Source = pdfFileIds is null
+                    ? new BetaBase64PdfSource { Data = Convert.ToBase64String(pdfs[i].Bytes) }
+                    : new BetaFileDocumentSource { FileID = pdfFileIds[i] },
             });
         foreach (var part in parts.OfType<AiImagePart>())
             blocks.Add(new BetaImageBlockParam

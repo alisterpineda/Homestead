@@ -20,13 +20,19 @@ public static class AiServiceExtensions
     }
 
     // Unconfigured AI is a silent no-op, so config that is there but cannot run (a typo, the retired
-    // Ai:Providers shape) gets one warning at startup rather than only a line on the admin page.
+    // Ai:Providers shape) gets one warning at startup rather than only a line on the admin page. Running AI that
+    // uploads PDFs says so once: documents leave the request and sit, briefly, in the key's workspace storage.
     public static void LogAiAvailability(this IServiceProvider services)
     {
         var availability = services.GetRequiredService<IAiProvider>().Availability;
+        var logger = services.GetRequiredService<ILoggerFactory>().CreateLogger(typeof(AiServiceExtensions));
         if (availability is { IsPresent: true, IsConfigured: false })
-            services.GetRequiredService<ILoggerFactory>().CreateLogger(typeof(AiServiceExtensions))
-                .LogWarning("AI is configured but unavailable: {Reason}", availability.Reason);
+            logger.LogWarning("AI is configured but unavailable: {Reason}", availability.Reason);
+        else if (availability.IsConfigured && services.GetRequiredService<AiInputSettings>().PdfInput
+                 && services.GetRequiredService<AiOptions>().PdfUpload)
+            logger.LogInformation(
+                "AI PDF input uploads each PDF to the Claude API's Files API for the call: stored in the API key's workspace (visible to its other keys, not covered by zero data retention), deleted after the call and expiring within {ExpirySeconds} s. Set Ai:PdfUpload=false to send PDFs inline",
+                AnthropicAiProvider.UploadExpirySeconds);
     }
 
     // The dedicated AI page-render path (renderer + cache service), mirroring AddThumbnails. Singletons:

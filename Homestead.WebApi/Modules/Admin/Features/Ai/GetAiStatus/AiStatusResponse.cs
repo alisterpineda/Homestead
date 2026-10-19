@@ -18,5 +18,6 @@ public record AiStatusResponse(
     bool ImageInput,
     int ImageRenderMaxEdge,
     bool PdfInput,
+    bool PdfUpload,
     int PdfInputMaxPages,
     long PdfInputMaxBytes);

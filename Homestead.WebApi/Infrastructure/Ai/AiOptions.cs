@@ -94,18 +94,26 @@ public class AiOptions
     public int ResolvePdfInputMaxPages() =>
         ResolveWithFloor(PdfInputMaxPages, MinPdfInputMaxPages, DefaultPdfInputMaxPages, MaxPdfInputMaxPages);
 
-    // A larger PDF takes the text + render path. The ceiling keeps the base64-encoded document (4/3 of the file)
-    // well inside the Claude API's 32 MB request limit. The default stays well below it because a PDF request is
-    // memory-hungry: the SDK holds the bytes, their base64 and several serialized copies of the body during the
-    // call (~20x the file size), and bulk classify runs several at once. Household documents are rarely larger.
-    public long PdfInputMaxBytes { get; set; } = DefaultPdfInputMaxBytes;
+    // Whether a PDF goes to the Claude API as an upload to its Files API (referenced by file_id, deleted after the
+    // call, and set to expire after an hour in case the delete never runs) rather than base64 inside the request.
+    // Uploading keeps the request a few KB and its memory near the file's size; inline base64 holds ~20x the file
+    // size during the call. Off is for an Ai:Endpoint proxy that doesn't serve /v1/files.
+    public bool PdfUpload { get; set; } = true;
 
-    public const long DefaultPdfInputMaxBytes = 4L * 1024 * 1024;
+    // A larger PDF takes the text + render path. Unset, the cap follows PdfUpload: 20 MiB when uploading, 4 MiB
+    // inline, where the ~20x memory cost bites (bulk classify runs several at once). The ceiling keeps an inline
+    // document's base64 (4/3 of the file) well inside the Claude API's 32 MB request limit, and large PDFs can fail
+    // even through the Files API. Household documents are rarely larger.
+    public long? PdfInputMaxBytes { get; set; }
+
+    public const long DefaultUploadPdfInputMaxBytes = 20L * 1024 * 1024;
+    public const long DefaultInlinePdfInputMaxBytes = 4L * 1024 * 1024;
     public const long MinPdfInputMaxBytes = 64L * 1024;
     public const long MaxPdfInputMaxBytes = 20L * 1024 * 1024;
 
     public long ResolvePdfInputMaxBytes() =>
-        ResolveWithFloor(PdfInputMaxBytes, MinPdfInputMaxBytes, DefaultPdfInputMaxBytes, MaxPdfInputMaxBytes);
+        ResolveWithFloor(PdfInputMaxBytes, MinPdfInputMaxBytes,
+            PdfUpload ? DefaultUploadPdfInputMaxBytes : DefaultInlinePdfInputMaxBytes, MaxPdfInputMaxBytes);
 
     // The one floor policy every knob shares: unset or below the floor is "unset" and falls back to the
     // default (so a degenerate tiny value never starves the feature); a ceiling, when given, clamps down.
