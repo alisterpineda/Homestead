@@ -6,6 +6,8 @@ import { HlmCardImports } from '@/shared/components/spartan/card';
 import { isSafeReturnPath } from '@/shared/utils/safe-return-path';
 
 const INACTIVE_ERROR = 'Your account is inactive. Please contact an administrator.';
+const CONFLICT_ERROR =
+  'This email already belongs to a Homestead account linked to a different sign-in identity. Please contact an administrator.';
 
 @Component({
   selector: 'app-login',
@@ -52,6 +54,8 @@ export class LoginComponent implements OnInit {
       this.error.set('Single sign-on failed. Please try again.');
     } else if (errorParam === 'account-inactive') {
       this.error.set(INACTIVE_ERROR);
+    } else if (errorParam === 'account-conflict') {
+      this.error.set(CONFLICT_ERROR);
     }
 
     const rawReturnUrl = this.route.snapshot.queryParamMap.get('returnUrl');

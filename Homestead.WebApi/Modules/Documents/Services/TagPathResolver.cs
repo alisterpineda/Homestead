@@ -121,7 +121,8 @@ public class TagPathResolver(AppDbContext db) : ITagPathResolver
         return results;
     }
 
-    private static (string[] Segments, string[] CandidatePaths) NormalizeAndBuildCandidatePaths(string path)
+    // Shared with the MCP TagPathSnapper so a path the model sends is normalised exactly as a write would store it.
+    internal static (string[] Segments, string[] CandidatePaths) NormalizeAndBuildCandidatePaths(string path)
     {
         var normalizedPath = path.Trim().Trim('/');
         var segments = normalizedPath.Split('/', StringSplitOptions.RemoveEmptyEntries);

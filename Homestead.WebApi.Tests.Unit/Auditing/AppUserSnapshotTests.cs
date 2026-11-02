@@ -97,6 +97,30 @@ public class AppUserSnapshotTests
     }
 
     [Fact]
+    public void From_MapsExternalSubject()
+    {
+        var user = new AppUser { Email = "e@t.com", DisplayName = "User", ExternalSubject = "sub-123" };
+
+        Assert.Equal("sub-123", AppUserSnapshot.From(user).ExternalSubject);
+        Assert.Equal("sub-123", AppUserSnapshot.From(user, "Admin").ExternalSubject);
+    }
+
+    [Fact]
+    public void Diff_DetectsExternalSubjectChange()
+    {
+        var before = new AppUserSnapshot { DisplayName = "User", Email = "e@t.com", IsActive = true, Role = "Admin" };
+        var after = before with { ExternalSubject = "sub-123" };
+
+        var changes = before.Diff(after);
+
+        var change = Assert.Single(changes);
+        var scalar = Assert.IsType<ScalarFieldChange>(change);
+        Assert.Equal("ExternalSubject", scalar.Field);
+        Assert.Null(scalar.OldValue);
+        Assert.Equal("sub-123", scalar.NewValue);
+    }
+
+    [Fact]
     public void Diff_ReturnsEmpty_WhenIdentical()
     {
         var snapshot = new AppUserSnapshot { DisplayName = "User", Email = "e@t.com", IsActive = true, Role = "Admin" };

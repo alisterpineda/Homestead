@@ -21,6 +21,7 @@ using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Modules.Inventory;
 using Homestead.WebApi.Modules.Inventory.Services;
 using Homestead.WebApi.Modules.Inventory.Features.Search;
+using Homestead.WebApi.Modules.Mcp;
 using Homestead.WebApi.Modules.Processing;
 using Homestead.WebApi.Modules.Search;
 using Homestead.WebApi.Common.Search;
@@ -166,6 +167,7 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 // Add services to the container.
 
 builder.AddAppAuthentication();
+builder.AddHomesteadMcp();
 builder.Services.AddSignalR();
 builder.Services.AddScoped<IProcessingNotifier, ProcessingNotifier>();
 builder.Services.AddScoped<IAuditLogger, AuditLogger>();
@@ -363,6 +365,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapHub<ProcessingHub>("/hubs/processing").RequireAuthorization(AuthPolicies.RequireContributor);
+app.MapHomesteadMcp();
 
 app.MapIdentityEndpoints();
 app.MapStatusEndpoints();

@@ -8,7 +8,16 @@ public static class AppUserPrincipal
 {
     public const string IsActiveClaimType = "IsActive";
 
-    public static ClaimsPrincipal Build(AppUser user)
+    // Marks a principal whose token validated but whose subject matches no AppUser (the MCP bearer door). It has
+    // no NameIdentifier, and ActiveUserHandler turns it into a 403 account_not_linked rather than a plain failure.
+    public const string UnlinkedClaimType = "homestead:unlinked";
+
+    public static ClaimsPrincipal Build(AppUser user) =>
+        Build(user, CookieAuthenticationDefaults.AuthenticationScheme);
+
+    // The one principal shape both doors produce (cookie sign-in, MCP bearer token), so ICurrentUserAccessor,
+    // ActiveUserHandler, the role policies and the audit actor read the same claims either way.
+    public static ClaimsPrincipal Build(AppUser user, string authenticationType)
     {
         var claims = new[]
         {
@@ -19,6 +28,6 @@ public static class AppUserPrincipal
             new Claim(IsActiveClaimType, user.IsActive ? "true" : "false"),
         };
         return new ClaimsPrincipal(
-            new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme));
+            new ClaimsIdentity(claims, authenticationType));
     }
 }

@@ -17,6 +17,12 @@ public class AppUserConfiguration : IEntityTypeConfiguration<AppUser>
             .HasMaxLength(256);
         builder.HasIndex(u => u.Email).IsUnique();
 
+        builder.Property(u => u.ExternalSubject)
+            .HasMaxLength(256);
+        builder.HasIndex(u => u.ExternalSubject)
+            .IsUnique()
+            .HasFilter("\"ExternalSubject\" IS NOT NULL");
+
         builder.Property(u => u.DisplayName)
             .IsRequired()
             .HasMaxLength(256);

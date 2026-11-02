@@ -19,8 +19,24 @@ public class OidcUserProvisioner(
                     ?? throw new InvalidOperationException("OIDC principal missing email claim.");
         var displayName = BuildDisplayName(principal);
         var hasAdminClaim = HasAdminClaim(principal);
+        var subject = principal.FindFirstValue("sub")
+                      ?? principal.FindFirstValue(ClaimTypes.NameIdentifier);
 
-        var user = await db.Users.FirstOrDefaultAsync(u => u.Email == email, ct);
+        // The subject is the stable join key (emails are not unique at the IdP and may be user-editable);
+        // email is only the fallback for legacy rows recorded before ExternalSubject existed. A row already
+        // linked to a different subject is never re-linked by email: that would let anyone who can set their IdP
+        // email to a member's take over that account (on both doors). It is an admin's job to re-link.
+        var user = subject is null
+            ? null
+            : await db.Users.FirstOrDefaultAsync(u => u.ExternalSubject == subject, ct);
+        if (user is null)
+        {
+            var byEmail = await db.Users.FirstOrDefaultAsync(u => u.Email == email, ct);
+            // The callback turns this into /login?error=account-conflict.
+            if (byEmail is not null && byEmail.ExternalSubject is not null && subject is not null)
+                throw new Common.AccessDeniedException();
+            user = byEmail;
+        }
 
         if (user is null)
         {
@@ -34,6 +50,7 @@ public class OidcUserProvisioner(
                 DisplayName = displayName,
                 IsActive = isFirstUser,
                 CreatedAt = DateTimeOffset.UtcNow,
+                ExternalSubject = subject,
                 Role = (isFirstUser || hasAdminClaim)
                     ? AppRole.Admin
                     : AppRole.Contributor,
@@ -44,6 +61,9 @@ public class OidcUserProvisioner(
         {
             if (!string.IsNullOrEmpty(displayName) && displayName != user.DisplayName)
                 user.DisplayName = displayName;
+
+            if (subject is not null && user.ExternalSubject != subject)
+                user.ExternalSubject = subject;
 
             // OIDC is source of truth for the Admin role.
             if (hasAdminClaim)

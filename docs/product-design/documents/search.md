@@ -4,7 +4,7 @@ This file covers the Documents list-page search: which fields are searched, how 
 
 ## Search-first list page
 
-The list page treats search as its primary entry point. A single text input at the top of the page drives both *what* documents are returned and *what order* they come back in when a query is present. Filters (tags, parties) are secondary — they sit in a popover and narrow the result set; sort is also secondary and is overridden by FTS rank when a search term is active.
+The list page treats search as its primary entry point. A single text input at the top of the page drives both *what* documents are returned and *what order* they come back in when a query is present. Filters (tags, parties, and — at the API level — date ranges and has-tags / has-parties / has-pending-suggestions) are secondary — they sit in a popover and narrow the result set; sort is also secondary and is overridden by FTS rank when a search term is active.
 
 The user's mental model is "type words, find files." Filters refine; they do not replace the search box. Typing into the search box debounces by ~300 ms before issuing a query.
 
@@ -65,12 +65,19 @@ Filters compose with search. All of the following are AND'd against the search p
 - **`PartyIds[]`** — exact-match against the document's linked parties. Multiple selected parties are OR'd.
 - **`Deleted`** — when true, the query runs against trashed documents (bypassing the default `DeletedAt IS NULL` filter); when false or null, against live documents. The list page and the trash page share the same endpoint and differ only by this flag.
 - **`GroupId`** — reserved for future scoping; not surfaced in the v1 UI.
+- **`DocumentDateFrom` / `DocumentDateTo`** — an inclusive date range on `DocumentDate` (a document dated exactly on either bound is included). Either end may be given alone for an open-ended range. A document with no document date never satisfies a bound, so any date filter excludes undated documents.
+- **`ExpiryDateFrom` / `ExpiryDateTo`** — the same inclusive range on `ExpiryDate` ("expiring in the next 90 days" is `ExpiryDateFrom=today&ExpiryDateTo=today+90`). Documents without an expiry date never match.
+- **`HasTags`** — `false` returns only untagged documents, `true` only documents with at least one tag; omitted means no filter.
+- **`HasParties`** — the same tri-state on linked parties.
+- **`HasPendingSuggestions`** — `true` returns documents with at least one AI suggestion still in the `Pending` state (the same predicate that drives each row's pending-review indicator), `false` those with none pending — a document whose suggestions are all approved or declined counts as none pending.
 
-Date-based filtering (e.g., "documents with DocumentDate between X and Y") is not currently exposed — date fields are sortable but not filterable.
+A range whose `From` is after its `To` is rejected with a 400 rather than silently returning nothing. All filters run on the access-scoped query before paging, so the total count and page boundaries reflect the filtered set and a filter never reveals a document the user cannot otherwise see.
+
+The date-range, expiry-range and has-* filters are API-level in v1: the list endpoint accepts them, but the list page's filter popover does not surface them yet.
 
 ## Sort
 
-Sort fields: `Name`, `FileSize`, `ContentType`, `DocumentDate`, `CreatedAt`, `UpdatedAt`, `DeletedAt`. Direction: ascending or descending. (`ExpiryDate` is a displayable document field but is not currently a sort option.)
+Sort fields: `Name`, `FileSize`, `ContentType`, `DocumentDate`, `ExpiryDate`, `CreatedAt`, `UpdatedAt`, `DeletedAt`. Direction: ascending or descending. Under `ExpiryDate`, documents without an expiry date sort **last in both directions** — ascending reads "soonest to expire first", descending "furthest out first", and the undated tail never crowds the top of either — with `UpdatedAt` (newest first) breaking ties so paging through that tail is stable. Like the has-* filters, the `ExpiryDate` sort is API-level in v1 and not yet offered in the list page's sort menu.
 
 When the user has typed a search term *and has not picked an explicit sort*, results are ordered by FTS rank — the most relevant matches come first. This is the default: the search-first design means a bare query implies "show me what's most relevant." If the user has explicitly chosen a sort field, that choice is respected and persists through the search (it is not overridden by rank); clearing the search leaves the chosen sort in place. When the search box is empty, the user's chosen sort (or the `UpdatedAt` default) applies.
 
@@ -86,7 +93,7 @@ Rules:
 
 - **Only when there are zero results.** A successful primary match never shows suggestions — they are a recovery affordance, not an always-on signal.
 - **Only when the query is at least three characters.** Two-character queries produce too much trigram noise to be useful.
-- **Filters apply.** Group, party, tag, and trash scoping run on the suggestion query exactly as they do on the primary query — clicking a chip never produces a "ghost" result that disappears on retry because the filter excluded it.
+- **Filters apply.** Group, party, tag, date-range, expiry-range, has-tags / has-parties / has-pending-suggestions, and trash scoping run on the suggestion query exactly as they do on the primary query — clicking a chip never produces a "ghost" result that disappears on retry because the filter excluded it.
 - **Federated over `Document.Name`, `Tag.Name`, and `Party.Name`.** All three are sources of suggestions (extracted text is not). A typo against a tag or party name surfaces the closest tag/party name directly — not only via an overlapping document name — and clicking the chip re-runs the primary search, which federates over those same names.
 - **Distinct.** A name that appears more than once — two documents with the same name, or a document name that coincides with a tag name — produces one chip, not several.
 

@@ -23,6 +23,11 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
     public async Task<GetDocumentsResult> HandleAsync(
         GetDocumentsQuery request, CancellationToken ct)
     {
+        EnsureRangeOrdered(request.DocumentDateFrom, request.DocumentDateTo,
+            nameof(GetDocumentsQuery.DocumentDateFrom), nameof(GetDocumentsQuery.DocumentDateTo));
+        EnsureRangeOrdered(request.ExpiryDateFrom, request.ExpiryDateTo,
+            nameof(GetDocumentsQuery.ExpiryDateFrom), nameof(GetDocumentsQuery.ExpiryDateTo));
+
         var scopedQuery = await BuildScopedQueryAsync(request, ct);
         var query = scopedQuery;
 
@@ -161,6 +166,14 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
         };
     }
 
+    private static void EnsureRangeOrdered(DateOnly? from, DateOnly? to, string fromName, string toName)
+    {
+        if (from is { } f && to is { } t && f > t)
+        {
+            throw new BusinessRuleException($"{fromName} must be on or before {toName}.");
+        }
+    }
+
     private async Task<IQueryable<Domain.Documents.Document>> BuildScopedQueryAsync(
         GetDocumentsQuery request, CancellationToken ct)
     {
@@ -171,6 +184,44 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
         if (request.GroupId.HasValue)
         {
             query = query.Where(d => d.GroupId == request.GroupId.Value);
+        }
+
+        // Inclusive bounds; a document with no date (or no expiry) never satisfies a bound.
+        if (request.DocumentDateFrom is { } documentDateFrom)
+        {
+            query = query.Where(d => d.DocumentDate >= documentDateFrom);
+        }
+
+        if (request.DocumentDateTo is { } documentDateTo)
+        {
+            query = query.Where(d => d.DocumentDate <= documentDateTo);
+        }
+
+        if (request.ExpiryDateFrom is { } expiryDateFrom)
+        {
+            query = query.Where(d => d.ExpiryDate >= expiryDateFrom);
+        }
+
+        if (request.ExpiryDateTo is { } expiryDateTo)
+        {
+            query = query.Where(d => d.ExpiryDate <= expiryDateTo);
+        }
+
+        if (request.HasTags is { } hasTags)
+        {
+            query = query.Where(d => d.DocumentTags.Any() == hasTags);
+        }
+
+        if (request.HasParties is { } hasParties)
+        {
+            query = query.Where(d => d.DocumentParties.Any() == hasParties);
+        }
+
+        if (request.HasPendingSuggestions is { } hasPending)
+        {
+            // Same predicate as the items' HasPendingSuggestions flag.
+            query = query.Where(d =>
+                d.Suggestions.Any(s => s.Status == DocumentSuggestionStatus.Pending) == hasPending);
         }
 
         if (request.PartyIds is { Length: > 0 })
@@ -246,6 +297,17 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
                 d.Versions.OrderByDescending(v => v.VersionNumber).Select(v => v.ContentType).FirstOrDefault()),
             (DocumentSortBy.DocumentDate, SortDirection.Asc) => query.OrderBy(d => d.DocumentDate),
             (DocumentSortBy.DocumentDate, SortDirection.Desc) => query.OrderByDescending(d => d.DocumentDate),
+            // Documents without an expiry sort last in both directions (Postgres would otherwise put NULLs
+            // first under DESC). Most documents have no expiry, so the UpdatedAt tiebreaker keeps paging over
+            // that tied tail deterministic.
+            (DocumentSortBy.ExpiryDate, SortDirection.Asc) => query
+                .OrderBy(d => d.ExpiryDate == null)
+                .ThenBy(d => d.ExpiryDate)
+                .ThenByDescending(d => d.UpdatedAt),
+            (DocumentSortBy.ExpiryDate, SortDirection.Desc) => query
+                .OrderBy(d => d.ExpiryDate == null)
+                .ThenByDescending(d => d.ExpiryDate)
+                .ThenByDescending(d => d.UpdatedAt),
             (DocumentSortBy.CreatedAt, SortDirection.Asc) => query.OrderBy(d => d.CreatedAt),
             (DocumentSortBy.CreatedAt, SortDirection.Desc) => query.OrderByDescending(d => d.CreatedAt),
             (DocumentSortBy.UpdatedAt, SortDirection.Asc) => query.OrderBy(d => d.UpdatedAt),

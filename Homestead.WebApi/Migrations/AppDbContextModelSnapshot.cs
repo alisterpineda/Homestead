@@ -18,7 +18,7 @@ namespace Homestead.WebApi.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.11")
+                .HasAnnotation("ProductVersion", "10.0.12")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "pg_trgm");
@@ -1189,6 +1189,10 @@ namespace Homestead.WebApi.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
+                    b.Property<string>("ExternalSubject")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
@@ -1201,6 +1205,10 @@ namespace Homestead.WebApi.Migrations
 
                     b.HasIndex("Email")
                         .IsUnique();
+
+                    b.HasIndex("ExternalSubject")
+                        .IsUnique()
+                        .HasFilter("\"ExternalSubject\" IS NOT NULL");
 
                     b.ToTable("users", (string)null);
                 });

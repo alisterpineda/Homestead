@@ -28,4 +28,32 @@ public record GetDocumentsQuery : PaginatedRequest
 
     [FromQuery(Name = "Deleted")]
     public bool? Deleted { get; init; }
+
+    /// <summary>Inclusive lower bound on <c>DocumentDate</c>; documents without a date never match a bound.</summary>
+    [FromQuery(Name = "DocumentDateFrom")]
+    public DateOnly? DocumentDateFrom { get; init; }
+
+    /// <summary>Inclusive upper bound on <c>DocumentDate</c>.</summary>
+    [FromQuery(Name = "DocumentDateTo")]
+    public DateOnly? DocumentDateTo { get; init; }
+
+    /// <summary>Inclusive lower bound on <c>ExpiryDate</c>; documents without an expiry never match a bound.</summary>
+    [FromQuery(Name = "ExpiryDateFrom")]
+    public DateOnly? ExpiryDateFrom { get; init; }
+
+    /// <summary>Inclusive upper bound on <c>ExpiryDate</c>.</summary>
+    [FromQuery(Name = "ExpiryDateTo")]
+    public DateOnly? ExpiryDateTo { get; init; }
+
+    /// <summary><c>true</c> = at least one tag, <c>false</c> = untagged, null = no filter.</summary>
+    [FromQuery(Name = "HasTags")]
+    public bool? HasTags { get; init; }
+
+    /// <summary><c>true</c> = at least one linked party, <c>false</c> = none, null = no filter.</summary>
+    [FromQuery(Name = "HasParties")]
+    public bool? HasParties { get; init; }
+
+    /// <summary><c>true</c> = at least one pending suggestion, <c>false</c> = none pending, null = no filter.</summary>
+    [FromQuery(Name = "HasPendingSuggestions")]
+    public bool? HasPendingSuggestions { get; init; }
 }

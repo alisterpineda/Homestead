@@ -20,6 +20,13 @@ export interface GetDocuments$Params {
   SortDir?: SortDirection;
   GroupId?: string;
   Deleted?: boolean;
+  DocumentDateFrom?: string;
+  DocumentDateTo?: string;
+  ExpiryDateFrom?: string;
+  ExpiryDateTo?: string;
+  HasTags?: boolean;
+  HasParties?: boolean;
+  HasPendingSuggestions?: boolean;
   Page?: number;
   PageSize?: number;
 }
@@ -35,6 +42,13 @@ export function getDocuments(http: HttpClient, rootUrl: string, params: GetDocum
     rb.query('SortDir', params.SortDir, {});
     rb.query('GroupId', params.GroupId, {});
     rb.query('Deleted', params.Deleted, {});
+    rb.query('DocumentDateFrom', params.DocumentDateFrom, {});
+    rb.query('DocumentDateTo', params.DocumentDateTo, {});
+    rb.query('ExpiryDateFrom', params.ExpiryDateFrom, {});
+    rb.query('ExpiryDateTo', params.ExpiryDateTo, {});
+    rb.query('HasTags', params.HasTags, {});
+    rb.query('HasParties', params.HasParties, {});
+    rb.query('HasPendingSuggestions', params.HasPendingSuggestions, {});
     rb.query('Page', params.Page, {});
     rb.query('PageSize', params.PageSize, {});
   }

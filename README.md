@@ -90,6 +90,83 @@ services:
 
 Users signing in via OIDC are automatically provisioned — no manual account creation needed. New accounts start **deactivated** — sign-in is refused with an "account inactive" notice on the login page — until an admin activates them from `/admin`; only the very first user is activated automatically.
 
+### Connect your Claude (MCP)
+
+Homestead can optionally serve an [MCP](https://modelcontextprotocol.io) server at `/mcp`, so household members can ask their own Claude — claude.ai, Claude Desktop or Claude Code — to search and organise their documents. Claude signs in through the same identity provider as the web app, using a second OAuth client you register for it, and acts as the signed-in user: same role, same document access, and every change shows in the activity stream as theirs. The steps below are for Authentik; another IdP works the same way if it issues signed JWT access tokens whose `aud` is the client id and whose `sub` matches the web client's. The product design is in [docs/product-design/shared/mcp.md](docs/product-design/shared/mcp.md).
+
+#### Authentik provider setup
+
+1. Create an **OAuth2/OpenID Provider** named "Homestead MCP":
+   - **Client type:** Confidential. **Flow:** authorization code (the same authorization flow your web provider uses).
+   - **Redirect URIs:**
+     - `https://claude.ai/api/mcp/auth_callback`
+     - `https://claude.com/api/mcp/auth_callback`
+     - `http://localhost:8765/callback`
+     - `http://127.0.0.1:8765/callback`
+
+     The first two serve claude.ai and Claude Desktop (Anthropic may move the callback between them, so register both); the last two serve Claude Code.
+   - **Scopes:** the `openid`, `profile` and `email` mappings **plus `offline_access`**. Without `offline_access` Authentik issues no refresh token, and Claude loses the connection at every token expiry.
+   - **Signing key:** an RS256 or ES256 certificate. This is **required** — with no signing key Authentik signs tokens with HS256 keyed by the client secret (which every connected Claude holds), and Homestead rejects HS256.
+   - **Subject mode:** "hashed user ID" — the same as your web provider, so both providers give a user the same `sub`. Homestead links Claude to an account by that subject.
+   - **Issuer mode:** per provider (the issuer is derived from the application slug).
+   - **Access token validity:** leave it at the default (1 hour). Raise it only if the refresh check in [Verify a token](#verify-a-token) still fails with `offline_access` selected, and never above 1 hour — it is how long a removed user keeps access.
+   - Note the **Client ID** and **Client Secret**.
+2. Create an **Application** for that provider. Its **slug** fixes the issuer URL (`https://<authentik>/application/o/<slug>/`), so choose it once. Bind it to household users only — anyone the binding admits can try to connect, and only users with a Homestead account get further.
+3. Configure Homestead (see [MCP (optional)](#mcp-optional)):
+
+   ```yaml
+   environment:
+     Mcp__Authority: https://authentik.example.com/application/o/homestead-mcp/
+     Mcp__Audience: <the provider's client id>
+     Mcp__PublicUrl: https://homestead.example.com/mcp
+   ```
+
+   `Mcp__Authority` is the `issuer` from `https://<authentik>/application/o/<slug>/.well-known/openid-configuration`, **copied verbatim** — trailing slash included; Claude clients compare it byte-for-byte. `Mcp__PublicUrl` is `https://<host>/mcp` exactly as users will type it. On restart the log shows `MCP server enabled at /mcp` with the audience, issuer and resource it is using.
+
+#### Reverse proxy
+
+- **Preserve the `Host` header** on requests to Homestead. The sign-in challenge Homestead sends points Claude at its metadata document on the host the request arrived on.
+- **Do not block Anthropic's IP range `160.79.104.0/21`** — for Homestead *or* Authentik. claude.ai and Claude Desktop connectors run on Anthropic's servers, which fetch Homestead's metadata and Authentik's discovery document and exchange tokens from that range. A WAF rule, geo-block or access gateway (forward auth, VPN-only access) in front of either breaks the flow. Claude Code connects from your own machine instead.
+- Authentik's **discovery and token endpoints must answer within 10 seconds**, or claude.ai gives up.
+
+#### Verify a token
+
+Decode one access token from the MCP provider (it is a JWT) and check:
+
+- the header's `alg` is `RS256` or `ES256`;
+- `aud` equals the provider's client id (`Mcp__Audience`);
+- `sub` and `email` are present;
+- `iss` equals `Mcp__Authority` exactly.
+
+Then connect a client and call `whoami`, wait past the access-token lifetime, and call it again: it must answer without a new sign-in prompt. If it does not, the provider is missing its `offline_access` mapping.
+
+#### First-time users
+
+Each user must **sign in to the Homestead web app once** before connecting Claude — that sign-in is what records their identity, and the MCP door only ever looks accounts up, never creates them. Until they do, the connector reports "No Homestead account is linked to this identity. Sign in to Homestead in the browser first." Deactivated accounts get the usual "account inactive" refusal.
+
+#### Access changes
+
+- **Deactivating or demoting a user on Homestead's `/admin` page is immediate** on both the web app and Claude.
+- **Removing the user from the Authentik application** ends their Claude access when their current access token expires (at most the token validity, 1 hour by default).
+- **Changing their Authentik groups alone does not change their Homestead role** — the admin role is re-synced from the groups claim only at their next web sign-in. Demote them in `/admin` as well if it must take effect now.
+
+#### Connect from claude.ai / Claude Desktop
+
+In claude.ai (Claude Desktop uses the same connectors): **Settings → Connectors → Add custom connector**, enter a name and the URL `https://homestead.example.com/mcp`, and under the OAuth client options choose **Use your own OAuth client** and enter the MCP provider's client id and secret. Save, then **Connect** and sign in with Authentik.
+
+#### Connect from Claude Code
+
+```bash
+claude mcp add --transport http homestead https://homestead.example.com/mcp \
+  --client-id <client id> --client-secret --callback-port 8765
+```
+
+`--client-secret` prompts for the secret. Then run `/mcp` in Claude Code, pick `homestead` and sign in in the browser it opens. Port 8765 must be free on your machine — it is the callback port registered on the provider. `claude mcp login homestead` and `claude mcp logout homestead` sign in again or forget the tokens.
+
+#### What Claude can do
+
+Claude can see who it is signed in as (`whoami`), search documents with the same search as the web app plus date, expiry, untagged and pending-review filters (`search_documents`), read a document's metadata, AI suggestions and, on request, its extracted text (`get_document`), and list tags and parties (`list_tags`, `list_parties`). Contributors and Admins can also edit a document's name, dates, notes, tags and parties (`update_document`), add or remove tags and parties on up to 100 documents at once (`bulk_update_documents`), approve or decline AI suggestions (`resolve_suggestions`), create a tag or party (`create_tag`, `create_party`), leave a comment (`add_comment`) and move up to 20 documents to the trash (`move_to_trash`); Viewers and Guests get the read tools only. Edits apply directly, as the user's own; nothing is deleted permanently — Claude cannot upload, permanently delete or empty the trash, and anything it trashes can be restored in the web app. Tag paths and party names must already exist unless the user asks Claude for a new one. Document text is passed to Claude as data, marked untrusted, never as instructions.
+
 ### Environment Variables
 
 #### Database (required)
@@ -214,6 +291,18 @@ target on `/admin/backup` and is what backup pairings are stored against, so ren
 A `GoogleDrive` target also has to be **connected** — config only names the OAuth client; the grant
 itself is minted by an admin at `google.com/device` from the target's card on `/admin/backup`. See
 [Google Drive backup setup](docs/google-drive-backup-setup.md) for the one-time Google Cloud steps.
+
+#### MCP (optional)
+
+The MCP server for Claude clients is **off** unless `Mcp__Authority` and `Mcp__Audience` (and, in production, `Mcp__PublicUrl`) are set — see [Connect your Claude (MCP)](#connect-your-claude-mcp) for the IdP side. With nothing set, `/mcp` answers 404 and the startup log says so in one line. A section that is present but invalid never stops the app from starting: `/mcp` stays a 404 and the startup log has one warning with the reason.
+
+| Variable | Default | Description |
+|---|---|---|
+| `Mcp__Authority` | — | **Required.** The MCP provider's issuer — the `issuer` value from its `/.well-known/openid-configuration`, copied verbatim (Authentik's ends in `/`) |
+| `Mcp__Audience` | — | **Required.** The MCP OAuth client's id; access tokens must carry it as `aud` |
+| `Mcp__PublicUrl` | — | **Required in production.** The exact public URL of the endpoint, as users will type it into Claude, e.g. `https://homestead.example.com/mcp`. Claude clients reject the server unless it matches byte-for-byte. Only Development infers it from the request |
+| `Mcp__MetadataAddress` | — | Explicit discovery-document URL, if it isn't at the authority's `/.well-known/openid-configuration` |
+| `Mcp__AdditionalScopes__0`, `__1`, … | — | Scopes to advertise on top of `openid profile email`. Never `offline_access`: Claude clients request it themselves when the IdP offers it, and Homestead drops it from this list (with a log line) |
 
 ### Volumes
 

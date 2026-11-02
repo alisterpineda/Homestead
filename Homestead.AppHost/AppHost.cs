@@ -39,6 +39,14 @@ var webapi = builder.AddProject<Projects.Homestead_WebApi>("homestead-webapi")
         context.EnvironmentVariables["OIDC_ROLE_CLAIM"] = "groups";
         context.EnvironmentVariables["OIDC_ADMIN_CLAIM_VALUES"] = "homestead-admin";
 
+        // MCP server (bearer door at /mcp) — on locally, validating access tokens the realm's
+        // homestead-mcp client issues (secret homestead-mcp-dev-secret; its audience mapper puts
+        // "homestead-mcp" in aud). Mcp__PublicUrl is deliberately unset: Development infers the RFC 9728
+        // resource from the request. Turning MCP off locally means editing this block.
+        context.EnvironmentVariables["Mcp__Authority"] =
+            ReferenceExpression.Create($"{keycloakUrl}/realms/homestead");
+        context.EnvironmentVariables["Mcp__Audience"] = "homestead-mcp";
+
         // Optional AI — the Claude API (off by default). Sourced from AppHost user-secrets so no key is
         // committed, e.g.
         //   dotnet user-secrets set "Ai:ApiKey" "<key>"

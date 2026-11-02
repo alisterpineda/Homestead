@@ -12,6 +12,7 @@
         <PackageReference Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" Version="13.6.1" />
         <PackageReference Include="Azure.AI.DocumentIntelligence" Version="1.0.0" />
         <PackageReference Include="Google.Apis.Drive.v3" Version="1.77.0.4276" />
+        <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.12" />
         <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.12" />
         <PackageReference Include="Microsoft.AspNetCore.DataProtection.EntityFrameworkCore" Version="10.0.12" />
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
@@ -22,13 +23,15 @@
         <PackageReference Include="Asp.Versioning.Http" Version="10.2.3" />
         <PackageReference Include="Cronos" Version="0.13.0" />
         <PackageReference Include="Anthropic" Version="12.57.0" />
-        <!-- Schema generation only (AiJsonSchema); a transitive dependency of Anthropic anyway. -->
-        <PackageReference Include="Microsoft.Extensions.AI.Abstractions" Version="10.10.1" />
+        <!-- Schema generation only (AiJsonSchema); a transitive dependency of Anthropic anyway. At least 10.11.0
+             because ModelContextProtocol.Core 2.3.0 requires it (NU1605 otherwise). -->
+        <PackageReference Include="Microsoft.Extensions.AI.Abstractions" Version="10.11.0" />
         <PackageReference Include="Microsoft.Extensions.ApiDescription.Server" Version="10.0.12">
           <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
           <PrivateAssets>all</PrivateAssets>
         </PackageReference>
         <PackageReference Include="Microsoft.AspNetCore.JsonPatch.SystemTextJson" Version="10.0.12" />
+        <PackageReference Include="ModelContextProtocol.AspNetCore" Version="2.3.0" />
         <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
         <PackageReference Include="Scalar.AspNetCore" Version="2.17.14" />
         <PackageReference Include="PdfPig" Version="0.1.16" />

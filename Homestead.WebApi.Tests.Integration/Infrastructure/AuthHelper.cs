@@ -28,6 +28,34 @@ public static class AuthHelper
         return CreateAuthenticatedClientAsync(factory, role: role, email, displayName, isActive);
     }
 
+    /// <summary>
+    /// Inserts an <see cref="AppUser"/> row directly (no sign-in). <paramref name="externalSubject"/> is the
+    /// OIDC <c>sub</c> the bearer (MCP) door resolves users by; leave it null for a cookie-only user.
+    /// </summary>
+    public static async Task<AppUser> SeedUserAsync(
+        WebApplicationFactory<Program> factory,
+        string email,
+        string displayName,
+        AppRole role,
+        bool isActive,
+        string? externalSubject = null)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var user = new AppUser
+        {
+            Email = email,
+            DisplayName = displayName,
+            Role = role,
+            IsActive = isActive,
+            CreatedAt = DateTimeOffset.UtcNow,
+            ExternalSubject = externalSubject,
+        };
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+        return user;
+    }
+
     private static async Task<HttpClient> CreateAuthenticatedClientAsync(
         WebApplicationFactory<Program> factory,
         string role,
@@ -45,20 +73,7 @@ public static class AuthHelper
             HandleCookies = true
         });
 
-        using (var scope = factory.Services.CreateScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            db.Users.Add(new AppUser
-            {
-                Id = Guid.NewGuid(),
-                Email = email,
-                DisplayName = displayName,
-                Role = Enum.Parse<AppRole>(role),
-                IsActive = isActive,
-                CreatedAt = DateTimeOffset.UtcNow,
-            });
-            await db.SaveChangesAsync();
-        }
+        await SeedUserAsync(factory, email, displayName, Enum.Parse<AppRole>(role), isActive);
 
         var loginResponse = await client.GetAsync($"/test/force-login?email={Uri.EscapeDataString(email)}");
         loginResponse.EnsureSuccessStatusCode();

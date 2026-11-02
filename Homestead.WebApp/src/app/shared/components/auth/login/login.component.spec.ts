@@ -75,6 +75,12 @@ describe('LoginComponent', () => {
     expect(text).toContain('account is inactive');
   });
 
+  it('shows the account-conflict message when ?error=account-conflict', () => {
+    const fixture = configure({ errorParam: 'account-conflict' });
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('linked to a different sign-in identity');
+  });
+
   it('forwards a safe ?returnUrl to AuthService.loginWithOidc on click', () => {
     const fixture = configure({ returnUrl: '/documents/123' });
     const auth = TestBed.inject(AuthService);

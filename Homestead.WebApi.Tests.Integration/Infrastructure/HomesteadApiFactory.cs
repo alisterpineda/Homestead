@@ -6,10 +6,14 @@ using Homestead.WebApi.Modules.Finances.PriceProviders;
 using Homestead.WebApi.Modules.Finances.PriceProviders.BankOfCanada;
 using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Processing;
+using System.Security.Cryptography;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
+using Microsoft.IdentityModel.Tokens;
 
 namespace Homestead.WebApi.Tests.Integration.Infrastructure;
 
@@ -43,6 +47,26 @@ public class HomesteadApiFactory : WebApplicationFactory<Program>
 
     /// <summary>The root folder path that target is configured with.</summary>
     public const string GoogleDriveRootFolderPath = "Homestead/Backup";
+
+    /// <summary>
+    /// The issuer the MCP bearer door trusts in tests (<c>Mcp:Authority</c>). Nothing is served there: the
+    /// JwtBearer configuration is pinned below, so no discovery request is ever made.
+    /// </summary>
+    public const string McpTestIssuer = "https://idp.test/realms/homestead";
+
+    /// <summary>The <c>aud</c> the MCP bearer door requires in tests (<c>Mcp:Audience</c>).</summary>
+    public const string McpTestAudience = "homestead-mcp-test";
+
+    /// <summary>The IdP's RS256 signing key, as its JWKS would publish it. Tokens signed with it validate.</summary>
+    public static readonly RsaSecurityKey McpSigningKey = new(RSA.Create(2048)) { KeyId = "mcp-test-rsa" };
+
+    /// <summary>
+    /// A symmetric key the pinned configuration ALSO trusts — the shape of an IdP that falls back to HS256 keyed
+    /// with the client secret. Trusting it on purpose means an HS256 token is refused only by the algorithm
+    /// allow-list, not because its key happens to be unknown.
+    /// </summary>
+    public static readonly SymmetricSecurityKey McpSymmetricKey =
+        new(RandomNumberGenerator.GetBytes(32)) { KeyId = "mcp-test-hmac" };
 
     /// <summary>Google's OAuth endpoints, faked. Script it before driving the connect flow.</summary>
     public FakeGoogleOAuthClient GoogleOAuth { get; } = new();
@@ -108,6 +132,11 @@ public class HomesteadApiFactory : WebApplicationFactory<Program>
         builder.UseSetting("Oidc:ClientId", "test-client");
         builder.UseSetting("Oidc:ClientSecret", "test-secret");
 
+        // Turn the MCP bearer door on. Development, so Mcp:PublicUrl is not required and the metadata's
+        // `resource` is inferred from the request. The token validation itself is pinned below.
+        builder.UseSetting("Mcp:Authority", McpTestIssuer);
+        builder.UseSetting("Mcp:Audience", McpTestAudience);
+
         // Disable the autonomous scheduler tick so tests can drive it deterministically
         // by resolving JobSchedulerService and calling TryFireOneDueScheduleAsync.
         builder.UseSetting("Processing:Scheduling:Enabled", "false");
@@ -134,6 +163,23 @@ public class HomesteadApiFactory : WebApplicationFactory<Program>
 
         builder.ConfigureServices(services =>
         {
+            // Pin the MCP bearer scheme's IdP metadata to a static document (issuer + signing keys) so token
+            // validation never fetches discovery or JWKS from McpTestIssuer. Registered after AddJwtBearer's own
+            // configure, so it layers on top of the production TokenValidationParameters (audience, algorithm
+            // allow-list, OnTokenValidated) rather than replacing them. Zero skew so an expired token is expired.
+            // A no-op on a host where MCP is disabled (the named options are simply never resolved).
+            services.Configure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, o =>
+            {
+                o.Configuration = new OpenIdConnectConfiguration
+                {
+                    Issuer = McpTestIssuer,
+                    SigningKeys = { McpSigningKey, McpSymmetricKey },
+                };
+                o.TokenValidationParameters.ValidIssuer = McpTestIssuer;
+                o.TokenValidationParameters.ClockSkew = TimeSpan.Zero;
+                o.RequireHttpsMetadata = false;
+            });
+
             // Register test-only force-login endpoint for inactive user authentication
             services.AddSingleton<IStartupFilter, TestForceLoginStartupFilter>();
 

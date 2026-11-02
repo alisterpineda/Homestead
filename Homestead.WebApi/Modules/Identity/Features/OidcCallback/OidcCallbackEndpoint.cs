@@ -1,4 +1,5 @@
 using Homestead.WebApi.Authentication;
+using Homestead.WebApi.Domain.Identity;
 using Homestead.WebApi.Modules.Identity.Features.OidcLogin;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -19,7 +20,17 @@ public static class OidcCallbackEndpoint
             if (!authResult.Succeeded || authResult.Principal is null)
                 return Results.Redirect("/login?error=oidc-failed");
 
-            var user = await provisioner.ProvisionOrUpdateAsync(authResult.Principal, cancellationToken);
+            AppUser user;
+            try
+            {
+                user = await provisioner.ProvisionOrUpdateAsync(authResult.Principal, cancellationToken);
+            }
+            catch (Common.AccessDeniedException)
+            {
+                // The email belongs to an account linked to a different IdP identity (see OidcUserProvisioner).
+                await ctx.SignOutAsync(AuthenticationExtensions.ExternalOidcScheme);
+                return Results.Redirect("/login?error=account-conflict");
+            }
 
             // Always clean up the external bridge cookie, even when sign-in is blocked.
             await ctx.SignOutAsync(AuthenticationExtensions.ExternalOidcScheme);

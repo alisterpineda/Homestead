@@ -26,6 +26,7 @@ CLAUDE.md files (`/CLAUDE.md`, `Homestead.WebApi/CLAUDE.md`,
 
 - [shared/table-ux.md](shared/table-ux.md) — product/UX rules for every data-table screen (toolbars, the unified-popover filter pattern, selection state, responsive behaviour). Applies across modules.
 - [shared/universal-search.md](shared/universal-search.md) — the global command palette (⌘K): search-only, grouped per-source (no global ranking), and the `ISearchSource` / presenter seam that makes new modules additive. v1 ships Inventory items.
+- [shared/mcp.md](shared/mcp.md) — the optional MCP server that lets a user's own Claude client act on their documents as them: the tool catalogue, read-for-everyone / write-for-Contributors, direct writes attributed to the signed-in user, subject-keyed lookup-only sign-in through the same IdP, and what is deliberately left out (upload, restore, permanent delete, other modules). v1 covers Documents.
 
 ## Maintenance
 
