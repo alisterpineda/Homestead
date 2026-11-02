@@ -4,7 +4,7 @@ A household management application for documents and personal finances, with a .
 
 ## Docker Deployment
 
-Homestead ships as a single Docker image containing both the API and frontend. It requires a PostgreSQL database and an OIDC provider (e.g., Authentik, Keycloak, Auth0). OIDC is the only sign-in method — the application refuses to start without it.
+Homestead ships as a single Docker image containing both the API and frontend, published to GitHub Container Registry as `ghcr.io/alisterpineda/homestead` (`latest` tracks `main`; `vX.Y.Z` tags are also pushed for releases). It requires a PostgreSQL database and an OIDC provider (e.g., Authentik, Keycloak, Auth0). OIDC is the only sign-in method — the application refuses to start without it. To build the image yourself instead, replace the `image:` line with `build: .` from a checkout.
 
 ### Quick Start
 
@@ -13,8 +13,7 @@ Homestead ships as a single Docker image containing both the API and frontend. I
 ```yaml
 services:
   homestead:
-    image: homestead:latest
-    build: .
+    image: ghcr.io/alisterpineda/homestead:latest
     restart: unless-stopped
     ports:
       - 8080:8080

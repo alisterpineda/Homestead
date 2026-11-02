@@ -149,22 +149,29 @@ jobs:
 
   build-image:
     uses: ./.github/workflows/docker-build.yml
-    secrets: inherit
+    permissions:
+      contents: read
+      packages: write
 
   e2e-test:
     needs: build-image
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
+    permissions:
+      contents: read
+      packages: read
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Log in to Docker Hub
+      - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Download amd64 digest
         uses: actions/download-artifact@v4
@@ -174,7 +181,7 @@ jobs:
 
       - name: Pull and tag E2E image
         env:
-          REGISTRY_IMAGE: alisterpineda/homestead
+          REGISTRY_IMAGE: ghcr.io/${{ github.repository_owner }}/homestead
         run: |
           DIGEST=$(ls ${{ runner.temp }}/digests/)
           docker pull $REGISTRY_IMAGE@sha256:$DIGEST
