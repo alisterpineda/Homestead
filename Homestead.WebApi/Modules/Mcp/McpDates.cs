@@ -21,6 +21,14 @@ public static class McpDates
             : throw new ArgumentException($"{parameterName} must be a date in {DateFormat} form, got '{value}'.");
     }
 
+    // A range with both ends given must not run backwards. Checked by the tool in wire names, ahead of the handler's
+    // own check (a BusinessRuleException in C# property names, which the REST API keeps).
+    public static void RequireOrdered(DateOnly? from, DateOnly? to, string fromName, string toName)
+    {
+        if (from is { } f && to is { } t && f > t)
+            throw new ArgumentException($"{fromName} must be on or before {toName}.");
+    }
+
     public static string FormatTimestamp(DateTimeOffset value) =>
         value.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture);
 

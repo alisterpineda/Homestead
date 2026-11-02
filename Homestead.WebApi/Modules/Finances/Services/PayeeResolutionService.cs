@@ -35,7 +35,7 @@ public class PayeeResolutionService(
             return new Dictionary<int, PayeeResolution>();
 
         // No availability guard of its own: callers gate on IAiProvider.Availability, and SendAsync throws with
-        // the reason (AiAvailability.EnsureConfigured) if one doesn't.
+        // the reason (FeatureAvailability.EnsureConfigured) if one doesn't.
 
         var systemPrompt = BuildSystemPrompt();
         var userMessage = BuildUserMessage(lines, catalog);

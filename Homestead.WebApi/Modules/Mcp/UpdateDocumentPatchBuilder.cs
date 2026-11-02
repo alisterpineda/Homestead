@@ -80,7 +80,7 @@ public static class UpdateDocumentPatchBuilder
     private static List<string>? TagPathsAfterDelta(IReadOnlyList<string> current, UpdateDocumentInput input)
     {
         var remove = input.RemoveTagPaths
-            .Select(p => TagPathResolver.NormalizeAndBuildCandidatePaths(p).CandidatePaths[^1])
+            .Select(TagPathResolver.NormalizePath)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         if (input.AddTagPaths.FirstOrDefault(remove.Contains) is { } both)
@@ -101,7 +101,7 @@ public static class UpdateDocumentPatchBuilder
     private static List<Guid>? PartyIdsAfterDelta(IReadOnlyList<ResolvedParty> current, UpdateDocumentInput input)
     {
         var remove = input.RemovePartyNames
-            .Select(n => n.Trim() is { Length: > 0 } t ? t : throw new ArgumentException("Party name cannot be empty."))
+            .Select(PartyNameResolver.NormalizeName)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         if (input.AddParties.FirstOrDefault(p => remove.Contains(p.Name)) is { } both)

@@ -1,3 +1,5 @@
+using Homestead.WebApi.Common;
+
 namespace Homestead.WebApi.Infrastructure.Ai;
 
 // The exit door: the one seam between Homestead and the model behind it. One registered singleton, no resolver.
@@ -7,28 +9,12 @@ namespace Homestead.WebApi.Infrastructure.Ai;
 // are plain data and move over unchanged.
 public interface IAiProvider
 {
-    AiAvailability Availability { get; }
+    // Absent / unavailable-with-reason / ready: the statement job and the probe word their messages differently for
+    // the first two (the E2E suite pins the absent-case text); Reason is what the admin status page shows.
+    FeatureAvailability Availability { get; }
 
     // One structured-output request, one attempt. Throws InvalidOperationException (naming the reason) when
     // unconfigured, AiResponseIncompleteException when the reply did not finish cleanly, and the backend SDK's own
     // exceptions otherwise (AiProviderErrors reads their status).
     Task<AiReply> SendAsync(AiRequest request, CancellationToken ct);
-}
-
-// Absent config, misconfigured config and "ready" are three states callers tell apart: the statement job and the
-// probe word their messages differently for the first two (the E2E suite pins the absent-case text). Reason is
-// set only when IsPresent && !IsConfigured, and is what the admin status page shows.
-public sealed record AiAvailability(bool IsConfigured, bool IsPresent, string? Reason)
-{
-    public static readonly AiAvailability Absent = new(false, false, null);
-    public static readonly AiAvailability Ready = new(true, true, null);
-
-    public static AiAvailability Unavailable(string reason) => new(false, true, reason);
-
-    // The one wording of "can't send": what SendAsync throws, and what a caller that must not proceed throws.
-    public void EnsureConfigured()
-    {
-        if (!IsConfigured)
-            throw new InvalidOperationException(IsPresent ? $"AI is unavailable: {Reason}" : "AI is not configured.");
-    }
 }

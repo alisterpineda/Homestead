@@ -11,36 +11,22 @@ public sealed class PartyNameResolver(AppDbContext db)
 {
     public async Task<PartyNameResolution> ResolveAsync(IEnumerable<string> names, CancellationToken ct)
     {
-        var trimmed = names
-            .Select(n => n.Trim() is { Length: > 0 } t ? t : throw new ArgumentException("Party name cannot be empty."))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        var trimmed = names.Select(NormalizeName).ToList();
         if (trimmed.Count == 0)
             return new PartyNameResolution([], []);
 
-        var lowered = trimmed.Select(n => n.ToLowerInvariant()).ToList();
         var matches = await db.Parties.AsNoTracking()
-            .Where(p => lowered.Contains(p.Name.ToLower()))
+            .WhereNameIn(p => p.Name, trimmed)
             .Select(p => new ResolvedParty(p.Id, p.Name))
             .ToListAsync(ct);
 
-        var known = new List<ResolvedParty>();
-        var unknown = new List<string>();
-        foreach (var name in trimmed)
-        {
-            var party = matches.FirstOrDefault(p => string.Equals(p.Name, name, StringComparison.Ordinal))
-                        ?? matches
-                            .Where(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase))
-                            .OrderBy(p => p.Name, StringComparer.Ordinal)
-                            .FirstOrDefault();
-            if (party is null)
-                unknown.Add(name);
-            else if (known.All(k => k.Id != party.Id))
-                known.Add(party);
-        }
-
+        var (known, unknown) = CaseInsensitiveMatch.Choose(trimmed, matches, p => p.Id, p => p.Name);
         return new PartyNameResolution(known, unknown);
     }
+
+    // The one trim of a party name the model sends, for additions and removals alike; a blank name is invalid input.
+    public static string NormalizeName(string name) =>
+        name.Trim() is { Length: > 0 } trimmed ? trimmed : throw new ArgumentException("Party name cannot be empty.");
 
     // ResolveAsync, but any unknown name is an error the model can act on.
     public async Task<IReadOnlyList<ResolvedParty>> RequireKnownAsync(IEnumerable<string> names, CancellationToken ct)

@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Text.Json;
 using Homestead.WebApi.Authentication;
+using Homestead.WebApi.Common;
 using ModelContextProtocol;
 using ModelContextProtocol.AspNetCore;
 
@@ -28,7 +29,7 @@ public static class McpServiceExtensions
         var availability = McpConfiguration.Validate(options, isDevelopment);
 
         builder.Services.AddSingleton(options);
-        builder.Services.AddSingleton(availability);
+        builder.Services.AddKeyedSingleton(McpOptions.SectionName, availability);
 
         if (!availability.IsConfigured)
             return builder;
@@ -60,7 +61,7 @@ public static class McpServiceExtensions
     // Called after the MapHub line.
     public static WebApplication MapHomesteadMcp(this WebApplication app)
     {
-        var availability = app.Services.GetRequiredService<McpAvailability>();
+        var availability = app.Services.GetRequiredKeyedService<FeatureAvailability>(McpOptions.SectionName);
         if (availability.IsConfigured)
         {
             app.MapMcp(EndpointPath)
@@ -88,7 +89,7 @@ public static class McpServiceExtensions
 
     public static void LogMcpAvailability(this IServiceProvider services)
     {
-        var availability = services.GetRequiredService<McpAvailability>();
+        var availability = services.GetRequiredKeyedService<FeatureAvailability>(McpOptions.SectionName);
         var options = services.GetRequiredService<McpOptions>();
         var logger = services.GetRequiredService<ILoggerFactory>().CreateLogger(typeof(McpServiceExtensions));
 

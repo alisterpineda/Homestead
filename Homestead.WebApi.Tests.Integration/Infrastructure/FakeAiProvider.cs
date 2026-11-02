@@ -1,4 +1,5 @@
 using Homestead.WebApi.Infrastructure.Ai;
+using Homestead.WebApi.Common;
 
 namespace Homestead.WebApi.Tests.Integration.Infrastructure;
 
@@ -10,7 +11,7 @@ namespace Homestead.WebApi.Tests.Integration.Infrastructure;
 /// </summary>
 public sealed class FakeAiProvider : IAiProvider
 {
-    public AiAvailability Availability => AiAvailability.Ready;
+    public FeatureAvailability Availability => FeatureAvailability.Ready;
 
     public Task<AiReply> SendAsync(AiRequest request, CancellationToken ct) =>
         throw new NotSupportedException("FakeAiProvider.SendAsync must not be called in tests.");

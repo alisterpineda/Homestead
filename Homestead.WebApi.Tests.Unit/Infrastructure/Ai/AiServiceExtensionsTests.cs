@@ -2,6 +2,7 @@ using Homestead.WebApi.Infrastructure.Ai;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Homestead.WebApi.Common;
 
 namespace Homestead.WebApi.Tests.Unit.Infrastructure.Ai;
 
@@ -31,7 +32,7 @@ public class AiServiceExtensionsTests
 
         services.LogAiAvailability();
 
-        Assert.Equal(AiAvailability.Unavailable(AiConfiguration.LegacyConfigReason),
+        Assert.Equal(FeatureAvailability.Unavailable(AiConfiguration.LegacyConfigReason),
             services.GetRequiredService<IAiProvider>().Availability);
         var warning = Assert.Single(logs, l => l.Level == LogLevel.Warning);
         Assert.Equal($"AI is configured but unavailable: {AiConfiguration.LegacyConfigReason}", warning.Message);

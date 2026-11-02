@@ -3,6 +3,7 @@ using Anthropic;
 using Anthropic.Core;
 using Anthropic.Models.Files;
 using Anthropic.Models.Beta.Messages;
+using Homestead.WebApi.Common;
 
 namespace Homestead.WebApi.Infrastructure.Ai;
 
@@ -35,11 +36,11 @@ public sealed class AnthropicAiProvider : IAiProvider
         Availability = AiConfiguration.Validate(options, legacyKeysPresent);
     }
 
-    public AiAvailability Availability { get; }
+    public FeatureAvailability Availability { get; }
 
     public async Task<AiReply> SendAsync(AiRequest request, CancellationToken ct)
     {
-        Availability.EnsureConfigured();
+        Availability.EnsureConfigured("AI");
 
         var stream = AnthropicRequestMapper.ShouldStream(request);
         var configuredModel = _options.Model!;

@@ -1,6 +1,8 @@
+using Homestead.WebApi.Common;
+
 namespace Homestead.WebApi.Modules.Mcp;
 
-// Turns the "Mcp" section into an McpAvailability, and resolves the scopes the protected-resource metadata
+// Turns the "Mcp" section into a FeatureAvailability, and resolves the scopes the protected-resource metadata
 // advertises.
 //
 // Validation returns a reason rather than throwing (no ValidateOnStart, mirroring AiConfiguration): a broken Mcp
@@ -13,7 +15,7 @@ public static class McpConfiguration
     public static readonly string[] BaseScopes = ["openid", "profile", "email"];
 
     // "Present" = any of the four strings is set. AdditionalScopes alone means nothing without an issuer.
-    public static McpAvailability Validate(McpOptions options, bool isDevelopment)
+    public static FeatureAvailability Validate(McpOptions options, bool isDevelopment)
     {
         var present = !string.IsNullOrWhiteSpace(options.Authority)
             || !string.IsNullOrWhiteSpace(options.Audience)
@@ -21,27 +23,27 @@ public static class McpConfiguration
             || !string.IsNullOrWhiteSpace(options.PublicUrl);
 
         if (!present)
-            return McpAvailability.Absent;
+            return FeatureAvailability.Absent;
         if (!IsAbsoluteHttpUri(options.Authority))
-            return McpAvailability.Unavailable("Mcp:Authority must be an absolute URI.");
+            return FeatureAvailability.Unavailable("Mcp:Authority must be an absolute URI.");
         if (string.IsNullOrWhiteSpace(options.Audience))
-            return McpAvailability.Unavailable("Mcp:Audience is required.");
+            return FeatureAvailability.Unavailable("Mcp:Audience is required.");
         if (string.IsNullOrWhiteSpace(options.PublicUrl))
         {
             // Development infers the resource from the request; behind a TLS-terminating proxy the request's
             // scheme/host cannot be trusted to rebuild it byte-for-byte, so production must say what URL users type.
             if (!isDevelopment)
-                return McpAvailability.Unavailable(
+                return FeatureAvailability.Unavailable(
                     "Mcp:PublicUrl is required outside Development (the public URL of /mcp).");
         }
         else if (!IsAbsoluteHttpUri(options.PublicUrl))
         {
-            return McpAvailability.Unavailable("Mcp:PublicUrl must be an absolute URI.");
+            return FeatureAvailability.Unavailable("Mcp:PublicUrl must be an absolute URI.");
         }
         if (!string.IsNullOrWhiteSpace(options.MetadataAddress) && !IsAbsoluteHttpUri(options.MetadataAddress))
-            return McpAvailability.Unavailable("Mcp:MetadataAddress must be an absolute URI.");
+            return FeatureAvailability.Unavailable("Mcp:MetadataAddress must be an absolute URI.");
 
-        return McpAvailability.Ready;
+        return FeatureAvailability.Ready;
     }
 
     // Base + additional, distinct, in order. offline_access is dropped: a resource server should not advertise it

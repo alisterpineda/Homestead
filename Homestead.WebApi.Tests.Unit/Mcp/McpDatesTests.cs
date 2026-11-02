@@ -32,4 +32,25 @@ public class McpDatesTests
         Assert.Contains("document_date_to", e.Message);
         Assert.Contains("yyyy-MM-dd", e.Message);
     }
+
+    [Fact]
+    public void RequireOrdered_FromAfterTo_IsInvalidInput_InWireNames()
+    {
+        var e = Assert.Throws<ArgumentException>(() => McpDates.RequireOrdered(
+            new DateOnly(2024, 12, 31), new DateOnly(2024, 1, 1), "document_date_from", "document_date_to"));
+        Assert.Equal("document_date_from must be on or before document_date_to.", e.Message);
+    }
+
+    [Fact]
+    public void RequireOrdered_SameDay_IsFine() =>
+        McpDates.RequireOrdered(new DateOnly(2024, 3, 7), new DateOnly(2024, 3, 7), "expiry_from", "expiry_to");
+
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(false, false)]
+    public void RequireOrdered_AnOpenEnd_IsFine(bool hasFrom, bool hasTo) =>
+        McpDates.RequireOrdered(
+            hasFrom ? new DateOnly(2024, 12, 31) : null, hasTo ? new DateOnly(2024, 1, 1) : null,
+            "expiry_from", "expiry_to");
 }

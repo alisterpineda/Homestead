@@ -7,6 +7,7 @@ using Homestead.WebApi.Tests.Unit.Infrastructure.Ai;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
+using Homestead.WebApi.Common;
 
 namespace Homestead.WebApi.Tests.Unit.Documents;
 
@@ -17,7 +18,7 @@ public class AiClassificationServiceTests
 
     public AiClassificationServiceTests()
     {
-        _provider.Availability.Returns(AiAvailability.Ready);
+        _provider.Availability.Returns(FeatureAvailability.Ready);
         _sut = SutWith(TestAiProviders.Settings());
     }
 

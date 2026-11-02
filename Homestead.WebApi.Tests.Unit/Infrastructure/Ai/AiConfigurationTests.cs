@@ -1,9 +1,10 @@
 using Homestead.WebApi.Infrastructure.Ai;
 using Microsoft.Extensions.Configuration;
+using Homestead.WebApi.Common;
 
 namespace Homestead.WebApi.Tests.Unit.Infrastructure.Ai;
 
-// The "Ai" section -> AiAvailability (absent / unavailable-with-reason / ready), legacy-key detection, effort
+// The "Ai" section -> FeatureAvailability (absent / unavailable-with-reason / ready), legacy-key detection, effort
 // parsing, and the input-knob floors resolved into AiInputSettings.
 public class AiConfigurationTests
 {
@@ -15,7 +16,7 @@ public class AiConfigurationTests
     private static AiOptions Bind(IConfiguration config) =>
         config.GetSection(AiOptions.SectionName).Get<AiOptions>() ?? new AiOptions();
 
-    private static AiAvailability Availability(params (string Key, string? Value)[] values)
+    private static FeatureAvailability Availability(params (string Key, string? Value)[] values)
     {
         var config = Config(values);
         return AiConfiguration.Validate(Bind(config), AiConfiguration.LegacyKeysPresent(config));
@@ -23,31 +24,31 @@ public class AiConfigurationTests
 
     [Fact]
     public void NoAiSection_IsAbsent() =>
-        Assert.Equal(AiAvailability.Absent, Availability());
+        Assert.Equal(FeatureAvailability.Absent, Availability());
 
     // The input knobs have defaults and mean nothing without a model, so setting one alone isn't "configuring AI".
     [Fact]
     public void KnobsAlone_AreStillAbsent() =>
-        Assert.Equal(AiAvailability.Absent, Availability(("Ai:ImageInput", "false"), ("Ai:MaxInputChars", "5000")));
+        Assert.Equal(FeatureAvailability.Absent, Availability(("Ai:ImageInput", "false"), ("Ai:MaxInputChars", "5000")));
 
     [Fact]
     public void KeyAndModel_AreReady() =>
-        Assert.Equal(AiAvailability.Ready, Availability(("Ai:ApiKey", "sk"), ("Ai:Model", "claude-opus-5-5")));
+        Assert.Equal(FeatureAvailability.Ready, Availability(("Ai:ApiKey", "sk"), ("Ai:Model", "claude-opus-5-5")));
 
     [Theory]
     [InlineData("Ai:Model", "claude-opus-5-5", "Ai:ApiKey is required.")]
     [InlineData("Ai:ApiKey", "sk", "Ai:Model is required.")]
     public void MissingKeyOrModel_IsUnavailableWithReason(string key, string value, string reason) =>
-        Assert.Equal(AiAvailability.Unavailable(reason), Availability((key, value)));
+        Assert.Equal(FeatureAvailability.Unavailable(reason), Availability((key, value)));
 
     [Fact]
     public void RelativeEndpoint_IsUnavailableWithReason() =>
-        Assert.Equal(AiAvailability.Unavailable("Ai:Endpoint must be an absolute URI."),
+        Assert.Equal(FeatureAvailability.Unavailable("Ai:Endpoint must be an absolute URI."),
             Availability(("Ai:ApiKey", "sk"), ("Ai:Model", "m"), ("Ai:Endpoint", "api.example.com")));
 
     [Fact]
     public void AbsoluteEndpoint_IsReady() =>
-        Assert.Equal(AiAvailability.Ready,
+        Assert.Equal(FeatureAvailability.Ready,
             Availability(("Ai:ApiKey", "sk"), ("Ai:Model", "m"), ("Ai:Endpoint", "https://proxy.example.com")));
 
     [Theory]
@@ -83,12 +84,12 @@ public class AiConfigurationTests
     [InlineData("Ai:Providers:local:Type", "Anthropic")]
     [InlineData("Ai:DefaultProvider", "local")]
     public void LegacyKeysOnly_AreUnavailableWithTheLegacyReason(string key, string value) =>
-        Assert.Equal(AiAvailability.Unavailable(AiConfiguration.LegacyConfigReason), Availability((key, value)));
+        Assert.Equal(FeatureAvailability.Unavailable(AiConfiguration.LegacyConfigReason), Availability((key, value)));
 
     // Both shapes may coexist during the transition (the rollback story): the new keys win.
     [Fact]
     public void LegacyKeysAlongsideNewKeys_AreReady() =>
-        Assert.Equal(AiAvailability.Ready, Availability(
+        Assert.Equal(FeatureAvailability.Ready, Availability(
             ("Ai:Providers:local:Type", "Anthropic"), ("Ai:DefaultProvider", "local"),
             ("Ai:ApiKey", "sk"), ("Ai:Model", "claude-opus-5-5")));
 
@@ -181,7 +182,7 @@ public class AiConfigurationTests
         var provider = new AnthropicAiProvider(new AiOptions { Model = "m" }, legacyKeysPresent: false,
             Microsoft.Extensions.Logging.Abstractions.NullLogger<AnthropicAiProvider>.Instance, new AiTelemetry());
 
-        Assert.Equal(AiAvailability.Unavailable("Ai:ApiKey is required."), provider.Availability);
+        Assert.Equal(FeatureAvailability.Unavailable("Ai:ApiKey is required."), provider.Availability);
     }
 
     [Theory]

@@ -261,7 +261,8 @@ public sealed class DocumentWriteTools(
         CancellationToken ct = default) =>
         invoker.WriteAsync(async c =>
         {
-            var trimmed = name?.Trim() is { Length: > 0 } t ? t : throw new ArgumentException("name cannot be empty.");
+            // The same trim every other party-name input gets, so what is stored is what later lookups match.
+            var trimmed = PartyNameResolver.NormalizeName(name ?? "");
 
             // Case-insensitive, like every other name lookup here (Party.Name's unique index is case-sensitive, so
             // CreatePartyHandler's own duplicate check would let "ACME" fork "Acme").
@@ -339,9 +340,8 @@ public sealed class DocumentWriteTools(
 
     private async Task<List<Guid>> PartyIdsByNameAsync(List<string> names, CancellationToken ct)
     {
-        var lowered = names.Select(n => n.ToLowerInvariant()).ToList();
         return await db.Parties.AsNoTracking()
-            .Where(p => lowered.Contains(p.Name.ToLower()))
+            .WhereNameIn(p => p.Name, names)
             .Select(p => p.Id)
             .ToListAsync(ct);
     }
@@ -349,13 +349,13 @@ public sealed class DocumentWriteTools(
     // Normalised as any tag write would (an empty path is an ArgumentException), distinct case-insensitively.
     private static List<string> NormalizeTagPaths(string[]? paths) =>
         (paths ?? [])
-        .Select(p => TagPathResolver.NormalizeAndBuildCandidatePaths(p).CandidatePaths[^1])
+        .Select(TagPathResolver.NormalizePath)
         .Distinct(StringComparer.OrdinalIgnoreCase)
         .ToList();
 
     private static List<string> TrimPartyNames(string[]? names) =>
         (names ?? [])
-        .Select(n => n.Trim() is { Length: > 0 } t ? t : throw new ArgumentException("Party name cannot be empty."))
+        .Select(PartyNameResolver.NormalizeName)
         .Distinct(StringComparer.OrdinalIgnoreCase)
         .ToList();
 

@@ -28,7 +28,7 @@ public class StatementExtractionService(
     public async Task<StatementIr> ExtractAsync(string extractedText, byte[]? pageImage, CancellationToken ct)
     {
         // No availability guard of its own: callers gate on IAiProvider.Availability, and SendAsync throws with
-        // the reason (AiAvailability.EnsureConfigured) if one doesn't.
+        // the reason (FeatureAvailability.EnsureConfigured) if one doesn't.
 
         var systemPrompt = BuildSystemPrompt();
         var userMessage = BuildUserMessage(extractedText, settings.StatementMaxInputChars);

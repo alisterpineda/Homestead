@@ -1,5 +1,6 @@
 using Homestead.WebApi.Infrastructure.Ai;
 using NSubstitute;
+using Homestead.WebApi.Common;
 
 namespace Homestead.WebApi.Tests.Unit.Infrastructure.Ai;
 
@@ -30,7 +31,7 @@ public static class TestAiProviders
     public static IAiProvider Provider(string replyJson = "{}")
     {
         var provider = Substitute.For<IAiProvider>();
-        provider.Availability.Returns(AiAvailability.Ready);
+        provider.Availability.Returns(FeatureAvailability.Ready);
         provider.SendAsync(Arg.Any<AiRequest>(), Arg.Any<CancellationToken>())
             .Returns(Reply(replyJson));
         return provider;
@@ -40,10 +41,10 @@ public static class TestAiProviders
 
     // Config that is there but cannot run; SendAsync throws like the real one.
     public static IAiProvider Unconfigured(string reason = "Ai:ApiKey is required.") =>
-        WithAvailability(AiAvailability.Unavailable(reason), $"AI is unavailable: {reason}");
+        WithAvailability(FeatureAvailability.Unavailable(reason), $"AI is unavailable: {reason}");
 
     // No Ai:* config at all.
-    public static IAiProvider Absent() => WithAvailability(AiAvailability.Absent, "AI is not configured.");
+    public static IAiProvider Absent() => WithAvailability(FeatureAvailability.Absent, "AI is not configured.");
 
     // Records every request the provider is sent; the returned function reads the latest (null before any).
     public static IAiProvider Capture(this IAiProvider provider, out Func<AiRequest?> lastRequest)
@@ -58,7 +59,7 @@ public static class TestAiProviders
     public static string UserText(this AiRequest request) =>
         string.Concat(request.UserContent.OfType<AiTextPart>().Select(p => p.Text));
 
-    private static IAiProvider WithAvailability(AiAvailability availability, string message)
+    private static IAiProvider WithAvailability(FeatureAvailability availability, string message)
     {
         var provider = Substitute.For<IAiProvider>();
         provider.Availability.Returns(availability);

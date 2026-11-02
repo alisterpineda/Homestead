@@ -83,6 +83,19 @@ public class PartyNameResolverTests : IDisposable
     }
 
     [Fact]
+    public void NormalizeName_TrimsTheName() =>
+        Assert.Equal("Toronto Hydro", PartyNameResolver.NormalizeName("  Toronto Hydro "));
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void NormalizeName_Blank_IsInvalidInput(string name)
+    {
+        var e = Assert.Throws<ArgumentException>(() => PartyNameResolver.NormalizeName(name));
+        Assert.Equal("Party name cannot be empty.", e.Message);
+    }
+
+    [Fact]
     public async Task RequireKnown_AllKnown_ReturnsThem()
     {
         var parties = await _sut.RequireKnownAsync(["acme", "Jane Doe"], Ct);

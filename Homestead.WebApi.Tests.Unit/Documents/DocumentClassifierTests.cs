@@ -16,6 +16,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
+using Homestead.WebApi.Common;
 
 namespace Homestead.WebApi.Tests.Unit.Documents;
 
@@ -100,7 +101,7 @@ public class DocumentClassifierTests : IDisposable
     {
         var ct = TestContext.Current.CancellationToken;
 
-        _aiProvider.Availability.Returns(AiAvailability.Absent);
+        _aiProvider.Availability.Returns(FeatureAvailability.Absent);
 
         var result = await _sut.ClassifyAsync(_documentId, "Test Doc", ClassificationScope.All, ct);
 
@@ -116,7 +117,7 @@ public class DocumentClassifierTests : IDisposable
     {
         var ct = TestContext.Current.CancellationToken;
 
-        _aiProvider.Availability.Returns(AiAvailability.Unavailable("Ai:ApiKey is required."));
+        _aiProvider.Availability.Returns(FeatureAvailability.Unavailable("Ai:ApiKey is required."));
 
         var result = await _sut.ClassifyAsync(_documentId, "Test Doc", ClassificationScope.All, ct);
 
@@ -216,7 +217,7 @@ public class DocumentClassifierTests : IDisposable
     public async Task ClassifyAsync_AiAbsent_InMemoryOverload_ReturnsNull()
     {
         var ct = TestContext.Current.CancellationToken;
-        _aiProvider.Availability.Returns(AiAvailability.Absent);
+        _aiProvider.Availability.Returns(FeatureAvailability.Absent);
         var file = new ClassificationFile("hash", Path.Combine(_mediaPath, "upload.png"), "image/png", 100);
 
         var result = await _sut.ClassifyAsync("Upload Name", "in-memory text", file, ClassificationScope.All, ct);

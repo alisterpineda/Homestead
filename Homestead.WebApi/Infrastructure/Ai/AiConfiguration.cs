@@ -1,6 +1,8 @@
+using Homestead.WebApi.Common;
+
 namespace Homestead.WebApi.Infrastructure.Ai;
 
-// Turns the "Ai" section into an AiAvailability, and detects the retired multi-provider keys.
+// Turns the "Ai" section into a FeatureAvailability, and detects the retired multi-provider keys.
 //
 // Validation returns a reason rather than throwing: there is deliberately no ValidateOnStart (mirroring
 // OcrEngineConfiguration) — a misconfigured AI section must not stop the app from booting: the build-time OpenAPI
@@ -24,7 +26,7 @@ public static class AiConfiguration
     // input knobs alone (budgets, ImageInput) don't count — they have defaults and mean nothing without a model.
     // Legacy keys are flagged only when the new ApiKey/Model are both absent, so old and new shapes can coexist
     // during the transition (that is the rollback story).
-    public static AiAvailability Validate(AiOptions options, bool legacyKeysPresent)
+    public static FeatureAvailability Validate(AiOptions options, bool legacyKeysPresent)
     {
         var hasKey = !string.IsNullOrWhiteSpace(options.ApiKey);
         var hasModel = !string.IsNullOrWhiteSpace(options.Model);
@@ -33,20 +35,20 @@ public static class AiConfiguration
             || !string.IsNullOrWhiteSpace(options.Effort);
 
         if (!present)
-            return AiAvailability.Absent;
+            return FeatureAvailability.Absent;
         if (legacyKeysPresent && !hasKey && !hasModel)
-            return AiAvailability.Unavailable(LegacyConfigReason);
+            return FeatureAvailability.Unavailable(LegacyConfigReason);
         if (!string.IsNullOrWhiteSpace(options.Endpoint) && !Uri.TryCreate(options.Endpoint, UriKind.Absolute, out _))
-            return AiAvailability.Unavailable("Ai:Endpoint must be an absolute URI.");
+            return FeatureAvailability.Unavailable("Ai:Endpoint must be an absolute URI.");
         if (!hasKey)
-            return AiAvailability.Unavailable("Ai:ApiKey is required.");
+            return FeatureAvailability.Unavailable("Ai:ApiKey is required.");
         if (!hasModel)
-            return AiAvailability.Unavailable("Ai:Model is required.");
+            return FeatureAvailability.Unavailable("Ai:Model is required.");
         if (ParseEffort(options.Effort) is null)
-            return AiAvailability.Unavailable(
+            return FeatureAvailability.Unavailable(
                 $"Ai:Effort '{options.Effort}' is not one of: {string.Join(", ", Enum.GetValues<AiEffort>().Select(ToWire))}.");
 
-        return AiAvailability.Ready;
+        return FeatureAvailability.Ready;
     }
 
     // Blank = medium; otherwise the wire string, case-insensitive; null when unrecognised.

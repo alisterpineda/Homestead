@@ -121,7 +121,8 @@ public class TagPathResolver(AppDbContext db) : ITagPathResolver
         return results;
     }
 
-    // Shared with the MCP TagPathSnapper so a path the model sends is normalised exactly as a write would store it.
+    // internal because Modules/Mcp normalises model-sent paths with it (directly, or via NormalizePath below), so a
+    // path the model sends is normalised exactly as a write would store it. Throws ArgumentException on an empty path.
     internal static (string[] Segments, string[] CandidatePaths) NormalizeAndBuildCandidatePaths(string path)
     {
         var normalizedPath = path.Trim().Trim('/');
@@ -136,6 +137,9 @@ public class TagPathResolver(AppDbContext db) : ITagPathResolver
 
         return (segments, candidatePaths);
     }
+
+    // The full normalised path alone (the last candidate path), for callers that need no ancestors.
+    internal static string NormalizePath(string path) => NormalizeAndBuildCandidatePaths(path).CandidatePaths[^1];
 
     private void MergeChangeTrackerEntries(IEnumerable<string> candidatePaths, Dictionary<string, Tag> existingTags)
     {

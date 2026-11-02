@@ -56,7 +56,7 @@ public class AiClassificationService(
             return null;
 
         // No availability guard of its own: callers gate on IAiProvider.Availability, and SendAsync throws with
-        // the reason (AiAvailability.EnsureConfigured) if one doesn't.
+        // the reason (FeatureAvailability.EnsureConfigured) if one doesn't.
 
         // The service stays "dumb" about inputs: it sends what it is given, and the decision (PDF, text + render,
         // text) is made upstream by ClassificationInputSelector. Production's PDF mode passes no extracted text —

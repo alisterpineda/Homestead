@@ -1,8 +1,8 @@
 namespace Homestead.WebApi.Modules.Mcp;
 
 // The "Mcp" section: the bearer door for Claude clients. Opt-in — with no section the endpoint is not mapped and
-// /mcp answers 404. Bound from stock Mcp__* env vars; validated by McpConfiguration into an McpAvailability (no
-// ValidateOnStart, mirroring AiOptions).
+// /mcp answers 404. Bound from stock Mcp__* env vars; validated by McpConfiguration into a FeatureAvailability
+// (no ValidateOnStart, mirroring AiOptions).
 public class McpOptions
 {
     public const string SectionName = "Mcp";
@@ -27,14 +27,4 @@ public class McpOptions
     // themselves when the IdP lists it) and is dropped if listed here. Empty by default: the binder appends to a
     // pre-filled list.
     public List<string> AdditionalScopes { get; set; } = [];
-}
-
-// Absent config, misconfigured config and "ready" are told apart at startup: absent logs one Information line,
-// misconfigured one Warning with the reason. Reason is set only when IsPresent && !IsConfigured.
-public sealed record McpAvailability(bool IsConfigured, bool IsPresent, string? Reason)
-{
-    public static readonly McpAvailability Absent = new(false, false, null);
-    public static readonly McpAvailability Ready = new(true, true, null);
-
-    public static McpAvailability Unavailable(string reason) => new(false, true, reason);
 }

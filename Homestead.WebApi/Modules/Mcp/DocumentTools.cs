@@ -57,13 +57,20 @@ public sealed class DocumentTools(
         CancellationToken ct = default) =>
         invoker.ReadAsync(async c =>
         {
+            var documentDateFrom = McpDates.ParseOptional(document_date_from, nameof(document_date_from));
+            var documentDateTo = McpDates.ParseOptional(document_date_to, nameof(document_date_to));
+            var expiryFrom = McpDates.ParseOptional(expiry_from, nameof(expiry_from));
+            var expiryTo = McpDates.ParseOptional(expiry_to, nameof(expiry_to));
+            McpDates.RequireOrdered(documentDateFrom, documentDateTo, nameof(document_date_from), nameof(document_date_to));
+            McpDates.RequireOrdered(expiryFrom, expiryTo, nameof(expiry_from), nameof(expiry_to));
+
             var request = new GetDocumentsQuery
             {
                 Search = query,
-                DocumentDateFrom = McpDates.ParseOptional(document_date_from, nameof(document_date_from)),
-                DocumentDateTo = McpDates.ParseOptional(document_date_to, nameof(document_date_to)),
-                ExpiryDateFrom = McpDates.ParseOptional(expiry_from, nameof(expiry_from)),
-                ExpiryDateTo = McpDates.ParseOptional(expiry_to, nameof(expiry_to)),
+                DocumentDateFrom = documentDateFrom,
+                DocumentDateTo = documentDateTo,
+                ExpiryDateFrom = expiryFrom,
+                ExpiryDateTo = expiryTo,
                 SortBy = ParseSortBy(sort_by),
                 SortDir = ParseSortDir(sort_dir),
                 HasTags = has_tags,

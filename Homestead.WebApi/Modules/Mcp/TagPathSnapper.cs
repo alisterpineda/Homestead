@@ -13,37 +13,21 @@ public sealed class TagPathSnapper(AppDbContext db)
 {
     private const int MaxNearest = 3;
 
-    // Normalised exactly as a write would (TagPathResolver; an empty path throws ArgumentException, which the
-    // invoker reports as invalid input), matched case-insensitively. An exact-casing match wins when two casings of
-    // one path exist. Known keeps input order without duplicates; Suggestions lists only unknowns with any nearest.
+    // Normalised exactly as a write would (TagPathResolver.NormalizePath; an empty path throws ArgumentException,
+    // which the invoker reports as invalid input), matched by CaseInsensitiveMatch: an exact-casing match wins when
+    // two casings of one path exist. Known keeps input order without duplicates; Suggestions lists only unknowns
+    // with any nearest.
     public async Task<TagPathSnapResult> SnapAsync(IEnumerable<string> paths, CancellationToken ct)
     {
-        var normalized = paths
-            .Select(p => TagPathResolver.NormalizeAndBuildCandidatePaths(p).CandidatePaths[^1])
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        var normalized = paths.Select(TagPathResolver.NormalizePath).ToList();
         if (normalized.Count == 0)
             return new TagPathSnapResult([], [], []);
 
-        var lowered = normalized.Select(p => p.ToLowerInvariant()).ToList();
         var matches = await db.Tags.AsNoTracking()
-            .Where(t => lowered.Contains(t.Path.ToLower()))
+            .WhereNameIn(t => t.Path, normalized)
             .ToListAsync(ct);
 
-        var known = new List<Tag>();
-        var unknown = new List<string>();
-        foreach (var path in normalized)
-        {
-            var tag = matches.FirstOrDefault(t => string.Equals(t.Path, path, StringComparison.Ordinal))
-                      ?? matches
-                          .Where(t => string.Equals(t.Path, path, StringComparison.OrdinalIgnoreCase))
-                          .OrderBy(t => t.Path, StringComparer.Ordinal)
-                          .FirstOrDefault();
-            if (tag is null)
-                unknown.Add(path);
-            else if (known.All(k => k.Id != tag.Id))
-                known.Add(tag);
-        }
+        var (known, unknown) = CaseInsensitiveMatch.Choose(normalized, matches, t => t.Id, t => t.Path);
 
         if (unknown.Count == 0)
             return new TagPathSnapResult(known, [], []);

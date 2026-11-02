@@ -1,4 +1,5 @@
 using Homestead.WebApi.Modules.Mcp;
+using Homestead.WebApi.Common;
 
 namespace Homestead.WebApi.Tests.Unit.Mcp;
 
@@ -17,7 +18,7 @@ public class McpConfigurationTests
     [Fact]
     public void NothingSet_IsAbsent()
     {
-        Assert.Equal(McpAvailability.Absent, McpConfiguration.Validate(new McpOptions(), isDevelopment: false));
+        Assert.Equal(FeatureAvailability.Absent, McpConfiguration.Validate(new McpOptions(), isDevelopment: false));
     }
 
     [Fact]
@@ -25,7 +26,7 @@ public class McpConfigurationTests
     {
         var options = new McpOptions { Authority = " ", Audience = "", MetadataAddress = "  ", PublicUrl = "\t" };
 
-        Assert.Equal(McpAvailability.Absent, McpConfiguration.Validate(options, isDevelopment: false));
+        Assert.Equal(FeatureAvailability.Absent, McpConfiguration.Validate(options, isDevelopment: false));
     }
 
     [Fact]
@@ -33,13 +34,13 @@ public class McpConfigurationTests
     {
         var options = new McpOptions { AdditionalScopes = ["groups"] };
 
-        Assert.Equal(McpAvailability.Absent, McpConfiguration.Validate(options, isDevelopment: false));
+        Assert.Equal(FeatureAvailability.Absent, McpConfiguration.Validate(options, isDevelopment: false));
     }
 
     [Fact]
     public void FullConfig_IsReady()
     {
-        Assert.Equal(McpAvailability.Ready, McpConfiguration.Validate(Valid(), isDevelopment: false));
+        Assert.Equal(FeatureAvailability.Ready, McpConfiguration.Validate(Valid(), isDevelopment: false));
     }
 
     [Theory]
@@ -53,7 +54,7 @@ public class McpConfigurationTests
 
         var availability = McpConfiguration.Validate(options, isDevelopment: false);
 
-        Assert.Equal(McpAvailability.Unavailable("Mcp:Authority must be an absolute URI."), availability);
+        Assert.Equal(FeatureAvailability.Unavailable("Mcp:Authority must be an absolute URI."), availability);
     }
 
     [Theory]
@@ -66,7 +67,7 @@ public class McpConfigurationTests
 
         var availability = McpConfiguration.Validate(options, isDevelopment: false);
 
-        Assert.Equal(McpAvailability.Unavailable("Mcp:Audience is required."), availability);
+        Assert.Equal(FeatureAvailability.Unavailable("Mcp:Audience is required."), availability);
     }
 
     [Fact]
@@ -78,7 +79,7 @@ public class McpConfigurationTests
         var availability = McpConfiguration.Validate(options, isDevelopment: false);
 
         Assert.Equal(
-            McpAvailability.Unavailable("Mcp:PublicUrl is required outside Development (the public URL of /mcp)."),
+            FeatureAvailability.Unavailable("Mcp:PublicUrl is required outside Development (the public URL of /mcp)."),
             availability);
     }
 
@@ -88,7 +89,7 @@ public class McpConfigurationTests
         var options = Valid();
         options.PublicUrl = null;
 
-        Assert.Equal(McpAvailability.Ready, McpConfiguration.Validate(options, isDevelopment: true));
+        Assert.Equal(FeatureAvailability.Ready, McpConfiguration.Validate(options, isDevelopment: true));
     }
 
     [Theory]
@@ -101,7 +102,7 @@ public class McpConfigurationTests
 
         var availability = McpConfiguration.Validate(options, isDevelopment);
 
-        Assert.Equal(McpAvailability.Unavailable("Mcp:PublicUrl must be an absolute URI."), availability);
+        Assert.Equal(FeatureAvailability.Unavailable("Mcp:PublicUrl must be an absolute URI."), availability);
     }
 
     [Fact]
@@ -112,7 +113,7 @@ public class McpConfigurationTests
 
         var availability = McpConfiguration.Validate(options, isDevelopment: false);
 
-        Assert.Equal(McpAvailability.Unavailable("Mcp:MetadataAddress must be an absolute URI."), availability);
+        Assert.Equal(FeatureAvailability.Unavailable("Mcp:MetadataAddress must be an absolute URI."), availability);
     }
 
     [Fact]
@@ -121,7 +122,7 @@ public class McpConfigurationTests
         var options = Valid();
         options.MetadataAddress = "https://auth.example.com/application/o/homestead-mcp/.well-known/openid-configuration";
 
-        Assert.Equal(McpAvailability.Ready, McpConfiguration.Validate(options, isDevelopment: false));
+        Assert.Equal(FeatureAvailability.Ready, McpConfiguration.Validate(options, isDevelopment: false));
     }
 
     [Fact]

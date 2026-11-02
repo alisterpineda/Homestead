@@ -3,7 +3,7 @@ using System.Numerics;
 namespace Homestead.WebApi.Infrastructure.Ai;
 
 // The one "Ai" config section: the Claude API key and model, the effort every request carries, the refusal
-// fallback switch, and the consumer-side input knobs. Validated by AiConfiguration into an AiAvailability (no
+// fallback switch, and the consumer-side input knobs. Validated by AiConfiguration into a FeatureAvailability (no
 // ValidateOnStart — see there); the knobs are resolved once into AiInputSettings.
 public class AiOptions
 {

@@ -1,4 +1,8 @@
+using System.Collections.Immutable;
 using System.Text.RegularExpressions;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Homestead.WebApi.Tests.Unit.Mcp;
 
@@ -123,6 +127,16 @@ public partial class McpConventionTests
     }
 
     [Fact]
+    public void ToolScan_ScansEveryToolType()
+    {
+        // Guards the guard: a [McpServerToolType] the syntax scan skips (a record, a struct) would escape every write
+        // rule. The regex type list and the scanned types must name the same types in the same files.
+        Assert.Equal(
+            ToolTypes().Select(t => $"{t.Path}: {t.Name}").Order(),
+            ScanToolClasses().Select(c => $"{c.Path}: {c.Name}").Order());
+    }
+
+    [Fact]
     public void HandlerCalls_RunInsideTheInvokerFrameTheirKindRequires()
     {
         var offenders = FrameProblems(ScanToolClasses())
@@ -130,10 +144,11 @@ public partial class McpConventionTests
             .ToList();
 
         Assert.True(offenders.Count == 0,
-            "Handler calls in *Tools.cs run inside McpToolInvoker: Get* handlers under ReadAsync / ReadDocumentAsync / " +
-            "Write*Async, every other handler under Write*Async, document-id handlers under ReadDocumentAsync / " +
-            "WriteDocumentAsync (only the self-authorizing bulk and suggestion handlers may use plain WriteAsync), " +
-            "McpDocumentReads under ReadDocumentAsync / WriteDocumentAsync:\n" +
+            "Handler calls in *Tools.cs run inside the work delegate of an McpToolInvoker call: unscoped Get* " +
+            "handlers under any frame, other unscoped handlers under WriteAsync / WriteDocumentAsync; GetDocumentHandler " +
+            "and McpDocumentReads under ReadDocumentAsync / WriteDocumentAsync; every other document-id handler " +
+            "(PatchDocumentHandler, CreateCommentHandler, the suggestion handlers) under WriteDocumentAsync only; " +
+            "the self-authorizing bulk handlers under WriteAsync / WriteDocumentAsync:\n" +
             string.Join("\n", offenders));
     }
 
@@ -339,6 +354,158 @@ public partial class McpConventionTests
     }
 
     [Fact]
+    public void FrameRule_FlagsAHandlerCalledInsideAnInterpolatedStringHole_OutsideEveryFrame()
+    {
+        // A text scan that blanks string literals blanks the holes too; the call in the hole still runs.
+        const string source = """
+            [McpServerToolType]
+            public sealed class SampleTools(McpToolInvoker invoker, GetTagsHandler getTags)
+            {
+                [McpServerTool(Name = "describe", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
+                public async Task<string> Describe(CancellationToken ct = default) =>
+                    $"{(await getTags.HandleAsync(new(), ct)).TotalCount} tags";
+            }
+            """;
+
+        Assert.Equal(
+            ["Describe → GetTagsHandler: called outside the invoker; allowed frames: ReadAsync / ReadDocumentAsync / WriteAsync / WriteDocumentAsync"],
+            FrameFindings(source));
+    }
+
+    [Fact]
+    public void FrameRule_AcceptsAHandlerCalledInANestedLambdaInsideItsFrame()
+    {
+        const string source = """
+            [McpServerToolType]
+            public sealed class SampleTools(McpToolInvoker invoker, PatchDocumentHandler patchDocument)
+            {
+                [McpServerTool(Name = "patch", ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false),
+                 Authorize(Policy = AuthPolicies.RequireContributor)]
+                public Task<int> Patch(Guid document_id, CancellationToken ct = default) =>
+                    invoker.WriteDocumentAsync(document_id, async c =>
+                    {
+                        Func<Task> patch = async () => await patchDocument.HandleAsync(document_id, new(), c);
+                        await patch();
+                        return 1;
+                    }, ct);
+            }
+            """;
+
+        var calls = ToolSourceScanner.Scan(SampleToolsFile, source).SelectMany(c => c.HandlerCalls).ToList();
+
+        // Seen guards the guard: the call must be found in its frame, or the empty findings would prove nothing.
+        Assert.Equal(
+            ("PatchDocumentHandler@WriteDocumentAsync", 0),
+            (string.Join(", ", calls.Select(c => $"{c.Handler}@{c.Frame}")), FrameFindings(source).Count));
+    }
+
+    [Fact]
+    public void FrameRule_ScansARecordClassToolType()
+    {
+        const string source = """
+            [McpServerToolType]
+            public sealed record class SampleTools(McpToolInvoker invoker, PatchDocumentHandler patchDocument)
+            {
+                [McpServerTool(Name = "patch", ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false),
+                 Authorize(Policy = AuthPolicies.RequireContributor)]
+                public async Task<int> Patch(Guid document_id, CancellationToken ct = default)
+                {
+                    await patchDocument.HandleAsync(document_id, new(), ct);
+                    return 1;
+                }
+            }
+            """;
+
+        Assert.Equal(
+            ["Patch → PatchDocumentHandler: called outside the invoker; allowed frames: WriteDocumentAsync"],
+            FrameFindings(source));
+    }
+
+    [Fact]
+    public void FrameRule_FlagsAHandlerCalledInTheInvokersIdArgument_AsOutsideTheInvoker()
+    {
+        // The id and ct arguments are evaluated before the frame authorizes; only the work delegate runs inside it.
+        const string source = """
+            [McpServerToolType]
+            public sealed class SampleTools(McpToolInvoker invoker, CreateCommentHandler createComment)
+            {
+                [McpServerTool(Name = "comment", ReadOnly = false, Destructive = false, Idempotent = false, OpenWorld = false),
+                 Authorize(Policy = AuthPolicies.RequireContributor)]
+                public async Task<int> Comment(CancellationToken ct = default) =>
+                    await invoker.WriteDocumentAsync((await createComment.HandleAsync(new(), ct)).DocumentId, c => Task.FromResult(1), ct);
+            }
+            """;
+
+        Assert.Equal(
+            ["Comment → CreateCommentHandler: called outside the invoker; allowed frames: WriteDocumentAsync"],
+            FrameFindings(source));
+    }
+
+    [Fact]
+    public void FrameRule_AcceptsAHelperPassedAsTheInvokersWorkMethodGroup()
+    {
+        const string source = """
+            [McpServerToolType]
+            public sealed class SampleTools(McpToolInvoker invoker, PatchDocumentHandler patchDocument)
+            {
+                [McpServerTool(Name = "patch", ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false),
+                 Authorize(Policy = AuthPolicies.RequireContributor)]
+                public Task<int> Patch(Guid document_id, CancellationToken ct = default) =>
+                    invoker.WriteDocumentAsync(document_id, PatchAsync, ct);
+
+                private async Task<int> PatchAsync(CancellationToken ct)
+                {
+                    await patchDocument.HandleAsync(Guid.Empty, new(), ct);
+                    return 1;
+                }
+            }
+            """;
+
+        var calls = ToolSourceScanner.Scan(SampleToolsFile, source).SelectMany(c => c.HandlerCalls).ToList();
+
+        Assert.Equal(
+            ("PatchDocumentHandler@WriteDocumentAsync", 0),
+            (string.Join(", ", calls.Select(c => $"{c.Handler}@{c.Frame}")), FrameFindings(source).Count));
+    }
+
+    // --- the attribute rules fed known sources ---
+
+    private const string AllHints = "ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false";
+
+    // The one tool method of an inline *Tools.cs source whose method carries these attribute lists.
+    private static ToolMethod ScanOneTool(string attributes) =>
+        Assert.Single(ToolSourceScanner.Scan(SampleToolsFile, $$"""
+            [McpServerToolType]
+            public sealed class SampleTools(McpToolInvoker invoker)
+            {
+                {{attributes}}
+                public Task<int> One(CancellationToken ct = default) => invoker.WriteAsync(c => Task.FromResult(1), ct);
+            }
+            """).SelectMany(c => c.Tools));
+
+    [Theory]
+    [InlineData($"[McpServerTool(Name = \"one\", {AllHints})]", false)]
+    [InlineData($"[McpServerTool(Name = \"one\", {AllHints})] [Authorize]", false)]
+    [InlineData($"[McpServerTool(Name = \"one\", {AllHints}), Authorize(Policy = AuthPolicies.RequireContributor)]", true)]
+    [InlineData($"[McpServerTool(Name = \"one\", {AllHints})]\n[Authorize(Policy = AuthPolicies.RequireContributor)]", true)]
+    public void AttributeScan_SeesAnAuthorizePolicy_OnlyWhenOneIsNamed(string attributes, bool hasPolicy)
+    {
+        var tool = ScanOneTool(attributes);
+
+        Assert.Equal((ReadOnly: (bool?)false, HasAuthorizePolicy: hasPolicy), (tool.ReadOnly, tool.HasAuthorizePolicy));
+    }
+
+    [Fact]
+    public void AttributeScan_ReportsAnOmittedHint()
+    {
+        var tool = ScanOneTool(
+            "[McpServerTool(Name = \"one\", ReadOnly = false, Destructive = true, Idempotent = true)," +
+            " Authorize(Policy = AuthPolicies.RequireContributor)]");
+
+        Assert.Equal(["OpenWorld"], tool.MissingHints);
+    }
+
+    [Fact]
     public void ToolSources_NeverTouchTheUnitOfWork_TheAuditPipeline_OrValidators()
     {
         string[] forbidden = ["IUnitOfWork", "IAuditContext", "IAuditLogger", "IValidator<", "SaveChanges"];
@@ -419,8 +586,9 @@ public partial class McpConventionTests
         private static readonly HashSet<string> Unscoped =
             ["GetDocumentsHandler", "GetTagsHandler", "GetPartiesHandler", "CreateTagHandler", "CreatePartyHandler"];
 
-        // The only handlers that authorize every document they touch themselves (EnsureAllDocumentsWritableAsync),
-        // so plain WriteAsync is enough.
+        // The only handlers that authorize every document they touch themselves, all-or-nothing and before any write
+        // (BulkUpdateDocumentsHandler with one EnsureAllDocumentsWritableAsync over the found ids,
+        // BulkDeleteDocumentsHandler with a Write check per found document), so plain WriteAsync is enough.
         private static readonly HashSet<string> SelfAuthorizing =
             ["BulkUpdateDocumentsHandler", "BulkDeleteDocumentsHandler"];
 
@@ -445,317 +613,211 @@ public partial class McpConventionTests
     private sealed record ToolMethod(
         string Method, bool? ReadOnly, IReadOnlyList<string> MissingHints, bool HasAuthorizePolicy);
 
-    // Frame = the innermost invoker method whose argument list contains the call; null = outside every frame.
+    // Frame = the innermost invoker method whose work delegate (a lambda, anonymous method or method group argument)
+    // contains the call; null = outside every frame, including a call in the invoker's id or ct argument.
     private sealed record HandlerCall(string Path, int Line, string Member, string Handler, string? Frame);
 
     private sealed record ToolClass(
         string Path, string Name, IReadOnlyList<ToolMethod> Tools, IReadOnlyList<HandlerCall> HandlerCalls);
 
     /// <summary>
-    /// A pragmatic text scan, not a parser: comments and string/char literals are blanked (lengths kept), then
-    /// bracket depth splits the class body into members and finds each invoker call's argument-list extent.
-    /// Handler references are the constructor's <c>*Handler</c> and <c>McpDocumentReads</c> parameters and any
-    /// <c>*Handler</c> type token in the body.
+    /// A syntax-only Roslyn scan (no compilation, no semantic model): <c>[McpServerToolType]</c> types (class, record,
+    /// struct), their <c>[McpServerTool]</c> methods' hint arguments and <c>[Authorize(Policy = …)]</c>, and every
+    /// handler reference in the type's body — a use of a primary-constructor parameter typed <c>*Handler</c> or <c>McpDocumentReads</c>,
+    /// or a <c>*Handler</c> name used as a type — with the frames it runs in: only an invoker call's delegate argument
+    /// is a frame, since its id and ct arguments are evaluated before it authorizes. Names are matched by text, so a
+    /// shadowing local or an aliased type is not told apart; comments and string contents are trivia or tokens, never
+    /// names, while an interpolated string's holes are ordinary expressions.
     /// </summary>
-    private static partial class ToolSourceScanner
+    private static class ToolSourceScanner
     {
+        private const string HandlerSuffix = "Handler";
         private static readonly string[] InvokerMethods = ["ReadAsync", "ReadDocumentAsync", "WriteAsync", "WriteDocumentAsync"];
         private static readonly string[] Hints = ["ReadOnly", "Destructive", "Idempotent", "OpenWorld"];
 
-        [GeneratedRegex(@"\[\s*McpServerToolType\s*\][^{;]*?\bclass\s+(?<name>\w+)")]
-        private static partial Regex ClassHeader();
+        private sealed record Scope(
+            TypeDeclarationSyntax Type, string? Invoker, IReadOnlyDictionary<string, string> HandlerParameters);
 
-        [GeneratedRegex(@"\bMcpServerTool(Attribute)?\b")]
-        private static partial Regex ToolAttribute();
+        public static IEnumerable<ToolClass> Scan(string path, string text) =>
+            CSharpSyntaxTree.ParseText(text).GetCompilationUnitRoot()
+                .DescendantNodes()
+                .OfType<TypeDeclarationSyntax>()
+                .Where(t => HasAttribute(t.AttributeLists, "McpServerToolType"))
+                .Select(t => ScanType(path, t))
+                .ToList();
 
-        [GeneratedRegex(@"\bAuthorize(Attribute)?\s*\(\s*Policy\s*=")]
-        private static partial Regex AuthorizePolicy();
-
-        [GeneratedRegex(@"\b(?<name>\w+Handler)\b")]
-        private static partial Regex HandlerTypeToken();
-
-        [GeneratedRegex(@"\b(?<name>[A-Za-z_]\w*)\s*(<[^(){};]*>)?\s*\(")]
-        private static partial Regex MethodNameBeforeParen();
-
-        private sealed record Member(string? Name, int Start, int End, string Attributes, bool IsTool);
-
-        private sealed record Frame(string Kind, int Start, int End);
-
-        public static IEnumerable<ToolClass> Scan(string path, string raw)
+        private static ToolClass ScanType(string path, TypeDeclarationSyntax type)
         {
-            var text = Mask(raw);
+            var parameters = (type.ParameterList?.Parameters ?? [])
+                .Where(p => p.Type is not null)
+                .Select(p => (Type: SimpleTypeName(p.Type!), Name: p.Identifier.ValueText))
+                .ToList();
+            var scope = new Scope(
+                type,
+                parameters.FirstOrDefault(p => p.Type == "McpToolInvoker").Name,
+                parameters
+                    .Where(p => p.Type.EndsWith(HandlerSuffix, StringComparison.Ordinal) || p.Type == HandlerRules.DocumentReads)
+                    .ToDictionary(p => p.Name, p => p.Type));
 
-            foreach (Match header in ClassHeader().Matches(text))
+            var calls = new List<HandlerCall>();
+            foreach (var name in BodyNames(type))
             {
-                var i = header.Index + header.Length;
-                while (i < text.Length && text[i] is not ('(' or '{')) i++;
+                if (HandlerReferenced(name, scope) is not { } handler)
+                    continue;
 
-                var ctorParameters = "";
-                if (text[i] == '(')
-                {
-                    var close = MatchClose(text, i);
-                    ctorParameters = text[(i + 1)..close];
-                    i = close;
-                    while (text[i] != '{') i++;
-                }
-
-                var bodyStart = i;
-                var bodyEnd = MatchClose(text, bodyStart);
-                var parameters = ParseParameters(ctorParameters);
-                var handlerFields = parameters
-                    .Where(p => p.Type.EndsWith("Handler", StringComparison.Ordinal) || p.Type == HandlerRules.DocumentReads)
-                    .ToList();
-                var invokerName = parameters.FirstOrDefault(p => p.Type == "McpToolInvoker").Name;
-
-                var members = SplitMembers(text, bodyStart + 1, bodyEnd);
-                var frames = invokerName is null ? [] : FindFrames(text, bodyStart, bodyEnd, invokerName);
-
-                var references = new List<(int Pos, string Handler)>();
-                var body = text[bodyStart..bodyEnd];
-                foreach (var (type, name) in handlerFields)
-                    references.AddRange(Regex.Matches(body, $@"\b{Regex.Escape(name)}\b")
-                        .Select(m => (bodyStart + m.Index, type)));
-                references.AddRange(HandlerTypeToken().Matches(body)
-                    .Select(m => (bodyStart + m.Index, m.Groups["name"].Value)));
-
-                var calls = new List<HandlerCall>();
-                foreach (var (pos, handler) in references)
-                {
-                    var owner = members.FirstOrDefault(m => pos >= m.Start && pos < m.End);
-                    var line = raw[..pos].Count(c => c == '\n') + 1;
-                    foreach (var frame in ResolveFrames(pos, text, bodyStart, bodyEnd, members, frames, []))
-                        calls.Add(new HandlerCall(path, line, owner?.Name ?? "?", handler, frame));
-                }
-
-                var tools = members.Where(m => m.IsTool).Select(m => ReadToolAttributes(m)).ToList();
-                yield return new ToolClass(path, header.Groups["name"].Value, tools, calls);
+                var member = OwningMember(name, type);
+                var line = name.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
+                var frames = ResolveFrames(name, scope, []);
+                // Empty only for a helper reachable solely through a cycle of helpers: no tool frames it, so outside.
+                foreach (var frame in frames.Count == 0 ? [null] : frames)
+                    calls.Add(new HandlerCall(path, line, MemberName(member), handler, frame));
             }
+
+            var tools = type.Members
+                .OfType<MethodDeclarationSyntax>()
+                .Where(IsTool)
+                .Select(ReadToolAttributes)
+                .ToList();
+
+            return new ToolClass(path, type.Identifier.ValueText, tools, calls);
         }
 
-        // The frames a reference at pos runs in: its innermost enclosing invoker call, or — inside a non-tool helper
-        // with no frame of its own — the frames of each of the helper's call sites. Null = outside every frame.
-        private static List<string?> ResolveFrames(
-            int pos, string text, int bodyStart, int bodyEnd, List<Member> members, List<Frame> frames,
-            HashSet<string> visited)
+        // The handler a name refers to: a handler parameter used by name (invoked, passed on, captured), or a
+        // *Handler name in a type position (new, typeof, generic argument, static access, local declaration).
+        private static string? HandlerReferenced(SimpleNameSyntax name, Scope scope)
         {
-            var frame = frames.Where(f => pos > f.Start && pos < f.End).MinBy(f => f.End - f.Start);
-            if (frame is not null)
-                return [frame.Kind];
+            if (IsMemberName(name))
+                return null;
 
-            var owner = members.FirstOrDefault(m => pos >= m.Start && pos < m.End);
-            if (owner is null || owner.IsTool || owner.Name is null)
+            var text = name.Identifier.ValueText;
+            if (name is IdentifierNameSyntax && scope.HandlerParameters.TryGetValue(text, out var type))
+                return type;
+
+            var invoked = name.Parent is InvocationExpressionSyntax invocation && invocation.Expression == name;
+            return !invoked && text.Length > HandlerSuffix.Length && text.EndsWith(HandlerSuffix, StringComparison.Ordinal)
+                ? text
+                : null;
+        }
+
+        // The frames a node runs in: the innermost invoker call whose delegate argument contains it, or — inside a
+        // non-tool method with no frame of its own — the frames of each of that helper's call sites. Null = outside
+        // every frame. visited holds the helpers on the current path (the cycle guard).
+        private static List<string?> ResolveFrames(SyntaxNode node, Scope scope, ImmutableHashSet<string> visited)
+        {
+            var frame = node.AncestorsAndSelf()
+                .OfType<ArgumentSyntax>()
+                .Where(IsDelegate)
+                .Select(argument => FrameKind(argument.Parent?.Parent, scope))
+                .FirstOrDefault(kind => kind is not null);
+            if (frame is not null)
+                return [frame];
+
+            if (OwningMember(node, scope.Type) is not MethodDeclarationSyntax helper || IsTool(helper))
                 return [null];
-            if (!visited.Add(owner.Name))
+
+            var name = helper.Identifier.ValueText;
+            if (visited.Contains(name))
                 return [];
 
-            var callSites = Regex.Matches(text[bodyStart..bodyEnd], $@"\b{Regex.Escape(owner.Name)}\s*(<[^(){{}};]*>)?\s*\(")
-                .Select(m => bodyStart + m.Index)
-                .Where(p => p < owner.Start || p >= owner.End)
+            var callSites = BodyNames(scope.Type)
+                .Where(n => n.Identifier.ValueText == name
+                            && !helper.Span.Contains(n.Span)
+                            && (!IsMemberName(n) || n.Parent is MemberAccessExpressionSyntax { Expression: ThisExpressionSyntax }))
                 .ToList();
             if (callSites.Count == 0)
                 return [null];
 
-            return callSites
-                .SelectMany(p => ResolveFrames(p, text, bodyStart, bodyEnd, members, frames, visited))
-                .ToList();
+            return callSites.SelectMany(site => ResolveFrames(site, scope, visited.Add(name))).ToList();
         }
 
-        private static ToolMethod ReadToolAttributes(Member member)
+        // The work argument's shapes: a lambda or anonymous method (whatever it calls runs inside the frame), or a
+        // method group (Helper, this.Helper, field.Method — a name, not invoked). An id or ct argument of that same
+        // shape (document_id, input.Id) also counts, as syntax cannot tell a method group from a property; one that
+        // computes anything ((await x).Id, Parse(s)) does not.
+        private static bool IsDelegate(ArgumentSyntax argument) => argument.Expression
+            is AnonymousFunctionExpressionSyntax
+            or SimpleNameSyntax
+            or MemberAccessExpressionSyntax { Expression: IdentifierNameSyntax or ThisExpressionSyntax, Name: SimpleNameSyntax };
+
+        // invoker.ReadAsync(…) / invoker.WriteDocumentAsync<T>(…) and so on → the method name; anything else → null.
+        private static string? FrameKind(SyntaxNode? node, Scope scope) =>
+            scope.Invoker is not null
+            && node is InvocationExpressionSyntax
+            {
+                Expression: MemberAccessExpressionSyntax { Expression: IdentifierNameSyntax target, Name: var method },
+            }
+            && target.Identifier.ValueText == scope.Invoker
+            && InvokerMethods.Contains(method.Identifier.ValueText)
+                ? method.Identifier.ValueText
+                : null;
+
+        private static ToolMethod ReadToolAttributes(MethodDeclarationSyntax method)
         {
-            var attribute = ToolAttribute().Match(member.Attributes);
-            var i = attribute.Index + attribute.Length;
-            while (i < member.Attributes.Length && char.IsWhiteSpace(member.Attributes[i])) i++;
-            var arguments = i < member.Attributes.Length && member.Attributes[i] == '('
-                ? member.Attributes[(i + 1)..MatchClose(member.Attributes, i)]
-                : "";
+            var attributes = method.AttributeLists.SelectMany(l => l.Attributes).ToList();
+            var arguments = attributes.First(a => IsNamed(a, "McpServerTool")).ArgumentList?.Arguments ?? [];
 
             var values = Hints.ToDictionary(
                 h => h,
-                h => Regex.Match(arguments, $@"\b{h}\s*=\s*(?<value>true|false)\b") is { Success: true } m
-                    ? m.Groups["value"].Value == "true"
-                    : (bool?)null);
+                h => arguments.FirstOrDefault(a => a.NameEquals?.Name.Identifier.ValueText == h)?.Expression.Kind() switch
+                {
+                    SyntaxKind.TrueLiteralExpression => true,
+                    SyntaxKind.FalseLiteralExpression => false,
+                    _ => (bool?)null,
+                });
+
+            var hasPolicy = attributes.Any(a =>
+                IsNamed(a, "Authorize")
+                && (a.ArgumentList?.Arguments ?? []).Any(x => x.NameEquals?.Name.Identifier.ValueText == "Policy"));
 
             return new ToolMethod(
-                member.Name ?? "?",
+                method.Identifier.ValueText,
                 values["ReadOnly"],
                 Hints.Where(h => values[h] is null).ToList(),
-                AuthorizePolicy().IsMatch(member.Attributes));
+                hasPolicy);
         }
 
-        private static List<Frame> FindFrames(string text, int start, int end, string invokerName)
+        // Every simple name in the type's members, attributes excluded (a nameof in a [Description] runs nothing).
+        private static IEnumerable<SimpleNameSyntax> BodyNames(TypeDeclarationSyntax type) =>
+            type.Members.SelectMany(m => m
+                .DescendantNodes(n => n is not AttributeListSyntax)
+                .OfType<SimpleNameSyntax>());
+
+        // x.Name — the member being accessed, not a reference to a parameter or type of that name.
+        private static bool IsMemberName(SimpleNameSyntax name) =>
+            name.Parent is MemberAccessExpressionSyntax access && access.Name == name;
+
+        private static MemberDeclarationSyntax? OwningMember(SyntaxNode node, TypeDeclarationSyntax type) =>
+            node.AncestorsAndSelf().OfType<MemberDeclarationSyntax>().FirstOrDefault(m => m.Parent == type);
+
+        private static string MemberName(MemberDeclarationSyntax? member) => member switch
         {
-            var pattern = $@"\b{Regex.Escape(invokerName)}\s*\.\s*(?<kind>{string.Join("|", InvokerMethods)})\b\s*(<[^(){{}};]*>)?\s*\(";
-            return Regex.Matches(text[start..end], pattern)
-                .Select(m =>
-                {
-                    var open = start + m.Index + m.Length - 1;
-                    return new Frame(m.Groups["kind"].Value, open, MatchClose(text, open));
-                })
-                .ToList();
-        }
+            MethodDeclarationSyntax m => m.Identifier.ValueText,
+            PropertyDeclarationSyntax p => p.Identifier.ValueText,
+            ConstructorDeclarationSyntax c => c.Identifier.ValueText,
+            BaseFieldDeclarationSyntax f => string.Join(", ", f.Declaration.Variables.Select(v => v.Identifier.ValueText)),
+            _ => "?",
+        };
 
-        // A member ends at a ';' or a closing '}' at depth zero (so an expression body's lambda braces, nested
-        // inside the invoker call's parentheses, never end it).
-        private static List<Member> SplitMembers(string text, int start, int end)
+        private static bool IsTool(MethodDeclarationSyntax method) => HasAttribute(method.AttributeLists, "McpServerTool");
+
+        private static bool HasAttribute(SyntaxList<AttributeListSyntax> lists, string name) =>
+            lists.SelectMany(l => l.Attributes).Any(a => IsNamed(a, name));
+
+        // [Name], [NameAttribute], [Ns.Name] — the last identifier, with or without the Attribute suffix.
+        private static bool IsNamed(AttributeSyntax attribute, string name)
         {
-            var members = new List<Member>();
-            int paren = 0, brace = 0, bracket = 0, memberStart = start;
-
-            for (var i = start; i < end; i++)
-            {
-                switch (text[i])
-                {
-                    case '(': paren++; break;
-                    case ')': paren--; break;
-                    case '[': bracket++; break;
-                    case ']': bracket--; break;
-                    case '{': brace++; break;
-                    case '}':
-                        brace--;
-                        if (brace == 0 && paren == 0 && bracket == 0) Close(i + 1);
-                        break;
-                    case ';':
-                        if (brace == 0 && paren == 0 && bracket == 0) Close(i + 1);
-                        break;
-                }
-            }
-
-            return members;
-
-            void Close(int memberEnd)
-            {
-                var segment = text[memberStart..memberEnd];
-                var j = 0;
-                while (j < segment.Length && char.IsWhiteSpace(segment[j])) j++;
-
-                var attributes = new List<string>();
-                while (j < segment.Length && segment[j] == '[')
-                {
-                    var close = MatchClose(segment, j);
-                    attributes.Add(segment[(j + 1)..close]);
-                    j = close + 1;
-                    while (j < segment.Length && char.IsWhiteSpace(segment[j])) j++;
-                }
-
-                if (j < segment.Length)
-                {
-                    var signature = segment[j..];
-                    var name = MethodNameBeforeParen().Match(signature) is { Success: true } m
-                               && !signature[..m.Index].Contains('=')
-                        ? m.Groups["name"].Value
-                        : null;
-                    var attributeText = string.Join("\n", attributes);
-                    members.Add(new Member(name, memberStart, memberEnd, attributeText, ToolAttribute().IsMatch(attributeText)));
-                }
-
-                memberStart = memberEnd;
-            }
+            var text = SimpleTypeName(attribute.Name);
+            return text == name || text == name + "Attribute";
         }
 
-        private static List<(string Type, string Name)> ParseParameters(string parameters)
+        // Ns.Type<T>? → Type.
+        private static string SimpleTypeName(TypeSyntax type) => type switch
         {
-            var result = new List<(string, string)>();
-            int depth = 0, start = 0;
-            for (var i = 0; i <= parameters.Length; i++)
-            {
-                if (i < parameters.Length)
-                {
-                    var c = parameters[i];
-                    if (c is '(' or '<' or '[') depth++;
-                    else if (c is ')' or '>' or ']') depth--;
-                    if (c != ',' || depth != 0) continue;
-                }
-
-                var parameter = Regex.Replace(parameters[start..i], @"\[[^\]]*\]", "").Split('=')[0].Trim();
-                if (Regex.Match(parameter, @"^(?<type>.+?)\s+@?(?<name>\w+)$", RegexOptions.Singleline) is { Success: true } m)
-                {
-                    var type = Regex.Replace(m.Groups["type"].Value, @"<.*>|\?", "").Trim();
-                    result.Add((type[(type.LastIndexOf('.') + 1)..], m.Groups["name"].Value));
-                }
-                start = i + 1;
-            }
-            return result;
-        }
-
-        // The index of the bracket closing the one at open ('(', '[' or '{'), counting only that bracket kind.
-        private static int MatchClose(string text, int open)
-        {
-            var (opener, closer) = text[open] switch
-            {
-                '(' => ('(', ')'),
-                '[' => ('[', ']'),
-                '{' => ('{', '}'),
-                _ => throw new ArgumentException($"No bracket at {open}."),
-            };
-
-            var depth = 0;
-            for (var i = open; i < text.Length; i++)
-            {
-                if (text[i] == opener) depth++;
-                else if (text[i] == closer && --depth == 0) return i;
-            }
-            throw new InvalidOperationException($"Unbalanced '{opener}' at {open}.");
-        }
-
-        // Comments and string/char literal contents become spaces (newlines kept), so brackets, handler names and
-        // hint text inside them are invisible to the scan and every index still points into the raw source.
-        private static string Mask(string source)
-        {
-            var s = source.ToCharArray();
-            var i = 0;
-            while (i < s.Length)
-            {
-                if (s[i] == '/' && At(i + 1) == '/')
-                {
-                    while (i < s.Length && s[i] != '\n') Blank(i++);
-                }
-                else if (s[i] == '/' && At(i + 1) == '*')
-                {
-                    Blank(i++); Blank(i++);
-                    while (i < s.Length && !(s[i] == '*' && At(i + 1) == '/')) Blank(i++);
-                    if (i < s.Length) { Blank(i++); Blank(i++); }
-                }
-                else if (s[i] == '"' && At(i + 1) == '"' && At(i + 2) == '"')
-                {
-                    var quotes = 0;
-                    while (At(i) == '"') { quotes++; i++; }
-                    while (i < s.Length)
-                    {
-                        var run = 0;
-                        while (At(i + run) == '"') run++;
-                        if (run >= quotes) { i += run; break; }
-                        Blank(i++);
-                    }
-                }
-                else if (s[i] == '"')
-                {
-                    var verbatim = i > 0 && (s[i - 1] == '@' || (s[i - 1] == '$' && i > 1 && s[i - 2] == '@'));
-                    i++;
-                    while (i < s.Length)
-                    {
-                        if (verbatim && s[i] == '"' && At(i + 1) == '"') { Blank(i++); Blank(i++); continue; }
-                        if (!verbatim && s[i] == '\\') { Blank(i++); if (i < s.Length) Blank(i++); continue; }
-                        if (s[i] == '"') { i++; break; }
-                        Blank(i++);
-                    }
-                }
-                else if (s[i] == '\'')
-                {
-                    i++;
-                    if (At(i) == '\\') { Blank(i++); if (i < s.Length) Blank(i++); }
-                    else if (i < s.Length) Blank(i++);
-                    while (i < s.Length && s[i] != '\'') Blank(i++);
-                    i++;
-                }
-                else
-                {
-                    i++;
-                }
-            }
-            return new string(s);
-
-            char At(int index) => index < s.Length ? s[index] : '\0';
-            void Blank(int index) { if (s[index] != '\n') s[index] = ' '; }
-        }
+            NullableTypeSyntax n => SimpleTypeName(n.ElementType),
+            QualifiedNameSyntax q => q.Right.Identifier.ValueText,
+            AliasQualifiedNameSyntax a => a.Name.Identifier.ValueText,
+            SimpleNameSyntax s => s.Identifier.ValueText,
+            _ => type.ToString(),
+        };
     }
 }

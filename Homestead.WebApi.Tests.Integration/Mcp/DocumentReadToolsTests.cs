@@ -236,7 +236,7 @@ public partial class DocumentReadToolsTests(PostgresFixture fixture) : Integrati
         Assert.Equal(expected, error);
     }
 
-    // GetDocumentsHandler's own range check (a BusinessRuleException), relayed as its message.
+    // Checked by the tool in wire names, as invalid input — not GetDocumentsHandler's own (C# property names) check.
     [Fact]
     public async Task Search_DocumentDateFromAfterTo_IsAnError()
     {
@@ -247,7 +247,20 @@ public partial class DocumentReadToolsTests(PostgresFixture fixture) : Integrati
             ["document_date_from"] = "2024-12-31", ["document_date_to"] = "2024-01-01",
         }, CT);
 
-        Assert.Equal("DocumentDateFrom must be on or before DocumentDateTo.", error);
+        Assert.Equal("Invalid input: document_date_from must be on or before document_date_to.", error);
+    }
+
+    [Fact]
+    public async Task Search_ExpiryFromAfterTo_IsAnError()
+    {
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        var error = await McpToolResults.CallForErrorAsync(client, "search_documents", new Dictionary<string, object?>
+        {
+            ["expiry_from"] = "2025-06-30", ["expiry_to"] = "2025-06-01",
+        }, CT);
+
+        Assert.Equal("Invalid input: expiry_from must be on or before expiry_to.", error);
     }
 
     [Fact]
