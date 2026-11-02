@@ -2,7 +2,8 @@ namespace Homestead.WebApi.Modules.Mcp;
 
 // What the document tools put on the wire. Flat records; McpServiceExtensions serializes them snake_case with nulls
 // omitted. Dates are yyyy-MM-dd (DateOnly), timestamps UTC ISO 8601 strings, and document ids are the only GUIDs:
-// tags travel by path, parties by name, suggestions by their own id.
+// tags travel by path, parties by name, suggestions by their own id. Text derived from the file's content (snippet,
+// summary, extracted text) carries the untrusted_ prefix.
 
 public sealed record SearchDocumentsResult(
     IReadOnlyList<SearchDocumentsItemResult> Items,
@@ -23,8 +24,8 @@ public sealed record SearchDocumentsItemResult(
     bool PendingReview,
     IReadOnlyList<string> Tags,
     IReadOnlyList<string> Parties,
-    string? Snippet,
-    string? Summary);
+    string? UntrustedSnippet,
+    string? UntrustedSummary);
 
 public sealed record GetDocumentResult(
     Guid Id,
@@ -32,7 +33,7 @@ public sealed record GetDocumentResult(
     DateOnly? DocumentDate,
     DateOnly? ExpiryDate,
     string Notes,
-    string? Summary,
+    string? UntrustedSummary,
     string FileExtension,
     long FileSize,
     int VersionCount,

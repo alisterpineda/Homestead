@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Domain.Identity;
 using Homestead.WebApi.Persistence;
@@ -29,6 +30,28 @@ public class DocumentReadToolsTests(PostgresFixture fixture) : IntegrationTestBa
         var result = await SearchAsync(client, new() { ["query"] = "zephyrine" });
 
         Assert.Equal(["Glacier letter.pdf"], result.Items.Select(i => i.Name));
+    }
+
+    // Snippet and summary are derived from the file's content, so they travel under the untrusted_ label too. Asserted
+    // on the raw JSON: the key is the contract the model reads.
+    [Fact]
+    public async Task Search_WithSummary_LabelsSnippetAndSummaryAsUntrusted()
+    {
+        var admin = await CreateAdminClientAsync();
+        await SeedDocumentAsync(admin, "Glacier letter.pdf",
+            extractedText: "Notice about the zephyrine meter reading.", summary: "A meter reading notice.");
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        // CallAsync<JsonElement> keeps the wire names: the key is the contract the model reads.
+        var json = await McpToolResults.CallAsync<JsonElement>(client, "search_documents",
+            new Dictionary<string, object?> { ["query"] = "zephyrine", ["include_summary"] = true }, CT);
+
+        var item = Assert.Single(json.GetProperty("items").EnumerateArray());
+        Assert.Equal(["untrusted_snippet", "untrusted_summary"], ContentKeys(item));
+        var snippet = item.GetProperty("untrusted_snippet").GetString();
+        Assert.Equal("A meter reading notice.", item.GetProperty("untrusted_summary").GetString());
+        Assert.Contains("zephyrine", snippet);
+        Assert.DoesNotContain("<mark>", snippet);
     }
 
     [Fact]
@@ -221,6 +244,20 @@ public class DocumentReadToolsTests(PostgresFixture fixture) : IntegrationTestBa
     }
 
     [Fact]
+    public async Task GetDocument_LabelsSummaryAsUntrusted()
+    {
+        var admin = await CreateAdminClientAsync();
+        var id = await SeedDocumentAsync(admin, "letter.pdf", summary: "A meter reading notice.");
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        var json = await McpToolResults.CallAsync<JsonElement>(client, "get_document",
+            new Dictionary<string, object?> { ["document_id"] = id }, CT);
+
+        Assert.Equal(["untrusted_summary"], ContentKeys(json));
+        Assert.Equal("A meter reading notice.", json.GetProperty("untrusted_summary").GetString());
+    }
+
+    [Fact]
     public async Task GetDocument_WithoutIncludeText_ReportsOnlyTheTextLength()
     {
         var admin = await CreateAdminClientAsync();
@@ -351,6 +388,12 @@ public class DocumentReadToolsTests(PostgresFixture fixture) : IntegrationTestBa
     // Lists compared inside a tuple must be values (xUnit compares arrays in a tuple by reference).
     private static string Csv<T>(IEnumerable<T> values) => string.Join(", ", values);
 
+    // Which of the file-derived snippet/summary keys, labelled or not, an object carries.
+    private static IReadOnlyList<string> ContentKeys(JsonElement element) =>
+        element.EnumerateObject().Select(p => p.Name)
+            .Where(n => n is "snippet" or "summary" or "untrusted_snippet" or "untrusted_summary")
+            .Order(StringComparer.Ordinal).ToList();
+
     private static IReadOnlyList<string> Names(SearchDocumentsPayload result) =>
         result.Items.Select(i => i.Name).Order(StringComparer.Ordinal).ToList();
 
@@ -365,7 +408,8 @@ public class DocumentReadToolsTests(PostgresFixture fixture) : IntegrationTestBa
         DateOnly? expiryDate = null,
         bool pendingNameSuggestion = false,
         Guid? groupId = null,
-        string? extractedText = null)
+        string? extractedText = null,
+        string? summary = null)
     {
         var id = await UploadAndWaitAsync(admin, name, groupId);
 
@@ -390,6 +434,8 @@ public class DocumentReadToolsTests(PostgresFixture fixture) : IntegrationTestBa
         var document = await db.Documents.FirstAsync(d => d.Id == id, CT);
         document.DocumentDate = documentDate;
         document.ExpiryDate = expiryDate;
+        if (summary is not null)
+            document.Summary = summary;
         await db.SaveChangesAsync(CT);
 
         if (pendingNameSuggestion)

@@ -58,11 +58,13 @@ internal sealed record SearchItemPayload(
     bool PendingReview,
     IReadOnlyList<string> Tags,
     IReadOnlyList<string> Parties,
-    string? Snippet);
+    string? UntrustedSnippet,
+    string? UntrustedSummary);
 
 internal sealed record GetDocumentPayload(
     Guid Id,
     string Name,
+    string? UntrustedSummary,
     IReadOnlyList<PendingSuggestionPayload> PendingSuggestions,
     string? UntrustedDocumentText,
     int TextTotalChars,
