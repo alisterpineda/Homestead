@@ -7,8 +7,7 @@ public static class DocumentTitleStyle
 {
     public const string Form = "\"Issuer Type - Detail - Period\", in Title Case, ideally 60 characters or fewer";
 
-    // The examples deliberately name no eval fixture's issuer or subject (Homestead.WebApi.Tests.Eval/Fixtures), so
-    // the eval can't score the prompt's own answers.
+    // The examples are deliberately generic so a real document is never titled by echoing the prompt.
     public const string Examples =
         "\"Midas Invoice - Honda Civic Brake Repair\", \"Hydro One Bill - March 2025\", " +
         "\"Acme Pay Stub - Jane Doe - March 2025\", \"TD Joint Chequing Statement - March 2025\", " +

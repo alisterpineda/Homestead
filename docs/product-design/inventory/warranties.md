@@ -117,7 +117,7 @@ Deleting a single warranty is a real delete (no trash, no undo), consistent with
 
 ## Audit
 
-Every warranty create / update / delete is written to the audit log under its **own entity type, `ItemWarranty`**, with `ParentEntityId = ItemId`. Unlike notes, these rows **are projected into the item's activity feed**: "Alister added a warranty", "Alister updated a warranty (expiry)", "Alister removed a warranty (Bosch · until 2028-03-12)".
+Every warranty create / update / delete is written to the audit log under its **own entity type, `ItemWarranty`**, with `ParentEntityId = ItemId`. Unlike notes, these rows **are projected into the item's activity feed**: "Alex added a warranty", "Alex updated a warranty (expiry)", "Alex removed a warranty (Bosch · until 2028-03-12)".
 
 The two rules sit next to each other on purpose, and the split follows Documents' precedent exactly ([activity.md § Auditing notes](activity.md#auditing-notes)). `DocumentComment` is audited under its own type and *not* projected — an "edited a comment" row beside the comment itself is noise, and the comment is already visible. `DocumentVersion` *is* projected, because a new version is a change to the document. A warranty is the `DocumentVersion` case: it is structured data about the item, its rows live in a different section of the page than the feed, and when one is deleted the feed's line is the **only** remaining trace — which is precisely why the delete row carries a description of what was removed. A note, by contrast, is the `DocumentComment` case: it shows in the feed in its current state, or not at all.
 

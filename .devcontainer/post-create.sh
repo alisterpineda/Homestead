@@ -5,7 +5,7 @@ sudo apt-get update && sudo apt-get install -y tmux tesseract-ocr
 
 cp .devcontainer/tmux.conf "$HOME/.tmux.conf"
 
-# Local tools (dotnet-ef, aieval) are not restored implicitly by build/test.
+# Local tools (dotnet-ef) are not restored implicitly by build/test.
 dotnet tool restore
 
 (cd Homestead.WebApp && npm install)

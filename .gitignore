@@ -42,6 +42,3 @@ __pycache__/
 # playwright-cli output — snapshots, screenshots, saved login state (Claude Code self-QA)
 .playwright-cli/
 
-# AI eval harness: disk cache (under-test + judge responses), results store, and generated report
-**/.eval-reports/
-**/report.html

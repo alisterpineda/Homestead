@@ -46,7 +46,6 @@
 
     <ItemGroup>
       <InternalsVisibleTo Include="Homestead.WebApi.Tests.Unit" />
-      <InternalsVisibleTo Include="Homestead.WebApi.Tests.Eval" />
     </ItemGroup>
 
 </Project>

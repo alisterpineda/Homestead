@@ -8,13 +8,6 @@
         "dotnet-ef"
       ],
       "rollForward": false
-    },
-    "microsoft.extensions.ai.evaluation.console": {
-      "version": "10.7.0",
-      "commands": [
-        "aieval"
-      ],
-      "rollForward": false
     }
   }
 }

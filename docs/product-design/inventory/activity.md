@@ -12,7 +12,7 @@ This is deliberately **not** a maintenance scheduler. Notes record what *was* do
 
 Each item has exactly one **activity feed**. It is a read-time merge of two sources:
 
-- **Audit entries** — system-generated, one per field-level mutation of the item, projected from the shared `auditing.audit_logs` table into a human-readable summary ("Alister updated location"). These already back the durable detail page's History section; nothing is double-written.
+- **Audit entries** — system-generated, one per field-level mutation of the item, projected from the shared `auditing.audit_logs` table into a human-readable summary ("Alex updated location"). These already back the durable detail page's History section; nothing is double-written.
 - **Notes** — user-authored, dated entries stored in their own table (`inventory.item_notes`), keyed by `Item.Id`.
 
 The two are interleaved in one chronological list, as Documents interleaves audit entries and comments. There is one source of truth for "what changed" (the audit log) and one for "what the household said about it" (notes); the feed is the projection of both.
@@ -62,7 +62,7 @@ Two consequences are surfaced rather than hidden:
 
 ### Auditing notes
 
-Every note create / update / delete is written to the audit log via `IAuditLogger` under **its own entity type, `InventoryNote`**, with `ParentEntityId = ItemId`. The precedent is `DocumentComment`, which Documents audits under its own type with the document as parent and does *not* project into the document feed (Documents *does* project `DocumentVersion` rows through `ParentEntityId` — that is the deliberate counter-example, because a version change is a change to the document). Note audit rows are **not** projected into the item's feed: "Alister edited a note" beside the note itself is noise, and a "deleted a note" ghost would contradict delete-is-destructive. The feed shows the note in its current state, or not at all.
+Every note create / update / delete is written to the audit log via `IAuditLogger` under **its own entity type, `InventoryNote`**, with `ParentEntityId = ItemId`. The precedent is `DocumentComment`, which Documents audits under its own type with the document as parent and does *not* project into the document feed (Documents *does* project `DocumentVersion` rows through `ParentEntityId` — that is the deliberate counter-example, because a version change is a change to the document). Note audit rows are **not** projected into the item's feed: "Alex edited a note" beside the note itself is noise, and a "deleted a note" ghost would contradict delete-is-destructive. The feed shows the note in its current state, or not at all.
 
 Inventory's own counter-example is **`ItemWarranty`** (see [warranties.md](warranties.md#audit)), audited under its own type with the item as parent exactly as notes are — and *projected* into this feed ("added a warranty", "updated a warranty (expiry)", "removed a warranty (Bosch · until 2028-03-12)"). The two sibling rules sit here together because the split is the same one Documents draws: a warranty is the `DocumentVersion` case — structured data about the item, living in a different section of the page, whose delete row is the only trace left behind — while a note is the `DocumentComment` case, visible in the feed itself or nowhere.
 
@@ -118,7 +118,7 @@ Both detail pages are single-column with no tablet/desktop branch, so the rules 
 
 ### Status coupling
 
-A status change writes **one** audit row and nothing else — no note is auto-created. That row is not rendered as a bare "updated status" either: the summary reads the transition *and* the `StatusNote` off the same row and prints a sentence — "Alister lent this item to Dave", "Alister marked this item returned", "Alister archived this item (Sold to Sam)", "Alister restored this item". A note-only edit (fixing the borrower's name) falls through to the generic path and reads "Alister updated status note", and rows written before the enum collapsed still render sensibly ("Alister changed status to Sold").
+A status change writes **one** audit row and nothing else — no note is auto-created. That row is not rendered as a bare "updated status" either: the summary reads the transition *and* the `StatusNote` off the same row and prints a sentence — "Alex lent this item to Dave", "Alex marked this item returned", "Alex archived this item (Sold to Sam)", "Alex restored this item". A note-only edit (fixing the borrower's name) falls through to the generic path and reads "Alex updated status note", and rows written before the enum collapsed still render sensibly ("Alex changed status to Sold").
 
 This is why the status note is a *field*, not a note: the feed already tells the story from the audit row, so a second write would duplicate it. Nothing hands off from a status gesture to the composer.
 

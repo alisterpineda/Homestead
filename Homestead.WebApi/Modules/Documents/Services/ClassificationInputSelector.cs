@@ -7,8 +7,8 @@ namespace Homestead.WebApi.Modules.Documents.Services;
 // itself), the OCR text plus a page-1 render, or the OCR text alone.
 public enum ClassificationInputMode { Text, TextAndImage, Pdf }
 
-// The one place that decides a classify call's input mode — production (DocumentClassifier) and the eval harness
-// both call it, so the eval scores the input production would actually send. Pure apart from ReadPdfFacts.
+// The one place that decides a classify call's input mode, so every caller sends the input production would
+// actually send. Pure apart from ReadPdfFacts.
 public static class ClassificationInputSelector
 {
     public const string PdfContentType = "application/pdf";

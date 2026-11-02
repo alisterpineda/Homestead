@@ -64,7 +64,7 @@ while Active). A consumable is never Lent, so the kinds differ only there.
   input is `#lend-to` and the durable edit sheet's status-note field is `#durable-status-note`
   (both `maxlength=256`). The edit sheet's "Lent to is required…" message renders as a form-level
   error at the bottom of the sheet body, not beside the field.
-- The activity feed prints the transition, not "updated status": "Alister lent this item to Dave",
+- The activity feed prints the transition, not "updated status": "Alex lent this item to Dave",
   "…marked this item returned", "…archived this item (Sold to Sam)", "…restored this item". A
   note-only edit reads "updated status note". Nothing writes a second note row for a status change.
 

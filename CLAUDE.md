@@ -55,7 +55,6 @@ When backend endpoints are added or modified, regenerate the frontend API client
 | `Homestead.WebApi.Tests.Integration/` | xUnit v3 + WebApplicationFactory + Testcontainers (PostgreSQL) + Respawn | Backend integration tests (requires Docker) |
 | `Homestead.WebApp/` (ng test) | Angular unit-test builder (Vitest) | Frontend unit tests (`*.spec.ts` files) |
 | `Homestead.E2E/` | Playwright + Testcontainers | End-to-end tests — auth flows, business workflows, roles, accessibility and layout, on desktop Chrome + Android Chrome + iPhone WebKit (requires Docker). Conventions in its [CLAUDE.md](Homestead.E2E/CLAUDE.md) |
-| `Homestead.WebApi.Tests.Eval/` | xUnit v3 + Microsoft.Extensions.AI.Evaluation (LLM-judge) | AI eval harness — scores doc-classification title/summary. Opt-in, **not** in the default test gate. `report.html` is regenerated manually via `aieval report` and only after an eval run has populated the store. See its [README](Homestead.WebApi.Tests.Eval/README.md). |
 
 ### Running Tests
 
