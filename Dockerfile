@@ -39,6 +39,10 @@ RUN sh /tessdata-src/scripts/fetch-tessdata.sh /usr/share/tessdata && rm -rf /te
 COPY --from=backend-build /app/publish .
 COPY --from=frontend-build /app/frontend/dist/Homestead/browser ./wwwroot/
 
+# License texts ship with the image: ours, the vendored/bundled notices, and the Angular build's list
+COPY LICENSE THIRD_PARTY_NOTICES.md ./licenses/
+COPY --from=frontend-build /app/frontend/dist/Homestead/3rdpartylicenses.txt ./licenses/
+
 RUN mkdir -p /media /cache && chown -R appuser:appgroup /media /cache
 
 USER appuser

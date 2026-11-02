@@ -23,6 +23,7 @@
     ]
   },
   "private": true,
+  "license": "MIT",
   "packageManager": "npm@11.8.0",
   "dependencies": {
     "@angular/cdk": "^22.2.2",

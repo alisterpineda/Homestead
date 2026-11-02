@@ -42,3 +42,22 @@ __pycache__/
 # playwright-cli output — snapshots, screenshots, saved login state (Claude Code self-QA)
 .playwright-cli/
 
+
+# Secrets and local overrides — never commit; use dotnet user-secrets or environment variables
+.env
+.env.*
+**/secrets.json
+**/appsettings.*.local.json
+*.pem
+*.pfx
+*.p12
+
+# Test output, saved logins, IDE and OS clutter
+TestResults/
+*.trx
+**/coverage/
+**/.auth/
+.playwright-mcp/
+.vs/
+*.user
+.DS_Store

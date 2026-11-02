@@ -9,7 +9,27 @@
 .github/
 .claude/
 *.md
+!THIRD_PARTY_NOTICES.md
 *.sln.DotSettings
 .idea/
 .vscode/
 Homestead.E2E/
+
+# Private local data and secrets — keep out of the build context entirely
+.local/
+.homestead-data/
+.playwright-cli/
+.playwright/
+.playwright-mcp/
+.pnpm-store/
+.agents/
+.devcontainer/
+**/.env
+**/.env.*
+**/secrets.json
+**/TestResults/
+**/coverage/
+**/.auth/
+Homestead.WebApi.Tests.Unit/
+Homestead.WebApi.Tests.Integration/
+Homestead.AppHost/

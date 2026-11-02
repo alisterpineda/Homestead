@@ -1,6 +1,7 @@
 {
   "name": "homestead-e2e",
   "private": true,
+  "license": "MIT",
   "scripts": {
     "e2e": "playwright test",
     "e2e:ui": "playwright test --ui",
