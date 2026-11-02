@@ -1,11 +1,9 @@
 using System.Text.Json;
 using Homestead.WebApi.Authentication;
-using Homestead.WebApi.Processing;
 using Homestead.WebApi.Tests.Integration.Infrastructure;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -176,40 +174,34 @@ public class McpEndpointTests(PostgresFixture fixture) : IntegrationTestBase(fix
     /// <summary>
     /// A second host on the same database whose web root holds an <c>index.html</c>, so the SPA fallback is live
     /// (the shared host has no web root, which makes every unmatched GET a 404 regardless of the guards under
-    /// test). With <paramref name="mcpEnabled"/> false the Mcp section is blanked out, i.e. absent. Both hosts'
-    /// job processors are paused for its lifetime so neither claims work against the shared database.
+    /// test). With <paramref name="mcpEnabled"/> false the Mcp section is blanked out, i.e. absent. The web root is
+    /// deleted when the host is disposed.
     /// </summary>
     private async Task<SecondaryHost> StartSecondaryHostAsync(bool mcpEnabled)
     {
-        var webRoot = Path.Combine(Path.GetTempPath(), "homestead-tests", $"webroot-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(webRoot);
-        await File.WriteAllTextAsync(Path.Combine(webRoot, "index.html"),
+        var webRoot = new TemporaryDirectory(
+            Path.Combine(Path.GetTempPath(), "homestead-tests", $"webroot-{Guid.NewGuid():N}"));
+        Directory.CreateDirectory(webRoot.Path);
+        await File.WriteAllTextAsync(Path.Combine(webRoot.Path, "index.html"),
             "<!doctype html><html><body>spa</body></html>", CT);
 
-        var sharedPause = await Factory.Services.GetRequiredService<IJobProcessorControl>().PauseAsync(CT);
-        var factory = Factory.WithWebHostBuilder(b =>
+        return await StartSecondaryHostAsync(b =>
         {
-            b.UseWebRoot(webRoot);
+            b.UseWebRoot(webRoot.Path);
             if (!mcpEnabled)
             {
                 b.UseSetting("Mcp:Authority", "");
                 b.UseSetting("Mcp:Audience", "");
             }
-        });
-        var ownPause = await factory.Services.GetRequiredService<IJobProcessorControl>().PauseAsync(CT);
-        return new SecondaryHost(factory, webRoot, ownPause, sharedPause);
+        }, extra: webRoot);
     }
 
-    private sealed record SecondaryHost(
-        WebApplicationFactory<Program> Factory, string WebRoot, IAsyncDisposable OwnPause, IAsyncDisposable SharedPause)
-        : IAsyncDisposable
+    private sealed record TemporaryDirectory(string Path) : IAsyncDisposable
     {
-        public async ValueTask DisposeAsync()
+        public ValueTask DisposeAsync()
         {
-            await OwnPause.DisposeAsync();
-            await Factory.DisposeAsync();
-            await SharedPause.DisposeAsync();
-            try { Directory.Delete(WebRoot, recursive: true); } catch { /* best effort */ }
+            try { Directory.Delete(Path, recursive: true); } catch { /* best effort */ }
+            return ValueTask.CompletedTask;
         }
     }
 

@@ -64,11 +64,23 @@ internal sealed record SearchItemPayload(
 internal sealed record GetDocumentPayload(
     Guid Id,
     string Name,
+    DateOnly? DocumentDate,
+    DateOnly? ExpiryDate,
+    string Notes,
     string? UntrustedSummary,
+    string FileExtension,
+    long FileSize,
+    int VersionCount,
+    IReadOnlyList<DocumentTagPayload> Tags,
+    IReadOnlyList<DocumentPartyPayload> Parties,
     IReadOnlyList<PendingSuggestionPayload> PendingSuggestions,
     string? UntrustedDocumentText,
     int TextTotalChars,
     int? NextOffset);
+
+internal sealed record DocumentTagPayload(string Path, string? Description);
+
+internal sealed record DocumentPartyPayload(string Name, string? Description);
 
 internal sealed record PendingSuggestionPayload(Guid SuggestionId, string Field, string SuggestedValue, string? OriginalValue);
 
@@ -96,7 +108,14 @@ internal sealed record UpdateDocumentPayload(
 
 internal sealed record BulkUpdatePayload(int UpdatedCount, IReadOnlyList<Guid> NotFoundIds);
 
-internal sealed record ResolveSuggestionsPayload(Guid Id, string Name, int ResolvedCount);
+internal sealed record ResolveSuggestionsPayload(
+    Guid Id,
+    string Name,
+    DateOnly? DocumentDate,
+    DateOnly? ExpiryDate,
+    IReadOnlyList<string> Tags,
+    IReadOnlyList<string> Parties,
+    int ResolvedCount);
 
 internal sealed record CreateTagPayload(string Path, string? Description, bool Created);
 

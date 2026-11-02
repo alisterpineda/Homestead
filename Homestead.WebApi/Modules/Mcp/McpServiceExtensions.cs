@@ -40,6 +40,7 @@ public static class McpServiceExtensions
         builder.Services.AddScoped<McpToolInvoker>();
         builder.Services.AddScoped<TagPathSnapper>();
         builder.Services.AddScoped<PartyNameResolver>();
+        builder.Services.AddScoped<McpDocumentReads>();
 
         // Tool classes are discovered here and instantiated per call from the request's services; a DI
         // registration of a tool class is ignored. AddAuthorizationFilters honours [Authorize] on tool methods

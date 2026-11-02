@@ -2,6 +2,8 @@ using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Modules.Finances.Seeding;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Processing;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
@@ -99,6 +101,67 @@ public abstract class IntegrationTestBase : IAsyncLifetime
         => CreateUserClientAsync(isActive: isActive, role: "Guest");
 
     protected IServiceScope CreateScope() => Factory.Services.CreateScope();
+
+    /// <summary>
+    /// A second host over the shared database, built from the shared one with <paramref name="configure"/>'s
+    /// overrides. Both hosts' job processors are paused for its lifetime, so neither claims work against the shared
+    /// database or lands background work in what the test observes. <paramref name="extra"/> is owned from the call
+    /// on and disposed last (e.g. a temporary directory the overrides point at). If the host fails to start, the
+    /// shared pause is released before the exception propagates — otherwise the next test's
+    /// <see cref="InitializeAsync"/> would hang on the drained processor.
+    /// </summary>
+    protected async Task<SecondaryHost> StartSecondaryHostAsync(
+        Action<IWebHostBuilder> configure, IAsyncDisposable? extra = null)
+    {
+        IAsyncDisposable? sharedPause = null;
+        WebApplicationFactory<Program>? factory = null;
+        try
+        {
+            sharedPause = await Factory.Services.GetRequiredService<IJobProcessorControl>().PauseAsync(CT);
+            factory = Factory.WithWebHostBuilder(configure);
+            var ownPause = await factory.Services.GetRequiredService<IJobProcessorControl>().PauseAsync(CT);
+            return new SecondaryHost(factory, ownPause, sharedPause, extra);
+        }
+        catch
+        {
+            try
+            {
+                if (factory is not null)
+                    await factory.DisposeAsync();
+            }
+            finally
+            {
+                if (sharedPause is not null)
+                    await sharedPause.DisposeAsync();
+                if (extra is not null)
+                    await extra.DisposeAsync();
+            }
+            throw;
+        }
+    }
+
+    /// <summary>Disposes in order: its own pause, the host, the shared host's pause, then the extra disposable.</summary>
+    protected sealed record SecondaryHost(
+        WebApplicationFactory<Program> Factory,
+        IAsyncDisposable OwnPause,
+        IAsyncDisposable SharedPause,
+        IAsyncDisposable? Extra) : IAsyncDisposable
+    {
+        public async ValueTask DisposeAsync()
+        {
+            try
+            {
+                await OwnPause.DisposeAsync();
+                await Factory.DisposeAsync();
+            }
+            finally
+            {
+                await SharedPause.DisposeAsync();
+                if (Extra is not null)
+                    await Extra.DisposeAsync();
+            }
+        }
+    }
 
     protected static async Task<byte[]> GetUniquePdfBytesAsync()
     {

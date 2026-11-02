@@ -368,10 +368,32 @@ public class DocumentWriteToolsTests(PostgresFixture fixture) : IntegrationTestB
 
         var result = await ResolveAsync(client, id, new() { ["all"] = "decline" });
 
+        // The result reports the reverted state too (read back after the declines), not the state before them.
         Assert.Equal(
-            (2, new DocumentState("original.pdf", null, "", ""), "Declined, Declined"),
+            (2, new DocumentState("original.pdf", null, "", ""), "Declined, Declined",
+             Result: new DocumentState("original.pdf", null, "", ""), ResultExpiry: (DateOnly?)null),
             (result.ResolvedCount, await DocumentStateAsync(id),
-             $"{await SuggestionStatusAsync(nameSuggestion)}, {await SuggestionStatusAsync(tagSuggestion)}"));
+             $"{await SuggestionStatusAsync(nameSuggestion)}, {await SuggestionStatusAsync(tagSuggestion)}",
+             Result: new DocumentState(result.Name, result.DocumentDate, Csv(result.Tags), Csv(result.Parties)),
+             ResultExpiry: result.ExpiryDate));
+    }
+
+    // "all" resolves what is pending; an already-resolved suggestion is neither counted nor touched.
+    [Fact]
+    public async Task ResolveSuggestions_All_ResolvesAndCountsOnlyThePendingSuggestions()
+    {
+        var admin = await CreateAdminClientAsync();
+        var (id, nameSuggestion) = await SeedAppliedNameSuggestionAsync(admin);
+        var declined = await AddSuggestionAsync(
+            id, DocumentSuggestionField.DocumentDate, "2024-01-01", status: DocumentSuggestionStatus.Declined);
+        await using var client = await ConnectAsync(AppRole.Contributor);
+
+        var result = await ResolveAsync(client, id, new() { ["all"] = "approve" });
+
+        Assert.Equal(
+            (1, "Approved, Declined"),
+            (result.ResolvedCount,
+             $"{await SuggestionStatusAsync(nameSuggestion)}, {await SuggestionStatusAsync(declined)}"));
     }
 
     // The rollback test. The first decline reverts the name and flushes it (DeclineSuggestionHandler's
@@ -554,7 +576,8 @@ public class DocumentWriteToolsTests(PostgresFixture fixture) : IntegrationTestB
     }
 
     private async Task<Guid> AddSuggestionAsync(
-        Guid documentId, DocumentSuggestionField field, string suggestedValue, string? originalValue = null)
+        Guid documentId, DocumentSuggestionField field, string suggestedValue, string? originalValue = null,
+        DocumentSuggestionStatus status = DocumentSuggestionStatus.Pending)
     {
         using var scope = CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -562,7 +585,7 @@ public class DocumentWriteToolsTests(PostgresFixture fixture) : IntegrationTestB
         {
             DocumentId = documentId,
             Field = field,
-            Status = DocumentSuggestionStatus.Pending,
+            Status = status,
             SuggestedValue = suggestedValue,
             OriginalValue = originalValue,
             IsApplied = true,

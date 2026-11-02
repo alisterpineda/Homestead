@@ -2,7 +2,6 @@ using System.ComponentModel;
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Documents;
-using Homestead.WebApi.Modules.Documents.Features.Documents.GetDocument;
 using Homestead.WebApi.Modules.Documents.Features.Documents.GetDocuments;
 using Homestead.WebApi.Modules.Documents.Features.Parties.GetParties;
 using Homestead.WebApi.Modules.Documents.Features.Tags.GetTags;
@@ -22,7 +21,7 @@ public sealed class DocumentTools(
     TagPathSnapper tagSnapper,
     PartyNameResolver partyResolver,
     GetDocumentsHandler getDocuments,
-    GetDocumentHandler getDocument,
+    McpDocumentReads documentReads,
     GetTagsHandler getTags,
     GetPartiesHandler getParties,
     IDocumentQueryService documentQuery,
@@ -128,14 +127,25 @@ public sealed class DocumentTools(
         CancellationToken ct = default) =>
         invoker.ReadDocumentAsync(document_id, async c =>
         {
-            // Null past authorization = trashed (GetDocumentHandler sees active documents only).
-            var document = await getDocument.HandleAsync(document_id, c)
+            // Null past authorization = trashed (the reads see active documents only).
+            var document = await documentReads.DetailsAsync(document_id, c)
                            ?? throw new EntityNotFoundException($"document {document_id} (it may be in the trash).");
 
-            // text_total_chars is always reported, so the model knows whether asking for text is worth it.
-            var chunk = include_text
-                ? McpText.Slice(document.ExtractedText, text_offset, McpText.ClampMaxChars(text_max_chars))
-                : new TextChunk("", document.ExtractedText?.Length ?? 0, null);
+            // text_total_chars is always reported, so the model knows whether asking for text is worth it. Only the
+            // requested chunk is read, cut in SQL; offsets and lengths are code points (McpText.Window). With text,
+            // the total and next_offset come from the length read with the chunk, so all three describe one text.
+            var totalChars = document.TextTotalChars;
+            string? text = null;
+            int? nextOffset = null;
+            if (include_text)
+            {
+                McpText.RequireValidOffset(text_offset);
+                var maxChars = McpText.ClampMaxChars(text_max_chars);
+                var chunk = await documentReads.TextChunkAsync(document.LatestVersionId, text_offset, maxChars, c);
+                totalChars = chunk.TotalChars;
+                text = chunk.Text;
+                nextOffset = McpText.Window(chunk.TotalChars, text_offset, maxChars).NextOffset;
+            }
 
             return new GetDocumentResult(
                 document.Id,
@@ -149,14 +159,12 @@ public sealed class DocumentTools(
                 document.VersionCount,
                 McpDates.FormatTimestamp(document.CreatedAt),
                 McpDates.FormatTimestamp(document.UpdatedAt),
-                document.Tags.OrderBy(t => t.Path, StringComparer.OrdinalIgnoreCase)
-                    .Select(t => new DocumentTagResult(t.Path, t.Description)).ToList(),
-                document.Parties.OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase)
-                    .Select(p => new DocumentPartyResult(p.Name, p.Description)).ToList(),
-                await PendingSuggestionsAsync(document, c),
-                include_text ? chunk.Text : null,
-                chunk.TotalChars,
-                include_text ? chunk.NextOffset : null);
+                document.Tags.OrderBy(t => t.Path, StringComparer.OrdinalIgnoreCase).ToList(),
+                document.Parties.OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase).ToList(),
+                await PendingSuggestionsAsync(document.PendingSuggestions, c),
+                text,
+                totalChars,
+                nextOffset);
         }, ct);
 
     [McpServerTool(Name = "list_tags", Title = "List tags",
@@ -230,10 +238,10 @@ public sealed class DocumentTools(
 
     // Tag and party suggestions store the id; the model only ever sees paths and names.
     private async Task<List<PendingSuggestionResult>> PendingSuggestionsAsync(
-        GetDocumentResponse document, CancellationToken ct)
+        IReadOnlyList<McpPendingSuggestion> suggestions, CancellationToken ct)
     {
-        var tagIds = SuggestedIds(document, DocumentSuggestionField.Tags);
-        var partyIds = SuggestedIds(document, DocumentSuggestionField.Parties);
+        var tagIds = SuggestedIds(suggestions, DocumentSuggestionField.Tags);
+        var partyIds = SuggestedIds(suggestions, DocumentSuggestionField.Parties);
 
         var tagPaths = tagIds.Count == 0
             ? []
@@ -242,7 +250,7 @@ public sealed class DocumentTools(
             ? []
             : await db.Parties.AsNoTracking().Where(p => partyIds.Contains(p.Id)).ToDictionaryAsync(p => p.Id, p => p.Name, ct);
 
-        return document.Suggestions
+        return suggestions
             .OrderBy(s => s.Field).ThenBy(s => s.CreatedAt)
             .Select(s => new PendingSuggestionResult(
                 s.Id,
@@ -257,8 +265,8 @@ public sealed class DocumentTools(
             .ToList();
     }
 
-    private static List<Guid> SuggestedIds(GetDocumentResponse document, DocumentSuggestionField field) =>
-        document.Suggestions
+    private static List<Guid> SuggestedIds(IReadOnlyList<McpPendingSuggestion> suggestions, DocumentSuggestionField field) =>
+        suggestions
             .Where(s => s.Field == field)
             .Select(s => Guid.TryParse(s.SuggestedValue, out var id) ? id : Guid.Empty)
             .Where(id => id != Guid.Empty)

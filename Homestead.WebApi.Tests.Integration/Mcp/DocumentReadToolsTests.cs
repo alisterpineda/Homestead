@@ -1,9 +1,14 @@
+using System.Collections.Concurrent;
+using System.Data.Common;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Domain.Identity;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Tests.Integration.Infrastructure;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using ModelContextProtocol.Client;
 
@@ -15,7 +20,7 @@ namespace Homestead.WebApi.Tests.Integration.Mcp;
 /// door; the MCP user is a separate bearer account, which sees every document outside a group.
 /// </summary>
 [Collection("Integration")]
-public class DocumentReadToolsTests(PostgresFixture fixture) : IntegrationTestBase(fixture)
+public partial class DocumentReadToolsTests(PostgresFixture fixture) : IntegrationTestBase(fixture)
 {
     // --- search_documents ---
 
@@ -308,6 +313,51 @@ public class DocumentReadToolsTests(PostgresFixture fixture) : IntegrationTestBa
     }
 
     [Fact]
+    public async Task GetDocument_IncludeText_CountsCodePoints_SoAChunkAfterAnEmojiLosesNothing()
+    {
+        var admin = await CreateAdminClientAsync();
+        // 998 + 1 + 600 = 1599 code points (1600 UTF-16 units); the first 1000-char chunk ends one 'b' past "🙂".
+        var text = new string('a', 998) + "🙂" + new string('b', 600);
+        var id = await SeedDocumentAsync(admin, "emoji.pdf", extractedText: text);
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        var first = await GetDocumentAsync(client, id, new() { ["include_text"] = true, ["text_max_chars"] = 1000 });
+        var second = await GetDocumentAsync(client, id, new()
+        {
+            ["include_text"] = true, ["text_max_chars"] = 1000, ["text_offset"] = first.NextOffset,
+        });
+
+        Assert.Equal(
+            (Text: text, Totals: (1599, 1599), Next: ((int?)1000, (int?)null)),
+            (Text: first.UntrustedDocumentText + second.UntrustedDocumentText,
+             Totals: (first.TextTotalChars, second.TextTotalChars),
+             Next: (first.NextOffset, second.NextOffset)));
+    }
+
+    [Fact]
+    public async Task GetDocument_WithoutIncludeText_NeverSelectsTheText_OnlyItsLength()
+    {
+        var admin = await CreateAdminClientAsync();
+        var id = await SeedDocumentAsync(admin, "long.pdf", extractedText: new string('x', 1500));
+        var (_, token) = await McpAuthHelper.SeedAsync(Factory, AppRole.Viewer);
+        var sql = new SqlCapture();
+        await using var host = await StartSqlCapturingHostAsync(sql);
+        await using var client = await McpClientHelper.ConnectAsync(host.Factory, token, CT);
+
+        sql.Clear();
+        var withoutText = await GetDocumentAsync(client, id, new());
+        var usesWithoutText = sql.TextColumnUses();
+        sql.Clear();
+        await GetDocumentAsync(client, id, new() { ["include_text"] = true });
+        // The control: asking for text reads it, but only as a slice measured in the same statement — never the
+        // bare column (the whole text).
+        var usesWithText = sql.TextColumnUses();
+
+        Assert.Equal((WithoutText: "length", WithText: "length | length+substr", Total: 1500),
+            (WithoutText: usesWithoutText, WithText: usesWithText, Total: withoutText.TextTotalChars));
+    }
+
+    [Fact]
     public async Task GetDocument_LabelsSummaryAsUntrusted()
     {
         var admin = await CreateAdminClientAsync();
@@ -334,6 +384,85 @@ public class DocumentReadToolsTests(PostgresFixture fixture) : IntegrationTestBa
             (document.UntrustedDocumentText, document.TextTotalChars, document.NextOffset));
     }
 
+    [Theory]
+    [InlineData(1500)]
+    [InlineData(int.MaxValue)]
+    public async Task GetDocument_IncludeText_OffsetAtOrPastTheEnd_ReturnsNoText_AndNoNextOffset(int offset)
+    {
+        var admin = await CreateAdminClientAsync();
+        var id = await SeedDocumentAsync(admin, "long.pdf", extractedText: new string('x', 1500));
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        var document = await GetDocumentAsync(client, id, new() { ["include_text"] = true, ["text_offset"] = offset });
+
+        Assert.Equal(("", 1500, (int?)null),
+            (document.UntrustedDocumentText, document.TextTotalChars, document.NextOffset));
+    }
+
+    [Fact]
+    public async Task GetDocument_NullExtractedText_ReportsNoText_WithOrWithoutIncludeText()
+    {
+        var admin = await CreateAdminClientAsync();
+        var id = await SeedDocumentAsync(admin, "blank-scan.pdf");
+        await SetExtractedTextAsync(id, null);
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        var without = await GetDocumentAsync(client, id, new());
+        var with = await GetDocumentAsync(client, id, new() { ["include_text"] = true });
+
+        Assert.Equal(
+            (Without: ((string?)null, 0, (int?)null), With: (true, 0, (int?)null)),
+            (Without: (without.UntrustedDocumentText, without.TextTotalChars, without.NextOffset),
+             With: (string.IsNullOrEmpty(with.UntrustedDocumentText), with.TextTotalChars, with.NextOffset)));
+    }
+
+    // Everything get_document assembles, on a document whose second version differs from the first in extension,
+    // size and text — so a projection that picked the first version, or dropped a field, shows.
+    [Fact]
+    public async Task GetDocument_ReturnsTheFullMetadata_AndTheLatestVersionsFileAndText()
+    {
+        var admin = await CreateAdminClientAsync();
+        await CreateTagAsync(admin, "Home/Insurance", description: "Policies and claims");
+        await CreatePartyAsync(admin, "Acme Insurance", description: "The home insurer");
+        var id = await SeedDocumentAsync(admin, "policy.pdf",
+            tagPaths: ["Home/Insurance"], partyNames: ["Acme Insurance"],
+            documentDate: new DateOnly(2024, 3, 15), expiryDate: new DateOnly(2025, 3, 14),
+            extractedText: "The first version's text, which is longer than the second's.");
+        await UploadPngVersionAndWaitAsync(admin, id, "policy-renewal.png");
+        await SetExtractedTextAsync(id, "Renewal notice.");
+        await SetNotesAsync(id, "Renewed by phone.");
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        var document = await GetDocumentAsync(client, id, new() { ["include_text"] = true });
+
+        Assert.Equal(
+            (Versions: 2, Extension: ".png", HasSize: true, Text: "Renewal notice.", Total: 15, Next: (int?)null,
+             DocumentDate: (DateOnly?)new DateOnly(2024, 3, 15), ExpiryDate: (DateOnly?)new DateOnly(2025, 3, 14),
+             Notes: "Renewed by phone.",
+             Tags: "Home/Insurance: Policies and claims", Parties: "Acme Insurance: The home insurer"),
+            (Versions: document.VersionCount, Extension: document.FileExtension, HasSize: document.FileSize > 0,
+             Text: document.UntrustedDocumentText, Total: document.TextTotalChars, Next: document.NextOffset,
+             DocumentDate: document.DocumentDate, ExpiryDate: document.ExpiryDate,
+             Notes: document.Notes,
+             Tags: Csv(document.Tags.Select(t => $"{t.Path}: {t.Description}")),
+             Parties: Csv(document.Parties.Select(p => $"{p.Name}: {p.Description}"))));
+    }
+
+    [Fact]
+    public async Task GetDocument_ListsOnlyPendingSuggestions_NotResolvedOnes()
+    {
+        var admin = await CreateAdminClientAsync();
+        var id = await SeedDocumentAsync(admin, "letter.pdf");
+        await AddSuggestionAsync(id, DocumentSuggestionField.Name, "Pending name");
+        await AddSuggestionAsync(id, DocumentSuggestionField.Name, "Declined name", DocumentSuggestionStatus.Declined);
+        await AddSuggestionAsync(id, DocumentSuggestionField.DocumentDate, "2024-01-01", DocumentSuggestionStatus.Approved);
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        var document = await GetDocumentAsync(client, id, new());
+
+        Assert.Equal("Name: Pending name", Csv(document.PendingSuggestions.Select(s => $"{s.Field}: {s.SuggestedValue}")));
+    }
+
     [Fact]
     public async Task GetDocument_PendingTagAndPartySuggestions_ShowPathAndName_NotIds()
     {
@@ -341,8 +470,8 @@ public class DocumentReadToolsTests(PostgresFixture fixture) : IntegrationTestBa
         var id = await SeedDocumentAsync(admin, "policy.pdf");
         var tagId = await CreateTagAsync(admin, "Home/Insurance");
         var partyId = await CreatePartyAsync(admin, "Acme Insurance");
-        await AddPendingSuggestionAsync(id, DocumentSuggestionField.Tags, tagId.ToString());
-        await AddPendingSuggestionAsync(id, DocumentSuggestionField.Parties, partyId.ToString());
+        await AddSuggestionAsync(id, DocumentSuggestionField.Tags, tagId.ToString());
+        await AddSuggestionAsync(id, DocumentSuggestionField.Parties, partyId.ToString());
         await using var client = await ConnectAsync(AppRole.Viewer);
 
         var document = await GetDocumentAsync(client, id, new());
@@ -530,12 +659,14 @@ public class DocumentReadToolsTests(PostgresFixture fixture) : IntegrationTestBa
         await db.SaveChangesAsync(CT);
 
         if (pendingNameSuggestion)
-            await AddPendingSuggestionAsync(id, DocumentSuggestionField.Name, "Suggested " + name);
+            await AddSuggestionAsync(id, DocumentSuggestionField.Name, "Suggested " + name);
 
         return id;
     }
 
-    private async Task AddPendingSuggestionAsync(Guid documentId, DocumentSuggestionField field, string suggestedValue)
+    private async Task AddSuggestionAsync(
+        Guid documentId, DocumentSuggestionField field, string suggestedValue,
+        DocumentSuggestionStatus status = DocumentSuggestionStatus.Pending)
     {
         using var scope = CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -543,7 +674,7 @@ public class DocumentReadToolsTests(PostgresFixture fixture) : IntegrationTestBa
         {
             DocumentId = documentId,
             Field = field,
-            Status = DocumentSuggestionStatus.Pending,
+            Status = status,
             SuggestedValue = suggestedValue,
             IsApplied = false,
             CreatedAt = DateTimeOffset.UtcNow,
@@ -553,23 +684,98 @@ public class DocumentReadToolsTests(PostgresFixture fixture) : IntegrationTestBa
 
     private readonly Dictionary<string, Guid> _parties = new(StringComparer.Ordinal);
 
-    private async Task<Guid> CreatePartyAsync(HttpClient admin, string name)
+    private async Task<Guid> CreatePartyAsync(HttpClient admin, string name, string? description = null)
     {
         if (_parties.TryGetValue(name, out var existing))
             return existing;
 
-        var response = await admin.PostAsJsonAsync("/api/v1/documents/parties", new { name }, CT);
+        var response = await admin.PostAsJsonAsync("/api/v1/documents/parties", new { name, description }, CT);
         response.EnsureSuccessStatusCode();
         var party = await response.Content.ReadFromJsonAsync<CreatedEntity>(CT);
         return _parties[name] = party!.Id;
     }
 
-    private async Task<Guid> CreateTagAsync(HttpClient admin, string path)
+    private async Task<Guid> CreateTagAsync(HttpClient admin, string path, string? description = null)
     {
-        var response = await admin.PostAsJsonAsync("/api/v1/documents/tags", new { path }, CT);
+        var response = await admin.PostAsJsonAsync("/api/v1/documents/tags", new { path, description }, CT);
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<CreatedEntity>(CT))!.Id;
     }
 
     private sealed record CreatedEntity(Guid Id);
+
+    // Uploads a PNG as the document's next version over the cookie door and waits for it to be processed.
+    private async Task UploadPngVersionAndWaitAsync(HttpClient admin, Guid documentId, string fileName)
+    {
+        var form = new MultipartFormDataContent();
+        var file = new ByteArrayContent(await GetUniqueImageBytesAsync());
+        file.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/png");
+        form.Add(file, "file", fileName);
+
+        var response = await admin.PostAsync($"/api/v1/documents/{documentId}/versions", form, CT);
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        await WaitForJobCompletionAsync((await response.Content.ReadFromJsonAsync<JobResponse>(CT))!.JobId);
+    }
+
+    private async Task SetNotesAsync(Guid documentId, string notes)
+    {
+        using var scope = CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var document = await db.Documents.FirstAsync(d => d.Id == documentId, CT);
+        document.Notes = notes;
+        await db.SaveChangesAsync(CT);
+    }
+
+    // A second host over the shared database whose AppDbContext also records every command it runs; both job
+    // processors are paused for its lifetime, so no background work lands in the capture.
+    private Task<SecondaryHost> StartSqlCapturingHostAsync(SqlCapture sql) =>
+        StartSecondaryHostAsync(b => b.ConfigureTestServices(services =>
+            services.ConfigureDbContext<AppDbContext>(options => options.AddInterceptors(sql))));
+
+    private sealed partial class SqlCapture : DbCommandInterceptor
+    {
+        private readonly ConcurrentQueue<string> _commands = new();
+
+        public void Clear() => _commands.Clear();
+
+        // How each captured command touching the extracted-text column uses it — "length" (length() of it),
+        // "substr" (a substr()/substring() slice of it), "bare" (the column itself, i.e. the whole text) — one entry per distinct mix.
+        public string TextColumnUses() =>
+            string.Join(" | ", _commands
+                .Where(sql => sql.Contains("\"ExtractedText\"", StringComparison.Ordinal))
+                .Select(sql =>
+                {
+                    var rest = SubstrOfText().Replace(LengthOfText().Replace(sql, ""), "");
+                    return string.Join("+", new[]
+                    {
+                        LengthOfText().IsMatch(sql) ? "length" : null,
+                        SubstrOfText().IsMatch(sql) ? "substr" : null,
+                        rest.Contains("\"ExtractedText\"", StringComparison.Ordinal) ? "bare" : null,
+                    }.OfType<string>());
+                })
+                .Distinct()
+                .Order(StringComparer.Ordinal));
+
+        public override InterceptionResult<DbDataReader> ReaderExecuting(
+            DbCommand command, CommandEventData eventData, InterceptionResult<DbDataReader> result)
+        {
+            _commands.Enqueue(command.CommandText);
+            return result;
+        }
+
+        public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
+            DbCommand command, CommandEventData eventData, InterceptionResult<DbDataReader> result,
+            CancellationToken cancellationToken = default)
+        {
+            _commands.Enqueue(command.CommandText);
+            return ValueTask.FromResult(result);
+        }
+
+        [GeneratedRegex(@"length\(\s*(\w+\.)?""ExtractedText""\s*\)")]
+        private static partial Regex LengthOfText();
+
+        // Npgsql translates Substring to substring(); substr() is the same function.
+        [GeneratedRegex(@"substr(ing)?\(\s*(\w+\.)?""ExtractedText""\s*,")]
+        private static partial Regex SubstrOfText();
+    }
 }

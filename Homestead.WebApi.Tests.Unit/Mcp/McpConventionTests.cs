@@ -112,12 +112,14 @@ public partial class McpConventionTests
         var calls = classes.SelectMany(c => c.HandlerCalls).ToList();
 
         Assert.Equal(
-            (ReadTools: true, WriteTools: true, WriteMethods: true, PatchUnderWriteDocument: true, SearchUnderRead: true),
+            (ReadTools: true, WriteTools: true, WriteMethods: true, PatchUnderWriteDocument: true, SearchUnderRead: true,
+             ReadsUnderReadDocument: true),
             (ReadTools: classes.Any(c => c.Path == ReadToolsFile && c.Tools.Count > 0),
              WriteTools: classes.Any(c => c.Path == WriteToolsFile && c.Tools.Count > 0),
              WriteMethods: classes.SelectMany(c => c.Tools).Any(t => t.ReadOnly == false),
              PatchUnderWriteDocument: calls.Any(c => c is { Handler: "PatchDocumentHandler", Frame: "WriteDocumentAsync" }),
-             SearchUnderRead: calls.Any(c => c is { Handler: "GetDocumentsHandler", Frame: "ReadAsync" })));
+             SearchUnderRead: calls.Any(c => c is { Handler: "GetDocumentsHandler", Frame: "ReadAsync" }),
+             ReadsUnderReadDocument: calls.Any(c => c is { Handler: "McpDocumentReads", Frame: "ReadDocumentAsync" })));
     }
 
     [Fact]
@@ -130,7 +132,8 @@ public partial class McpConventionTests
         Assert.True(offenders.Count == 0,
             "Handler calls in *Tools.cs run inside McpToolInvoker: Get* handlers under ReadAsync / ReadDocumentAsync / " +
             "Write*Async, every other handler under Write*Async, document-id handlers under ReadDocumentAsync / " +
-            "WriteDocumentAsync (only the self-authorizing bulk and suggestion handlers may use plain WriteAsync):\n" +
+            "WriteDocumentAsync (only the self-authorizing bulk and suggestion handlers may use plain WriteAsync), " +
+            "McpDocumentReads under ReadDocumentAsync / WriteDocumentAsync:\n" +
             string.Join("\n", offenders));
     }
 
@@ -255,6 +258,45 @@ public partial class McpConventionTests
         Assert.Equal([$"One → {handler}: {problem}"], FrameFindings(source));
     }
 
+    // McpDocumentReads is no handler, but it reads one document by id with no access check of its own, so the scan
+    // follows it like a document-scoped handler: only the id-authorizing frames may call it.
+    [Theory]
+    [InlineData("ReadAsync", "One → McpDocumentReads: called under ReadAsync; allowed frames: ReadDocumentAsync / WriteDocumentAsync")]
+    [InlineData("ReadDocumentAsync", "")]
+    [InlineData(null, "CountAsync → McpDocumentReads: called outside the invoker; allowed frames: ReadDocumentAsync / WriteDocumentAsync")]
+    public void FrameRule_FollowsMcpDocumentReads_AsADocumentScopedRead(string? frame, string findings)
+    {
+        var body = frame switch
+        {
+            "ReadAsync" => "invoker.ReadAsync(async c => (await documentReads.DetailsAsync(document_id, c))!.VersionCount, ct)",
+            "ReadDocumentAsync" =>
+                "invoker.ReadDocumentAsync(document_id, async c => (await documentReads.DetailsAsync(document_id, c))!.VersionCount, ct)",
+            _ => """
+                 CountAsync(document_id, ct);
+
+                     private async Task<int> CountAsync(Guid id, CancellationToken ct) =>
+                         (await documentReads.DetailsAsync(id, ct))!.VersionCount
+                 """,
+        };
+        var source = $$"""
+            [McpServerToolType]
+            public sealed class SampleTools(McpToolInvoker invoker, McpDocumentReads documentReads)
+            {
+                [McpServerTool(Name = "one", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
+                public Task<int> One(Guid document_id, CancellationToken ct = default) =>
+                    {{body}};
+            }
+            """;
+
+        var calls = ToolSourceScanner.Scan(SampleToolsFile, source).SelectMany(c => c.HandlerCalls).ToList();
+
+        // Seen guards the guard: an accepted call must still be found, or the empty findings would prove nothing.
+        Assert.Equal(
+            (Seen: $"McpDocumentReads@{frame}", Findings: findings),
+            (Seen: string.Join(", ", calls.Select(c => $"{c.Handler}@{c.Frame}")),
+             Findings: string.Join("\n", FrameFindings(source))));
+    }
+
     [Fact]
     public void FrameRule_AcceptsEveryHandlerInTheFrameItsKindAllows()
     {
@@ -369,6 +411,10 @@ public partial class McpConventionTests
             "ApproveAllSuggestionsHandler", "DeclineAllSuggestionsHandler",
         ];
 
+        // Not a handler, but the same risk: McpDocumentReads reads one document by id and checks no access, so
+        // every member runs only under the id-authorizing frames (no Get-name convention applies to it).
+        public const string DocumentReads = "McpDocumentReads";
+
         // Take no document id (lists, tag and party creation).
         private static readonly HashSet<string> Unscoped =
             ["GetDocumentsHandler", "GetTagsHandler", "GetPartiesHandler", "CreateTagHandler", "CreatePartyHandler"];
@@ -382,7 +428,8 @@ public partial class McpConventionTests
         {
             var isGet = handler.StartsWith("Get", StringComparison.Ordinal);
             string[] allowed =
-                SelfAuthorizing.Contains(handler) ? [Write, WriteDocument]
+                handler == DocumentReads ? [ReadDocument, WriteDocument]
+                : SelfAuthorizing.Contains(handler) ? [Write, WriteDocument]
                 : DocumentScoped.Contains(handler) ? (isGet ? [ReadDocument, WriteDocument] : [WriteDocument])
                 : Unscoped.Contains(handler) ? (isGet ? [Read, ReadDocument, Write, WriteDocument] : [Write, WriteDocument])
                 : [];
@@ -407,7 +454,8 @@ public partial class McpConventionTests
     /// <summary>
     /// A pragmatic text scan, not a parser: comments and string/char literals are blanked (lengths kept), then
     /// bracket depth splits the class body into members and finds each invoker call's argument-list extent.
-    /// Handler references are the constructor's <c>*Handler</c> parameters and any <c>*Handler</c> type token in the body.
+    /// Handler references are the constructor's <c>*Handler</c> and <c>McpDocumentReads</c> parameters and any
+    /// <c>*Handler</c> type token in the body.
     /// </summary>
     private static partial class ToolSourceScanner
     {
@@ -454,7 +502,9 @@ public partial class McpConventionTests
                 var bodyStart = i;
                 var bodyEnd = MatchClose(text, bodyStart);
                 var parameters = ParseParameters(ctorParameters);
-                var handlerFields = parameters.Where(p => p.Type.EndsWith("Handler", StringComparison.Ordinal)).ToList();
+                var handlerFields = parameters
+                    .Where(p => p.Type.EndsWith("Handler", StringComparison.Ordinal) || p.Type == HandlerRules.DocumentReads)
+                    .ToList();
                 var invokerName = parameters.FirstOrDefault(p => p.Type == "McpToolInvoker").Name;
 
                 var members = SplitMembers(text, bodyStart + 1, bodyEnd);

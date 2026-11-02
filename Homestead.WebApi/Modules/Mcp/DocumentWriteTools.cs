@@ -5,7 +5,6 @@ using Homestead.WebApi.Common;
 using Homestead.WebApi.Modules.Documents.Features.Comments.CreateComment;
 using Homestead.WebApi.Modules.Documents.Features.Documents.BulkDeleteDocuments;
 using Homestead.WebApi.Modules.Documents.Features.Documents.BulkUpdateDocuments;
-using Homestead.WebApi.Modules.Documents.Features.Documents.GetDocument;
 using Homestead.WebApi.Modules.Documents.Features.Documents.PatchDocument;
 using Homestead.WebApi.Modules.Documents.Features.Parties.CreateParty;
 using Homestead.WebApi.Modules.Documents.Features.Suggestions.ApproveAllSuggestions;
@@ -33,7 +32,7 @@ public sealed class DocumentWriteTools(
     McpToolInvoker invoker,
     TagPathSnapper tagSnapper,
     PartyNameResolver partyResolver,
-    GetDocumentHandler getDocument,
+    McpDocumentReads documentReads,
     PatchDocumentHandler patchDocument,
     BulkUpdateDocumentsHandler bulkUpdateDocuments,
     BulkDeleteDocumentsHandler bulkDeleteDocuments,
@@ -67,8 +66,9 @@ public sealed class DocumentWriteTools(
         CancellationToken ct = default) =>
         invoker.WriteDocumentAsync(document_id, async c =>
         {
-            var document = await getDocument.HandleAsync(document_id, c)
-                           ?? throw new EntityNotFoundException($"document {document_id} (it may be in the trash).");
+            // The editable fields only; the response below comes from the patch handler's own reload.
+            var current = await documentReads.EditStateAsync(document_id, c)
+                          ?? throw new EntityNotFoundException($"document {document_id} (it may be in the trash).");
 
             var addTagPaths = add_tags is { Length: > 0 }
                 ? (await tagSnapper.RequireKnownAsync(add_tags, c)).Select(t => t.Path).ToList()
@@ -78,13 +78,7 @@ public sealed class DocumentWriteTools(
                 : [];
 
             var edit = UpdateDocumentPatchBuilder.Build(
-                new DocumentEditState(
-                    document.Name,
-                    document.DocumentDate,
-                    document.ExpiryDate,
-                    document.Notes,
-                    document.Tags.Select(t => t.Path).ToList(),
-                    document.Parties.Select(p => new ResolvedParty(p.Id, p.Name)).ToList()),
+                current.State,
                 new UpdateDocumentInput
                 {
                     Name = name,
@@ -184,8 +178,8 @@ public sealed class DocumentWriteTools(
             if (approve.Intersect(decline).Any())
                 throw new ArgumentException("A suggestion cannot be both approved and declined.");
 
-            // GetDocumentHandler lists pending suggestions only, so its count is what "all" resolves.
-            var before = await getDocument.HandleAsync(document_id, c)
+            // The pending-suggestion count is what "all" resolves.
+            var before = await documentReads.EditStateAsync(document_id, c)
                          ?? throw new EntityNotFoundException($"document {document_id} (it may be in the trash).");
 
             int resolved;
@@ -193,11 +187,11 @@ public sealed class DocumentWriteTools(
             {
                 case SuggestionResolution.Approve:
                     await approveAllSuggestions.HandleAsync(document_id, c);
-                    resolved = before.Suggestions.Count;
+                    resolved = before.PendingSuggestionCount;
                     break;
                 case SuggestionResolution.Decline:
                     await declineAllSuggestions.HandleAsync(document_id, c);
-                    resolved = before.Suggestions.Count;
+                    resolved = before.PendingSuggestionCount;
                     break;
                 default:
                     // An unknown or already-resolved id throws and rolls the whole call back.
@@ -210,16 +204,16 @@ public sealed class DocumentWriteTools(
             }
 
             // Declining reverts values; read the row back inside the transaction.
-            var after = await getDocument.HandleAsync(document_id, c)
+            var after = await documentReads.EditStateAsync(document_id, c)
                         ?? throw new EntityNotFoundException($"document {document_id} (it may be in the trash).");
 
             return new ResolveSuggestionsResult(
                 after.Id,
-                after.Name,
-                after.DocumentDate,
-                after.ExpiryDate,
-                after.Tags.Select(t => t.Path).Order(StringComparer.OrdinalIgnoreCase).ToList(),
-                after.Parties.Select(p => p.Name).Order(StringComparer.OrdinalIgnoreCase).ToList(),
+                after.State.Name,
+                after.State.DocumentDate,
+                after.State.ExpiryDate,
+                after.State.TagPaths.Order(StringComparer.OrdinalIgnoreCase).ToList(),
+                after.State.Parties.Select(p => p.Name).Order(StringComparer.OrdinalIgnoreCase).ToList(),
                 resolved);
         }, ct);
 
