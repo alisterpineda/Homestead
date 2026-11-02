@@ -20,7 +20,8 @@ public static class McpAuthHelper
     /// A signed access token for <paramref name="subject"/>. The validity window always ends at now +
     /// <paramref name="lifetime"/> and starts ten minutes before that, so a negative lifetime yields an expired
     /// token that is otherwise well-formed (nbf &lt; exp). <paramref name="audience"/> defaults to
-    /// <see cref="HomesteadApiFactory.McpTestAudience"/>.
+    /// <see cref="HomesteadApiFactory.McpTestAudience"/>, <paramref name="issuer"/> to
+    /// <see cref="HomesteadApiFactory.McpTestIssuer"/>.
     /// </summary>
     public static string CreateToken(
         string? subject,
@@ -28,7 +29,8 @@ public static class McpAuthHelper
         TimeSpan? lifetime = null,
         string? audience = null,
         string alg = SecurityAlgorithms.RsaSha256,
-        string? name = null)
+        string? name = null,
+        string? issuer = null)
     {
         var expires = DateTime.UtcNow + (lifetime ?? TimeSpan.FromMinutes(5));
         var claims = new Dictionary<string, object>();
@@ -45,7 +47,7 @@ public static class McpAuthHelper
 
         return new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor
         {
-            Issuer = HomesteadApiFactory.McpTestIssuer,
+            Issuer = issuer ?? HomesteadApiFactory.McpTestIssuer,
             Audience = audience ?? HomesteadApiFactory.McpTestAudience,
             Claims = claims,
             Expires = expires,

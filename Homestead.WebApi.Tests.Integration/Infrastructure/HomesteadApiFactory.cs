@@ -166,7 +166,7 @@ public class HomesteadApiFactory : WebApplicationFactory<Program>
             // Pin the MCP bearer scheme's IdP metadata to a static document (issuer + signing keys) so token
             // validation never fetches discovery or JWKS from McpTestIssuer. Registered after AddJwtBearer's own
             // configure, so it layers on top of the production TokenValidationParameters (audience, algorithm
-            // allow-list, OnTokenValidated) rather than replacing them. Zero skew so an expired token is expired.
+            // allow-list, clock skew, OnTokenValidated) rather than replacing them.
             // A no-op on a host where MCP is disabled (the named options are simply never resolved).
             services.Configure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, o =>
             {
@@ -176,7 +176,6 @@ public class HomesteadApiFactory : WebApplicationFactory<Program>
                     SigningKeys = { McpSigningKey, McpSymmetricKey },
                 };
                 o.TokenValidationParameters.ValidIssuer = McpTestIssuer;
-                o.TokenValidationParameters.ClockSkew = TimeSpan.Zero;
                 o.RequireHttpsMetadata = false;
             });
 

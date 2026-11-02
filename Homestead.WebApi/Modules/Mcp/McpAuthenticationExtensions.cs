@@ -11,11 +11,14 @@ namespace Homestead.WebApi.Modules.Mcp;
 // (WWW-Authenticate: Bearer resource_metadata="…") and serves /.well-known/oauth-protected-resource/mcp. The cookie
 // door is untouched: parameterless AddAuthentication() adds schemes without changing the Cookies defaults, and only
 // the McpActiveUser policy names McpAuth, so a bearer token is ignored everywhere else.
-internal static class McpAuthenticationExtensions
+public static class McpAuthenticationExtensions
 {
     // Authentik with no signing key falls back to HS256 keyed with the client secret — which Claude holds — so only
     // asymmetric algorithms are accepted.
     private static readonly string[] AllowedAlgorithms = [SecurityAlgorithms.RsaSha256, SecurityAlgorithms.EcdsaSha256];
+
+    // Tolerance on exp/nbf (the SDK default is 5 min). Named so the integration tests mint expired tokens past it.
+    public static readonly TimeSpan ClockSkew = TimeSpan.FromSeconds(30);
 
     public static void AddMcpAuthentication(this IServiceCollection services, McpOptions options, bool isDevelopment)
     {
@@ -36,7 +39,7 @@ internal static class McpAuthenticationExtensions
                     ValidateLifetime = true,
                     ValidateIssuerSigningKey = true,
                     ValidAlgorithms = AllowedAlgorithms,
-                    ClockSkew = TimeSpan.FromSeconds(30),
+                    ClockSkew = ClockSkew,
                     NameClaimType = "name",
                 };
                 o.Events = new JwtBearerEvents { OnTokenValidated = McpBearerPrincipal.ResolveAsync };

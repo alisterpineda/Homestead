@@ -179,7 +179,102 @@ public class DocumentWriteToolsTests(PostgresFixture fixture) : IntegrationTestB
             (result.UpdatedCount, Csv(result.NotFoundIds), (await DocumentStateAsync(id)).Tags));
     }
 
+    [Fact]
+    public async Task BulkUpdate_RemoveTags_UnlinksTheTagCaseInsensitively_LeavesTheRest()
+    {
+        var admin = await CreateAdminClientAsync();
+        var id = await SeedEditableDocumentAsync(admin);
+        await using var client = await ConnectAsync(AppRole.Contributor);
+
+        var result = await McpToolResults.CallAsync<BulkUpdatePayload>(client, "bulk_update_documents",
+            new Dictionary<string, object?> { ["document_ids"] = new[] { id }, ["remove_tags"] = new[] { "home/old" } },
+            CT);
+
+        Assert.Equal((1, "Home/Keep"), (result.UpdatedCount, (await DocumentStateAsync(id)).Tags));
+    }
+
+    // The removal lookup matches every casing of the stored name.
+    [Fact]
+    public async Task BulkUpdate_RemovePartiesInAnotherCasing_UnlinksTheStoredParty()
+    {
+        var admin = await CreateAdminClientAsync();
+        var id = await UploadAndWaitAsync(admin, "scan.pdf");
+        var acme = await CreatePartyAsync(admin, "Acme Power");
+        var other = await CreatePartyAsync(admin, "Other Co");
+        (await SendJsonPatchAsync(admin, $"/api/v1/documents/{id}", new[]
+        {
+            new { op = "replace", path = "/partyIds", value = (object)new[] { acme, other } },
+        })).EnsureSuccessStatusCode();
+        await using var client = await ConnectAsync(AppRole.Contributor);
+
+        var result = await McpToolResults.CallAsync<BulkUpdatePayload>(client, "bulk_update_documents",
+            new Dictionary<string, object?> { ["document_ids"] = new[] { id }, ["remove_parties"] = new[] { "acme power" } },
+            CT);
+
+        Assert.Equal((1, "Other Co"), (result.UpdatedCount, (await DocumentStateAsync(id)).Parties));
+    }
+
+    [Fact]
+    public async Task BulkUpdate_SameTagAddedAndRemoved_IsAnError_AndChangesNothing()
+    {
+        var admin = await CreateAdminClientAsync();
+        var id = await UploadAndWaitAsync(admin, "scan.pdf");
+        await CreateTagAsync(admin, "Home/Utilities");
+        await using var client = await ConnectAsync(AppRole.Contributor);
+
+        var error = await McpToolResults.CallForErrorAsync(client, "bulk_update_documents", new Dictionary<string, object?>
+        {
+            ["document_ids"] = new[] { id }, ["add_tags"] = new[] { "Home/Utilities" },
+            ["remove_tags"] = new[] { "home/utilities" },
+        }, CT);
+
+        Assert.Equal(
+            ("Invalid input: Tags cannot be both added and removed in the same request.", ""),
+            (error, (await DocumentStateAsync(id)).Tags));
+    }
+
     // --- create_tag / create_party ---
+
+    // The creation path: the deepest existing ancestor keeps its stored casing, so a lower-cased path never forks a
+    // second branch (Tag.Path's unique index is case-sensitive). Two existing levels, so the deepest — not the
+    // shallowest — ancestor must be the one kept.
+    [Fact]
+    public async Task CreateTag_NewPathUnderAnExistingBranchInAnotherCasing_KeepsTheStoredCasing()
+    {
+        var admin = await CreateAdminClientAsync();
+        await CreateTagAsync(admin, "Home/Garden");
+        await using var client = await ConnectAsync(AppRole.Contributor);
+
+        var result = await McpToolResults.CallAsync<CreateTagPayload>(client, "create_tag",
+            new Dictionary<string, object?> { ["path"] = "home/garden/Beds", ["description"] = "Raised beds" }, CT);
+
+        using var scope = CreateScope();
+        var tags = await scope.ServiceProvider.GetRequiredService<AppDbContext>().Tags.AsNoTracking()
+            .Select(t => new { t.Path, t.Description }).ToListAsync(CT);
+        Assert.Equal(
+            (Created: true, Path: "Home/Garden/Beds", Description: "Raised beds",
+             Stored: "Home, Home/Garden, Home/Garden/Beds", StoredDescription: "Raised beds"),
+            (result.Created, result.Path, result.Description,
+             Stored: Csv(tags.Select(t => t.Path).Order(StringComparer.Ordinal)),
+             StoredDescription: tags.SingleOrDefault(t => t.Path == "Home/Garden/Beds")?.Description));
+    }
+
+    [Fact]
+    public async Task CreateParty_NewName_CreatesIt()
+    {
+        await using var client = await ConnectAsync(AppRole.Contributor);
+
+        var result = await McpToolResults.CallAsync<CreatePartyPayload>(client, "create_party",
+            new Dictionary<string, object?> { ["name"] = "  Acme Power  ", ["description"] = "Electricity provider" }, CT);
+
+        using var scope = CreateScope();
+        var parties = await scope.ServiceProvider.GetRequiredService<AppDbContext>().Parties.AsNoTracking()
+            .Select(p => new { p.Name, p.Description }).ToListAsync(CT);
+        var stored = Assert.Single(parties);
+        Assert.Equal(
+            (true, "Acme Power", "Electricity provider", "Acme Power", "Electricity provider"),
+            (result.Created, result.Name, result.Description, stored.Name, stored.Description));
+    }
 
     [Fact]
     public async Task CreateTag_ExistingPath_ReturnsItUnchanged_WithoutTouchingColourOrDescription()
@@ -344,6 +439,44 @@ public class DocumentWriteToolsTests(PostgresFixture fixture) : IntegrationTestB
              AfterRestore: afterRestore));
     }
 
+    [Fact]
+    public async Task MoveToTrash_UnknownId_IsReportedAsNotFound_TheRestAreTrashed()
+    {
+        var admin = await CreateAdminClientAsync();
+        var trashed = await UploadAndWaitAsync(admin, "old-bill.pdf");
+        var unknown = Guid.NewGuid();
+        await using var client = await ConnectAsync(AppRole.Contributor);
+
+        var result = await McpToolResults.CallAsync<MoveToTrashPayload>(client, "move_to_trash",
+            new Dictionary<string, object?> { ["document_ids"] = new[] { trashed, unknown } }, CT);
+
+        Assert.Equal(
+            (Trashed: trashed.ToString(), NotFound: unknown.ToString(), Deleted: true),
+            (Trashed: Csv(result.Trashed.Select(t => t.Id)), NotFound: Csv(result.NotFoundIds),
+             Deleted: await IsTrashedAsync(trashed)));
+    }
+
+    // All-or-nothing: one listed document the caller can see but not write fails the call, and nothing is trashed.
+    [Fact]
+    public async Task MoveToTrash_WithADocumentTheCallerCannotWrite_FailsAsAWhole_AndTrashesNothing()
+    {
+        var admin = await CreateAdminClientAsync();
+        var (user, token) = await McpAuthHelper.SeedAsync(Factory, AppRole.Contributor);
+        var group = await CreateGroupAsync(admin, "MCP Read-only Group");
+        await AddGroupMemberAsync(admin, group, user.Id, accessLevel: "Viewer");
+        var writable = await UploadAndWaitAsync(admin, "household.pdf");
+        var readOnly = await UploadAndWaitAsync(admin, "group.pdf", group);
+        await using var client = await McpClientHelper.ConnectAsync(Factory, token, CT);
+
+        var error = await McpToolResults.CallForErrorAsync(client, "move_to_trash",
+            new Dictionary<string, object?> { ["document_ids"] = new[] { writable, readOnly } }, CT);
+
+        Assert.Equal(
+            (true, false, false),
+            (error.StartsWith("Not found or no access", StringComparison.Ordinal),
+             await IsTrashedAsync(writable), await IsTrashedAsync(readOnly)));
+    }
+
     // --- helpers ---
 
     private async Task<McpClient> ConnectAsync(AppRole role)
@@ -470,6 +603,14 @@ public class DocumentWriteToolsTests(PostgresFixture fixture) : IntegrationTestB
             document.DocumentDate,
             Csv(document.DocumentTags.Select(dt => dt.Tag.Path).Order(StringComparer.Ordinal)),
             Csv(document.DocumentParties.Select(dp => dp.Party.Name).Order(StringComparer.Ordinal)));
+    }
+
+    private async Task<bool> IsTrashedAsync(Guid id)
+    {
+        using var scope = CreateScope();
+        return await scope.ServiceProvider.GetRequiredService<AppDbContext>().Documents.AsNoTracking()
+            .IgnoreQueryFilters()
+            .Where(d => d.Id == id).Select(d => d.DeletedAt != null).SingleAsync(CT);
     }
 
     private static async Task<List<ActivityItem>> ActivityAsync(HttpClient admin, Guid id)

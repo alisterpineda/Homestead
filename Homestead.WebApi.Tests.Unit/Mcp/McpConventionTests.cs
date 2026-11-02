@@ -123,11 +123,8 @@ public partial class McpConventionTests
     [Fact]
     public void HandlerCalls_RunInsideTheInvokerFrameTheirKindRequires()
     {
-        var offenders = ScanToolClasses()
-            .SelectMany(c => c.HandlerCalls)
-            .Select(call => (call, Problem: HandlerRules.Check(call.Handler, call.Frame)))
-            .Where(x => x.Problem is not null)
-            .Select(x => $"{x.call.Path}:{x.call.Line} {x.call.Member} → {x.call.Handler}: {x.Problem}")
+        var offenders = FrameProblems(ScanToolClasses())
+            .Select(x => $"{x.Call.Path}:{x.Call.Line} {x.Call.Member} → {x.Call.Handler}: {x.Problem}")
             .ToList();
 
         Assert.True(offenders.Count == 0,
@@ -135,6 +132,168 @@ public partial class McpConventionTests
             "Write*Async, every other handler under Write*Async, document-id handlers under ReadDocumentAsync / " +
             "WriteDocumentAsync (only the self-authorizing bulk and suggestion handlers may use plain WriteAsync):\n" +
             string.Join("\n", offenders));
+    }
+
+    private static IEnumerable<(HandlerCall Call, string Problem)> FrameProblems(IEnumerable<ToolClass> classes) =>
+        classes
+            .SelectMany(c => c.HandlerCalls)
+            .Select(call => (call, Problem: HandlerRules.Check(call.Handler, call.Frame)))
+            .Where(x => x.Problem is not null)
+            .Select(x => (x.call, x.Problem!));
+
+    // --- the frame rule fed known sources (guards the guard: each shape below must be flagged, or not) ---
+
+    private const string SampleToolsFile = "Modules/Mcp/SampleTools.cs";
+
+    // "Member → Handler: problem" for each call the frame rule rejects in an inline *Tools.cs source.
+    private static List<string> FrameFindings(string source) =>
+        FrameProblems(ToolSourceScanner.Scan(SampleToolsFile, source))
+            .Select(x => $"{x.Call.Member} → {x.Call.Handler}: {x.Problem}")
+            .ToList();
+
+    [Fact]
+    public void FrameRule_FlagsADocumentScopedHandlerCalledOutsideEveryFrame()
+    {
+        // The read tool's ReadAsync frame comes first, so a frame that over-reached would swallow the later call.
+        const string source = """
+            [McpServerToolType]
+            public sealed class SampleTools(McpToolInvoker invoker, GetTagsHandler getTags, PatchDocumentHandler patchDocument)
+            {
+                [McpServerTool(Name = "list", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
+                public Task<int> List(CancellationToken ct = default) =>
+                    invoker.ReadAsync(async c => (await getTags.HandleAsync(new(), c)).TotalCount, ct);
+
+                [McpServerTool(Name = "patch", ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false),
+                 Authorize(Policy = AuthPolicies.RequireContributor)]
+                public async Task<int> Patch(Guid document_id, CancellationToken ct = default)
+                {
+                    await patchDocument.HandleAsync(document_id, new(), ct);
+                    return 1;
+                }
+            }
+            """;
+
+        Assert.Equal(
+            ["Patch → PatchDocumentHandler: called outside the invoker; allowed frames: WriteDocumentAsync"],
+            FrameFindings(source));
+    }
+
+    [Fact]
+    public void FrameRule_FlagsADocumentScopedHandlerUnderPlainWriteAsync()
+    {
+        const string source = """
+            [McpServerToolType]
+            public sealed class SampleTools(McpToolInvoker invoker, PatchDocumentHandler patchDocument)
+            {
+                [McpServerTool(Name = "patch", ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false),
+                 Authorize(Policy = AuthPolicies.RequireContributor)]
+                public Task<int> Patch(Guid document_id, CancellationToken ct = default) =>
+                    invoker.WriteAsync(async c =>
+                    {
+                        await patchDocument.HandleAsync(document_id, new(), c);
+                        return 1;
+                    }, ct);
+            }
+            """;
+
+        Assert.Equal(
+            ["Patch → PatchDocumentHandler: called under WriteAsync; allowed frames: WriteDocumentAsync"],
+            FrameFindings(source));
+    }
+
+    [Fact]
+    public void FrameRule_FlagsAHelperCalledFromInsideAndOutsideAFrame_AtTheOutsideCallSite()
+    {
+        const string source = """
+            [McpServerToolType]
+            public sealed class SampleTools(McpToolInvoker invoker, PatchDocumentHandler patchDocument)
+            {
+                [McpServerTool(Name = "inside", ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false),
+                 Authorize(Policy = AuthPolicies.RequireContributor)]
+                public Task<int> Inside(Guid document_id, CancellationToken ct = default) =>
+                    invoker.WriteDocumentAsync(document_id, c => PatchAsync(document_id, c), ct);
+
+                [McpServerTool(Name = "outside", ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false),
+                 Authorize(Policy = AuthPolicies.RequireContributor)]
+                public Task<int> Outside(Guid document_id, CancellationToken ct = default) =>
+                    PatchAsync(document_id, ct);
+
+                private async Task<int> PatchAsync(Guid id, CancellationToken ct)
+                {
+                    await patchDocument.HandleAsync(id, new(), ct);
+                    return 1;
+                }
+            }
+            """;
+
+        Assert.Equal(
+            ["PatchAsync → PatchDocumentHandler: called outside the invoker; allowed frames: WriteDocumentAsync"],
+            FrameFindings(source));
+    }
+
+    // The remaining branches of HandlerRules.Check: a document-scoped Get, an unscoped write, an unknown handler.
+    [Theory]
+    [InlineData("GetDocumentHandler", "called under ReadAsync; allowed frames: ReadDocumentAsync / WriteDocumentAsync")]
+    [InlineData("CreateTagHandler", "called under ReadAsync; allowed frames: WriteAsync / WriteDocumentAsync")]
+    [InlineData("FooHandler", "unclassified handler — add it to McpConventionTests.HandlerRules (does it take a document id?)")]
+    public void FrameRule_FlagsTheOtherHandlerKindsUnderPlainReadAsync(string handler, string problem)
+    {
+        var source = $$"""
+            [McpServerToolType]
+            public sealed class SampleTools(McpToolInvoker invoker, {{handler}} handler)
+            {
+                [McpServerTool(Name = "one", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
+                public Task<int> One(Guid document_id, CancellationToken ct = default) =>
+                    invoker.ReadAsync(async c =>
+                    {
+                        await handler.HandleAsync(document_id, c);
+                        return 1;
+                    }, ct);
+            }
+            """;
+
+        Assert.Equal([$"One → {handler}: {problem}"], FrameFindings(source));
+    }
+
+    [Fact]
+    public void FrameRule_AcceptsEveryHandlerInTheFrameItsKindAllows()
+    {
+        const string source = """
+            [McpServerToolType]
+            public sealed class SampleTools(
+                McpToolInvoker invoker, GetTagsHandler getTags, PatchDocumentHandler patchDocument,
+                BulkDeleteDocumentsHandler bulkDelete)
+            {
+                [McpServerTool(Name = "list", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
+                public Task<int> List(CancellationToken ct = default) =>
+                    invoker.ReadAsync(async c => (await getTags.HandleAsync(new(), c)).TotalCount, ct);
+
+                [McpServerTool(Name = "patch", ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false),
+                 Authorize(Policy = AuthPolicies.RequireContributor)]
+                public Task<int> Patch(Guid document_id, CancellationToken ct = default) =>
+                    invoker.WriteDocumentAsync(document_id, async c =>
+                    {
+                        await patchDocument.HandleAsync(document_id, new(), c);
+                        return 1;
+                    }, ct);
+
+                [McpServerTool(Name = "trash", ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false),
+                 Authorize(Policy = AuthPolicies.RequireContributor)]
+                public Task<int> Trash(Guid[] document_ids, CancellationToken ct = default) =>
+                    invoker.WriteAsync(async c =>
+                    {
+                        await bulkDelete.HandleAsync(new(document_ids), c);
+                        return 1;
+                    }, ct);
+            }
+            """;
+
+        var calls = ToolSourceScanner.Scan(SampleToolsFile, source).SelectMany(c => c.HandlerCalls).ToList();
+
+        // The positive control: all three calls are seen, each in its own frame, and none is flagged.
+        Assert.Equal(
+            ("GetTagsHandler@ReadAsync, PatchDocumentHandler@WriteDocumentAsync, BulkDeleteDocumentsHandler@WriteAsync", 0),
+            (string.Join(", ", calls.Select(c => $"{c.Handler}@{c.Frame}")), FrameFindings(source).Count));
     }
 
     [Fact]

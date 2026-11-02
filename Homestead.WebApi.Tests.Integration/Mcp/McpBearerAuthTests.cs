@@ -1,5 +1,6 @@
 using Homestead.WebApi.Domain.Identity;
 using Homestead.WebApi.Tests.Integration.Infrastructure;
+using McpAuthentication = Homestead.WebApi.Modules.Mcp.McpAuthenticationExtensions;
 using Microsoft.IdentityModel.Tokens;
 
 namespace Homestead.WebApi.Tests.Integration.Mcp;
@@ -99,8 +100,10 @@ public class McpBearerAuthTests(PostgresFixture fixture) : IntegrationTestBase(f
     [Fact]
     public async Task ExpiredToken_Is401()
     {
+        // Expired by a minute more than the production clock skew, which the factory leaves in place.
         var (user, _) = await McpAuthHelper.SeedAsync(Factory, AppRole.Admin);
-        var token = McpAuthHelper.CreateToken(user.ExternalSubject, user.Email, lifetime: TimeSpan.FromMinutes(-1));
+        var token = McpAuthHelper.CreateToken(user.ExternalSubject, user.Email,
+            lifetime: -(McpAuthentication.ClockSkew + TimeSpan.FromMinutes(1)));
 
         var response = await McpClientHelper.CreateBearerClient(Factory, token).SendAsync(McpRequests.Initialize(), CT);
 
@@ -116,6 +119,20 @@ public class McpBearerAuthTests(PostgresFixture fixture) : IntegrationTestBase(f
         var response = await McpClientHelper.CreateBearerClient(Factory, token).SendAsync(McpRequests.Initialize(), CT);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task WrongIssuer_Is401()
+    {
+        // Signed with the trusted RSA key and otherwise valid: only the issuer check refuses it.
+        var (user, _) = await McpAuthHelper.SeedAsync(Factory, AppRole.Admin);
+        var token = McpAuthHelper.CreateToken(user.ExternalSubject, user.Email, issuer: "https://evil.test/");
+
+        var response = await McpClientHelper.CreateBearerClient(Factory, token).SendAsync(McpRequests.Initialize(), CT);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        var challenge = string.Join(" ", response.Headers.WwwAuthenticate.Select(h => h.ToString()));
+        Assert.Contains("resource_metadata", challenge);
     }
 
     [Fact]

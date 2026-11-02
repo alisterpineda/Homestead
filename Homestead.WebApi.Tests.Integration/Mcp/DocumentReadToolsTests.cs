@@ -181,6 +181,70 @@ public class DocumentReadToolsTests(PostgresFixture fixture) : IntegrationTestBa
             (Csv(Names(active)), Csv(Names(trash)), trash.Items.All(i => i.DeletedAt is not null)));
     }
 
+    // The trash branch of the summary read: a trashed document's summary is found under in_trash.
+    [Fact]
+    public async Task Search_InTrashWithSummary_ReturnsTheTrashedDocumentsSummary()
+    {
+        var admin = await CreateAdminClientAsync();
+        var trashed = await SeedDocumentAsync(admin, "trashed.pdf", summary: "An old meter reading notice.");
+        (await admin.DeleteAsync($"/api/v1/documents/{trashed}", CT)).EnsureSuccessStatusCode();
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        var result = await SearchAsync(client, new() { ["in_trash"] = true, ["include_summary"] = true });
+
+        var item = Assert.Single(result.Items);
+        Assert.Equal(("trashed.pdf", "An old meter reading notice."), (item.Name, item.UntrustedSummary));
+    }
+
+    [Fact]
+    public async Task Search_SortByExpiryAscending_PutsTheDocumentWithoutAnExpiryLast()
+    {
+        // Seeded so that no order the tool could fall back to matches the expected one (soonest expiry, later expiry,
+        // no expiry): not name, not seed order (= updated_at), not document_date, in either direction.
+        var admin = await CreateAdminClientAsync();
+        await SeedDocumentAsync(admin, "z-later.pdf",
+            documentDate: new DateOnly(2024, 1, 1), expiryDate: new DateOnly(2027, 1, 1));
+        await SeedDocumentAsync(admin, "a-none.pdf", documentDate: new DateOnly(2024, 2, 1));
+        await SeedDocumentAsync(admin, "m-sooner.pdf",
+            documentDate: new DateOnly(2024, 3, 1), expiryDate: new DateOnly(2026, 6, 1));
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        var result = await SearchAsync(client, new() { ["sort_by"] = "expiry_date", ["sort_dir"] = "asc" });
+
+        Assert.Equal(["m-sooner.pdf", "z-later.pdf", "a-none.pdf"], result.Items.Select(i => i.Name));
+    }
+
+    // Bad input reaches the model as a recoverable "Invalid input: …" naming the parameter, not a generic SDK error.
+    [Theory]
+    [InlineData("document_date_from", "2024-3-7",
+        "Invalid input: document_date_from must be a date in yyyy-MM-dd form, got '2024-3-7'.")]
+    [InlineData("sort_by", "size",
+        "Invalid input: sort_by must be name, document_date, expiry_date or updated_at, got 'size'.")]
+    [InlineData("sort_dir", "sideways", "Invalid input: sort_dir must be asc or desc, got 'sideways'.")]
+    public async Task Search_BadInput_IsAnInvalidInputError(string parameter, string value, string expected)
+    {
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        var error = await McpToolResults.CallForErrorAsync(client, "search_documents",
+            new Dictionary<string, object?> { [parameter] = value }, CT);
+
+        Assert.Equal(expected, error);
+    }
+
+    // GetDocumentsHandler's own range check (a BusinessRuleException), relayed as its message.
+    [Fact]
+    public async Task Search_DocumentDateFromAfterTo_IsAnError()
+    {
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        var error = await McpToolResults.CallForErrorAsync(client, "search_documents", new Dictionary<string, object?>
+        {
+            ["document_date_from"] = "2024-12-31", ["document_date_to"] = "2024-01-01",
+        }, CT);
+
+        Assert.Equal("DocumentDateFrom must be on or before DocumentDateTo.", error);
+    }
+
     [Fact]
     public async Task Search_PageSizeAbove100_IsClamped()
     {
@@ -305,6 +369,33 @@ public class DocumentReadToolsTests(PostgresFixture fixture) : IntegrationTestBa
         Assert.Equal(
             ("Charlie", 2, 2, 3, 2),
             (Csv(result.Items.Select(t => t.Path)), result.Page, result.PageSize, result.TotalCount, result.TotalPages));
+    }
+
+    [Fact]
+    public async Task ListTags_ParentPathInAnotherCasing_ReturnsItsChildrenWithStoredCasing()
+    {
+        var admin = await CreateAdminClientAsync();
+        await CreateTagAsync(admin, "Home/Utilities");
+        await CreateTagAsync(admin, "Work/Tax");
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        var result = await McpToolResults.CallAsync<ListTagsPayload>(client, "list_tags",
+            new Dictionary<string, object?> { ["parent_path"] = "home" }, CT);
+
+        Assert.Equal(["Home/Utilities"], result.Items.Select(t => t.Path));
+    }
+
+    [Fact]
+    public async Task ListTags_SearchWithParentPath_IsAnError()
+    {
+        var admin = await CreateAdminClientAsync();
+        await CreateTagAsync(admin, "Home/Utilities");
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        var error = await McpToolResults.CallForErrorAsync(client, "list_tags",
+            new Dictionary<string, object?> { ["search"] = "util", ["parent_path"] = "Home" }, CT);
+
+        Assert.Equal("Invalid input: Give search or parent_path, not both.", error);
     }
 
     [Fact]
