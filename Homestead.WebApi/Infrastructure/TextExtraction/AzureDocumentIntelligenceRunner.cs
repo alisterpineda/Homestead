@@ -37,8 +37,9 @@ public class AzureDocumentIntelligenceRunner(
         };
 
         // WaitUntil.Completed polls the long-running operation to completion. Note this is bounded by the
-        // job processor's 5-minute JobTimeout, not by Azure: a large scan against a busy endpoint can
-        // exceed it and surface as a TimeoutException.
+        // caller's token, not by Azure: TextExtractionHelper cancels it a margin short of the job budget
+        // (the engine's JobTimeout, else Processing:JobTimeout), and a large scan against a busy endpoint
+        // that runs past it is recorded as a TimeoutException extraction failure.
         var operation = await client.AnalyzeDocumentAsync(WaitUntil.Completed, options, ct);
         var result = operation.Value;
 

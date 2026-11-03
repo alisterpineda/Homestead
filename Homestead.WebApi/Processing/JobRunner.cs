@@ -40,6 +40,9 @@ public sealed class JobRunner(
     /// <summary>How long a final-failure hook may run. Not linked to shutdown: it runs once, or never.</summary>
     private static readonly TimeSpan HookTimeout = TimeSpan.FromSeconds(30);
 
+    /// <summary>The longest budget a handler may declare through <see cref="IJobHandler.ResolveTimeout"/>.</summary>
+    internal static readonly TimeSpan MaxDeclaredTimeout = TimeSpan.FromDays(1);
+
     /// <summary>Slack added to a computed wake-up so the claim does not race the instant it becomes due.</summary>
     private static readonly TimeSpan WakeSlack = TimeSpan.FromMilliseconds(50);
 
@@ -268,7 +271,8 @@ public sealed class JobRunner(
             // The handler's token: host shutdown, the per-job timeout, or a lease we can no longer defend.
             using var leaseLost = new CancellationTokenSource();
             using var jobCts = CancellationTokenSource.CreateLinkedTokenSource(ct, leaseLost.Token);
-            jobCts.CancelAfter(_jobTimeout);
+            var timeout = ResolveTimeout(handler, job);
+            jobCts.CancelAfter(timeout);
 
             using var heartbeatStop = new CancellationTokenSource();
             var heartbeat = HeartbeatAsync(jobId, claimedAt, leaseLost, heartbeatStop.Token);
@@ -317,7 +321,7 @@ public sealed class JobRunner(
             }
 
             if (failure is OperationCanceledException && jobCts.IsCancellationRequested)
-                failure = new JobTimeoutException(jobId, _jobTimeout);
+                failure = new JobTimeoutException(jobId, timeout);
         }
         catch (Exception ex)
         {
@@ -329,6 +333,40 @@ public sealed class JobRunner(
         }
 
         await HandleFailureAsync(jobId, claimedAt, failure);
+    }
+
+    /// <summary>
+    /// The budget this run gets: the handler's own when it declares a positive one within
+    /// <see cref="MaxDeclaredTimeout"/>, else
+    /// <see cref="JobProcessingOptions.JobTimeout"/>. A handler that throws while answering gets the global
+    /// budget rather than failing the job — the question is about how long to wait, not whether to run.
+    /// </summary>
+    private TimeSpan ResolveTimeout(IJobHandler handler, ProcessingJob job)
+    {
+        try
+        {
+            var declared = handler.ResolveTimeout(job);
+            if (declared is null || declared <= TimeSpan.Zero)
+                return _jobTimeout;
+
+            // CancelAfter throws past ~49.7 days, which would fail the job; nothing legitimate asks for that.
+            if (declared > MaxDeclaredTimeout)
+            {
+                logger.LogWarning(
+                    "Job {JobId} ({JobType}) declared a timeout of {Declared}, over the {Max} ceiling; using the default of {Timeout}",
+                    job.Id, job.Type, declared, MaxDeclaredTimeout, _jobTimeout);
+                return _jobTimeout;
+            }
+
+            return declared.Value;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex,
+                "Could not resolve the timeout for job {JobId} ({JobType}); using the default of {Timeout}",
+                job.Id, job.Type, _jobTimeout);
+            return _jobTimeout;
+        }
     }
 
     private async Task HeartbeatAsync(

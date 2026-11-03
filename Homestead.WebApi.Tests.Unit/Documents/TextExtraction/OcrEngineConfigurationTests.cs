@@ -281,4 +281,89 @@ public class OcrEngineConfigurationTests
         Assert.Equal("azure-layout", OcrEngineConfiguration.ResolveDefaultKey("azure-layout"));
         Assert.Equal("typo", OcrEngineConfiguration.ResolveDefaultKey("typo"));
     }
+
+    // --- JobTimeout (any type) ---
+
+    private static OcrEngineOptions ValidOptions(TextExtractionEngineType type) => type switch
+    {
+        TextExtractionEngineType.AzureDocumentIntelligence => new OcrEngineOptions
+        {
+            Type = type,
+            Endpoint = "https://x.cognitiveservices.azure.com",
+            ApiKey = "k"
+        },
+        _ => new OcrEngineOptions { Type = type }
+    };
+
+    [Theory]
+    [InlineData(TextExtractionEngineType.Tesseract, 0)]
+    [InlineData(TextExtractionEngineType.Tesseract, -60)]
+    [InlineData(TextExtractionEngineType.AzureDocumentIntelligence, 0)]
+    [InlineData(TextExtractionEngineType.AzureDocumentIntelligence, -60)]
+    public void Validate_NonPositiveJobTimeout_ReportsReason(TextExtractionEngineType type, int seconds)
+    {
+        var options = ValidOptions(type);
+        options.JobTimeout = TimeSpan.FromSeconds(seconds);
+
+        Assert.Equal("JobTimeout must be positive when set.", OcrEngineConfiguration.Validate("some-engine", options));
+    }
+
+    // "600" meant as seconds binds as 600 days, which CancelAfter would reject on every job.
+    [Theory]
+    [InlineData(TextExtractionEngineType.Tesseract)]
+    [InlineData(TextExtractionEngineType.AzureDocumentIntelligence)]
+    public void Validate_JobTimeoutOverADay_ReportsReasonWithTheFormat(TextExtractionEngineType type)
+    {
+        var engines = OcrEngineConfiguration.ReadEngines(Config(new()
+        {
+            ["Ocr:Engines:slow:Type"] = type.ToString(),
+            ["Ocr:Engines:slow:Endpoint"] = "https://x.cognitiveservices.azure.com",
+            ["Ocr:Engines:slow:ApiKey"] = "k",
+            ["Ocr:Engines:slow:JobTimeout"] = "600",
+        }));
+        var (key, options) = engines.Single(e => e.Key == "slow");
+
+        Assert.Equal(TimeSpan.FromDays(600), options.JobTimeout);
+        var error = OcrEngineConfiguration.Validate(key, options);
+        Assert.NotNull(error);
+        Assert.Contains("at most 1.00:00:00", error);
+        Assert.Contains("hh:mm:ss", error);
+    }
+
+    [Fact]
+    public void Validate_JobTimeoutOfExactlyTheCeiling_IsValid()
+    {
+        var options = ValidOptions(TextExtractionEngineType.Tesseract);
+        options.JobTimeout = OcrEngineOptions.MaxJobTimeout;
+
+        Assert.Null(OcrEngineConfiguration.Validate("some-engine", options));
+    }
+
+    [Theory]
+    [InlineData(TextExtractionEngineType.Tesseract)]
+    [InlineData(TextExtractionEngineType.AzureDocumentIntelligence)]
+    public void Validate_PositiveOrUnsetJobTimeout_IsValid(TextExtractionEngineType type)
+    {
+        var unset = ValidOptions(type);
+        var positive = ValidOptions(type);
+        positive.JobTimeout = TimeSpan.FromMinutes(20);
+
+        Assert.Null(OcrEngineConfiguration.Validate("some-engine", unset));
+        Assert.Null(OcrEngineConfiguration.Validate("some-engine", positive));
+    }
+
+    [Fact]
+    public void ReadEngines_JobTimeoutEnvVarStyle_BindsAsATimeSpan()
+    {
+        // What Ocr__Engines__azure-layout__JobTimeout=00:20:00 arrives as.
+        var engines = OcrEngineConfiguration.ReadEngines(Config(new()
+        {
+            ["Ocr:Engines:azure-layout:Type"] = "AzureDocumentIntelligence",
+            ["Ocr:Engines:azure-layout:JobTimeout"] = "00:20:00",
+        }));
+
+        var (_, options) = Assert.Single(engines, e => e.Key == "azure-layout");
+        Assert.Equal(TimeSpan.FromMinutes(20), options.JobTimeout);
+        Assert.Null(engines.Single(e => e.Key == OcrEngineOptions.BuiltInTesseractKey).Options.JobTimeout);
+    }
 }

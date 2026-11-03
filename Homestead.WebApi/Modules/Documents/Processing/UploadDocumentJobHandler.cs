@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Security.Cryptography;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Documents;
@@ -24,12 +25,35 @@ public class UploadDocumentJobHandler(
     TextExtractionHelper textExtractionHelper,
     ITextExtractionEngineResolver engineResolver,
     IUnitOfWork unitOfWork,
-    ICreateDocumentFromUploadHandler createDocument) : IJobHandler
+    ICreateDocumentFromUploadHandler createDocument,
+    IOptions<JobProcessingOptions> processing) : IJobHandler
 {
+    // Left over once auto-classify's time is up, for creating the document and notifying. Capped at a
+    // tenth of the budget so a short one still leaves classification most of what remains.
+    internal static readonly TimeSpan PersistReserve = TimeSpan.FromSeconds(10);
+
     public ProcessingJobType Type => ProcessingJobType.UploadDocument;
+
+    // Uploads run the configured default engine, so they get its budget (Ocr:Engines:{key}:JobTimeout).
+    // Resolved per run like the key itself: an engine change applies to the next upload.
+    public TimeSpan? ResolveTimeout(ProcessingJob job) =>
+        textExtractionHelper.JobTimeoutFor(engineResolver.DefaultKey);
+
+    // How long auto-classify may take: what is left of the job budget, less the persist reserve. Zero or
+    // less means there is no time left to try.
+    internal static TimeSpan ClassificationAllowance(TimeSpan budget, TimeSpan elapsed)
+    {
+        var reserve = PersistReserve < budget / 10 ? PersistReserve : budget / 10;
+        return budget - elapsed - reserve;
+    }
 
     public async Task HandleAsync(ProcessingJob job, CancellationToken ct)
     {
+        // The runner started this job's clock just before calling in, under the same budget (see
+        // ResolveTimeout); classification below is bounded against it.
+        var started = Stopwatch.GetTimestamp();
+        var budget = ResolveTimeout(job) ?? processing.Value.ResolveJobTimeout();
+
         var payload = job.GetPayload<UploadDocumentPayload>()
             ?? throw new InvalidOperationException("Job payload is missing or invalid.");
 
@@ -95,23 +119,47 @@ public class UploadDocumentJobHandler(
 
             // Auto-classify in-memory (non-fatal). Folded into creation below so the document is created
             // with AI values already applied — a single Created audit entry, no suppressed Updated.
+            //
+            // Bounded by what is left of the job budget. Extraction may already have run to its own
+            // deadline, and a classify that then outran the job would time the whole upload out with no
+            // document; running out of time here is just a failed classification instead.
             ClassificationResult? classification = null;
+            var allowance = TimeSpan.Zero;
+            using var classifyCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             try
             {
                 if (await classifier.IsAutoClassifyEnabledAsync(ct))
                 {
-                    // Hand the placed file to the in-memory classify overload, since the document/version doesn't
-                    // exist yet. The classifier gates on AI being available before touching it (so an unconfigured
-                    // app makes no render and reads no PDF — IsAutoClassifyEnabledAsync only reads the setting),
-                    // then sends the PDF itself or a page-1 render (scope is All); a render also warms the
-                    // hash+edge-keyed cache for any later re-classify.
-                    var output = await classifier.ClassifyAsync(
-                        documentName, extractedText,
-                        new ClassificationFile(fileHash, finalPath, payload.ContentType, payload.FileSize),
-                        ClassificationScope.All, ct);
-                    if (output is not null)
-                        classification = output.Classification;
+                    allowance = ClassificationAllowance(budget, Stopwatch.GetElapsedTime(started));
+                    if (allowance > TimeSpan.Zero)
+                    {
+                        classifyCts.CancelAfter(allowance);
+
+                        // Hand the placed file to the in-memory classify overload, since the document/version
+                        // doesn't exist yet. The classifier gates on AI being available before touching it (so an
+                        // unconfigured app makes no render and reads no PDF — IsAutoClassifyEnabledAsync only reads
+                        // the setting), then sends the PDF itself or a page-1 render (scope is All); a render also
+                        // warms the hash+edge-keyed cache for any later re-classify.
+                        var output = await classifier.ClassifyAsync(
+                            documentName, extractedText,
+                            new ClassificationFile(fileHash, finalPath, payload.ContentType, payload.FileSize),
+                            ClassificationScope.All, classifyCts.Token);
+                        if (output is not null)
+                            classification = output.Classification;
+                    }
+                    else
+                    {
+                        logger.LogWarning(
+                            "No time left in the job budget ({Budget}) to auto-classify upload {UploadId}; creating it unclassified",
+                            budget, payload.UploadId);
+                    }
                 }
+            }
+            catch (OperationCanceledException) when (classifyCts.IsCancellationRequested && !ct.IsCancellationRequested)
+            {
+                logger.LogWarning(
+                    "Auto-classification of upload {UploadId} did not finish within the {Allowance} left in the job budget; creating it unclassified",
+                    payload.UploadId, allowance);
             }
             catch (OperationCanceledException) { throw; }
             catch (Exception ex)

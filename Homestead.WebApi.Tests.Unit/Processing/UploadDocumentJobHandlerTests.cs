@@ -23,6 +23,13 @@ public class UploadDocumentJobHandlerTests : IDisposable
     private readonly TestAppDbContext _db;
     private readonly string _mediaPath;
     private readonly ITextExtractionEngine _textExtractionEngine;
+
+    // A second configured engine, so the timeout tests can tell "the default engine" from "the built-in one".
+    private readonly ITextExtractionEngine _doclingEngine = TestTextExtraction.Engine("docling");
+    private readonly ITextExtractionEngineResolver _resolver = TestTextExtraction.Resolver();
+
+    // The global job budget the handler bounds auto-classify against; a test may shorten it.
+    private readonly JobProcessingOptions _processing = new();
     private readonly IProcessingNotifier _notifier;
     private readonly IDocumentClassifier _classifier;
     private readonly ThumbnailService _thumbnailService;
@@ -57,7 +64,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
         _thumbnailService = new ThumbnailService(
             Enumerable.Empty<IThumbnailGenerator>(), storage,
             Substitute.For<ILogger<ThumbnailService>>());
-        var textExtractionHelper = TestTextExtraction.Helper(_textExtractionEngine);
+        var textExtractionHelper = TestTextExtraction.Helper(_textExtractionEngine, _doclingEngine);
 
         _createDocument = Substitute.For<ICreateDocumentFromUploadHandler>();
         _createDocument.HandleAsync(Arg.Any<CreateDocumentFromUploadCommand>(), Arg.Any<CancellationToken>())
@@ -79,7 +86,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
         _handler = new UploadDocumentJobHandler(
             _db, storage, logger,
             _notifier, _classifier, _thumbnailService,
-            textExtractionHelper, TestTextExtraction.Resolver(), _unitOfWork, _createDocument);
+            textExtractionHelper, _resolver, _unitOfWork, _createDocument, Options.Create(_processing));
     }
 
     public void Dispose()
@@ -126,7 +133,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
         var content = Encoding.UTF8.GetBytes($"send-fields {Guid.NewGuid()}");
         var (job, _) = CreateUploadJob(content: content);
 
-        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
+        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(TestTextExtraction.Output("extracted text"));
 
         await _handler.HandleAsync(job, ct);
@@ -155,9 +162,9 @@ public class UploadDocumentJobHandlerTests : IDisposable
         // opens, so the Created audit entry is attributed to the uploader; the command runs inside it.
         Received.InOrder(() =>
         {
-            _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct);
+            _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
             _classifier.ClassifyAsync(
-                Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<ClassificationFile?>(), ClassificationScope.All, ct);
+                Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<ClassificationFile?>(), ClassificationScope.All, Arg.Any<CancellationToken>());
             _unitOfWork.SetActor(job.CreatedByUserId);
             _unitOfWork.ExecuteInTransactionAsync(Arg.Any<Func<Task<CreateDocumentFromUploadResult>>>(), ct);
         });
@@ -170,7 +177,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
         var ct = TestContext.Current.CancellationToken;
         var (job, _) = CreateUploadJob();
 
-        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
+        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(TestTextExtraction.Output("text"));
 
         var resultDocumentId = Guid.NewGuid();
@@ -208,7 +215,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
         var ct = TestContext.Current.CancellationToken;
         var (job, _) = CreateUploadJob();
 
-        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
+        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns<TextExtractionOutput>(x => throw new Exception("OCR failed"));
 
         await _handler.HandleAsync(job, ct);
@@ -224,7 +231,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
         var content = Encoding.UTF8.GetBytes($"move-final {Guid.NewGuid()}");
         var (job, stagingPath) = CreateUploadJob(content: content);
 
-        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
+        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(TestTextExtraction.Output("text"));
 
         await _handler.HandleAsync(job, ct);
@@ -257,7 +264,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
         var stagingPath = Path.Combine(_mediaPath, DocumentVersion.UploadsSubroot, $"{uploadId}.pdf");
         File.WriteAllText(stagingPath, $"unique content {Guid.NewGuid()}");
 
-        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
+        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(TestTextExtraction.Output("text"));
 
         await _handler.HandleAsync(job, ct);
@@ -273,7 +280,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
         var content = Encoding.UTF8.GetBytes($"compensation {Guid.NewGuid()}");
         var (job, stagingPath) = CreateUploadJob(content: content);
 
-        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
+        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(TestTextExtraction.Output("text"));
 
         _unitOfWork.ExecuteInTransactionAsync(Arg.Any<Func<Task<CreateDocumentFromUploadResult>>>(), Arg.Any<CancellationToken>())
@@ -293,7 +300,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
         var content = Encoding.UTF8.GetBytes($"dupe-content {Guid.NewGuid()}");
         var (job, _) = CreateUploadJob(content: content);
 
-        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
+        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(TestTextExtraction.Output("text"));
 
         var existing = SeedExistingDocumentWithHash(HashOf(content), trashed: false);
@@ -318,7 +325,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
         var content = Encoding.UTF8.GetBytes($"dupe-trashed {Guid.NewGuid()}");
         var (job, _) = CreateUploadJob(content: content);
 
-        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
+        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(TestTextExtraction.Output("text"));
 
         var existing = SeedExistingDocumentWithHash(HashOf(content), trashed: true);
@@ -339,12 +346,12 @@ public class UploadDocumentJobHandlerTests : IDisposable
         var (job, _) = CreateUploadJob(content: content);
         var hash = HashOf(content);
 
-        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
+        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(TestTextExtraction.Output("extracted text"));
 
         _classifier.IsAutoClassifyEnabledAsync(ct).Returns(true);
         _classifier.ClassifyAsync(
-            Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<ClassificationFile?>(), Arg.Any<ClassificationScope>(), ct)
+            Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<ClassificationFile?>(), Arg.Any<ClassificationScope>(), Arg.Any<CancellationToken>())
             .Returns(new DocumentClassificationOutput(
                 new ClassificationResult([], [], "summary", "AI Title"), []));
 
@@ -355,7 +362,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
         var expectedFile = new ClassificationFile(
             hash, Path.Combine(_mediaPath, DocumentVersion.GetFilePath(hash, ".pdf")), "application/pdf", 1024);
         await _classifier.Received(1).ClassifyAsync(
-            "Test Document", "extracted text", expectedFile, ClassificationScope.All, ct);
+            "Test Document", "extracted text", expectedFile, ClassificationScope.All, Arg.Any<CancellationToken>());
 
         await _createDocument.Received(1).HandleAsync(
             Arg.Is<CreateDocumentFromUploadCommand>(c => c.Classification != null),
@@ -368,7 +375,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
         var ct = TestContext.Current.CancellationToken;
         var (job, _) = CreateUploadJob();
 
-        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
+        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(TestTextExtraction.Output("text"));
 
         _classifier.IsAutoClassifyEnabledAsync(ct).Returns(false);
@@ -390,12 +397,12 @@ public class UploadDocumentJobHandlerTests : IDisposable
         var ct = TestContext.Current.CancellationToken;
         var (job, _) = CreateUploadJob();
 
-        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
+        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(TestTextExtraction.Output("text"));
 
         _classifier.IsAutoClassifyEnabledAsync(ct).Returns(true);
         _classifier.ClassifyAsync(
-            Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<ClassificationFile?>(), Arg.Any<ClassificationScope>(), ct)
+            Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<ClassificationFile?>(), Arg.Any<ClassificationScope>(), Arg.Any<CancellationToken>())
             .Returns<DocumentClassificationOutput?>(_ => throw new Exception("AI service unavailable"));
 
         await _handler.HandleAsync(job, ct);
@@ -420,12 +427,12 @@ public class UploadDocumentJobHandlerTests : IDisposable
         var ct = TestContext.Current.CancellationToken;
         var (job, _) = CreateUploadJob();
 
-        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
+        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(TestTextExtraction.Output("text"));
 
         _classifier.IsAutoClassifyEnabledAsync(ct).Returns(true);
         _classifier.ClassifyAsync(
-            Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<ClassificationFile?>(), Arg.Any<ClassificationScope>(), ct)
+            Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<ClassificationFile?>(), Arg.Any<ClassificationScope>(), Arg.Any<CancellationToken>())
             .Returns<DocumentClassificationOutput?>(_ => throw new OperationCanceledException());
 
         await Assert.ThrowsAsync<OperationCanceledException>(
@@ -457,5 +464,139 @@ public class UploadDocumentJobHandlerTests : IDisposable
         });
         _db.SaveChanges();
         return doc;
+    }
+
+    // --- Per-engine job budget ---
+
+    // The configured default engine's budget, not the built-in engine's.
+    [Fact]
+    public void ResolveTimeout_IsTheDefaultEnginesJobTimeout()
+    {
+        var (job, _) = CreateUploadJob();
+        _resolver.DefaultKey.Returns("docling");
+        _textExtractionEngine.JobTimeout.Returns(TimeSpan.FromMinutes(1));
+        _doclingEngine.JobTimeout.Returns(TimeSpan.FromMinutes(20));
+
+        Assert.Equal(TimeSpan.FromMinutes(20), _handler.ResolveTimeout(job));
+    }
+
+    [Fact]
+    public void ResolveTimeout_EngineWithoutABudget_IsNullSoTheGlobalOneApplies()
+    {
+        var (job, _) = CreateUploadJob();
+
+        Assert.Null(_handler.ResolveTimeout(job));
+    }
+
+    // An extraction that runs past its deadline is just a failed extraction: the document is still created.
+    [Fact]
+    public async Task HandleAsync_ExtractionPastItsDeadline_StillCreatesTheDocumentWithoutText()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (job, _) = CreateUploadJob();
+        _textExtractionEngine.JobTimeout.Returns(TimeSpan.FromMilliseconds(200));
+        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(async call =>
+            {
+                await Task.Delay(Timeout.Infinite, call.Arg<CancellationToken>());
+                return TestTextExtraction.Output("never");
+            });
+
+        await _handler.HandleAsync(job, ct);
+
+        await _createDocument.Received(1).HandleAsync(
+            Arg.Is<CreateDocumentFromUploadCommand>(c => c.ExtractedText == null && c.TextExtractionMetadata == null), ct);
+    }
+
+    // --- Auto-classify is bounded by what is left of the job budget ---
+
+    private void ClassifierHangsUntilCancelled()
+    {
+        _classifier.IsAutoClassifyEnabledAsync(Arg.Any<CancellationToken>()).Returns(true);
+        _classifier.ClassifyAsync(
+                Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<ClassificationFile?>(),
+                Arg.Any<ClassificationScope>(), Arg.Any<CancellationToken>())
+            .Returns(async call =>
+            {
+                await Task.Delay(Timeout.Infinite, call.Arg<CancellationToken>());
+                return (DocumentClassificationOutput?)null;
+            });
+    }
+
+    // A classify that would outrun the job is cut off in time: the document is created unclassified rather
+    // than the job timing out with nothing to show.
+    [Fact]
+    public async Task HandleAsync_ClassificationOutrunsTheJobBudget_CreatesTheDocumentUnclassified()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (job, _) = CreateUploadJob();
+        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(TestTextExtraction.Output("text"));
+        _processing.JobTimeout = TimeSpan.FromMilliseconds(500);
+        ClassifierHangsUntilCancelled();
+
+        await _handler.HandleAsync(job, ct).WaitAsync(TimeSpan.FromSeconds(10), ct);
+
+        await _createDocument.Received(1).HandleAsync(
+            Arg.Is<CreateDocumentFromUploadCommand>(c => c.ExtractedText == "text" && c.Classification == null), ct);
+    }
+
+    // The case review finding #1 named: extraction runs to its own deadline, then a slow classify must
+    // still fit in what is left, under the engine's budget.
+    [Fact]
+    public async Task HandleAsync_ExtractionAndClassificationBothSlow_StillCreatesTheDocument()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (job, _) = CreateUploadJob();
+        _textExtractionEngine.JobTimeout.Returns(TimeSpan.FromMilliseconds(400));
+        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(async call =>
+            {
+                await Task.Delay(Timeout.Infinite, call.Arg<CancellationToken>());
+                return TestTextExtraction.Output("never");
+            });
+        ClassifierHangsUntilCancelled();
+
+        await _handler.HandleAsync(job, ct).WaitAsync(TimeSpan.FromSeconds(10), ct);
+
+        await _createDocument.Received(1).HandleAsync(
+            Arg.Is<CreateDocumentFromUploadCommand>(c => c.ExtractedText == null && c.Classification == null), ct);
+    }
+
+    [Fact]
+    public async Task HandleAsync_NoTimeLeftForClassification_SkipsIt()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (job, _) = CreateUploadJob();
+        _processing.JobTimeout = TimeSpan.FromMilliseconds(200);
+        ClassifierHangsUntilCancelled();
+
+        // The allowance is taken after the setting is read; by then the budget, less its reserve, is spent.
+        _classifier.IsAutoClassifyEnabledAsync(Arg.Any<CancellationToken>())
+            .Returns(async _ =>
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(250), CancellationToken.None);
+                return true;
+            });
+
+        await _handler.HandleAsync(job, ct).WaitAsync(TimeSpan.FromSeconds(10), ct);
+
+        await _classifier.DidNotReceive().ClassifyAsync(
+            Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<ClassificationFile?>(),
+            Arg.Any<ClassificationScope>(), Arg.Any<CancellationToken>());
+        await _createDocument.Received(1).HandleAsync(
+            Arg.Is<CreateDocumentFromUploadCommand>(c => c.Classification == null), ct);
+    }
+
+    [Theory]
+    [InlineData(300, 0, 290)]     // 5-minute default, nothing used yet: 10 s reserve
+    [InlineData(300, 280, 10)]    // extraction ran to its deadline (270 s) and a bit more
+    [InlineData(300, 295, -5)]    // nothing left
+    [InlineData(1, 0, 0.9)]       // short budget: reserve capped at a tenth
+    public void ClassificationAllowance_IsWhatIsLeftLessTheReserve(double budget, double elapsed, double expected)
+    {
+        Assert.Equal(
+            TimeSpan.FromSeconds(expected),
+            UploadDocumentJobHandler.ClassificationAllowance(TimeSpan.FromSeconds(budget), TimeSpan.FromSeconds(elapsed)));
     }
 }

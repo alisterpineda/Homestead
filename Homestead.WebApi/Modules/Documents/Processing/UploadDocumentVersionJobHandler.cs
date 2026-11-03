@@ -27,6 +27,11 @@ public class UploadDocumentVersionJobHandler(
 {
     public ProcessingJobType Type => ProcessingJobType.UploadDocumentVersion;
 
+    // Uploads run the configured default engine, so they get its budget (Ocr:Engines:{key}:JobTimeout).
+    // Resolved per run like the key itself: an engine change applies to the next upload.
+    public TimeSpan? ResolveTimeout(ProcessingJob job) =>
+        textExtractionHelper.JobTimeoutFor(engineResolver.DefaultKey);
+
     public async Task HandleAsync(ProcessingJob job, CancellationToken ct)
     {
         var payload = job.GetPayload<UploadDocumentVersionPayload>()

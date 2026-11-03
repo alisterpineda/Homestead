@@ -21,6 +21,13 @@ public class ReprocessDocumentVersionJobHandler(
 {
     public ProcessingJobType Type => ProcessingJobType.ReprocessDocumentVersion;
 
+    // The engine stamped into the payload decides the budget. A payload that does not parse gets the
+    // global one; HandleAsync then fails it properly.
+    public TimeSpan? ResolveTimeout(ProcessingJob job) =>
+        job.GetPayload<ReprocessDocumentVersionPayload>()?.EngineKey is { } key
+            ? textExtractionHelper.JobTimeoutFor(key)
+            : null;
+
     public async Task HandleAsync(ProcessingJob job, CancellationToken ct)
     {
         var payload = job.GetPayload<ReprocessDocumentVersionPayload>()

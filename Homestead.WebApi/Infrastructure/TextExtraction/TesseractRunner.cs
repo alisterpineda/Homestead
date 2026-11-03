@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Globalization;
 
 namespace Homestead.WebApi.Infrastructure.TextExtraction;
@@ -29,35 +28,14 @@ public class TesseractRunner(ILogger<TesseractRunner> logger) : ITesseractRunner
         logger.LogDebug("Running tesseract OCR with tessdata={TessDataPath}, lang={Language}",
             options.TessDataPath, options.Language);
 
-        using var process = new Process();
-        process.StartInfo = new ProcessStartInfo
-        {
-            FileName = "tesseract",
-            RedirectStandardInput = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-
         var args = BuildArguments(
             options.Language, options.TessDataPath, options.Dpi, options.Psm, options.Oem);
-        foreach (var arg in args)
-            process.StartInfo.ArgumentList.Add(arg);
+        var (exitCode, text, stderr) = await ExternalProcess.RunAsync("tesseract", args, imageStream, ct);
 
-        process.Start();
-
-        await imageStream.CopyToAsync(process.StandardInput.BaseStream, ct);
-        process.StandardInput.Close();
-
-        var text = await process.StandardOutput.ReadToEndAsync(ct);
-        var stderr = await process.StandardError.ReadToEndAsync(ct);
-        await process.WaitForExitAsync(ct);
-
-        if (process.ExitCode != 0)
+        if (exitCode != 0)
         {
             logger.LogWarning("Tesseract exited with code {ExitCode}: {StdErr}",
-                process.ExitCode, stderr);
+                exitCode, stderr);
             return null;
         }
 

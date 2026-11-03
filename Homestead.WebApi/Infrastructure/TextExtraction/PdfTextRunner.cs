@@ -1,6 +1,4 @@
 using System.ComponentModel;
-using System.Diagnostics;
-using System.Text;
 using System.Text.RegularExpressions;
 
 namespace Homestead.WebApi.Infrastructure.TextExtraction;
@@ -52,22 +50,10 @@ public partial class PdfTextRunner(ILogger<PdfTextRunner> logger) : IPdfTextRunn
 
     public async Task<IReadOnlyList<string>?> ExtractPagesAsync(string filePath, CancellationToken ct)
     {
-        using var process = new Process();
-        process.StartInfo = new ProcessStartInfo
-        {
-            FileName = "pdftotext",
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            StandardOutputEncoding = Encoding.UTF8,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-        foreach (var arg in BuildArguments(filePath))
-            process.StartInfo.ArgumentList.Add(arg);
-
+        ExternalProcessResult result;
         try
         {
-            process.Start();
+            result = await ExternalProcess.RunAsync("pdftotext", BuildArguments(filePath), stdin: null, ct);
         }
         catch (Win32Exception ex)
         {
@@ -77,34 +63,16 @@ public partial class PdfTextRunner(ILogger<PdfTextRunner> logger) : IPdfTextRunn
             return null;
         }
 
-        try
+        if (result.ExitCode != 0)
         {
-            // Read both streams concurrently: reading them one after the other deadlocks once the
-            // unread one fills its pipe buffer.
-            var stdoutTask = process.StandardOutput.ReadToEndAsync(ct);
-            var stderrTask = process.StandardError.ReadToEndAsync(ct);
-            await Task.WhenAll(stdoutTask, stderrTask);
-            await process.WaitForExitAsync(ct);
-
-            var stderr = stderrTask.Result;
-            if (process.ExitCode != 0)
-            {
-                logger.LogWarning("pdftotext exited with code {ExitCode} for {FilePath}: {StdErr}",
-                    process.ExitCode, filePath, stderr);
-                return null;
-            }
-
-            if (!string.IsNullOrWhiteSpace(stderr))
-                logger.LogDebug("pdftotext stderr for {FilePath}: {StdErr}", filePath, stderr);
-
-            return SplitPages(stdoutTask.Result).Select(CompactLayout).ToList();
+            logger.LogWarning("pdftotext exited with code {ExitCode} for {FilePath}: {StdErr}",
+                result.ExitCode, filePath, result.StdErr);
+            return null;
         }
-        catch (OperationCanceledException)
-        {
-            // Don't leave the process running after the job that wanted it has gone.
-            try { process.Kill(entireProcessTree: true); }
-            catch (Exception killEx) when (killEx is InvalidOperationException or Win32Exception) { }
-            throw;
-        }
+
+        if (!string.IsNullOrWhiteSpace(result.StdErr))
+            logger.LogDebug("pdftotext stderr for {FilePath}: {StdErr}", filePath, result.StdErr);
+
+        return SplitPages(result.StdOut).Select(CompactLayout).ToList();
     }
 }

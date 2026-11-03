@@ -27,5 +27,9 @@ public interface ITextExtractionEngine
     // engine reads as unavailable-with-reason instead of failing at extraction time.
     string? ConfigurationError { get; }
 
+    // The configured per-engine job budget (Ocr:Engines:{key}:JobTimeout), or null for the global
+    // Processing:JobTimeout. See OcrEngineOptions.JobTimeout.
+    TimeSpan? JobTimeout { get; }
+
     Task<TextExtractionOutput> ExtractTextAsync(string filePath, string contentType, CancellationToken ct);
 }

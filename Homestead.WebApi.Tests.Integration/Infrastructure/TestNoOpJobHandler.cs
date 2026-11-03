@@ -15,11 +15,15 @@ namespace Homestead.WebApi.Tests.Integration.Infrastructure;
 /// <param name="FailWith"><c>transient</c> (an HTTP 503), <c>permanent</c>, or <c>structured</c>.</param>
 /// <param name="Block">Park the handler on <see cref="TestJobGate"/> until the test releases it.</param>
 /// <param name="HookThrows">Make <c>OnFinallyFailedAsync</c> throw after recording itself.</param>
+/// <param name="Timeout">What <c>ResolveTimeout</c> declares; null leaves the global budget.</param>
+/// <param name="TimeoutThrows">Make <c>ResolveTimeout</c> throw instead of answering.</param>
 public sealed record TestNoOpPayload(
     int FailTimes = 0,
     string FailWith = TestNoOpPayload.Transient,
     bool Block = false,
-    bool HookThrows = false)
+    bool HookThrows = false,
+    TimeSpan? Timeout = null,
+    bool TimeoutThrows = false)
 {
     public const string Transient = "transient";
     public const string Permanent = "permanent";
@@ -36,6 +40,14 @@ public sealed class TestNoOpJobHandler(TestJobGate gate, JobHookProbe probe) : I
     public ProcessingJobType Type => ProcessingJobType.NoOp;
 
     public int MaxAttempts => 3;
+
+    public TimeSpan? ResolveTimeout(ProcessingJob job)
+    {
+        var payload = Read(job);
+        if (payload.TimeoutThrows)
+            throw new InvalidOperationException("ResolveTimeout threw on purpose.");
+        return payload.Timeout;
+    }
 
     public async Task HandleAsync(ProcessingJob job, CancellationToken ct)
     {

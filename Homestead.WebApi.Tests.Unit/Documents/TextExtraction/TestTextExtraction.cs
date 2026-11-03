@@ -1,7 +1,9 @@
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Domain.Settings;
 using Homestead.WebApi.Infrastructure.TextExtraction;
+using Homestead.WebApi.Processing;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using NSubstitute;
 
 namespace Homestead.WebApi.Tests.Unit.Documents.TextExtraction;
@@ -55,7 +57,11 @@ public static class TestTextExtraction
     public static List<ITextExtractionEngine> Engines() => [Engine(), UnavailableEngine()];
 
     public static TextExtractionHelper Helper(params ITextExtractionEngine[] engines) =>
-        new(engines, Substitute.For<ILogger<TextExtractionHelper>>());
+        Helper(new JobProcessingOptions(), engines);
+
+    // With a specific global job budget — what an engine with no JobTimeout of its own runs under.
+    public static TextExtractionHelper Helper(JobProcessingOptions processing, params ITextExtractionEngine[] engines) =>
+        new(engines, Options.Create(processing), Substitute.For<ILogger<TextExtractionHelper>>());
 
     // A resolver that always answers with the built-in key — the default path, with no Ocr:DefaultEngine.
     public static ITextExtractionEngineResolver Resolver(string key = DefaultKey)

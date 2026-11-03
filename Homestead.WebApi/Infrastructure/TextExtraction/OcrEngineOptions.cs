@@ -35,6 +35,27 @@ public class OcrEngineOptions
             ? TextExtractionEngineType.Tesseract
             : null);
 
+    // --- Any type ---
+
+    // How long a job that runs this engine may take — the budget the OCR job handlers declare to the job
+    // runner (IJobHandler.ResolveTimeout) in place of the global Processing:JobTimeout, which applies when
+    // this is unset. TextExtractionHelper stops the engine a margin short of it, so a slow extraction
+    // degrades to "no text" instead of the whole job timing out. Set it for engines that are slow by
+    // nature (a CPU-bound sidecar on a large scan); a value below the global budget shortens the job.
+    //
+    // A TimeSpan, so "00:20:00". A bare number binds as DAYS ("600" is 600 days), hence MaxJobTimeout.
+    public TimeSpan? JobTimeout { get; set; }
+
+    // The longest JobTimeout accepted. Well past any real extraction, and far inside what
+    // CancellationTokenSource.CancelAfter accepts (~49.7 days), which would otherwise throw on every job.
+    public static readonly TimeSpan MaxJobTimeout = TimeSpan.FromDays(1);
+
+    // A JobTimeout fit to run under: set, positive, and within MaxJobTimeout. Anything else is reported
+    // by validation, and treated as unset by everything that schedules a deadline from it — the built-in
+    // engine runs even when its own validation fails.
+    public static TimeSpan? UsableJobTimeout(TimeSpan? value) =>
+        value > TimeSpan.Zero && value <= MaxJobTimeout ? value : null;
+
     // --- Tesseract ---
 
     public string TessDataPath { get; set; } = "tessdata";

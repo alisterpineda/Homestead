@@ -28,6 +28,19 @@ public interface IJobHandler
     bool ShouldRetry(Exception exception) => JobFailureClassifier.IsTransient(exception);
 
     /// <summary>
+    /// The time budget for this run, or null for <see cref="JobProcessingOptions.JobTimeout"/>. Consulted once
+    /// per attempt, before <see cref="HandleAsync"/>. A null, zero or negative answer means the global budget;
+    /// so does one over a day, or a throw, both logged.
+    /// </summary>
+    /// <remarks>
+    /// For a job type whose duration depends on what it is configured to call — the OCR handlers declare
+    /// the budget of the extraction engine they will run (<c>Ocr:Engines:{key}:JobTimeout</c>). It moves
+    /// only the timeout: the lease and its heartbeat are independent of it, and a timed-out job is still
+    /// never retried.
+    /// </remarks>
+    TimeSpan? ResolveTimeout(ProcessingJob job) => null;
+
+    /// <summary>
     /// Called once, after the last attempt has failed and the row is already <c>Failed</c>, so a handler
     /// can mark the entity it was working on failed too. Never called for an attempt that will be retried.
     /// </summary>

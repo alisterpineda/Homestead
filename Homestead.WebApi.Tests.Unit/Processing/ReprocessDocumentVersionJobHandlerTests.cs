@@ -18,6 +18,9 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
     private readonly TestAppDbContext _db;
     private readonly string _mediaPath;
     private readonly ITextExtractionEngine _textExtractionEngine;
+
+    // A second configured engine, so the timeout tests can tell "the stamped engine" from "the built-in one".
+    private readonly ITextExtractionEngine _doclingEngine = TestTextExtraction.Engine("docling");
     private readonly IProcessingNotifier _notifier;
     private readonly IUnitOfWork _unitOfWork;
     private bool _inTransaction;
@@ -40,7 +43,7 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
 
         var storage = Options.Create(new FileStorageOptions { MediaPath = _mediaPath });
 
-        var textExtractionHelper = TestTextExtraction.Helper(_textExtractionEngine);
+        var textExtractionHelper = TestTextExtraction.Helper(_textExtractionEngine, _doclingEngine);
 
         _reprocessVersionText = Substitute.For<IReprocessVersionTextHandler>();
         _reprocessVersionText.HandleAsync(Arg.Any<ReprocessVersionTextCommand>(), Arg.Any<CancellationToken>())
@@ -133,7 +136,7 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
         var (doc, version) = SeedDocumentWithVersion("old text");
         var job = CreateJob(doc.Id, version.Id);
 
-        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
+        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(TestTextExtraction.Output("new extracted text"));
 
         await _handler.HandleAsync(job, ct);
@@ -153,7 +156,7 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
         var (doc, version) = SeedDocumentWithVersion();
         var job = CreateJob(doc.Id, version.Id);
 
-        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
+        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(TestTextExtraction.Output("text"));
 
         await _handler.HandleAsync(job, ct);
@@ -162,7 +165,7 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
         // entry is attributed to whoever enqueued the job; the command runs inside the transaction.
         Received.InOrder(() =>
         {
-            _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct);
+            _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
             _unitOfWork.SetActor(job.CreatedByUserId);
             _unitOfWork.ExecuteInTransactionAsync(Arg.Any<Func<Task<ReprocessVersionTextResult>>>(), ct);
         });
@@ -176,7 +179,7 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
         var (doc, version) = SeedDocumentWithVersion();
         var job = CreateJob(doc.Id, version.Id);
 
-        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
+        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(TestTextExtraction.Output("text"));
 
         _reprocessVersionText.HandleAsync(Arg.Any<ReprocessVersionTextCommand>(), Arg.Any<CancellationToken>())
@@ -203,7 +206,7 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
         var job = CreateJob(doc.Id, version.Id);
         job.ParentJobId = Guid.NewGuid();
 
-        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
+        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(TestTextExtraction.Output("text"));
 
         await _handler.HandleAsync(job, ct);
@@ -239,7 +242,7 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
         var (doc, version) = SeedDocumentWithVersion("existing text");
         var job = CreateJob(doc.Id, version.Id);
 
-        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
+        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns<TextExtractionOutput>(x => throw new Exception("OCR failed"));
 
         await Assert.ThrowsAsync<TextExtractionFailedException>(
@@ -256,7 +259,7 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
         var (doc, version) = SeedDocumentWithVersion("existing text");
         var job = CreateJob(doc.Id, version.Id);
 
-        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
+        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns<TextExtractionOutput>(x => throw new Exception("OCR failed"));
 
         var ex = await Assert.ThrowsAsync<TextExtractionFailedException>(
@@ -278,5 +281,71 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
 
         await _reprocessVersionText.Received(1).HandleAsync(
             Arg.Is<ReprocessVersionTextCommand>(c => c.ExtractedText == null), ct);
+    }
+
+    // --- Per-engine job budget ---
+
+    [Fact]
+    public void ResolveTimeout_IsTheStampedEnginesJobTimeout()
+    {
+        var job = CreateJob(Guid.NewGuid(), Guid.NewGuid());
+        job.Payload = JsonSerializer.Serialize(
+            new ReprocessDocumentVersionPayload(Guid.NewGuid(), Guid.NewGuid(), "docling"));
+        _textExtractionEngine.JobTimeout.Returns(TimeSpan.FromMinutes(1));
+        _doclingEngine.JobTimeout.Returns(TimeSpan.FromMinutes(20));
+
+        Assert.Equal(TimeSpan.FromMinutes(20), _handler.ResolveTimeout(job));
+    }
+
+    [Fact]
+    public void ResolveTimeout_EngineWithoutABudget_IsNull()
+    {
+        var job = CreateJob(Guid.NewGuid(), Guid.NewGuid());
+
+        Assert.Null(_handler.ResolveTimeout(job));
+    }
+
+    // A key that no longer resolves runs the built-in engine, so it gets that engine's budget.
+    [Fact]
+    public void ResolveTimeout_DanglingStampedKey_IsTheBuiltInEnginesBudget()
+    {
+        var job = CreateJob(Guid.NewGuid(), Guid.NewGuid());
+        job.Payload = JsonSerializer.Serialize(
+            new ReprocessDocumentVersionPayload(Guid.NewGuid(), Guid.NewGuid(), "deleted-engine"));
+        _textExtractionEngine.JobTimeout.Returns(TimeSpan.FromMinutes(7));
+
+        Assert.Equal(TimeSpan.FromMinutes(7), _handler.ResolveTimeout(job));
+    }
+
+    [Fact]
+    public void ResolveTimeout_NoPayload_IsNull()
+    {
+        var job = CreateJob(Guid.NewGuid(), Guid.NewGuid());
+        job.Payload = null;
+
+        Assert.Null(_handler.ResolveTimeout(job));
+    }
+
+    // A reprocess has no "carry on without text": past its deadline it fails loudly, as a structured
+    // text_extraction_failed rather than a job timeout.
+    [Fact]
+    public async Task HandleAsync_ExtractionPastItsDeadline_FailsAsTextExtractionFailed()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (doc, version) = SeedDocumentWithVersion("existing text");
+        var job = CreateJob(doc.Id, version.Id);
+        _textExtractionEngine.JobTimeout.Returns(TimeSpan.FromMilliseconds(200));
+        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(async call =>
+            {
+                await Task.Delay(Timeout.Infinite, call.Arg<CancellationToken>());
+                return TestTextExtraction.Output("never");
+            });
+
+        var ex = await Assert.ThrowsAsync<TextExtractionFailedException>(() => _handler.HandleAsync(job, ct));
+
+        Assert.IsType<TimeoutException>(ex.InnerException);
+        await _reprocessVersionText.DidNotReceive().HandleAsync(
+            Arg.Any<ReprocessVersionTextCommand>(), Arg.Any<CancellationToken>());
     }
 }

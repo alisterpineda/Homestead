@@ -48,7 +48,26 @@ public static class OcrEngineConfiguration
         configuredDefault ?? OcrEngineOptions.BuiltInTesseractKey;
 
     // Returns null when the instance is usable, else a human-readable reason shown in the picker.
-    public static string? Validate(string key, OcrEngineOptions options) => options.ResolveType(key) switch
+    public static string? Validate(string key, OcrEngineOptions options) =>
+        ValidateCommon(options) ?? ValidateType(key, options);
+
+    // Checks every type shares, run before the per-type ones.
+    private static string? ValidateCommon(OcrEngineOptions options)
+    {
+        // Zero or negative would cancel every extraction before it started. Not floored silently the way
+        // Processing:JobTimeout is: an engine-specific budget is a deliberate setting, so a bad one says so.
+        if (options.JobTimeout is { } timeout && timeout <= TimeSpan.Zero)
+            return "JobTimeout must be positive when set.";
+
+        // Usually a unit slip: "600" meant as seconds binds as 600 days.
+        if (options.JobTimeout > OcrEngineOptions.MaxJobTimeout)
+            return $"JobTimeout must be at most {OcrEngineOptions.MaxJobTimeout:c}. It is a TimeSpan (hh:mm:ss, "
+                + "e.g. 00:20:00); a bare number is read as days.";
+
+        return null;
+    }
+
+    private static string? ValidateType(string key, OcrEngineOptions options) => options.ResolveType(key) switch
     {
         TextExtractionEngineType.Tesseract => ValidateTesseract(options),
         TextExtractionEngineType.AzureDocumentIntelligence => ValidateAzure(options),

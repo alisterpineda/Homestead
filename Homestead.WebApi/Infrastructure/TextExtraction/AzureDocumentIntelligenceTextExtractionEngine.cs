@@ -29,6 +29,8 @@ public class AzureDocumentIntelligenceTextExtractionEngine(
     public string? ConfigurationError { get; } = OcrEngineConfiguration.Validate(key, options);
     public bool IsConfigured => ConfigurationError is null;
 
+    public TimeSpan? JobTimeout => options.JobTimeout;
+
     public async Task<TextExtractionOutput> ExtractTextAsync(
         string filePath, string contentType, CancellationToken ct)
     {

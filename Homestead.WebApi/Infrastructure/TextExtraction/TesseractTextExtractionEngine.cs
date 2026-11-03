@@ -36,6 +36,8 @@ public class TesseractTextExtractionEngine(
     public string? ConfigurationError { get; } = OcrEngineConfiguration.Validate(key, options);
     public bool IsConfigured => ConfigurationError is null;
 
+    public TimeSpan? JobTimeout => options.JobTimeout;
+
     private static string ResolveLanguage(List<TesseractLanguage> languages) =>
         languages is { Count: > 0 }
             ? string.Join("+", languages.Select(l => l.ToString().ToLowerInvariant()))
