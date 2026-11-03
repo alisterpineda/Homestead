@@ -32,6 +32,9 @@ public record TextExtractionProvenanceResponse
     public int? PagesFromTextLayer { get; init; }
     public int? PagesOcred { get; init; }
 
+    /// <summary>"poppler" or "pdfpig" — which tool read a PDF's text layer. Null for images.</summary>
+    public string? TextLayerExtractor { get; init; }
+
     // --- Azure Document Intelligence ---
     public string? ModelId { get; init; }
     public AzureOutputContentFormat? OutputContentFormat { get; init; }
@@ -53,7 +56,8 @@ public record TextExtractionProvenanceResponse
                 Psm = t.Psm,
                 Oem = t.Oem,
                 PagesFromTextLayer = t.PagesFromTextLayer,
-                PagesOcred = t.PagesOcred
+                PagesOcred = t.PagesOcred,
+                TextLayerExtractor = t.TextLayerExtractor
             },
             AzureDocumentIntelligenceTextExtractionMetadata a => Base(a, TextExtractionMetadata.AzureDocumentIntelligenceSlug) with
             {

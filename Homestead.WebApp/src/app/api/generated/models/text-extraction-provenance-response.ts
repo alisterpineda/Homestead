@@ -17,4 +17,5 @@ export interface TextExtractionProvenanceResponse {
   pagesOcred?: (number | null);
   psm?: (number | null);
   requestedEngineKey?: (string | null);
+  textLayerExtractor?: (string | null);
 }

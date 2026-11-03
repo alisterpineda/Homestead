@@ -97,6 +97,9 @@ public abstract record TextExtractionMetadata
 
 public record TesseractTextExtractionMetadata : TextExtractionMetadata
 {
+    public const string PopplerTextLayer = "poppler";
+    public const string PdfPigTextLayer = "pdfpig";
+
     /// <summary>The tesseract -l argument, e.g. "eng" or "eng+fra".</summary>
     public required string Language { get; init; }
 
@@ -108,12 +111,25 @@ public record TesseractTextExtractionMetadata : TextExtractionMetadata
     /// Pages whose text came from the PDF's embedded text layer, and pages that were rasterized and OCR'd.
     /// The highest-value fields here: the hybrid PDF path silently picks one branch per page, and without
     /// these the choice is unknowable after the fact without re-running the extraction. A born-digital
-    /// bank statement showing PagesOcred: 0 is the proof that its badly-spaced text came from PdfPig's
-    /// page.Text rather than from OCR.
+    /// bank statement showing PagesOcred: 0 is the proof that its text came from the embedded text layer
+    /// (read by <see cref="TextLayerExtractor"/>) rather than from OCR.
     /// </summary>
     public int PagesFromTextLayer { get; init; }
 
     public int PagesOcred { get; init; }
+
+    /// <summary>
+    /// Which tool read a PDF's embedded text layer: <see cref="PopplerTextLayer"/> (<c>pdftotext -layout</c>,
+    /// column alignment kept) or <see cref="PdfPigTextLayer"/> (the fallback when pdftotext is missing,
+    /// fails, or disagrees with PdfPig on the page count — columns flattened into prose). Null for images,
+    /// where no text-layer pass runs, and for every version extracted before this field existed.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately nullable and NOT <c>required</c>: <see cref="TextExtractionMetadata.Deserialize"/> binds
+    /// this record directly, and a required member missing from an existing jsonb blob would throw —
+    /// which Deserialize turns into null, erasing every pre-existing version's provenance.
+    /// </remarks>
+    public string? TextLayerExtractor { get; init; }
 }
 
 public record AzureDocumentIntelligenceTextExtractionMetadata : TextExtractionMetadata

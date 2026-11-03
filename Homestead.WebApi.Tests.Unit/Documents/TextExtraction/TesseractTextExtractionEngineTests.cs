@@ -6,6 +6,7 @@ using NSubstitute;
 using SkiaSharp;
 using UglyToad.PdfPig.Content;
 using UglyToad.PdfPig.Core;
+using UglyToad.PdfPig.Fonts.Standard14Fonts;
 using UglyToad.PdfPig.Writer;
 
 namespace Homestead.WebApi.Tests.Unit.Documents.TextExtraction;
@@ -13,18 +14,24 @@ namespace Homestead.WebApi.Tests.Unit.Documents.TextExtraction;
 public class TesseractTextExtractionEngineTests : IDisposable
 {
     private readonly ITesseractRunner _runner;
+    private readonly IPdfTextRunner _pdfText;
     private readonly TesseractTextExtractionEngine _sut;
     private readonly string _tempFile;
 
     public TesseractTextExtractionEngineTests()
     {
         _runner = Substitute.For<ITesseractRunner>();
+        _pdfText = Substitute.For<IPdfTextRunner>();
+        // Stubbed explicitly to the "pdftotext unavailable" answer: left alone, NSubstitute hands back an
+        // empty substitute list, which would silently exercise the page-count-mismatch path instead.
+        _pdfText.ExtractPagesAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns((IReadOnlyList<string>?)null);
         _sut = EngineWith(new OcrEngineOptions());
         _tempFile = Path.GetTempFileName();
     }
 
     private TesseractTextExtractionEngine EngineWith(OcrEngineOptions options, string key = "tesseract") =>
-        new(key, options, _runner, Substitute.For<ILogger<TesseractTextExtractionEngine>>());
+        new(key, options, _runner, _pdfText, Substitute.For<ILogger<TesseractTextExtractionEngine>>());
 
     public void Dispose()
     {
@@ -137,6 +144,106 @@ public class TesseractTextExtractionEngineTests : IDisposable
         Assert.Equal(0, metadata.PagesFromTextLayer);
         Assert.Equal(1, metadata.PagesOcred);
         Assert.Null(metadata.RequestedEngineKey);
+        // No text-layer pass runs for an image.
+        Assert.Null(metadata.TextLayerExtractor);
+        await _pdfText.DidNotReceive().ExtractPagesAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ExtractTextAsync_PdfPopplerReadsEveryPage_UsesPopplerTextAndSkipsOcr()
+    {
+        File.WriteAllBytes(_tempFile, BuildTextThenImagePdf());
+        _pdfText.ExtractPagesAsync(_tempFile, Arg.Any<CancellationToken>())
+            .Returns(["\n\n  Col A    Col B  \n", "Second   page\n"]);
+
+        var result = await _sut.ExtractTextAsync(_tempFile, "application/pdf", CancellationToken.None);
+
+        // Poppler's text, not PdfPig's: leading blank lines dropped but the first line's indentation (a
+        // column position under -layout) kept; trailing whitespace dropped per page.
+        Assert.Equal("  Col A    Col B" + Environment.NewLine + "Second   page", result.Text);
+        var metadata = Assert.IsType<TesseractTextExtractionMetadata>(result.Metadata);
+        Assert.Equal(2, metadata.PagesFromTextLayer);
+        Assert.Equal(0, metadata.PagesOcred);
+        Assert.Equal(TesseractTextExtractionMetadata.PopplerTextLayer, metadata.TextLayerExtractor);
+        await _runner.DidNotReceive().OcrAsync(
+            Arg.Any<Stream>(), Arg.Any<TesseractRunOptions>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ExtractTextAsync_PdfPopplerPageBlank_OcrsJustThatPage()
+    {
+        File.WriteAllBytes(_tempFile, BuildTextThenImagePdf());
+        _pdfText.ExtractPagesAsync(_tempFile, Arg.Any<CancellationToken>())
+            .Returns(["poppler text\n", "  \n"]);
+        _runner.OcrAsync(Arg.Any<Stream>(), Arg.Any<TesseractRunOptions>(), Arg.Any<CancellationToken>())
+            .Returns("scanned text");
+
+        var result = await _sut.ExtractTextAsync(_tempFile, "application/pdf", CancellationToken.None);
+
+        Assert.Equal("poppler text" + Environment.NewLine + "scanned text", result.Text);
+        var metadata = Assert.IsType<TesseractTextExtractionMetadata>(result.Metadata);
+        Assert.Equal(1, metadata.PagesFromTextLayer);
+        Assert.Equal(1, metadata.PagesOcred);
+        Assert.Equal(TesseractTextExtractionMetadata.PopplerTextLayer, metadata.TextLayerExtractor);
+        await _runner.Received(1).OcrAsync(
+            Arg.Any<Stream>(), Arg.Any<TesseractRunOptions>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ExtractTextAsync_PdfPopplerUnavailable_FallsBackToPdfPig()
+    {
+        // _pdfText answers null (pdftotext missing or failed) by default.
+        File.WriteAllBytes(_tempFile, BuildTextThenImagePdf());
+        _runner.OcrAsync(Arg.Any<Stream>(), Arg.Any<TesseractRunOptions>(), Arg.Any<CancellationToken>())
+            .Returns("scanned text");
+
+        var result = await _sut.ExtractTextAsync(_tempFile, "application/pdf", CancellationToken.None);
+
+        Assert.Contains(PdfPigPageText, result.Text);
+        var metadata = Assert.IsType<TesseractTextExtractionMetadata>(result.Metadata);
+        Assert.Equal(1, metadata.PagesFromTextLayer);
+        Assert.Equal(1, metadata.PagesOcred);
+        Assert.Equal(TesseractTextExtractionMetadata.PdfPigTextLayer, metadata.TextLayerExtractor);
+    }
+
+    // The runner's contract is null-on-failure, but a throw must not cost the PDF its text either.
+    [Fact]
+    public async Task ExtractTextAsync_PdfTextRunnerThrows_FallsBackToPdfPig()
+    {
+        File.WriteAllBytes(_tempFile, BuildTextThenImagePdf());
+        _pdfText.ExtractPagesAsync(_tempFile, Arg.Any<CancellationToken>())
+            .Returns<IReadOnlyList<string>?>(_ => throw new IOException("pipe broke"));
+        _runner.OcrAsync(Arg.Any<Stream>(), Arg.Any<TesseractRunOptions>(), Arg.Any<CancellationToken>())
+            .Returns("scanned text");
+
+        var result = await _sut.ExtractTextAsync(_tempFile, "application/pdf", CancellationToken.None);
+
+        Assert.Contains(PdfPigPageText, result.Text);
+        var metadata = Assert.IsType<TesseractTextExtractionMetadata>(result.Metadata);
+        Assert.Equal(1, metadata.PagesFromTextLayer);
+        Assert.Equal(1, metadata.PagesOcred);
+        Assert.Equal(TesseractTextExtractionMetadata.PdfPigTextLayer, metadata.TextLayerExtractor);
+    }
+
+    // An embedded form feed in the text splits a page in two, so Poppler reports MORE pages than the PDF
+    // has; fewer is the defensive case. Either way the per-page text can't be trusted to line up.
+    [Theory]
+    [InlineData(1)]
+    [InlineData(3)]
+    public async Task ExtractTextAsync_PdfPopplerPageCountMismatch_FallsBackToPdfPig(int popplerPageCount)
+    {
+        File.WriteAllBytes(_tempFile, BuildTextThenImagePdf());
+        _pdfText.ExtractPagesAsync(_tempFile, Arg.Any<CancellationToken>())
+            .Returns(Enumerable.Repeat("only one page from poppler", popplerPageCount).ToList());
+        _runner.OcrAsync(Arg.Any<Stream>(), Arg.Any<TesseractRunOptions>(), Arg.Any<CancellationToken>())
+            .Returns("scanned text");
+
+        var result = await _sut.ExtractTextAsync(_tempFile, "application/pdf", CancellationToken.None);
+
+        Assert.Contains(PdfPigPageText, result.Text);
+        Assert.DoesNotContain("only one page from poppler", result.Text);
+        var metadata = Assert.IsType<TesseractTextExtractionMetadata>(result.Metadata);
+        Assert.Equal(TesseractTextExtractionMetadata.PdfPigTextLayer, metadata.TextLayerExtractor);
     }
 
     [Fact]
@@ -191,16 +298,33 @@ public class TesseractTextExtractionEngineTests : IDisposable
     // so the engine must rasterize the page (PDFtoImage) and hand the render to tesseract.
     private static byte[] BuildImageOnlyPdf()
     {
+        var builder = new PdfDocumentBuilder();
+        var page = builder.AddPage(PageSize.A4);
+        page.AddPng(SteelBluePng(), new PdfRectangle(50, 500, 250, 600));
+        return builder.Build();
+    }
+
+    private const string PdfPigPageText = "Embedded text layer";
+
+    // A two-page A4 PDF: page 1 carries a real text layer, page 2 only the SteelBlue PNG. Built in-test
+    // rather than added under tests/fixtures, whose README asks for a written reason per fixture.
+    private static byte[] BuildTextThenImagePdf()
+    {
+        var builder = new PdfDocumentBuilder();
+        var font = builder.AddStandard14Font(Standard14Font.Helvetica);
+        builder.AddPage(PageSize.A4).AddText(PdfPigPageText, 12, new PdfPoint(50, 700), font);
+        builder.AddPage(PageSize.A4).AddPng(SteelBluePng(), new PdfRectangle(50, 500, 250, 600));
+        return builder.Build();
+    }
+
+    private static byte[] SteelBluePng()
+    {
         using var bitmap = new SKBitmap(200, 100);
         using (var canvas = new SKCanvas(bitmap))
             canvas.Clear(SKColors.SteelBlue);
         using var image = SKImage.FromBitmap(bitmap);
         using var png = image.Encode(SKEncodedImageFormat.Png, 100);
-
-        var builder = new PdfDocumentBuilder();
-        var page = builder.AddPage(PageSize.A4);
-        page.AddPng(png.ToArray(), new PdfRectangle(50, 500, 250, 600));
-        return builder.Build();
+        return png.ToArray();
     }
 
     private static bool IsPng(byte[] bytes) =>

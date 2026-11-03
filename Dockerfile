@@ -25,7 +25,8 @@ RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 # tzdata: required by JobSchedulerService for IANA timezone lookups — do not remove.
 # ca-certificates: busybox wget needs it for the HTTPS tessdata download below.
 # tessdata language packages are NOT installed here — models are pinned via fetch-tessdata.sh.
-RUN apk add --no-cache tzdata tesseract-ocr fontconfig ca-certificates
+# poppler-utils: pdftotext -layout reads PDF text layers with column alignment (PdfPig is the fallback).
+RUN apk add --no-cache tzdata tesseract-ocr poppler-utils fontconfig ca-certificates
 
 # Pinned tessdata_best models (languages from tessdata.manifest, frozen to tessdata.ref).
 # Kept before the app COPYs so app-code changes don't invalidate this download layer.

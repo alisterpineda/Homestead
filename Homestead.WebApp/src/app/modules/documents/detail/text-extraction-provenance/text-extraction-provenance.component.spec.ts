@@ -44,6 +44,30 @@ describe('TextExtractionProvenanceComponent', () => {
     );
   });
 
+  it('names the tool that read the text layer', () => {
+    fixture.componentRef.setInput('provenance', { ...TESSERACT, textLayerExtractor: 'poppler' });
+    expect(component.detail()).toBe(
+      "Tesseract (eng) · 12 page(s) from embedded text layer (pdftotext -layout), 0 OCR'd",
+    );
+
+    fixture.componentRef.setInput('provenance', { ...TESSERACT, textLayerExtractor: 'pdfpig' });
+    expect(component.detail()).toBe(
+      "Tesseract (eng) · 12 page(s) from embedded text layer (PdfPig), 0 OCR'd",
+    );
+  });
+
+  // A fully OCR'd scan never ran a text-layer read worth naming.
+  it('omits the extractor when no page came from the text layer', () => {
+    fixture.componentRef.setInput('provenance', {
+      ...TESSERACT,
+      pagesFromTextLayer: 0,
+      pagesOcred: 3,
+      textLayerExtractor: 'poppler',
+    });
+
+    expect(component.detail()).toBe("Tesseract (eng) · 0 page(s) from embedded text layer, 3 OCR'd");
+  });
+
   it('reports the Azure model, format and analyzed page count', () => {
     fixture.componentRef.setInput('provenance', AZURE);
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-sudo apt-get update && sudo apt-get install -y tmux tesseract-ocr
+sudo apt-get update && sudo apt-get install -y tmux tesseract-ocr poppler-utils
 
 cp .devcontainer/tmux.conf "$HOME/.tmux.conf"
 

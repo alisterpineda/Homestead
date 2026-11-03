@@ -40,6 +40,36 @@ public class TextExtractionMetadataTests
     }
 
     [Fact]
+    public void Serialize_Tesseract_WritesTextLayerExtractorWhenSet()
+    {
+        var json = Serialize(new TesseractTextExtractionMetadata
+        {
+            EngineKey = "tesseract",
+            ExtractedAt = ExtractedAt,
+            Language = "eng",
+            PagesFromTextLayer = 3,
+            TextLayerExtractor = TesseractTextExtractionMetadata.PopplerTextLayer
+        });
+
+        Assert.Equal("poppler", json.GetProperty("textLayerExtractor").GetString());
+    }
+
+    // Images run no text-layer pass, so the key stays out of the blob rather than reading as "unknown".
+    [Fact]
+    public void Serialize_Tesseract_OmitsTextLayerExtractorWhenNull()
+    {
+        var json = Serialize(new TesseractTextExtractionMetadata
+        {
+            EngineKey = "tesseract",
+            ExtractedAt = ExtractedAt,
+            Language = "eng",
+            PagesOcred = 1
+        });
+
+        Assert.False(json.TryGetProperty("textLayerExtractor", out _));
+    }
+
+    [Fact]
     public void Serialize_Azure_WritesTypeSlugKeyAndEnumAsCamelCaseString()
     {
         var json = Serialize(new AzureDocumentIntelligenceTextExtractionMetadata
@@ -110,6 +140,8 @@ public class TextExtractionMetadataTests
         Assert.Equal("tesseract", metadata.EngineKey);
         Assert.Equal(12, metadata.PagesFromTextLayer);
         Assert.Equal(300, metadata.Dpi);
+        // This blob predates textLayerExtractor: old rows must keep reading, with the field simply null.
+        Assert.Null(metadata.TextLayerExtractor);
     }
 
     [Fact]
@@ -147,7 +179,12 @@ public class TextExtractionMetadataTests
     {
         TextExtractionMetadata original = expected == typeof(TesseractTextExtractionMetadata)
             ? new TesseractTextExtractionMetadata
-            { EngineKey = "tesseract", ExtractedAt = ExtractedAt, Language = "eng+fra" }
+            {
+                EngineKey = "tesseract",
+                ExtractedAt = ExtractedAt,
+                Language = "eng+fra",
+                TextLayerExtractor = TesseractTextExtractionMetadata.PdfPigTextLayer
+            }
             : new AzureDocumentIntelligenceTextExtractionMetadata
             {
                 EngineKey = "azure-layout",
@@ -183,6 +220,7 @@ public class TextExtractionMetadataTests
         Assert.Equal(12, response.PageCount);
         Assert.Null(response.Language);
         Assert.Null(response.PagesOcred);
+        Assert.Null(response.TextLayerExtractor);
     }
 
     [Fact]
@@ -194,7 +232,8 @@ public class TextExtractionMetadataTests
             ExtractedAt = ExtractedAt,
             Language = "eng",
             PagesFromTextLayer = 12,
-            PagesOcred = 0
+            PagesOcred = 0,
+            TextLayerExtractor = TesseractTextExtractionMetadata.PopplerTextLayer
         });
 
         var response = TextExtractionProvenanceResponse.From(json)!;
@@ -202,6 +241,7 @@ public class TextExtractionMetadataTests
         Assert.Equal("tesseract", response.Engine);
         Assert.Equal(12, response.PagesFromTextLayer);
         Assert.Equal(0, response.PagesOcred);
+        Assert.Equal("poppler", response.TextLayerExtractor);
         Assert.Null(response.ModelId);
         Assert.Null(response.PageCount);
     }

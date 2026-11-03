@@ -8,6 +8,7 @@ public static class TextExtractionServiceExtensions
     {
         // Stateless and shared by every Tesseract instance — it takes its per-run options as a parameter.
         services.AddSingleton<ITesseractRunner, TesseractRunner>();
+        services.AddSingleton<IPdfTextRunner, PdfTextRunner>();
 
         // One registration per configured instance, enumerable rather than keyed: MS DI cannot enumerate
         // keyed registrations, and enumeration is what feeds the picker. That keeps config the single
@@ -34,6 +35,7 @@ public static class TextExtractionServiceExtensions
                 key,
                 options,
                 sp.GetRequiredService<ITesseractRunner>(),
+                sp.GetRequiredService<IPdfTextRunner>(),
                 sp.GetRequiredService<ILogger<TesseractTextExtractionEngine>>()),
 
             // The runner is built per engine instance rather than resolved from DI: it holds this
@@ -57,6 +59,7 @@ public static class TextExtractionServiceExtensions
                 key,
                 options,
                 sp.GetRequiredService<ITesseractRunner>(),
+                sp.GetRequiredService<IPdfTextRunner>(),
                 sp.GetRequiredService<ILogger<TesseractTextExtractionEngine>>())
         };
 }

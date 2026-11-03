@@ -116,7 +116,7 @@ public class TextExtractionEngineTests : IntegrationTestBase
     private record ProvenanceItem(
         string Engine, string EngineKey, DateTimeOffset ExtractedAt,
         string? RequestedEngineKey, string? FallbackReason,
-        string? Language, int? PagesFromTextLayer, int? PagesOcred,
+        string? Language, int? PagesFromTextLayer, int? PagesOcred, string? TextLayerExtractor,
         string? ModelId, int? PageCount);
 
     private record DocumentWithProvenance(Guid Id, string? ExtractedText, ProvenanceItem? TextExtraction);
@@ -147,6 +147,12 @@ public class TextExtractionEngineTests : IntegrationTestBase
         Assert.Null(provenance.RequestedEngineKey);
         Assert.Null(provenance.FallbackReason);
 
+        // sample.pdf is a one-page born-digital PDF: its text layer was read by Poppler, nothing OCR'd.
+        // Needs pdftotext on PATH (poppler-utils — the Docker image, devcontainer and CI install it).
+        Assert.Equal("poppler", provenance.TextLayerExtractor);
+        Assert.Equal(1, provenance.PagesFromTextLayer);
+        Assert.Equal(0, provenance.PagesOcred);
+
         // Azure-only fields stay absent on the flattened DTO.
         Assert.Null(provenance.ModelId);
         Assert.Null(provenance.PageCount);
@@ -175,10 +181,12 @@ public class TextExtractionEngineTests : IntegrationTestBase
         Assert.Equal("tesseract", provenance.EngineKey);
         Assert.Null(provenance.RequestedEngineKey);
 
-        // The sample is a scanned PDF with no embedded text layer, so every page took the OCR branch.
-        // This pair is what makes the hybrid path's per-page decision visible after the fact.
-        Assert.NotNull(provenance.PagesOcred);
-        Assert.NotNull(provenance.PagesFromTextLayer);
+        // sample.pdf is a one-page born-digital PDF, so its one page came from the text layer (read by
+        // Poppler) and none took the OCR branch. This pair is what makes the hybrid path's per-page
+        // decision visible after the fact.
+        Assert.Equal("poppler", provenance.TextLayerExtractor);
+        Assert.Equal(1, provenance.PagesFromTextLayer);
+        Assert.Equal(0, provenance.PagesOcred);
     }
 
     // Provenance describes the extraction that produced the text. Once a human edits that text, the

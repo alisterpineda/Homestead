@@ -10,6 +10,7 @@ public class TesseractTextExtractionEngine(
     string key,
     OcrEngineOptions options,
     ITesseractRunner tesseract,
+    IPdfTextRunner pdfText,
     ILogger<TesseractTextExtractionEngine> logger)
     : ITextExtractionEngine
 {
@@ -23,8 +24,9 @@ public class TesseractTextExtractionEngine(
     ];
 
     // Text and how it was obtained, per page. The counts are what make the hybrid PDF branch visible
-    // after the fact — see TesseractTextExtractionMetadata.PagesFromTextLayer.
-    private record PdfExtraction(string? Text, int PagesFromTextLayer, int PagesOcred);
+    // after the fact — see TesseractTextExtractionMetadata.PagesFromTextLayer. TextLayerExtractor is
+    // which tool read the embedded text layer (Poppler, or PdfPig as the fallback).
+    private record PdfExtraction(string? Text, int PagesFromTextLayer, int PagesOcred, string? TextLayerExtractor);
 
     // The Tesseract language argument ("eng" or "eng+fra"), computed once from configured languages.
     private readonly string _language = ResolveLanguage(options.Languages);
@@ -48,19 +50,20 @@ public class TesseractTextExtractionEngine(
         if (SupportedImageTypes.Contains(contentType))
         {
             var text = await ExtractFromImageAsync(filePath, ct);
-            return Output(text, pagesFromTextLayer: 0, pagesOcred: 1);
+            return Output(text, pagesFromTextLayer: 0, pagesOcred: 1, textLayerExtractor: null);
         }
 
         if (contentType is "application/pdf")
         {
             var pdf = await ExtractFromPdfAsync(filePath, ct);
-            return Output(pdf.Text, pdf.PagesFromTextLayer, pdf.PagesOcred);
+            return Output(pdf.Text, pdf.PagesFromTextLayer, pdf.PagesOcred, pdf.TextLayerExtractor);
         }
 
-        return Output(text: null, pagesFromTextLayer: 0, pagesOcred: 0);
+        return Output(text: null, pagesFromTextLayer: 0, pagesOcred: 0, textLayerExtractor: null);
     }
 
-    private TextExtractionOutput Output(string? text, int pagesFromTextLayer, int pagesOcred) =>
+    private TextExtractionOutput Output(
+        string? text, int pagesFromTextLayer, int pagesOcred, string? textLayerExtractor) =>
         new(text, new TesseractTextExtractionMetadata
         {
             EngineKey = key,
@@ -70,7 +73,8 @@ public class TesseractTextExtractionEngine(
             Psm = options.Psm,
             Oem = options.Oem,
             PagesFromTextLayer = pagesFromTextLayer,
-            PagesOcred = pagesOcred
+            PagesOcred = pagesOcred,
+            TextLayerExtractor = textLayerExtractor
         });
 
     private async Task<string?> ExtractFromImageAsync(string filePath, CancellationToken ct)
@@ -83,19 +87,41 @@ public class TesseractTextExtractionEngine(
     {
         var pagesFromTextLayer = 0;
         var pagesOcred = 0;
+        string? textLayerExtractor = null;
 
         try
         {
+            // PdfPig stays the authority on page order and count; Poppler only supplies the text.
             using var document = PdfDocument.Open(filePath);
             var sb = new StringBuilder();
 
+            var popplerPages = await TryReadTextLayerAsync(filePath, ct);
+            var usePoppler = popplerPages is not null && popplerPages.Count == document.NumberOfPages;
+            if (popplerPages is not null && !usePoppler)
+            {
+                // Embedded form feeds in the text would skew the split; PdfPig's per-page text can't.
+                logger.LogWarning(
+                    "pdftotext returned {PopplerPages} pages for {FilePath} but the PDF has {PdfPages}; using PdfPig",
+                    popplerPages.Count, filePath, document.NumberOfPages);
+            }
+            // The runner logs its own warning when pdftotext is missing (once per process) or exits
+            // non-zero (per file); TryReadTextLayerAsync logs anything it throws.
+            textLayerExtractor = usePoppler
+                ? TesseractTextExtractionMetadata.PopplerTextLayer
+                : TesseractTextExtractionMetadata.PdfPigTextLayer;
+
             using var pdfStream = File.OpenRead(filePath);
 
-            foreach (var page in document.GetPages())
+            // By number rather than GetPages(): PdfPig builds a page's letters and Text as it parses it, which
+            // is wasted work for every page when Poppler's text is the one used.
+            for (var pageNumber = 1; pageNumber <= document.NumberOfPages; pageNumber++)
             {
                 ct.ThrowIfCancellationRequested();
 
-                var pageText = page.Text;
+                // Trailing whitespace only: -layout's leading spaces are the column alignment.
+                var pageText = usePoppler
+                    ? popplerPages![pageNumber - 1].TrimEnd()
+                    : document.GetPage(pageNumber).Text;
                 if (!string.IsNullOrWhiteSpace(pageText))
                 {
                     if (sb.Length > 0)
@@ -107,7 +133,7 @@ public class TesseractTextExtractionEngine(
                 }
 
                 // No embedded text on this page — render as image and OCR.
-                var ocrText = await TryOcrPageAsync(pdfStream, page.Number, filePath, ct);
+                var ocrText = await TryOcrPageAsync(pdfStream, pageNumber, filePath, ct);
                 if (!string.IsNullOrWhiteSpace(ocrText))
                 {
                     if (sb.Length > 0)
@@ -119,7 +145,7 @@ public class TesseractTextExtractionEngine(
             }
 
             return new PdfExtraction(
-                sb.Length > 0 ? sb.ToString().Trim() : null, pagesFromTextLayer, pagesOcred);
+                sb.Length > 0 ? TrimText(sb.ToString()) : null, pagesFromTextLayer, pagesOcred, textLayerExtractor);
         }
         catch (OperationCanceledException)
         {
@@ -128,8 +154,39 @@ public class TesseractTextExtractionEngine(
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Failed to extract text from PDF {FilePath}", filePath);
-            return new PdfExtraction(null, pagesFromTextLayer, pagesOcred);
+            return new PdfExtraction(null, pagesFromTextLayer, pagesOcred, textLayerExtractor);
         }
+    }
+
+    // The runner reports a missing or failing pdftotext as null, but anything it throws must still fall
+    // back to PdfPig: inside ExtractFromPdfAsync's catch-all it would cost the PDF all of its text.
+    private async Task<IReadOnlyList<string>?> TryReadTextLayerAsync(string filePath, CancellationToken ct)
+    {
+        try
+        {
+            return await pdfText.ExtractPagesAsync(filePath, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex, "pdftotext failed for {FilePath}; using PdfPig", filePath);
+            return null;
+        }
+    }
+
+    // Drops leading blank LINES but not the first line's indentation, which in -layout output is
+    // column alignment like any other line's.
+    private static string TrimText(string text)
+    {
+        var trimmed = text.TrimEnd();
+        var firstContent = 0;
+        for (var i = 0; i < trimmed.Length; i++)
+        {
+            if (trimmed[i] == '\n')
+                firstContent = i + 1;
+            else if (!char.IsWhiteSpace(trimmed[i]))
+                break;
+        }
+        return trimmed[firstContent..];
     }
 
     // Per-page failure (tesseract missing, render error, etc.) must not discard

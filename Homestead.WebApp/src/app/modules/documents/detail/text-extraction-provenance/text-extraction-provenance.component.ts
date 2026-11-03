@@ -5,6 +5,11 @@ import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideTriangleAlert } from '@ng-icons/lucide';
 import type { TextExtractionProvenanceResponse } from '@/api/generated/models/text-extraction-provenance-response';
 
+const TEXT_LAYER_EXTRACTORS: Record<string, string> = {
+  poppler: 'pdftotext -layout',
+  pdfpig: 'PdfPig',
+};
+
 /**
  * How a version's extracted text was produced. Read-only, and shown only when provenance exists —
  * versions extracted before this was recorded simply show nothing.
@@ -49,7 +54,10 @@ export class TextExtractionProvenanceComponent {
     if (p.engine === 'tesseract') {
       const parts = [`Tesseract (${p.language})`];
       if (p.pagesFromTextLayer || p.pagesOcred) {
-        parts.push(`${p.pagesFromTextLayer ?? 0} page(s) from embedded text layer, ${p.pagesOcred ?? 0} OCR'd`);
+        // Which tool read the text layer: Poppler keeps column alignment, PdfPig (the fallback) flattens it.
+        const extractor = p.pagesFromTextLayer ? TEXT_LAYER_EXTRACTORS[p.textLayerExtractor ?? ''] : undefined;
+        const source = extractor ? `embedded text layer (${extractor})` : 'embedded text layer';
+        parts.push(`${p.pagesFromTextLayer ?? 0} page(s) from ${source}, ${p.pagesOcred ?? 0} OCR'd`);
       }
       return parts.join(' · ');
     }
