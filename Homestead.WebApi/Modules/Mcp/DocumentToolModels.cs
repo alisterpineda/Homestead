@@ -71,7 +71,9 @@ public sealed record ListTagsResult(
     IReadOnlyList<TagItemResult> Items, int Page, int PageSize, int TotalCount, int TotalPages,
     IReadOnlyList<string> Warnings);
 
-public sealed record TagItemResult(string Path, string? Description, int DocumentCount);
+// DocumentCount is the tag's own; TotalDocumentCount counts distinct documents tagged with it or any descendant,
+// so a parent that is never applied directly still shows what sits under it.
+public sealed record TagItemResult(string Path, string? Description, int DocumentCount, int TotalDocumentCount);
 
 public sealed record ListPartiesResult(
     IReadOnlyList<PartyItemResult> Items, int Page, int PageSize, int TotalCount, int TotalPages,

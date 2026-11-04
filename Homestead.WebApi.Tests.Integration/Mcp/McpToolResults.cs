@@ -103,7 +103,7 @@ internal sealed record ListTagsPayload(
     IReadOnlyList<TagItemPayload> Items, int Page, int PageSize, int TotalCount, int TotalPages,
     IReadOnlyList<string> Warnings);
 
-internal sealed record TagItemPayload(string Path, string? Description, int DocumentCount);
+internal sealed record TagItemPayload(string Path, string? Description, int DocumentCount, int TotalDocumentCount);
 
 internal sealed record ListPartiesPayload(
     IReadOnlyList<PartyItemPayload> Items, int Page, int PageSize, int TotalCount, int TotalPages,

@@ -51,11 +51,13 @@ public sealed class DocumentTools(
         [Description("true = at least one tag, false = untagged.")] bool? has_tags = null,
         [Description("true = at least one linked party, false = none.")] bool? has_parties = null,
         [Description("true = has AI suggestions awaiting review, false = none.")] bool? pending_review = null,
+        [Description("true = has a document date, false = undated.")] bool? has_document_date = null,
+        [Description("true = has an expiry date, false = none.")] bool? has_expiry_date = null,
         [Description("Inclusive lower bound on the document date (yyyy-MM-dd).")] string? document_date_from = null,
         [Description("Inclusive upper bound on the document date (yyyy-MM-dd).")] string? document_date_to = null,
         [Description("Inclusive lower bound on the expiry date (yyyy-MM-dd).")] string? expiry_from = null,
         [Description("Inclusive upper bound on the expiry date (yyyy-MM-dd).")] string? expiry_to = null,
-        [Description("name, document_date, expiry_date or updated_at (default: relevance with a query, else updated_at; in the trash, deleted_at). Name sorts case-insensitively; documents without the date sort last in both directions; ties break by updated_at, newest first.")] string? sort_by = null,
+        [Description("name, document_date, expiry_date, created_at or updated_at (default: relevance with a query, else updated_at; in the trash, deleted_at). Name sorts case-insensitively; documents without the date sort last in both directions; ties break by updated_at, newest first.")] string? sort_by = null,
         [Description("asc or desc (default desc); ignored when results are ordered by relevance.")] string? sort_dir = null,
         [Description("Include each document's AI summary as untrusted_summary (null when the document has none).")] bool include_summary = false,
         [Description("Search the trash instead of active documents.")] bool in_trash = false,
@@ -102,6 +104,8 @@ public sealed class DocumentTools(
                 HasTags = has_tags,
                 HasParties = has_parties,
                 HasPendingSuggestions = pending_review,
+                HasDocumentDate = has_document_date,
+                HasExpiryDate = has_expiry_date,
                 IncludeChildTags = include_child_tags,
                 Deleted = in_trash,
                 Page = warnings.Clamp(nameof(page), page, 1, int.MaxValue),
@@ -241,8 +245,9 @@ public sealed class DocumentTools(
 
     [McpServerTool(Name = "list_tags", Title = "List tags",
          ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false),
-     Description("The household's tag taxonomy as `/`-delimited paths. Use only these paths when tagging; never " +
-                 "make up a tag.")]
+     Description("The household's tag taxonomy as `/`-delimited paths, each with its description, `document_count` " +
+                 "(documents tagged with it directly) and `total_document_count` (with it or any tag under it). Use " +
+                 "only these paths when tagging; never make up a tag.")]
     public Task<ListTagsResult> ListTags(
         [Description("Text to match in tag names and paths. Not combinable with parent_path.")] string? search = null,
         [Description("Only the tags under this path (all depths).")] string? parent_path = null,
@@ -273,14 +278,17 @@ public sealed class DocumentTools(
                 PageSize = warnings.Clamp(nameof(page_size), page_size, 1, McpPaging.ListMaxPageSize),
             }, c);
 
+            var totals = await TotalDocumentCountsAsync(result.Items.Select(t => t.Path).ToList(), c);
+
             return new ListTagsResult(
-                result.Items.Select(t => new TagItemResult(t.Path, t.Description, t.DocumentCount)).ToList(),
+                result.Items.Select(t => new TagItemResult(t.Path, t.Description, t.DocumentCount, totals[t.Path])).ToList(),
                 result.Page, result.PageSize, result.TotalCount, result.TotalPages, warnings.Items);
         }, ct);
 
     [McpServerTool(Name = "list_parties", Title = "List parties",
          ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false),
-     Description("People and organisations documents can be linked to. Use these names (matched case-insensitively).")]
+     Description("People and organisations documents can be linked to, each with its description and document count. " +
+                 "Use these names (matched case-insensitively).")]
     public Task<ListPartiesResult> ListParties(
         [Description("Text to match in party names and descriptions.")] string? search = null,
         [Description("1-based page number.")] int page = 1,
@@ -302,6 +310,28 @@ public sealed class DocumentTools(
                 result.Items.Select(p => new PartyItemResult(p.Name, p.Description, p.DocumentCount)).ToList(),
                 result.Page, result.PageSize, result.TotalCount, result.TotalPages, warnings.Items);
         }, ct);
+
+    // Distinct documents tagged with each path or any path under it. The same source as the handler's DocumentCount
+    // (every document-tag row, trashed documents included), read once: a household's rows number in the thousands,
+    // so one scan beats a query per tag of the page.
+    private async Task<Dictionary<string, int>> TotalDocumentCountsAsync(List<string> paths, CancellationToken ct)
+    {
+        if (paths.Count == 0)
+            return [];
+
+        var rows = await db.DocumentTags.AsNoTracking()
+            .Select(dt => new { dt.Tag.Path, dt.DocumentId })
+            .ToListAsync(ct);
+
+        return paths.ToDictionary(
+            path => path,
+            path => rows
+                .Where(r => r.Path == path || r.Path.StartsWith(path + "/", StringComparison.Ordinal))
+                .Select(r => r.DocumentId)
+                .Distinct()
+                .Count(),
+            StringComparer.Ordinal);
+    }
 
     private async Task<Dictionary<Guid, string?>> SummariesAsync(List<Guid> ids, bool inTrash, CancellationToken ct) =>
         await documentQuery.AccessibleDocuments(inTrash ? TrashFilter.TrashedOnly : TrashFilter.ActiveOnly)
@@ -359,9 +389,10 @@ public sealed class DocumentTools(
         "name" => DocumentSortBy.Name,
         "document_date" => DocumentSortBy.DocumentDate,
         "expiry_date" => DocumentSortBy.ExpiryDate,
+        "created_at" => DocumentSortBy.CreatedAt,
         "updated_at" => DocumentSortBy.UpdatedAt,
         _ => throw new ArgumentException(
-            $"sort_by must be name, document_date, expiry_date or updated_at, got '{value}'."),
+            $"sort_by must be name, document_date, expiry_date, created_at or updated_at, got '{value}'."),
     };
 
     private static SortDirection? ParseSortDir(string? value) => value?.Trim().ToLowerInvariant() switch

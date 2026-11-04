@@ -84,13 +84,14 @@ Filters compose with search. All of the following are AND'd against the search p
 - **`GroupId`** — reserved for future scoping; not surfaced in the v1 UI.
 - **`DocumentDateFrom` / `DocumentDateTo`** — an inclusive date range on `DocumentDate` (a document dated exactly on either bound is included). Either end may be given alone for an open-ended range. A document with no document date never satisfies a bound, so any date filter excludes undated documents.
 - **`ExpiryDateFrom` / `ExpiryDateTo`** — the same inclusive range on `ExpiryDate` ("expiring in the next 90 days" is `ExpiryDateFrom=today&ExpiryDateTo=today+90`). Documents without an expiry date never match.
+- **`HasDocumentDate`** / **`HasExpiryDate`** — `true` returns only documents with that date set, `false` only those without; omitted means no filter. The complement of a date range: "what still needs a date" is `HasDocumentDate=false`.
 - **`HasTags`** — `false` returns only untagged documents, `true` only documents with at least one tag; omitted means no filter.
 - **`HasParties`** — the same tri-state on linked parties.
 - **`HasPendingSuggestions`** — `true` returns documents with at least one AI suggestion still in the `Pending` state (the same predicate that drives each row's pending-review indicator), `false` those with none pending — a document whose suggestions are all approved or declined counts as none pending.
 
 A range whose `From` is after its `To` is rejected with a 400 rather than silently returning nothing. All filters run on the access-scoped query before paging, so the total count and page boundaries reflect the filtered set and a filter never reveals a document the user cannot otherwise see.
 
-The date-range, expiry-range and has-* filters are API-level in v1: the list endpoint accepts them, but the list page's filter popover does not surface them yet.
+The date-range, expiry-range and has-* filters (including has-document-date / has-expiry-date) are API-level in v1: the list endpoint accepts them, but the list page's filter popover does not surface them yet.
 
 ## Sort
 

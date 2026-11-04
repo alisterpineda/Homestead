@@ -366,7 +366,7 @@ public partial class DocumentReadToolsTests(PostgresFixture fixture) : Integrati
     [InlineData("document_date_from", "2024-3-7",
         "Invalid input: document_date_from must be a date in yyyy-MM-dd form, got '2024-3-7'.")]
     [InlineData("sort_by", "size",
-        "Invalid input: sort_by must be name, document_date, expiry_date or updated_at, got 'size'.")]
+        "Invalid input: sort_by must be name, document_date, expiry_date, created_at or updated_at, got 'size'.")]
     [InlineData("sort_dir", "sideways", "Invalid input: sort_dir must be asc or desc, got 'sideways'.")]
     public async Task Search_BadInput_IsAnInvalidInputError(string parameter, string value, string expected)
     {
@@ -922,6 +922,78 @@ public partial class DocumentReadToolsTests(PostgresFixture fixture) : Integrati
     }
 
     // --- list_tags / list_parties ---
+
+    [Fact]
+    public async Task ListTags_ReturnsDescriptions_AndCountsDescendantsIntoTheTotal()
+    {
+        var admin = await CreateAdminClientAsync();
+        await CreateTagAsync(admin, "Insurance", description: "Policies and claims");
+        await CreateTagAsync(admin, "Insurance/Disability");
+        await CreateTagAsync(admin, "Insurance/Home");
+        await SeedDocumentAsync(admin, "ltd.pdf", tagPaths: ["Insurance/Disability"]);
+        await SeedDocumentAsync(admin, "both.pdf", tagPaths: ["Insurance/Disability", "Insurance/Home"]);
+        await SeedDocumentAsync(admin, "direct.pdf", tagPaths: ["Insurance"]);
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        var result = await McpToolResults.CallAsync<ListTagsPayload>(client, "list_tags", null, CT);
+
+        // Insurance: one direct document; three distinct documents under it in total (both.pdf counted once).
+        Assert.Equal(
+            ["Insurance: Policies and claims, 1, 3", "Insurance/Disability: , 2, 2", "Insurance/Home: , 1, 1"],
+            result.Items.Select(t => $"{t.Path}: {t.Description}, {t.DocumentCount}, {t.TotalDocumentCount}"));
+    }
+
+    [Fact]
+    public async Task ListParties_ReturnsDescriptions()
+    {
+        var admin = await CreateAdminClientAsync();
+        await CreatePartyAsync(admin, "Acme Insurance", description: "The home insurer");
+        await CreatePartyAsync(admin, "Nobody Inc");
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        var result = await McpToolResults.CallAsync<ListPartiesPayload>(client, "list_parties", null, CT);
+
+        Assert.Equal(["Acme Insurance: The home insurer", "Nobody Inc: "],
+            result.Items.Select(p => $"{p.Name}: {p.Description}"));
+    }
+
+    [Fact]
+    public async Task Search_SortByCreatedAt_OrdersByUpload_NotByLastEdit()
+    {
+        var admin = await CreateAdminClientAsync();
+        var first = await SeedDocumentAsync(admin, "first.pdf");
+        await SeedDocumentAsync(admin, "second.pdf");
+        // Editing the first makes it the most recently updated; created_at still says it came first.
+        (await SendJsonPatchAsync(admin, $"/api/v1/documents/{first}",
+            new List<object> { new { op = "replace", path = "/name", value = (object)"first (renamed).pdf" } })).EnsureSuccessStatusCode();
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        var byCreated = await SearchAsync(client, new() { ["sort_by"] = "created_at", ["sort_dir"] = "desc" });
+        var byUpdated = await SearchAsync(client, new() { ["sort_by"] = "updated_at", ["sort_dir"] = "desc" });
+
+        Assert.Equal(
+            ("second.pdf, first (renamed).pdf", "first (renamed).pdf, second.pdf"),
+            (Csv(byCreated.Items.Select(i => i.Name)), Csv(byUpdated.Items.Select(i => i.Name))));
+    }
+
+    [Fact]
+    public async Task Search_HasDocumentDate_AndHasExpiryDate_Filter()
+    {
+        var admin = await CreateAdminClientAsync();
+        await SeedDocumentAsync(admin, "dated.pdf", documentDate: new DateOnly(2024, 1, 1));
+        await SeedDocumentAsync(admin, "expiring.pdf", expiryDate: new DateOnly(2027, 1, 1));
+        await SeedDocumentAsync(admin, "neither.pdf");
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        var dated = await SearchAsync(client, new() { ["has_document_date"] = true });
+        var undated = await SearchAsync(client, new() { ["has_document_date"] = false });
+        var expiring = await SearchAsync(client, new() { ["has_expiry_date"] = true });
+        var noExpiry = await SearchAsync(client, new() { ["has_expiry_date"] = false, ["has_document_date"] = false });
+
+        Assert.Equal(
+            ("dated.pdf", "expiring.pdf, neither.pdf", "expiring.pdf", "neither.pdf"),
+            (Csv(Names(dated)), Csv(Names(undated)), Csv(Names(expiring)), Csv(Names(noExpiry))));
+    }
 
     [Fact]
     public async Task ListTags_SecondPage_ReturnsTheRemainderWithPageInfo()

@@ -243,6 +243,16 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
             query = query.Where(d => d.ExpiryDate <= expiryDateTo);
         }
 
+        if (request.HasDocumentDate is { } hasDocumentDate)
+        {
+            query = query.Where(d => (d.DocumentDate != null) == hasDocumentDate);
+        }
+
+        if (request.HasExpiryDate is { } hasExpiryDate)
+        {
+            query = query.Where(d => (d.ExpiryDate != null) == hasExpiryDate);
+        }
+
         if (request.HasTags is { } hasTags)
         {
             query = query.Where(d => d.DocumentTags.Any() == hasTags);

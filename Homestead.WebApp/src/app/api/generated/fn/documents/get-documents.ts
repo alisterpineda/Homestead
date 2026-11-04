@@ -26,6 +26,8 @@ export interface GetDocuments$Params {
   DocumentDateTo?: string;
   ExpiryDateFrom?: string;
   ExpiryDateTo?: string;
+  HasDocumentDate?: boolean;
+  HasExpiryDate?: boolean;
   HasTags?: boolean;
   HasParties?: boolean;
   HasPendingSuggestions?: boolean;
@@ -49,6 +51,8 @@ export function getDocuments(http: HttpClient, rootUrl: string, params: GetDocum
     rb.query('DocumentDateTo', params.DocumentDateTo, {});
     rb.query('ExpiryDateFrom', params.ExpiryDateFrom, {});
     rb.query('ExpiryDateTo', params.ExpiryDateTo, {});
+    rb.query('HasDocumentDate', params.HasDocumentDate, {});
+    rb.query('HasExpiryDate', params.HasExpiryDate, {});
     rb.query('HasTags', params.HasTags, {});
     rb.query('HasParties', params.HasParties, {});
     rb.query('HasPendingSuggestions', params.HasPendingSuggestions, {});

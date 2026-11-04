@@ -49,6 +49,14 @@ public record GetDocumentsQuery : PaginatedRequest
     [FromQuery(Name = "ExpiryDateTo")]
     public DateOnly? ExpiryDateTo { get; init; }
 
+    /// <summary><c>true</c> = has a document date, <c>false</c> = undated, null = no filter.</summary>
+    [FromQuery(Name = "HasDocumentDate")]
+    public bool? HasDocumentDate { get; init; }
+
+    /// <summary><c>true</c> = has an expiry date, <c>false</c> = none, null = no filter.</summary>
+    [FromQuery(Name = "HasExpiryDate")]
+    public bool? HasExpiryDate { get; init; }
+
     /// <summary><c>true</c> = at least one tag, <c>false</c> = untagged, null = no filter.</summary>
     [FromQuery(Name = "HasTags")]
     public bool? HasTags { get; init; }
