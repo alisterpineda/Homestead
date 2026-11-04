@@ -234,6 +234,9 @@ public class DoclingRunner(
         AddField(content, "image_export_mode", "placeholder");
         // Keeps page boundaries findable in the Markdown, as Azure's page comments do.
         AddField(content, "md_page_break_placeholder", PageBreakPlaceholder);
+        // Tables without column padding: docling-serve's default pads every cell to its column's width, 12-71% of the
+        // stored text on the smoke samples, paid for by statement import, MCP reads and search snippets.
+        AddField(content, "md_compact_tables", "true");
         if (request.TableMode is { } tableMode)
             AddField(content, "table_mode", tableMode);
         AddField(content, "force_ocr", request.ForceOcr ? "true" : "false");

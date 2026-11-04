@@ -6,9 +6,9 @@ using Microsoft.Extensions.Options;
 namespace Homestead.WebApi.Infrastructure.TextExtraction;
 
 // Table-aware, local extraction through a docling-serve sidecar: layout analysis plus table-structure
-// recognition, returned as Markdown with pipe tables. Like Azure it takes no hybrid path — the whole file
-// goes to the sidecar, which reads a PDF's text layer itself and OCRs only what lacks one (unless
-// ForceOcr). Unlike Azure it is free and keeps documents on the host.
+// recognition, returned as Markdown with pipe tables, requested compact (no column padding). Like Azure it
+// takes no hybrid path — the whole file goes to the sidecar, which reads a PDF's text layer itself and OCRs
+// only what lacks one (unless ForceOcr). Unlike Azure it is free and keeps documents on the host.
 //
 // Slow on CPU (seconds to tens of seconds per page), so a Docling instance should set its own JobTimeout:
 // the job budget the handlers declare. Every conversion is sent a document_timeout — the deadline

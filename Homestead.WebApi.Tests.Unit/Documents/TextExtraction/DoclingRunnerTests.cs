@@ -81,6 +81,7 @@ public class DoclingRunnerTests
         Assert.Equal("md", submit.Field("to_formats"));
         Assert.Equal("placeholder", submit.Field("image_export_mode"));
         Assert.Equal("<!-- PageBreak -->", submit.Field("md_page_break_placeholder"));
+        Assert.Equal("true", submit.Field("md_compact_tables"));
         Assert.Equal("false", submit.Field("force_ocr"));
         Assert.Equal("false", submit.Field("abort_on_error"));
         // Unset options are omitted, so the server's defaults apply.
