@@ -34,6 +34,7 @@ if (bool.TryParse(builder.Configuration["Docling:Enabled"], out var doclingEnabl
     doclingApiKey = builder.AddParameter(
         "docling-api-key", new GenerateParameterDefault { MinLength = 32, Special = false }, secret: true, persist: true);
 
+    // Bumping the tag (here and in the README): run DoclingSidecarContractTests against the new image first.
     docling = builder.AddContainer("docling", "ghcr.io/docling-project/docling-serve-cpu", "v1.38.2")
         .WithHttpEndpoint(port: 5001, targetPort: 5001, name: "http") // fixed host port: a stable UI link
         // Required, not decoration: WaitFor on a container without a health check only waits for Running,
