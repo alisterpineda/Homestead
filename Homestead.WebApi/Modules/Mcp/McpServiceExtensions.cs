@@ -15,12 +15,15 @@ public static class McpServiceExtensions
 {
     public const string EndpointPath = "/mcp";
 
-    // How tool arguments are read and tool results written: the SDK's defaults (its type metadata, nulls omitted)
-    // with snake_case property names, so result records stay plain C# and the wire matches the parameter names
-    // (which the SDK takes verbatim from the C# parameters — hence snake_case parameters in the tool classes).
+    // How tool arguments are read and tool results written: the SDK's defaults (its type metadata) with snake_case
+    // property names, so result records stay plain C# and the wire matches the parameter names (which the SDK takes
+    // verbatim from the C# parameters — hence snake_case parameters in the tool classes), and nulls written: an
+    // unset optional field is an explicit null, never a missing key, so "no summary" and "no expiry" read the same
+    // way every time instead of as a field the model has to know to miss.
     public static readonly JsonSerializerOptions ToolJsonOptions = new(McpJsonUtilities.DefaultOptions)
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.Never,
     };
 
     // Called right after AddAppAuthentication(): the bearer scheme and policy extend the cookie setup.

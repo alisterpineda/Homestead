@@ -1,7 +1,7 @@
 namespace Homestead.WebApi.Modules.Mcp;
 
 // What the document tools put on the wire. Flat records; McpServiceExtensions serializes them snake_case with nulls
-// omitted. Dates are yyyy-MM-dd (DateOnly), timestamps UTC ISO 8601 strings, and document ids are the only GUIDs:
+// written (an unset optional field is an explicit null, never a missing key). Dates are yyyy-MM-dd (DateOnly), timestamps UTC ISO 8601 strings, and document ids are the only GUIDs:
 // tags travel by path, parties by name, suggestions by their own id. Text derived from the file's content (snippet,
 // summary, extracted text) carries the untrusted_ prefix.
 
@@ -45,7 +45,7 @@ public sealed record GetDocumentResult(
     string? UntrustedDocumentText,
     int TextTotalChars,
     // Where the latest version's text came from: an engine type slug, or "manual" when a person hand-edited
-    // it. Not file-derived, so unprefixed. Null (omitted) when the version carries no provenance.
+    // it. Not file-derived, so unprefixed. Null when the version carries no provenance.
     string? TextSource,
     int? NextOffset);
 

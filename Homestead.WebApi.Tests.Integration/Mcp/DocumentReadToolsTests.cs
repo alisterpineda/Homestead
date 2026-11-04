@@ -59,6 +59,25 @@ public partial class DocumentReadToolsTests(PostgresFixture fixture) : Integrati
         Assert.DoesNotContain("<mark>", snippet);
     }
 
+    // A document without a summary says so with an explicit null (never a missing key), so "none generated" is
+    // something the model reads rather than infers.
+    [Fact]
+    public async Task Search_WithSummary_ReturnsNullForADocumentWithoutOne()
+    {
+        var admin = await CreateAdminClientAsync();
+        await SeedDocumentAsync(admin, "summarised.pdf", summary: "A meter reading notice.");
+        await SeedDocumentAsync(admin, "unsummarised.pdf");
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        var json = await McpToolResults.CallAsync<JsonElement>(client, "search_documents",
+            new Dictionary<string, object?> { ["include_summary"] = true, ["sort_by"] = "name", ["sort_dir"] = "asc" }, CT);
+
+        var items = json.GetProperty("items").EnumerateArray().ToList();
+        Assert.Equal(
+            [("summarised.pdf", "A meter reading notice."), ("unsummarised.pdf", null)],
+            items.Select(i => (i.GetProperty("name").GetString(), i.GetProperty("untrusted_summary").GetString())));
+    }
+
     [Fact]
     public async Task Search_ByTagPath_SnapsCasing_ExpandsChildren_ReturnsStoredPaths()
     {
@@ -368,6 +387,21 @@ public partial class DocumentReadToolsTests(PostgresFixture fixture) : Integrati
 
         Assert.Equal((WithoutText: "length", WithText: "length | length+substr", Total: 1500),
             (WithoutText: usesWithoutText, WithText: usesWithText, Total: withoutText.TextTotalChars));
+    }
+
+    [Fact]
+    public async Task GetDocument_WithoutASummary_ReturnsAnExplicitNull()
+    {
+        var admin = await CreateAdminClientAsync();
+        var id = await SeedDocumentAsync(admin, "letter.pdf");
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        var json = await McpToolResults.CallAsync<JsonElement>(client, "get_document",
+            new Dictionary<string, object?> { ["document_id"] = id }, CT);
+
+        // The key is present and null: "no summary" is read, never inferred from a missing field.
+        Assert.True(json.TryGetProperty("untrusted_summary", out var summary));
+        Assert.Equal(JsonValueKind.Null, summary.ValueKind);
     }
 
     [Fact]

@@ -34,7 +34,8 @@ Documents module, not a second product.
 
 ### Tool catalogue
 
-Parameters and results use the wire names (snake_case). Dates are `yyyy-MM-dd`; timestamps are UTC ISO 8601.
+Parameters and results use the wire names (snake_case). Dates are `yyyy-MM-dd`; timestamps are UTC ISO 8601. An
+optional result field that has no value is an explicit `null`, never a missing key.
 Document ids are the only ids Claude ever sees: tags travel by **path**, parties by exact **name**, AI suggestions by
 their own `suggestion_id`. "Page info" is `page`, `page_size`, `total_count`, `total_pages`. Every tool declares all
 four hints explicitly (the protocol's defaults for an unset hint are "destructive" and "open-world"), and none is
@@ -62,7 +63,9 @@ The behaviour that matters to a user, tool by tool:
   [search.md](../documents/search.md) — date and expiry ranges, has-tags / has-parties / has-pending-suggestions, the
   expiry sort. An unknown tag path or party name is an error that names the nearest matches, never a silently empty
   filter.
-- **Document text is opt-in and labelled.** `get_document` returns the summary and metadata by default; extracted
+- **Document text is opt-in and labelled.** `get_document` returns the summary and metadata by default (the summary
+  is `null` when none has been generated — only the web app's Summarize action or auto-classification on upload
+  creates one, never a Claude client); extracted
   text comes only on request, in bounded chunks (`text_offset` → `next_offset`, null at the end), under the field name
   `untrusted_document_text`, because it is the file's content and may contain text written to manipulate a model.
   Search snippets and AI summaries are derived from that content, so they carry the same label
