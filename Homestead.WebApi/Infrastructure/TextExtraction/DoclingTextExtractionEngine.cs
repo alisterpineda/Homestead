@@ -16,10 +16,11 @@ namespace Homestead.WebApi.Infrastructure.TextExtraction;
 // instance sets none — so a conversion can never outlive the helper's patience by more than the time it
 // sat in the sidecar's queue.
 //
-// That queue time is the limit of the guarantee: document_timeout counts conversion only, and nothing
-// here cancels a task the helper abandons (no per-task cancel is known in docling-serve's API), so a task abandoned
-// while queued still runs, up to document_timeout, when its turn comes. Keep Processing:MaxConcurrency
-// near the sidecar's worker count so jobs do not queue behind each other inside it.
+// That queue time is why the runner caps conversions in flight (MaxConcurrency, default 1, matched to the
+// sidecar's workers): document_timeout counts conversion only, and docling-serve has no per-task cancel
+// (none in v1.38.2's /openapi.json), so a task abandoned while queued INSIDE the sidecar would still run
+// when its turn came. Jobs past the cap wait in the runner instead, where the deadline cancels the wait
+// and nothing is submitted; a job that gets a slot late has its document_timeout shortened by the wait.
 public class DoclingTextExtractionEngine(
     string key,
     OcrEngineOptions options,

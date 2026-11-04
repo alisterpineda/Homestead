@@ -111,6 +111,13 @@ public class OcrEngineOptions
     // Sent as force_ocr: OCR every page even when it has a text layer. Off by default — a born-digital PDF's
     // embedded text is exact, OCR of it is not.
     public bool ForceOcr { get; set; }
+
+    // How many conversions this instance has in flight at the sidecar at once; further jobs wait here, in
+    // Homestead, for a slot. Match it to the sidecar's DOCLING_SERVE_ENG_LOC_NUM_WORKERS. Queueing on this
+    // side is the point: a job whose deadline passes while it waits gives up without ever submitting, where
+    // a task queued inside docling-serve cannot be cancelled and would still convert after its job gave up.
+    // Per instance, so two instances pointed at one sidecar each get their own allowance.
+    public int MaxConcurrency { get; set; } = 1;
 }
 
 public static class DoclingTableModes

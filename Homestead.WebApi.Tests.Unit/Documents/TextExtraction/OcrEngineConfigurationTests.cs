@@ -421,6 +421,26 @@ public class OcrEngineConfigurationTests
         Assert.Equal("TableMode must be 'fast' or 'accurate'.", OcrEngineConfiguration.Validate("docling", options));
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void Validate_DoclingMaxConcurrencyBelowOne_ReportsReason(int maxConcurrency)
+    {
+        var options = ValidOptions(TextExtractionEngineType.Docling);
+        options.MaxConcurrency = maxConcurrency;
+
+        Assert.Equal("MaxConcurrency must be at least 1.", OcrEngineConfiguration.Validate("docling", options));
+    }
+
+    [Fact]
+    public void Validate_DoclingMaxConcurrency_DefaultsToOne()
+    {
+        var options = ValidOptions(TextExtractionEngineType.Docling);
+
+        Assert.Equal(1, options.MaxConcurrency);
+        Assert.Null(OcrEngineConfiguration.Validate("docling", options));
+    }
+
     [Fact]
     public void Validate_NoType_ListsDoclingAmongTheTypes()
     {
@@ -439,6 +459,7 @@ public class OcrEngineConfigurationTests
             ["Ocr:Engines:docling:TableMode"] = "fast",
             ["Ocr:Engines:docling:ForceOcr"] = "true",
             ["Ocr:Engines:docling:JobTimeout"] = "00:20:00",
+            ["Ocr:Engines:docling:MaxConcurrency"] = "2",
         }));
 
         var (key, options) = engines.Single(e => e.Key == "docling");
@@ -446,6 +467,7 @@ public class OcrEngineConfigurationTests
         Assert.Equal("fast", options.TableMode);
         Assert.True(options.ForceOcr);
         Assert.Equal(TimeSpan.FromMinutes(20), options.JobTimeout);
+        Assert.Equal(2, options.MaxConcurrency);
         Assert.Null(OcrEngineConfiguration.Validate(key, options));
     }
 }

@@ -20,12 +20,18 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+#      docling:                       # optional, see "Text extraction engines"
+#        condition: service_healthy
     environment:
       DB_HOST: postgres
       DB_PASSWORD: changeme
       OIDC_AUTHORITY: https://idp.example.com/...
       OIDC_CLIENT_ID: your-client-id
       OIDC_CLIENT_SECRET: your-client-secret
+#      Ocr__Engines__docling__Type: Docling
+#      Ocr__Engines__docling__Endpoint: http://docling:5001
+#      Ocr__Engines__docling__JobTimeout: "00:15:00"
+#      Ocr__DefaultEngine: docling
     volumes:
       - media:/media
       - cache:/cache
@@ -44,6 +50,20 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+#  docling:                           # optional local, table-aware text extraction (~4.4 GB image)
+#    image: ghcr.io/docling-project/docling-serve-cpu:v1.38.2
+#    restart: unless-stopped
+#    environment:
+#      DOCLING_SERVE_ENG_LOC_NUM_WORKERS: "1"
+#      DOCLING_NUM_THREADS: "4"
+#    mem_limit: 6g
+#    healthcheck:                     # the image has none; it listens only once its models are loaded
+#      test: ["CMD", "curl", "-fsS", "http://localhost:5001/health"]
+#      interval: 10s
+#      timeout: 5s
+#      start_period: 60s
+#      retries: 5
 
 volumes:
   media:
@@ -244,7 +264,8 @@ In Docker, keep the key out of the compose file: put `Ai__ApiKey` in an `env_fil
 | `FileStorage__MediaPath` | `/media` | Path for document storage |
 | `FileStorage__CachePath` | `/cache` | Path for generated thumbnail cache |
 | `Ocr__Engines__tesseract__TessDataPath` | `/usr/share/tessdata` | Directory of pinned Tesseract `.traineddata` models — see [OCR Models](#ocr-models-tesseract) |
-| `Ocr__Engines__{key}__*` | — | Defines an additional text-extraction engine instance — see [Text extraction engines](#text-extraction-engines) |
+| `Ocr__Engines__{key}__*` | — | Defines an additional text-extraction engine instance — see [Text extraction engines](#text-extraction-engines) (Docling's keys are under [Docling](#docling)) |
+| `Ocr__Engines__{key}__JobTimeout` | `Processing__JobTimeout` (5 min) | Time budget for a job that runs this engine, as a `TimeSpan` (`"00:20:00"`; a bare number is days). Extraction stops a margin short of it rather than the whole job timing out: an upload still creates its document, without text; a reprocess fails as `text_extraction_failed` and keeps the version's existing text |
 | `Ocr__DefaultEngine` | `tesseract` | Which engine uploads and un-pinned reprocess runs use — an `Ocr__Engines__{key}` name. A name matching no engine falls back to `tesseract` and records the substitution in the version's provenance |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | — | OpenTelemetry collector endpoint (optional) |
 
@@ -341,11 +362,12 @@ env vars / user-secrets where your existing secret tooling already works — the
 and no API keys in a `pg_dump`. Which engine to *use* is also config: `Ocr:DefaultEngine` names the
 default (shown read-only on the Documents settings page); the reprocess dialogs can override it per run.
 
-Two types are supported:
+Three types are supported:
 
 | `Type` | Cost | Notes |
 |---|---|---|
-| `Tesseract` | Free, local | Always available. For PDFs, reads any embedded text layer and only OCRs text-less pages. |
+| `Tesseract` | Free, local | Always available. For PDFs, reads the embedded text layer with Poppler's `pdftotext -layout` (column alignment preserved), falls back to PdfPig if Poppler is missing, and OCRs only text-less pages. |
+| `Docling` | Free, local (separate container) | Optional. Layout + table-structure recognition; returns Markdown with pipe tables. The CPU image runs on any x86-64 with AVX2; expect seconds to tens of seconds per page on CPU. See [Docling](#docling). |
 | `AzureDocumentIntelligence` | Billed per page | Optional. Sends the whole file; with `prebuilt-layout` returns Markdown with HTML tables, which is what makes table-heavy documents (e.g. bank statements) parse well. |
 
 Engines are **named instances**, so one Azure resource can back several engines that differ only by
@@ -359,7 +381,8 @@ model:
     "azure-layout": { "Type": "AzureDocumentIntelligence", "Endpoint": "https://<res>.cognitiveservices.azure.com",
                       "ApiKey": "<key>", "ModelId": "prebuilt-layout", "OutputContentFormat": "Markdown" },
     "azure-read":   { "Type": "AzureDocumentIntelligence", "Endpoint": "https://<res>.cognitiveservices.azure.com",
-                      "ApiKey": "<key>", "ModelId": "prebuilt-read" }
+                      "ApiKey": "<key>", "ModelId": "prebuilt-read" },
+    "docling":      { "Type": "Docling", "Endpoint": "http://docling:5001", "JobTimeout": "00:20:00" }
   }
 }
 ```
@@ -410,6 +433,65 @@ dotnet user-secrets set "Ocr:DefaultEngine" "azure-layout"
 > warning when the analyzed page count is short of the source, and records the analyzed count in the
 > version's extraction provenance.
 
+#### Docling
+
+[Docling](https://github.com/docling-project/docling) (MIT) does layout analysis, table-structure
+recognition and OCR fully offline, and returns Markdown with pipe tables — the local alternative to
+Azure's `prebuilt-layout`. Homestead calls a [`docling-serve`](https://github.com/docling-project/docling-serve)
+sidecar over HTTP; the commented-out `docling` service in the [Quick Start](#quick-start) compose file
+is all it needs (internal network, no published port). The CPU image bundles its models, so no volume
+is needed either.
+
+| Option | Default | Description |
+|---|---|---|
+| `Endpoint` | — (required) | docling-serve base URL, e.g. `http://docling:5001` |
+| `ApiKey` | — | Sent as `X-Api-Key`; only needed when the sidecar sets `DOCLING_SERVE_API_KEY` |
+| `TableMode` | server default (`accurate`) | `fast` or `accurate`. `fast` trades table-structure quality for speed on CPU |
+| `ForceOcr` | `false` | OCR every page even when it has a text layer. A born-digital PDF's embedded text is exact; OCR of it is not |
+| `JobTimeout` | `Processing__JobTimeout` (5 min) | Set it: a large scan can take many minutes on CPU. Every conversion is also sent this budget (less a margin) as docling-serve's `document_timeout` |
+| `MaxConcurrency` | `1` | Conversions this engine sends the sidecar at once. Set it to the sidecar's `DOCLING_SERVE_ENG_LOC_NUM_WORKERS` |
+
+- **Memory.** docling-serve idles at around 2 GB and climbs during a conversion. Cap the container
+  (`mem_limit: 6g` is comfortable on a 16 GB host) and run **one worker**
+  (`DOCLING_SERVE_ENG_LOC_NUM_WORKERS: "1"`) with `DOCLING_NUM_THREADS` set to about your physical
+  core count.
+- **Concurrency.** Keep the engine's `MaxConcurrency` equal to the sidecar's worker count (both 1
+  in the example). Homestead runs up to `Processing__MaxConcurrency` jobs at once (4 by default), so
+  during a bulk reprocess the extra extraction jobs wait in Homestead for a conversion slot rather
+  than queuing inside docling-serve. That matters because docling-serve cannot cancel a task: a job
+  that ran out of time with its task still queued in the sidecar would leave it to convert anyway,
+  delaying everything behind it. Waiting in Homestead, a job whose `JobTimeout` runs out simply gives
+  up without submitting (an upload keeps its document without text, a reprocess fails), and the wait
+  counts against its budget, so size `JobTimeout` for a full bulk run's queue, or reprocess in
+  smaller batches.
+- **Switching to GPU later** is a compose-only change: install the
+  [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html),
+  change the image to `ghcr.io/docling-project/docling-serve-cu128:v1.38.2`, and reserve the GPU:
+  ```yaml
+      deploy:
+        resources:
+          reservations:
+            devices:
+              - driver: nvidia
+                count: 1
+                capabilities: [gpu]
+  ```
+  Nothing in Homestead changes.
+
+For local Aspire dev, AppHost can run the sidecar for you. It is opt-in because of the image size:
+
+```bash
+cd Homestead.AppHost
+dotnet user-secrets set "Docling:Enabled" "true"
+dotnet user-secrets set "Ocr:DefaultEngine" "docling"   # optional
+```
+
+AppHost then starts a `docling` container (UI at `http://localhost:5001/ui`), defines the `docling`
+engine with a 20-minute `JobTimeout`, and makes the WebApi wait for the sidecar's health check. The
+sidecar is locked with a generated API key, persisted in AppHost user-secrets as
+`Parameters:docling-api-key` and handed to the WebApi; the UI asks for it (copy it from the
+dashboard's parameters). Any `Ocr:Engines:docling:*` user-secret still overrides those values.
+
 ### OCR Models (Tesseract)
 
 OCR uses Tesseract (invoked as an external CLI) with models pinned to an exact
@@ -431,6 +513,10 @@ the provisioned directory. Every environment provisions the same way and converg
 - **Dev container** — `post-create.sh` installs the Tesseract binary and runs the script; the env
   var is set in `devcontainer.json`'s `remoteEnv`.
 - **CI** — the `integration-test` job installs the binary, runs the script, and sets the env var.
+
+The same three places also install **`poppler-utils`**, whose `pdftotext` reads PDF text layers
+(the Alpine and Debian package names are both `poppler-utils`). Without it the engine falls back to
+PdfPig, which flattens columns into prose, and logs a warning once per process.
 
 `dotnet build` / `dotnet test` never touch the network — provisioning happens only in those hooks.
 
@@ -460,6 +546,8 @@ script once into a writable directory and point the env var there:
 sh scripts/fetch-tessdata.sh "$HOME/.local/share/tessdata"
 export Ocr__Engines__tesseract__TessDataPath="$HOME/.local/share/tessdata"
 ```
+
+Also put `tesseract` and `pdftotext` on `PATH` (e.g. `brew install tesseract poppler`).
 
 ## Development
 

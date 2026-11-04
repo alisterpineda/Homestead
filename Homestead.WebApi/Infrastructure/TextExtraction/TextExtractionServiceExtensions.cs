@@ -64,7 +64,8 @@ public static class TextExtractionServiceExtensions
                     options.Endpoint ?? string.Empty,
                     options.ApiKey,
                     DoclingRunner.CreateHttpClient(),
-                    sp.GetRequiredService<ILogger<DoclingRunner>>()),
+                    sp.GetRequiredService<ILogger<DoclingRunner>>(),
+                    options.MaxConcurrency),
                 sp.GetRequiredService<ILogger<DoclingTextExtractionEngine>>()),
 
             // An instance with no usable Type still has to REGISTER — refusing here would take the whole

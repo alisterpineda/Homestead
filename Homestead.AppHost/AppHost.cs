@@ -17,6 +17,37 @@ var keycloak = builder.AddKeycloak("keycloak", 8080)
 
 var keycloakUrl = keycloak.GetEndpoint("http");
 
+// Optional local Docling sidecar (table-aware Markdown extraction, see the README's "Text extraction
+// engines"). A 4.4 GB image that idles at a few GB of RAM, so it is opt-in:
+//   dotnet user-secrets set "Docling:Enabled" "true"
+//   dotnet user-secrets set "Ocr:DefaultEngine" "docling"   (optional; otherwise pick it per reprocess)
+// The first run with the flag pulls the image, and while the flag is on the WebApi waits for the sidecar's
+// model load (seconds once the image is local) on every start.
+IResourceBuilder<ContainerResource>? docling = null;
+IResourceBuilder<ParameterResource>? doclingApiKey = null;
+if (bool.TryParse(builder.Configuration["Docling:Enabled"], out var doclingEnabled) && doclingEnabled)
+{
+    // The sidecar sits on a fixed host port with docling-serve's default CORS ("*") and an API that fetches
+    // URLs, so any web page could otherwise drive it from inside the dev network. A generated key, kept in
+    // user-secrets as Parameters:docling-api-key (persist), locks it; the WebApi is handed the same key.
+    // The UI asks for it — copy it from the dashboard's parameters.
+    doclingApiKey = builder.AddParameter(
+        "docling-api-key", new GenerateParameterDefault { MinLength = 32, Special = false }, secret: true, persist: true);
+
+    docling = builder.AddContainer("docling", "ghcr.io/docling-project/docling-serve-cpu", "v1.38.2")
+        .WithHttpEndpoint(port: 5001, targetPort: 5001, name: "http") // fixed host port: a stable UI link
+        // Required, not decoration: WaitFor on a container without a health check only waits for Running,
+        // and docling-serve only listens once its models are loaded, so early conversions would be refused.
+        .WithHttpHealthCheck("/health")
+        // One conversion at a time, four threads: the homelab sizing the README recommends. One worker
+        // matches the engine's MaxConcurrency default of 1, so further jobs wait in the WebApi, not here.
+        .WithEnvironment("DOCLING_SERVE_ENG_LOC_NUM_WORKERS", "1")
+        .WithEnvironment("DOCLING_NUM_THREADS", "4")
+        .WithEnvironment("DOCLING_SERVE_ENABLE_UI", "true")
+        .WithEnvironment("DOCLING_SERVE_API_KEY", doclingApiKey)
+        .WithUrlForEndpoint("http", ep => new() { Url = "/ui", DisplayText = "Docling UI" });
+}
+
 var webapi = builder.AddProject<Projects.Homestead_WebApi>("homestead-webapi")
     .WaitFor(postgresdb)
     .WaitFor(keycloak)
@@ -46,6 +77,18 @@ var webapi = builder.AddProject<Projects.Homestead_WebApi>("homestead-webapi")
         context.EnvironmentVariables["Mcp__Authority"] =
             ReferenceExpression.Create($"{keycloakUrl}/realms/homestead");
         context.EnvironmentVariables["Mcp__Audience"] = "homestead-mcp";
+
+        // The Docling engine instance, when the sidecar is on. Set before the Ocr secrets walk below, so a
+        // secret (Ocr:Engines:docling:TableMode, :JobTimeout, even :Endpoint) still overrides these.
+        if (docling is not null && doclingApiKey is not null)
+        {
+            context.EnvironmentVariables["Ocr__Engines__docling__Type"] = "Docling";
+            context.EnvironmentVariables["Ocr__Engines__docling__Endpoint"] = docling.GetEndpoint("http");
+            context.EnvironmentVariables["Ocr__Engines__docling__ApiKey"] = doclingApiKey.Resource;
+            // Generous: CPU conversion runs seconds to tens of seconds per page, and a bulk reprocess queues
+            // for the one conversion slot, which counts against each job's budget.
+            context.EnvironmentVariables["Ocr__Engines__docling__JobTimeout"] = "00:20:00";
+        }
 
         // Optional AI — the Claude API (off by default). Sourced from AppHost user-secrets so no key is
         // committed, e.g.
@@ -98,6 +141,9 @@ var webapi = builder.AddProject<Projects.Homestead_WebApi>("homestead-webapi")
     })
     .WithUrlForEndpoint("http", ep => new() { Url = "/scalar/v1", DisplayText = "Scalar" })
     .WithUrlForEndpoint("https", ep => new() { Url = "/scalar/v1", DisplayText = "Scalar" });
+
+if (docling is not null)
+    webapi.WaitFor(docling);
 
 builder.AddJavaScriptApp("homestead-webapp", "../Homestead.WebApp", "start")
     .WithReference(webapi)

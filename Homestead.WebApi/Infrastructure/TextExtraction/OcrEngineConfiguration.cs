@@ -125,6 +125,9 @@ public static class OcrEngineConfiguration
         if (options.TableMode is not null && !DoclingTableModes.IsValid(options.TableMode))
             return $"TableMode must be '{DoclingTableModes.Fast}' or '{DoclingTableModes.Accurate}'.";
 
+        if (options.MaxConcurrency < 1)
+            return "MaxConcurrency must be at least 1.";
+
         // No ApiKey check: the key is optional (only a sidecar with DOCLING_SERVE_API_KEY wants one).
         return null;
     }
