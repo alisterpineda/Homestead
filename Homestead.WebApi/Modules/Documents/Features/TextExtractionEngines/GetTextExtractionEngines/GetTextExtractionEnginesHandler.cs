@@ -48,6 +48,7 @@ public class GetTextExtractionEnginesHandler(
     {
         TextExtractionEngineType.Tesseract => "Tesseract",
         TextExtractionEngineType.AzureDocumentIntelligence => "Azure Document Intelligence",
+        TextExtractionEngineType.Docling => "Docling",
         _ => type.ToString()
     };
 }

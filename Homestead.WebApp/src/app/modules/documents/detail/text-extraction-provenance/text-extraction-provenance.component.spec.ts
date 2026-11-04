@@ -24,6 +24,18 @@ const AZURE: TextExtractionProvenanceResponse = {
   pageCount: 12,
 };
 
+const DOCLING: TextExtractionProvenanceResponse = {
+  engine: 'docling',
+  engineKey: 'docling',
+  extractedAt: '2026-07-15T10:34:02Z',
+  serverVersion: '1.38.2',
+  tableMode: null,
+  forceOcr: false,
+  pageCount: 3,
+  conversionStatus: 'success',
+  processingSeconds: 41.66,
+};
+
 describe('TextExtractionProvenanceComponent', () => {
   let fixture: ComponentFixture<TextExtractionProvenanceComponent>;
   let component: TextExtractionProvenanceComponent;
@@ -74,6 +86,43 @@ describe('TextExtractionProvenanceComponent', () => {
     expect(component.detail()).toBe(
       'Azure Document Intelligence (prebuilt-layout) · Markdown output · 12 page(s) analyzed',
     );
+  });
+
+  it('reports the Docling table mode, page count and processing time', () => {
+    fixture.componentRef.setInput('provenance', DOCLING);
+    expect(component.detail()).toBe('Docling · accurate tables · 3 page(s) · 41.7s');
+
+    fixture.componentRef.setInput('provenance', { ...DOCLING, tableMode: 'fast', forceOcr: true });
+    expect(component.detail()).toBe('Docling · fast tables · forced OCR · 3 page(s) · 41.7s');
+  });
+
+  // partial_success is the only durable sign that some pages or tables did not make it into the text.
+  it('flags a partial Docling conversion', () => {
+    fixture.componentRef.setInput('provenance', { ...DOCLING, conversionStatus: 'partial_success' });
+
+    expect(component.detail()).toBe(
+      'Docling · accurate tables · 3 page(s) · 41.7s · partial: some content could not be converted',
+    );
+  });
+
+  // An unreadable PDF records 0 pages, and the sidecar may omit its processing time: both are left out
+  // rather than shown as "0 page(s)" or a blank time.
+  it('omits a Docling page count of 0 and a missing processing time', () => {
+    fixture.componentRef.setInput('provenance', { ...DOCLING, pageCount: 0, processingSeconds: null });
+
+    expect(component.detail()).toBe('Docling · accurate tables');
+  });
+
+  it('says a Docling run on an unsupported file type converted nothing', () => {
+    fixture.componentRef.setInput('provenance', {
+      ...DOCLING,
+      conversionStatus: 'unsupported_content_type',
+      pageCount: 0,
+      processingSeconds: null,
+      serverVersion: null,
+    });
+
+    expect(component.detail()).toBe('Docling · not converted (unsupported file type)');
   });
 
   // Versions extracted before provenance existed render nothing rather than an empty shell.

@@ -71,6 +71,7 @@ public static class OcrEngineConfiguration
     {
         TextExtractionEngineType.Tesseract => ValidateTesseract(options),
         TextExtractionEngineType.AzureDocumentIntelligence => ValidateAzure(options),
+        TextExtractionEngineType.Docling => ValidateDocling(options),
         // Only reachable for a non-built-in key with no Type: refuse rather than defaulting to Tesseract,
         // which would silently run the wrong engine under the operator's chosen name.
         null => $"Type is required (one of: {string.Join(", ", Enum.GetNames<TextExtractionEngineType>())}).",
@@ -105,6 +106,26 @@ public static class OcrEngineConfiguration
             return $"OutputContentFormat 'Markdown' requires a layout model; '{options.ModelId}' does not support it.";
         }
 
+        return null;
+    }
+
+    private static string? ValidateDocling(OcrEngineOptions options)
+    {
+        if (string.IsNullOrWhiteSpace(options.Endpoint))
+            return "Endpoint is required.";
+
+        // http is legitimate here, unlike for Azure: the sidecar normally sits on the compose network.
+        if (!Uri.TryCreate(options.Endpoint, UriKind.Absolute, out var endpoint)
+            || endpoint.Scheme is not ("http" or "https"))
+        {
+            return "Endpoint must be an absolute http or https URI.";
+        }
+
+        // Caught here rather than as a 422 from the sidecar inside a background job.
+        if (options.TableMode is not null && !DoclingTableModes.IsValid(options.TableMode))
+            return $"TableMode must be '{DoclingTableModes.Fast}' or '{DoclingTableModes.Accurate}'.";
+
+        // No ApiKey check: the key is optional (only a sidecar with DOCLING_SERVE_API_KEY wants one).
         return null;
     }
 }

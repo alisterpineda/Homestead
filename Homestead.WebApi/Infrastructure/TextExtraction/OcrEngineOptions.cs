@@ -78,11 +78,14 @@ public class OcrEngineOptions
     // Tesseract OCR engine mode (--oem). 3 = default (best engine available); never errors on engine selection.
     public int Oem { get; set; } = 3;
 
-    // --- Azure Document Intelligence ---
+    // --- Azure Document Intelligence, and Docling ---
 
-    // Resource endpoint, e.g. https://my-docint.cognitiveservices.azure.com.
+    // Azure: the resource endpoint, e.g. https://my-docint.cognitiveservices.azure.com.
+    // Docling: the docling-serve base URL, e.g. http://docling:5001.
     public string? Endpoint { get; set; }
 
+    // Azure: required. Docling: optional — sent as X-Api-Key, and only needed when the sidecar sets
+    // DOCLING_SERVE_API_KEY.
     public string? ApiKey { get; set; }
 
     // The analysis model. One Azure resource serves several meaningfully different models, which is why
@@ -98,6 +101,26 @@ public class OcrEngineOptions
         OutputContentFormat ?? (AzureModels.SupportsMarkdown(ModelId)
             ? AzureOutputContentFormat.Markdown
             : AzureOutputContentFormat.Text);
+
+    // --- Docling ---
+
+    // docling-serve's table_mode: "fast" or "accurate". Null sends nothing, leaving the server default
+    // (accurate). Fast trades table-structure quality for speed on CPU.
+    public string? TableMode { get; set; }
+
+    // Sent as force_ocr: OCR every page even when it has a text layer. Off by default — a born-digital PDF's
+    // embedded text is exact, OCR of it is not.
+    public bool ForceOcr { get; set; }
+}
+
+public static class DoclingTableModes
+{
+    public const string Fast = "fast";
+    public const string Accurate = "accurate";
+
+    public static bool IsValid(string? mode) =>
+        string.Equals(mode, Fast, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(mode, Accurate, StringComparison.OrdinalIgnoreCase);
 }
 
 public static class AzureModels

@@ -1,4 +1,6 @@
 using Homestead.WebApi.Domain.Settings;
+using Homestead.WebApi.Processing;
+using Microsoft.Extensions.Options;
 
 namespace Homestead.WebApi.Infrastructure.TextExtraction;
 
@@ -50,6 +52,20 @@ public static class TextExtractionServiceExtensions
                     options.ApiKey ?? string.Empty,
                     sp.GetRequiredService<ILogger<AzureDocumentIntelligenceRunner>>()),
                 sp.GetRequiredService<ILogger<AzureDocumentIntelligenceTextExtractionEngine>>()),
+
+            // Same shape as Azure: a runner per instance holding its endpoint, key, and its own HttpClient
+            // (see DoclingRunner on why not IHttpClientFactory). A blank endpoint is fine here — the engine
+            // reports ConfigurationError and refuses before the runner is touched.
+            TextExtractionEngineType.Docling => new DoclingTextExtractionEngine(
+                key,
+                options,
+                sp.GetRequiredService<IOptions<JobProcessingOptions>>(),
+                new DoclingRunner(
+                    options.Endpoint ?? string.Empty,
+                    options.ApiKey,
+                    DoclingRunner.CreateHttpClient(),
+                    sp.GetRequiredService<ILogger<DoclingRunner>>()),
+                sp.GetRequiredService<ILogger<DoclingTextExtractionEngine>>()),
 
             // An instance with no usable Type still has to REGISTER — refusing here would take the whole
             // app down over one typo'd engine, which is what the no-startup-validator posture exists to

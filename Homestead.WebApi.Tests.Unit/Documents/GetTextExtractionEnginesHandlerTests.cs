@@ -2,6 +2,7 @@ using Homestead.WebApi.Domain.Settings;
 using Homestead.WebApi.Infrastructure.TextExtraction;
 using Homestead.WebApi.Modules.Documents.Features.TextExtractionEngines.GetTextExtractionEngines;
 using Homestead.WebApi.Tests.Unit.Documents.TextExtraction;
+using NSubstitute;
 
 namespace Homestead.WebApi.Tests.Unit.Documents;
 
@@ -54,5 +55,20 @@ public class GetTextExtractionEnginesHandlerTests
         Assert.Null(dangling.Type);
         Assert.False(dangling.IsConfigured);
         Assert.Contains("not defined under Ocr:Engines", dangling.ConfigurationError);
+    }
+
+    [Theory]
+    [InlineData(TextExtractionEngineType.Tesseract, "Tesseract")]
+    [InlineData(TextExtractionEngineType.AzureDocumentIntelligence, "Azure Document Intelligence")]
+    [InlineData(TextExtractionEngineType.Docling, "Docling")]
+    public async Task NamesEachEngineType(TextExtractionEngineType type, string expected)
+    {
+        var engine = TestTextExtraction.Engine("some-engine");
+        engine.Type.Returns(type);
+        var sut = Sut("some-engine", TestTextExtraction.Engine(), engine);
+
+        var result = await sut.HandleAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(expected, Assert.Single(result, r => r.Key == "some-engine").Name);
     }
 }

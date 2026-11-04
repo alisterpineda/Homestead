@@ -13,11 +13,13 @@ namespace Homestead.WebApi.Domain.Documents;
 [JsonPolymorphic(TypeDiscriminatorPropertyName = DiscriminatorPropertyName)]
 [JsonDerivedType(typeof(TesseractTextExtractionMetadata), TesseractSlug)]
 [JsonDerivedType(typeof(AzureDocumentIntelligenceTextExtractionMetadata), AzureDocumentIntelligenceSlug)]
+[JsonDerivedType(typeof(DoclingTextExtractionMetadata), DoclingSlug)]
 public abstract record TextExtractionMetadata
 {
     public const string DiscriminatorPropertyName = "engine";
     public const string TesseractSlug = "tesseract";
     public const string AzureDocumentIntelligenceSlug = "azure-document-intelligence";
+    public const string DoclingSlug = "docling";
 
     public static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -85,6 +87,7 @@ public abstract record TextExtractionMetadata
                 TesseractSlug => document.RootElement.Deserialize<TesseractTextExtractionMetadata>(JsonOptions),
                 AzureDocumentIntelligenceSlug =>
                     document.RootElement.Deserialize<AzureDocumentIntelligenceTextExtractionMetadata>(JsonOptions),
+                DoclingSlug => document.RootElement.Deserialize<DoclingTextExtractionMetadata>(JsonOptions),
                 _ => null
             };
         }
@@ -144,4 +147,42 @@ public record AzureDocumentIntelligenceTextExtractionMetadata : TextExtractionMe
     /// against a 30-page statement is the only evidence the text is incomplete.
     /// </summary>
     public int PageCount { get; init; }
+}
+
+public record DoclingTextExtractionMetadata : TextExtractionMetadata
+{
+    public const string SuccessStatus = "success";
+    public const string PartialSuccessStatus = "partial_success";
+
+    // Ours, not docling-serve's: the file is a type Docling does not convert, so no request was made.
+    public const string UnsupportedContentTypeStatus = "unsupported_content_type";
+
+    /// <summary>
+    /// The docling-serve version that ran, when the sidecar reports it. Null when its <c>/version</c> is
+    /// disabled (<c>DOCLING_SERVE_SHOW_VERSION_INFO=false</c>) or could not be read.
+    /// </summary>
+    public string? ServerVersion { get; init; }
+
+    /// <summary>The table_mode sent ("fast" or "accurate"); null when the server default (accurate) applied.</summary>
+    public string? TableMode { get; init; }
+
+    public bool ForceOcr { get; init; }
+
+    /// <summary>
+    /// Source pages, counted locally with PdfPig (1 for an image) — the Markdown response carries no page
+    /// count. Zero when the PDF could not be read.
+    /// </summary>
+    public int PageCount { get; init; }
+
+    /// <summary>
+    /// docling-serve's conversion status: "success" or "partial_success" (a stored text only ever comes
+    /// from one of those), or <see cref="UnsupportedContentTypeStatus"/> when no conversion was attempted.
+    /// "partial_success" is the durable signal that some pages or tables failed to convert and the text is
+    /// incomplete. Required: every Docling row has one, and the record is new, so there is no older blob
+    /// without it.
+    /// </summary>
+    public required string ConversionStatus { get; init; }
+
+    /// <summary>Server-side processing time, as docling-serve reports it.</summary>
+    public double? ProcessingSeconds { get; init; }
 }

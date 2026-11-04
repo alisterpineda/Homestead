@@ -1,6 +1,5 @@
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Domain.Settings;
-using UglyToad.PdfPig;
 
 namespace Homestead.WebApi.Infrastructure.TextExtraction;
 
@@ -69,31 +68,13 @@ public class AzureDocumentIntelligenceTextExtractionEngine(
     // warning in ParseAccountStatementJobHandler; PageCount in the metadata makes it durable.
     private void WarnOnPageShortfall(string filePath, string contentType, int analyzedPages)
     {
-        var sourcePages = TryCountSourcePages(filePath, contentType);
+        var sourcePages = SourcePageCounter.TryCount(filePath, contentType, logger);
         if (sourcePages is int total && analyzedPages > 0 && analyzedPages < total)
         {
             logger.LogWarning(
                 "Engine '{Key}' analyzed only {AnalyzedPages} of {SourcePages} pages of {FilePath}. "
                 + "An F0 (free) Document Intelligence resource caps analysis at 2 pages; extracted text is incomplete.",
                 key, analyzedPages, total, filePath);
-        }
-    }
-
-    private int? TryCountSourcePages(string filePath, string contentType)
-    {
-        if (contentType is not "application/pdf")
-            return 1;
-
-        try
-        {
-            using var document = PdfDocument.Open(filePath);
-            return document.NumberOfPages;
-        }
-        catch (Exception ex)
-        {
-            // Only used to detect a page shortfall; a PDF we cannot open just means no shortfall check.
-            logger.LogDebug(ex, "Could not read page count of {FilePath} to check for truncation", filePath);
-            return null;
         }
     }
 }

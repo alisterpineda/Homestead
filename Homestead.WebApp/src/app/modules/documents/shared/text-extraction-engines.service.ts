@@ -38,6 +38,7 @@ export class TextExtractionEnginesService {
   /**
    * Whether picking this engine bills per page. Tesseract runs locally and is free; Azure Document
    * Intelligence is charged per page, which is what makes an unbounded bulk reprocess worth warning about.
+   * Docling is not metered either: it is a self-hosted sidecar, free however many pages it converts.
    */
   isMetered(key: string): boolean {
     return this.find(key)?.type === 'AzureDocumentIntelligence';

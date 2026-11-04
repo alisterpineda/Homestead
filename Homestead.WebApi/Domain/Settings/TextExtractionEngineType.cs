@@ -3,7 +3,8 @@ namespace Homestead.WebApi.Domain.Settings;
 public enum TextExtractionEngineType
 {
     Tesseract,
-    AzureDocumentIntelligence
+    AzureDocumentIntelligence,
+    Docling
 }
 
 // Output shape requested from Azure Document Intelligence. Our own enum rather than the SDK's

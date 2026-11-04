@@ -175,28 +175,100 @@ public class TextExtractionMetadataTests
     [Theory]
     [InlineData(typeof(TesseractTextExtractionMetadata))]
     [InlineData(typeof(AzureDocumentIntelligenceTextExtractionMetadata))]
+    [InlineData(typeof(DoclingTextExtractionMetadata))]
     public void Serialize_RoundTripsThroughTheBaseType(Type expected)
     {
-        TextExtractionMetadata original = expected == typeof(TesseractTextExtractionMetadata)
-            ? new TesseractTextExtractionMetadata
+        TextExtractionMetadata original = expected switch
+        {
+            _ when expected == typeof(TesseractTextExtractionMetadata) => new TesseractTextExtractionMetadata
             {
                 EngineKey = "tesseract",
                 ExtractedAt = ExtractedAt,
                 Language = "eng+fra",
                 TextLayerExtractor = TesseractTextExtractionMetadata.PdfPigTextLayer
-            }
-            : new AzureDocumentIntelligenceTextExtractionMetadata
-            {
-                EngineKey = "azure-layout",
-                ExtractedAt = ExtractedAt,
-                ModelId = AzureModels.PrebuiltLayout,
-                OutputContentFormat = AzureOutputContentFormat.Markdown
-            };
+            },
+            _ when expected == typeof(AzureDocumentIntelligenceTextExtractionMetadata) =>
+                new AzureDocumentIntelligenceTextExtractionMetadata
+                {
+                    EngineKey = "azure-layout",
+                    ExtractedAt = ExtractedAt,
+                    ModelId = AzureModels.PrebuiltLayout,
+                    OutputContentFormat = AzureOutputContentFormat.Markdown
+                },
+            _ when expected == typeof(DoclingTextExtractionMetadata) => Docling(),
+            _ => throw new ArgumentOutOfRangeException(nameof(expected), expected, "No sample for this type.")
+        };
 
         var back = TextExtractionMetadata.Deserialize(TextExtractionMetadata.Serialize(original));
 
         Assert.IsType(expected, back);
         Assert.Equal(original, back);
+    }
+
+    private static DoclingTextExtractionMetadata Docling() => new()
+    {
+        EngineKey = "docling",
+        ExtractedAt = ExtractedAt,
+        ServerVersion = "1.38.2",
+        TableMode = "accurate",
+        ForceOcr = false,
+        PageCount = 3,
+        ConversionStatus = DoclingTextExtractionMetadata.PartialSuccessStatus,
+        ProcessingSeconds = 41.7
+    };
+
+    [Fact]
+    public void Serialize_Docling_UsesItsSlugAndCamelCase()
+    {
+        var json = Serialize(Docling());
+
+        Assert.Equal("docling", json.GetProperty("engine").GetString());
+        Assert.Equal("docling", json.GetProperty("engineKey").GetString());
+        Assert.Equal("1.38.2", json.GetProperty("serverVersion").GetString());
+        Assert.Equal("accurate", json.GetProperty("tableMode").GetString());
+        Assert.False(json.GetProperty("forceOcr").GetBoolean());
+        Assert.Equal(3, json.GetProperty("pageCount").GetInt32());
+        Assert.Equal("partial_success", json.GetProperty("conversionStatus").GetString());
+        Assert.Equal(41.7, json.GetProperty("processingSeconds").GetDouble());
+    }
+
+    [Fact]
+    public void Deserialize_DoclingWithKeysReordered_StillReads()
+    {
+        // As jsonb returns it: keys sorted by (length, bytes), so "engine" is not first.
+        var asJsonbReturnsIt = """
+            {"engine":"docling","forceOcr":false,"engineKey":"docling","pageCount":3,"tableMode":"fast",
+             "extractedAt":"2026-07-15T10:34:02+00:00","serverVersion":"1.38.2",
+             "conversionStatus":"success","processingSeconds":12.5}
+            """;
+
+        var metadata = Assert.IsType<DoclingTextExtractionMetadata>(
+            TextExtractionMetadata.Deserialize(asJsonbReturnsIt));
+
+        Assert.Equal("docling", metadata.EngineKey);
+        Assert.Equal("fast", metadata.TableMode);
+        Assert.Equal(3, metadata.PageCount);
+        Assert.Equal("success", metadata.ConversionStatus);
+        Assert.Equal(12.5, metadata.ProcessingSeconds);
+    }
+
+    [Fact]
+    public void ProvenanceResponse_Docling_FlattensAndLeavesOtherEnginesFieldsNull()
+    {
+        var response = TextExtractionProvenanceResponse.From(TextExtractionMetadata.Serialize(Docling()))!;
+
+        Assert.Equal("docling", response.Engine);
+        Assert.Equal("docling", response.EngineKey);
+        Assert.Equal("1.38.2", response.ServerVersion);
+        Assert.Equal("accurate", response.TableMode);
+        Assert.False(response.ForceOcr);
+        Assert.Equal(3, response.PageCount);
+        Assert.Equal("partial_success", response.ConversionStatus);
+        Assert.Equal(41.7, response.ProcessingSeconds);
+        Assert.Null(response.Language);
+        Assert.Null(response.PagesOcred);
+        Assert.Null(response.ModelId);
+        Assert.Null(response.OutputContentFormat);
     }
 
     // The API DTO is flat rather than a union, because ng-openapi-gen turns a polymorphic hierarchy into
@@ -221,6 +293,8 @@ public class TextExtractionMetadataTests
         Assert.Null(response.Language);
         Assert.Null(response.PagesOcred);
         Assert.Null(response.TextLayerExtractor);
+        Assert.Null(response.ConversionStatus);
+        Assert.Null(response.ForceOcr);
     }
 
     [Fact]

@@ -16,6 +16,7 @@ const ENGINES: TextExtractionEngineResponse[] = [
     configurationError: null,
     isDefault: false,
   },
+  { key: 'docling', name: 'Docling', type: 'Docling', isConfigured: true, configurationError: null, isDefault: false },
 ];
 
 describe('BulkReprocessDialogComponent', () => {
@@ -99,6 +100,10 @@ describe('BulkReprocessDialogComponent', () => {
     expect(component.showCostWarning()).toBe(false);
 
     component.engineKey.set('tesseract');
+    expect(component.showCostWarning()).toBe(false);
+
+    // Docling is self-hosted: no per-page bill however large the selection.
+    component.engineKey.set('docling');
     expect(component.showCostWarning()).toBe(false);
 
     component.engineKey.set('azure-layout');

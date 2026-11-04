@@ -292,6 +292,11 @@ public class OcrEngineConfigurationTests
             Endpoint = "https://x.cognitiveservices.azure.com",
             ApiKey = "k"
         },
+        TextExtractionEngineType.Docling => new OcrEngineOptions
+        {
+            Type = type,
+            Endpoint = "http://docling:5001"
+        },
         _ => new OcrEngineOptions { Type = type }
     };
 
@@ -300,6 +305,7 @@ public class OcrEngineConfigurationTests
     [InlineData(TextExtractionEngineType.Tesseract, -60)]
     [InlineData(TextExtractionEngineType.AzureDocumentIntelligence, 0)]
     [InlineData(TextExtractionEngineType.AzureDocumentIntelligence, -60)]
+    [InlineData(TextExtractionEngineType.Docling, 0)]
     public void Validate_NonPositiveJobTimeout_ReportsReason(TextExtractionEngineType type, int seconds)
     {
         var options = ValidOptions(type);
@@ -342,6 +348,7 @@ public class OcrEngineConfigurationTests
     [Theory]
     [InlineData(TextExtractionEngineType.Tesseract)]
     [InlineData(TextExtractionEngineType.AzureDocumentIntelligence)]
+    [InlineData(TextExtractionEngineType.Docling)]
     public void Validate_PositiveOrUnsetJobTimeout_IsValid(TextExtractionEngineType type)
     {
         var unset = ValidOptions(type);
@@ -365,5 +372,80 @@ public class OcrEngineConfigurationTests
         var (_, options) = Assert.Single(engines, e => e.Key == "azure-layout");
         Assert.Equal(TimeSpan.FromMinutes(20), options.JobTimeout);
         Assert.Null(engines.Single(e => e.Key == OcrEngineOptions.BuiltInTesseractKey).Options.JobTimeout);
+    }
+
+    // --- Docling ---
+
+    // Endpoint only: the API key is optional (a sidecar without DOCLING_SERVE_API_KEY wants none), and
+    // http is legitimate on a compose network.
+    [Fact]
+    public void Validate_DoclingWithEndpointOnly_IsValid()
+    {
+        Assert.Null(OcrEngineConfiguration.Validate("docling", ValidOptions(TextExtractionEngineType.Docling)));
+    }
+
+    [Theory]
+    [InlineData(null, "Endpoint is required.")]
+    [InlineData("  ", "Endpoint is required.")]
+    [InlineData("docling:5001", "Endpoint must be an absolute http or https URI.")]
+    [InlineData("/docling", "Endpoint must be an absolute http or https URI.")]
+    [InlineData("ftp://docling:5001", "Endpoint must be an absolute http or https URI.")]
+    public void Validate_DoclingBadEndpoint_ReportsReason(string? endpoint, string expected)
+    {
+        var options = ValidOptions(TextExtractionEngineType.Docling);
+        options.Endpoint = endpoint;
+
+        Assert.Equal(expected, OcrEngineConfiguration.Validate("docling", options));
+    }
+
+    [Theory]
+    [InlineData("fast")]
+    [InlineData("accurate")]
+    [InlineData("Accurate")]
+    public void Validate_DoclingKnownTableMode_IsValid(string tableMode)
+    {
+        var options = ValidOptions(TextExtractionEngineType.Docling);
+        options.TableMode = tableMode;
+
+        Assert.Null(OcrEngineConfiguration.Validate("docling", options));
+    }
+
+    [Theory]
+    [InlineData("slow")]
+    [InlineData("")]
+    public void Validate_DoclingUnknownTableMode_ReportsReason(string tableMode)
+    {
+        var options = ValidOptions(TextExtractionEngineType.Docling);
+        options.TableMode = tableMode;
+
+        Assert.Equal("TableMode must be 'fast' or 'accurate'.", OcrEngineConfiguration.Validate("docling", options));
+    }
+
+    [Fact]
+    public void Validate_NoType_ListsDoclingAmongTheTypes()
+    {
+        var error = OcrEngineConfiguration.Validate("docling", new OcrEngineOptions { Endpoint = "http://docling:5001" });
+
+        Assert.Equal("Type is required (one of: Tesseract, AzureDocumentIntelligence, Docling).", error);
+    }
+
+    [Fact]
+    public void ReadEngines_DoclingEnvVarStyle_Binds()
+    {
+        var engines = OcrEngineConfiguration.ReadEngines(Config(new()
+        {
+            ["Ocr:Engines:docling:Type"] = "Docling",
+            ["Ocr:Engines:docling:Endpoint"] = "http://docling:5001",
+            ["Ocr:Engines:docling:TableMode"] = "fast",
+            ["Ocr:Engines:docling:ForceOcr"] = "true",
+            ["Ocr:Engines:docling:JobTimeout"] = "00:20:00",
+        }));
+
+        var (key, options) = engines.Single(e => e.Key == "docling");
+        Assert.Equal(TextExtractionEngineType.Docling, options.Type);
+        Assert.Equal("fast", options.TableMode);
+        Assert.True(options.ForceOcr);
+        Assert.Equal(TimeSpan.FromMinutes(20), options.JobTimeout);
+        Assert.Null(OcrEngineConfiguration.Validate(key, options));
     }
 }

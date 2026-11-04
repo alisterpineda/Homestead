@@ -69,6 +69,20 @@ export class TextExtractionProvenanceComponent {
       return parts.join(' · ');
     }
 
+    if (p.engine === 'docling') {
+      // Recorded without a request: the file type is one Docling does not convert, so nothing ran.
+      if (p.conversionStatus === 'unsupported_content_type') return 'Docling · not converted (unsupported file type)';
+
+      // No table mode recorded means the server default ran, which is accurate.
+      const parts = ['Docling', `${p.tableMode ?? 'accurate'} tables`];
+      if (p.forceOcr) parts.push('forced OCR');
+      if (p.pageCount) parts.push(`${p.pageCount} page(s)`);
+      if (p.processingSeconds != null) parts.push(`${Math.round(p.processingSeconds * 10) / 10}s`);
+      // The durable sign that the stored text is incomplete — some pages or tables failed to convert.
+      if (p.conversionStatus === 'partial_success') parts.push('partial: some content could not be converted');
+      return parts.join(' · ');
+    }
+
     return p.engine;
   });
 }

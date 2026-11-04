@@ -11,7 +11,7 @@ namespace Homestead.WebApi.Modules.Documents.Features.Versions;
 /// </summary>
 public record TextExtractionProvenanceResponse
 {
-    /// <summary>Engine type slug — "tesseract" or "azure-document-intelligence".</summary>
+    /// <summary>Engine type slug — "tesseract", "azure-document-intelligence", or "docling".</summary>
     public required string Engine { get; init; }
 
     /// <summary>The configured engine instance that ran, e.g. "azure-layout".</summary>
@@ -38,7 +38,31 @@ public record TextExtractionProvenanceResponse
     // --- Azure Document Intelligence ---
     public string? ModelId { get; init; }
     public AzureOutputContentFormat? OutputContentFormat { get; init; }
+
+    /// <summary>
+    /// Shared by Azure and Docling, with different sources: Azure = pages it reports having analyzed,
+    /// Docling = source pages counted locally.
+    /// </summary>
     public int? PageCount { get; init; }
+
+    // --- Docling ---
+    public string? ServerVersion { get; init; }
+
+    /// <summary>"fast" or "accurate"; null when the server default (accurate) applied.</summary>
+    public string? TableMode { get; init; }
+
+    public bool? ForceOcr { get; init; }
+
+    /// <summary>
+    /// One of <see cref="DoclingTextExtractionMetadata.SuccessStatus"/> ("success"),
+    /// <see cref="DoclingTextExtractionMetadata.PartialSuccessStatus"/> ("partial_success": some content
+    /// could not be converted, so the text is incomplete), or
+    /// <see cref="DoclingTextExtractionMetadata.UnsupportedContentTypeStatus"/> ("unsupported_content_type":
+    /// a file type Docling does not convert, so no conversion ran and there is no text).
+    /// </summary>
+    public string? ConversionStatus { get; init; }
+
+    public double? ProcessingSeconds { get; init; }
 
     /// <summary>
     /// Maps the persisted jsonb. Returns null for a version extracted before provenance existed, and
@@ -64,6 +88,15 @@ public record TextExtractionProvenanceResponse
                 ModelId = a.ModelId,
                 OutputContentFormat = a.OutputContentFormat,
                 PageCount = a.PageCount
+            },
+            DoclingTextExtractionMetadata d => Base(d, TextExtractionMetadata.DoclingSlug) with
+            {
+                ServerVersion = d.ServerVersion,
+                TableMode = d.TableMode,
+                ForceOcr = d.ForceOcr,
+                PageCount = d.PageCount,
+                ConversionStatus = d.ConversionStatus,
+                ProcessingSeconds = d.ProcessingSeconds
             },
             _ => null
         };

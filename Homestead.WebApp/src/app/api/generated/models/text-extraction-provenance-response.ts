@@ -3,11 +3,13 @@
 
 import { AzureOutputContentFormat } from '../models/azure-output-content-format';
 export interface TextExtractionProvenanceResponse {
+  conversionStatus?: (string | null);
   dpi?: (number | null);
   engine: string;
   engineKey: string;
   extractedAt: string;
   fallbackReason?: (string | null);
+  forceOcr?: (boolean | null);
   language?: (string | null);
   modelId?: (string | null);
   oem?: (number | null);
@@ -15,7 +17,10 @@ export interface TextExtractionProvenanceResponse {
   pageCount?: (number | null);
   pagesFromTextLayer?: (number | null);
   pagesOcred?: (number | null);
+  processingSeconds?: (number | null);
   psm?: (number | null);
   requestedEngineKey?: (string | null);
+  serverVersion?: (string | null);
+  tableMode?: (string | null);
   textLayerExtractor?: (string | null);
 }

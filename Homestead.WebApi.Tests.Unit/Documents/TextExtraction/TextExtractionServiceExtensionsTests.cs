@@ -1,3 +1,4 @@
+using Homestead.WebApi.Domain.Settings;
 using Homestead.WebApi.Infrastructure.TextExtraction;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -37,5 +38,23 @@ public class TextExtractionServiceExtensionsTests
 
         Assert.Equal(OcrEngineOptions.BuiltInTesseractKey, resolver.DefaultKey);
         Assert.Equal(OcrEngineOptions.BuiltInTesseractKey, resolver.ResolveKey(null));
+    }
+
+    [Fact]
+    public void AddTextExtraction_DoclingInstance_RegistersAsADoclingEngine()
+    {
+        using var sp = Build(new()
+        {
+            ["Ocr:Engines:docling:Type"] = "Docling",
+            ["Ocr:Engines:docling:Endpoint"] = "http://docling:5001",
+            ["Ocr:Engines:docling:JobTimeout"] = "00:20:00",
+        });
+
+        var engine = Assert.Single(sp.GetServices<ITextExtractionEngine>(), e => e.Key == "docling");
+
+        Assert.IsType<DoclingTextExtractionEngine>(engine);
+        Assert.Equal(TextExtractionEngineType.Docling, engine.Type);
+        Assert.True(engine.IsConfigured);
+        Assert.Equal(TimeSpan.FromMinutes(20), engine.JobTimeout);
     }
 }
