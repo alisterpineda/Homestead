@@ -221,6 +221,42 @@ public partial class DocumentReadToolsTests(PostgresFixture fixture) : Integrati
     }
 
     [Fact]
+    public async Task Search_SortByDocumentDate_PutsUndatedLastInBothDirections_AndNewestUpdatedFirstOnATie()
+    {
+        // Names are chosen so neither name order nor seed order reproduces the expected orders by accident. The two
+        // documents dated June tie; the later-seeded one (newer updated_at) comes first in both directions.
+        var admin = await CreateAdminClientAsync();
+        await SeedDocumentAsync(admin, "z-january.pdf", documentDate: new DateOnly(2024, 1, 1));
+        await SeedDocumentAsync(admin, "a-undated.pdf");
+        await SeedDocumentAsync(admin, "m-june-older.pdf", documentDate: new DateOnly(2024, 6, 1));
+        await SeedDocumentAsync(admin, "b-june-newer.pdf", documentDate: new DateOnly(2024, 6, 1));
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        var desc = await SearchAsync(client, new() { ["sort_by"] = "document_date", ["sort_dir"] = "desc" });
+        var asc = await SearchAsync(client, new() { ["sort_by"] = "document_date", ["sort_dir"] = "asc" });
+
+        Assert.Equal(
+            (Desc: "b-june-newer.pdf, m-june-older.pdf, z-january.pdf, a-undated.pdf",
+             Asc: "z-january.pdf, b-june-newer.pdf, m-june-older.pdf, a-undated.pdf"),
+            (Desc: Csv(desc.Items.Select(i => i.Name)), Asc: Csv(asc.Items.Select(i => i.Name))));
+    }
+
+    [Fact]
+    public async Task Search_SortByName_IsCaseInsensitive()
+    {
+        // Ordinal order would put the all-caps names first ("MIC", "MR Pelvis" before "Manulife"; "MedRec" before
+        // "Medical").
+        var admin = await CreateAdminClientAsync();
+        foreach (var name in new[] { "MIC.pdf", "MR Pelvis.pdf", "Manulife.pdf", "MedRec.pdf", "Medical.pdf" })
+            await SeedDocumentAsync(admin, name);
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        var result = await SearchAsync(client, new() { ["sort_by"] = "name", ["sort_dir"] = "asc" });
+
+        Assert.Equal("Manulife.pdf, Medical.pdf, MedRec.pdf, MIC.pdf, MR Pelvis.pdf", Csv(result.Items.Select(i => i.Name)));
+    }
+
+    [Fact]
     public async Task Search_SortByExpiryAscending_PutsTheDocumentWithoutAnExpiryLast()
     {
         // Seeded so that no order the tool could fall back to matches the expected one (soonest expiry, later expiry,

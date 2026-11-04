@@ -283,10 +283,14 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
         var effectiveSortBy = sortBy ?? DocumentSortBy.UpdatedAt;
         var effectiveSortDir = sortDir ?? SortDirection.Desc;
 
-        return (effectiveSortBy, effectiveSortDir) switch
+        // Every order ends in UpdatedAt (newest first), then Id, so ties — same name, same date, the undated tail —
+        // page deterministically. Name sorts case-insensitively (lower(), which the trigram index does not serve,
+        // but a household's document table is small). Documents without a date (or an expiry) sort last in both
+        // directions: Postgres would otherwise put NULLs first under DESC, and most documents have no expiry.
+        var ordered = (effectiveSortBy, effectiveSortDir) switch
         {
-            (DocumentSortBy.Name, SortDirection.Asc) => query.OrderBy(d => d.Name),
-            (DocumentSortBy.Name, SortDirection.Desc) => query.OrderByDescending(d => d.Name),
+            (DocumentSortBy.Name, SortDirection.Asc) => query.OrderBy(d => d.Name.ToLower()),
+            (DocumentSortBy.Name, SortDirection.Desc) => query.OrderByDescending(d => d.Name.ToLower()),
             (DocumentSortBy.FileSize, SortDirection.Asc) => query.OrderBy(d =>
                 d.Versions.OrderByDescending(v => v.VersionNumber).Select(v => v.FileSize).FirstOrDefault()),
             (DocumentSortBy.FileSize, SortDirection.Desc) => query.OrderByDescending(d =>
@@ -295,26 +299,29 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
                 d.Versions.OrderByDescending(v => v.VersionNumber).Select(v => v.ContentType).FirstOrDefault()),
             (DocumentSortBy.ContentType, SortDirection.Desc) => query.OrderByDescending(d =>
                 d.Versions.OrderByDescending(v => v.VersionNumber).Select(v => v.ContentType).FirstOrDefault()),
-            (DocumentSortBy.DocumentDate, SortDirection.Asc) => query.OrderBy(d => d.DocumentDate),
-            (DocumentSortBy.DocumentDate, SortDirection.Desc) => query.OrderByDescending(d => d.DocumentDate),
-            // Documents without an expiry sort last in both directions (Postgres would otherwise put NULLs
-            // first under DESC). Most documents have no expiry, so the UpdatedAt tiebreaker keeps paging over
-            // that tied tail deterministic.
+            (DocumentSortBy.DocumentDate, SortDirection.Asc) => query
+                .OrderBy(d => d.DocumentDate == null)
+                .ThenBy(d => d.DocumentDate),
+            (DocumentSortBy.DocumentDate, SortDirection.Desc) => query
+                .OrderBy(d => d.DocumentDate == null)
+                .ThenByDescending(d => d.DocumentDate),
             (DocumentSortBy.ExpiryDate, SortDirection.Asc) => query
                 .OrderBy(d => d.ExpiryDate == null)
-                .ThenBy(d => d.ExpiryDate)
-                .ThenByDescending(d => d.UpdatedAt),
+                .ThenBy(d => d.ExpiryDate),
             (DocumentSortBy.ExpiryDate, SortDirection.Desc) => query
                 .OrderBy(d => d.ExpiryDate == null)
-                .ThenByDescending(d => d.ExpiryDate)
-                .ThenByDescending(d => d.UpdatedAt),
+                .ThenByDescending(d => d.ExpiryDate),
             (DocumentSortBy.CreatedAt, SortDirection.Asc) => query.OrderBy(d => d.CreatedAt),
             (DocumentSortBy.CreatedAt, SortDirection.Desc) => query.OrderByDescending(d => d.CreatedAt),
-            (DocumentSortBy.UpdatedAt, SortDirection.Asc) => query.OrderBy(d => d.UpdatedAt),
-            (DocumentSortBy.UpdatedAt, SortDirection.Desc) => query.OrderByDescending(d => d.UpdatedAt),
+            (DocumentSortBy.UpdatedAt, SortDirection.Asc) => query.OrderBy(d => d.UpdatedAt).ThenBy(d => d.Id),
+            (DocumentSortBy.UpdatedAt, _) => query.OrderByDescending(d => d.UpdatedAt),
             (DocumentSortBy.DeletedAt, SortDirection.Asc) => query.OrderBy(d => d.DeletedAt),
             (DocumentSortBy.DeletedAt, SortDirection.Desc) => query.OrderByDescending(d => d.DeletedAt),
             _ => query.OrderByDescending(d => d.UpdatedAt),
         };
+
+        return effectiveSortBy == DocumentSortBy.UpdatedAt && effectiveSortDir == SortDirection.Asc
+            ? ordered
+            : ordered.ThenByDescending(d => d.UpdatedAt).ThenBy(d => d.Id);
     }
 }

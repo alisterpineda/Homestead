@@ -48,7 +48,7 @@ public sealed class DocumentTools(
         [Description("Inclusive upper bound on the document date (yyyy-MM-dd).")] string? document_date_to = null,
         [Description("Inclusive lower bound on the expiry date (yyyy-MM-dd).")] string? expiry_from = null,
         [Description("Inclusive upper bound on the expiry date (yyyy-MM-dd).")] string? expiry_to = null,
-        [Description("name, document_date, expiry_date or updated_at (default: relevance with a query, else updated_at; in the trash, deleted_at; documents without an expiry sort last).")] string? sort_by = null,
+        [Description("name, document_date, expiry_date or updated_at (default: relevance with a query, else updated_at; in the trash, deleted_at). Name sorts case-insensitively; documents without the date sort last in both directions; ties break by updated_at, newest first.")] string? sort_by = null,
         [Description("asc or desc (default desc).")] string? sort_dir = null,
         [Description("Include each document's AI summary as untrusted_summary (null when the document has none).")] bool include_summary = false,
         [Description("Search the trash instead of active documents.")] bool in_trash = false,
