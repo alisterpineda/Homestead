@@ -55,6 +55,8 @@ public sealed record GetDocumentResult(
     // it. Not file-derived, so unprefixed. Null when the version carries no provenance.
     string? TextSource,
     int? NextOffset,
+    // Whether text remains beyond this response: past this chunk with include_text, or at all without it.
+    bool HasMore,
     // The chunk length actually used (after clamping); null without include_text.
     int? TextMaxChars,
     IReadOnlyList<string> Warnings);

@@ -93,6 +93,7 @@ internal sealed record GetDocumentPayload(
     int TextTotalChars,
     string? TextSource,
     int? NextOffset,
+    bool HasMore,
     int? TextMaxChars,
     IReadOnlyList<string> Warnings);
 

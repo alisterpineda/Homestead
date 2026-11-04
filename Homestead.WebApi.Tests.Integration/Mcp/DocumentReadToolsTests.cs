@@ -711,7 +711,7 @@ public partial class DocumentReadToolsTests(PostgresFixture fixture) : Integrati
     [Theory]
     [InlineData(1500)]
     [InlineData(int.MaxValue)]
-    public async Task GetDocument_IncludeText_OffsetAtOrPastTheEnd_ReturnsNoText_AndNoNextOffset(int offset)
+    public async Task GetDocument_IncludeText_OffsetAtOrPastTheEnd_ReturnsNoText_AndSaysSo(int offset)
     {
         var admin = await CreateAdminClientAsync();
         var id = await SeedDocumentAsync(admin, "long.pdf", extractedText: new string('x', 1500));
@@ -719,8 +719,53 @@ public partial class DocumentReadToolsTests(PostgresFixture fixture) : Integrati
 
         var document = await GetDocumentAsync(client, id, new() { ["include_text"] = true, ["text_offset"] = offset });
 
-        Assert.Equal(("", 1500, (int?)null),
-            (document.UntrustedDocumentText, document.TextTotalChars, document.NextOffset));
+        Assert.Equal(("", 1500, (int?)null, false, $"text_offset {offset} is at or past text_total_chars (1500); nothing to read."),
+            (document.UntrustedDocumentText, document.TextTotalChars, document.NextOffset, document.HasMore, Csv(document.Warnings)));
+    }
+
+    // Chunks never split a word: a full chunk ends at its last whitespace, next_offset points there, and the chunks
+    // concatenate back to the original text. has_more says whether to continue.
+    [Fact]
+    public async Task GetDocument_IncludeText_ChunksEndAtWhitespace_AndJoinBackToTheText()
+    {
+        var text = string.Join(' ', Enumerable.Range(0, 300).Select(i => $"word{i:D3}"));   // 2399 code points
+        var admin = await CreateAdminClientAsync();
+        var id = await SeedDocumentAsync(admin, "words.pdf", extractedText: text);
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        var chunks = new List<GetDocumentPayload>();
+        int? offset = 0;
+        while (offset is not null)
+        {
+            var chunk = await GetDocumentAsync(client, id, new()
+            {
+                ["include_text"] = true, ["text_max_chars"] = 1000, ["text_offset"] = offset,
+            });
+            chunks.Add(chunk);
+            offset = chunk.NextOffset;
+        }
+
+        Assert.Equal(3, chunks.Count);
+        Assert.Equal(text, string.Concat(chunks.Select(c => c.UntrustedDocumentText)));
+        // Every chunk but the last ends on a whole word, not inside one and not on the separating space.
+        Assert.All(chunks.SkipLast(1), c => Assert.Matches(@"word\d{3}$", c.UntrustedDocumentText));
+        Assert.Equal([true, true, false], chunks.Select(c => c.HasMore));
+        Assert.True(chunks[0].NextOffset < 1000);
+    }
+
+    [Fact]
+    public async Task GetDocument_HasMore_WithoutIncludeText_SaysWhetherThereIsAnyText()
+    {
+        var admin = await CreateAdminClientAsync();
+        var withText = await SeedDocumentAsync(admin, "letter.pdf", extractedText: "Short.");
+        var blank = await SeedDocumentAsync(admin, "blank.pdf");
+        await SetExtractedTextAsync(blank, null);
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        var some = await GetDocumentAsync(client, withText, new());
+        var none = await GetDocumentAsync(client, blank, new());
+
+        Assert.Equal((true, false), (some.HasMore, none.HasMore));
     }
 
     [Fact]
