@@ -4,6 +4,8 @@ using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using ModelContextProtocol;
 using ModelContextProtocol.AspNetCore;
+using ModelContextProtocol.Protocol;
+using ModelContextProtocol.Server;
 
 namespace Homestead.WebApi.Modules.Mcp;
 
@@ -45,18 +47,83 @@ public static class McpServiceExtensions
 
         // Tool classes are discovered here and instantiated per call from the request's services; a DI
         // registration of a tool class is ignored. AddAuthorizationFilters honours [Authorize] on tool methods
-        // (hides them from tools/list and rejects calls for callers who fail the policy).
+        // (hides them from tools/list and rejects calls for callers who fail the policy). The input check runs after
+        // it, so a caller the policy rejects never sees an argument message.
         builder.Services.AddMcpServer(o =>
             {
                 o.ServerInfo = new() { Name = "homestead", Version = InformationalVersion() };
                 o.ServerInstructions = McpServerInstructions.Text;
             })
             .WithHttpTransport(o => o.SessionMode = HttpServerSessionMode.Stateless)
-            .WithToolsFromAssembly(typeof(Program).Assembly, ToolJsonOptions)
-            .AddAuthorizationFilters();
+            .WithHomesteadTools(typeof(Program).Assembly)
+            .AddAuthorizationFilters()
+            .WithRequestFilters(f => f.AddCallToolFilter(CheckArguments));
 
         return builder;
     }
+
+    // What WithToolsFromAssembly does — every [McpServerTool] method of every [McpServerToolType] class, instantiated
+    // per call from the request's services — plus a corrected input schema (McpToolSchemas), which the SDK's own
+    // registration offers no hook for.
+    private static IMcpServerBuilder WithHomesteadTools(this IMcpServerBuilder builder, Assembly assembly)
+    {
+        var toolTypes = assembly.GetTypes().Where(t => t.GetCustomAttribute<McpServerToolTypeAttribute>() is not null);
+        foreach (var toolType in toolTypes)
+        {
+            var methods = toolType
+                .GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static)
+                .Where(m => m.GetCustomAttribute<McpServerToolAttribute>() is not null);
+            foreach (var method in methods)
+            {
+                builder.Services.AddSingleton(services =>
+                {
+                    var options = new McpServerToolCreateOptions { Services = services, SerializerOptions = ToolJsonOptions };
+                    var tool = method.IsStatic
+                        ? McpServerTool.Create(method, target: null, options)
+                        : McpServerTool.Create(method, request => CreateToolInstance(request, toolType), options);
+                    tool.ProtocolTool.InputSchema = McpToolSchemas.TightenArrayItems(tool.ProtocolTool.InputSchema);
+                    return tool;
+                });
+            }
+        }
+
+        return builder;
+    }
+
+    private static object CreateToolInstance(RequestContext<CallToolRequestParams> request, Type toolType) =>
+        ActivatorUtilities.CreateInstance(
+            request.Services ?? request.Server.Services
+            ?? throw new InvalidOperationException("No service provider to create the tool from."), toolType);
+
+    // The call-tool filter: arguments that do not fit the tool's input schema are answered with a message naming
+    // them (McpInputCheck), in the same error shape the SDK gives a tool's own McpException, instead of the SDK's
+    // bare "An error occurred invoking '…'." from a failed bind.
+    private static McpRequestHandler<CallToolRequestParams, CallToolResult> CheckArguments(
+        McpRequestHandler<CallToolRequestParams, CallToolResult> next) =>
+        (request, ct) =>
+        {
+            if (request.MatchedPrimitive is McpServerTool tool)
+            {
+                var problems = McpInputCheck.Check(tool.ProtocolTool.InputSchema, request.Params?.Arguments);
+                if (problems.Count > 0)
+                {
+                    return ValueTask.FromResult(new CallToolResult
+                    {
+                        IsError = true,
+                        Content =
+                        [
+                            new TextContentBlock
+                            {
+                                Text = $"An error occurred invoking '{tool.ProtocolTool.Name}': Invalid input: " +
+                                       string.Join("\n", problems),
+                            },
+                        ],
+                    });
+                }
+            }
+
+            return next(request, ct);
+        };
 
     // Called after the MapHub line.
     public static WebApplication MapHomesteadMcp(this WebApplication app)

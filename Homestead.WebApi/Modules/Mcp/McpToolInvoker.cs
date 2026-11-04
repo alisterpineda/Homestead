@@ -15,9 +15,10 @@ namespace Homestead.WebApi.Modules.Mcp;
 // - Authorization by document id is part of the signature (ReadDocumentAsync / WriteDocumentAsync), so a tool cannot
 //   forget it. Non-admins get AccessDeniedException for nonexistent ids too, hence "Not found or no access".
 // - Writes are role-gated, then run in one IUnitOfWork transaction (committed once, rolled back on any throw).
-// - Domain exceptions become McpException, the only kind whose message reaches the client. Anything unmapped
-//   (including OperationCanceledException and an McpException thrown by work) propagates untouched. No logging
-//   here: the SDK already logs every McpException.
+// - Domain exceptions become McpException, the only kind whose message reaches the client. Anything else becomes an
+//   "Unexpected error" McpException carrying the type and message — the SDK would otherwise answer with no message at
+//   all — except OperationCanceledException and an McpException thrown by work, which propagate untouched. No logging
+//   here: the SDK already logs every McpException (with its inner exception).
 public sealed class McpToolInvoker(
     IAuthorizationService authz, IHttpContextAccessor http, ICurrentUserAccessor currentUser, IUnitOfWork unitOfWork)
 {
@@ -71,9 +72,11 @@ public sealed class McpToolInvoker(
         authz.AuthorizeDocumentAsync(
             http.HttpContext?.User ?? throw new AccessDeniedException(), documentId, operation);
 
-    // DomainExceptionHandler's order. Null = not ours: the exception filter leaves it (and its stack) untouched.
+    // DomainExceptionHandler's order, then the catch-all. Null = leave it (and its stack) untouched.
     private static McpException? Map(Exception exception) => exception switch
     {
+        OperationCanceledException => null,
+        McpException => null,
         AccessDeniedException e => new McpException("Not found or no access: " + e.Message, e),
         EntityNotFoundException e => new McpException("Not found: " + e.Message, e),
         DuplicateEntityException e => new McpException("Conflict: " + e.Message, e),
@@ -87,6 +90,7 @@ public sealed class McpToolInvoker(
             e),
         // TagPathResolver's "Tag path cannot be empty." and the resolvers' own input checks.
         ArgumentException e => new McpException("Invalid input: " + e.Message, e),
-        _ => null,
+        // A bug or an outage: the model still gets something to report, and the inner exception keeps the stack.
+        _ => new McpException($"Unexpected error ({exception.GetType().Name}): {exception.Message}", exception),
     };
 }

@@ -127,14 +127,16 @@ public class McpToolInvokerTests
     }
 
     [Fact]
-    public async Task UnknownException_IsRethrownUntouched()
+    public async Task UnknownException_MapsToUnexpectedError_NamingTheTypeAndMessage()
     {
+        // The SDK would answer a non-McpException with no message at all; the model needs something to report. The
+        // original stays as the inner exception for the SDK's log.
         var thrown = new InvalidOperationException("boom");
 
-        var caught = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            _sut.ReadAsync<int>(_ => throw thrown, TestContext.Current.CancellationToken));
+        var e = await ReadThrowing(thrown);
 
-        Assert.Same(thrown, caught);
+        Assert.Equal("Unexpected error (InvalidOperationException): boom", e.Message);
+        Assert.Same(thrown, e.InnerException);
     }
 
     [Fact]

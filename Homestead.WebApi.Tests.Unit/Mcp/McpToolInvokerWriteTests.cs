@@ -108,15 +108,16 @@ public class McpToolInvokerWriteTests
     }
 
     [Fact]
-    public async Task WriteAsync_UnknownException_IsRethrownUntouched()
+    public async Task WriteAsync_UnknownException_MapsToUnexpectedError()
     {
         SignInAs(AppRole.Admin);
         var thrown = new InvalidOperationException("boom");
 
-        var caught = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+        var e = await Assert.ThrowsAsync<McpException>(() =>
             _sut.WriteAsync<int>(_ => throw thrown, TestContext.Current.CancellationToken));
 
-        Assert.Same(thrown, caught);
+        Assert.Equal("Unexpected error (InvalidOperationException): boom", e.Message);
+        Assert.Same(thrown, e.InnerException);
     }
 
     [Fact]
