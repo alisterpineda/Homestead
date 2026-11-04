@@ -21,6 +21,7 @@ export interface GetDocumentsResponse {
   hasThumbnail?: boolean;
   id: string;
   matchSnippet?: (string | null);
+  matchedOn?: (Array<string> | null);
   name: string;
   ownerUserId?: (string | null);
   ownerUserName?: (string | null);

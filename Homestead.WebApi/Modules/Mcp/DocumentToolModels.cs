@@ -12,8 +12,11 @@ public sealed record SearchDocumentsResult(
     int PageSize,
     int TotalCount,
     int TotalPages,
-    IReadOnlyList<string> DidYouMean,
+    IReadOnlyList<DidYouMeanResult> DidYouMean,
     IReadOnlyList<string> Warnings);
+
+// A near name on zero results: Kind is document, tag or party; Value is the stored name to retry with.
+public sealed record DidYouMeanResult(string Kind, string Value);
 
 public sealed record SearchDocumentsItemResult(
     Guid Id,
@@ -27,7 +30,9 @@ public sealed record SearchDocumentsItemResult(
     IReadOnlyList<string> Tags,
     IReadOnlyList<string> Parties,
     string? UntrustedSnippet,
-    string? UntrustedSummary);
+    string? UntrustedSummary,
+    // With a query: which of name, content, tag, party, notes matched, in that order. Null without a query.
+    IReadOnlyList<string>? MatchedOn);
 
 public sealed record GetDocumentResult(
     Guid Id,

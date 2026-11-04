@@ -7,6 +7,7 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
+import { DocumentMatchMode } from '../../models/document-match-mode';
 import { DocumentSortBy } from '../../models/document-sort-by';
 import { GetDocumentsResult } from '../../models/get-documents-result';
 import { SortDirection } from '../../models/sort-direction';
@@ -16,6 +17,7 @@ export interface GetDocuments$Params {
   TagIds?: Array<string>;
   IncludeChildTags: boolean;
   Search?: string;
+  MatchMode?: DocumentMatchMode;
   SortBy?: DocumentSortBy;
   SortDir?: SortDirection;
   GroupId?: string;
@@ -38,6 +40,7 @@ export function getDocuments(http: HttpClient, rootUrl: string, params: GetDocum
     rb.query('TagIds', params.TagIds, {});
     rb.query('IncludeChildTags', params.IncludeChildTags, {});
     rb.query('Search', params.Search, {});
+    rb.query('MatchMode', params.MatchMode, {});
     rb.query('SortBy', params.SortBy, {});
     rb.query('SortDir', params.SortDir, {});
     rb.query('GroupId', params.GroupId, {});

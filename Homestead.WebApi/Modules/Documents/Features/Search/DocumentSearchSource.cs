@@ -27,7 +27,7 @@ public class DocumentSearchSource(IDocumentQueryService accessService) : ISearch
         var tsQueryString = SearchTsQueryBuilder.Build(query);
 
         var filtered = DocumentSearchPredicate.ApplyTextSearch(
-            accessService.AccessibleDocuments().AsNoTracking(), query, tsQueryString);
+            accessService.AccessibleDocuments().AsNoTracking(), query);
 
         // Full (uncapped) match count drives "View all (N)".
         var total = await filtered.CountAsync(ct);
@@ -41,7 +41,7 @@ public class DocumentSearchSource(IDocumentQueryService accessService) : ISearch
         var ordered = tsQueryString is not null
             ? filtered
                 .OrderByDescending(d => d.SearchVector != null
-                    ? d.SearchVector.RankCoverDensity(EF.Functions.ToTsQuery(TsLanguage, tsQueryString))
+                    ? d.SearchVector.RankCoverDensity(EF.Functions.ToTsQuery(TsLanguage, EF.Functions.Unaccent(tsQueryString)))
                     : 0f)
                 .ThenByDescending(d => d.UpdatedAt)
             : filtered.OrderByDescending(d => d.UpdatedAt);
@@ -57,14 +57,15 @@ public class DocumentSearchSource(IDocumentQueryService accessService) : ISearch
                 d.CreatedAt,
                 d.Versions.OrderByDescending(v => v.VersionNumber).Select(v => v.ContentType).FirstOrDefault(),
                 // Mirror of GetDocumentsHandler's MatchSnippet: only generate a headline when the FTS
-                // vector actually matched (name/tag/party-only matches produce no content snippet).
+                // vector actually matched (name/tag/party-only matches produce no content snippet). Query and
+                // text are both accent-folded, as the stored vector is, so the headline finds the match.
                 (tsQueryString != null && d.SearchVector != null
-                    && d.SearchVector.Matches(EF.Functions.ToTsQuery(TsLanguage, tsQueryString)))
-                    ? EF.Functions.ToTsQuery(TsLanguage, tsQueryString)
+                    && d.SearchVector.Matches(EF.Functions.ToTsQuery(TsLanguage, EF.Functions.Unaccent(tsQueryString))))
+                    ? EF.Functions.ToTsQuery(TsLanguage, EF.Functions.Unaccent(tsQueryString))
                         .GetResultHeadline(
                             TsLanguage,
-                            d.Versions.OrderByDescending(v => v.VersionNumber)
-                                .Select(v => v.ExtractedText).FirstOrDefault() ?? string.Empty,
+                            EF.Functions.Unaccent(d.Versions.OrderByDescending(v => v.VersionNumber)
+                                .Select(v => v.ExtractedText).FirstOrDefault() ?? string.Empty),
                             MatchSnippetSanitizer.HeadlineOptions)
                     : null))
             .ToListAsync(ct);

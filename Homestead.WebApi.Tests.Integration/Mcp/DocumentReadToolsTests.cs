@@ -37,6 +37,93 @@ public partial class DocumentReadToolsTests(PostgresFixture fixture) : Integrati
         Assert.Equal(["Glacier letter.pdf"], result.Items.Select(i => i.Name));
     }
 
+    // Whole words: "car" is not "care", "card" or "carrying", in the name or the text, and every term must match.
+    [Fact]
+    public async Task Search_ShortTerm_MatchesWholeWordsOnly_NotPrefixesOrSubstrings()
+    {
+        var admin = await CreateAdminClientAsync();
+        await SeedDocumentAsync(admin, "Midas invoice.pdf", extractedText: "Brake repair for the car, parts and labour.");
+        await SeedDocumentAsync(admin, "Health care booklet.pdf", extractedText: "Health Care plan: how to repair a claim.");
+        await SeedDocumentAsync(admin, "Moving day.pdf", extractedText: "Carrying boxes; repair the shelf after.");
+        await SeedDocumentAsync(admin, "GO CARD.pdf", extractedText: "GO CARD terms; repair of a damaged card.");
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        var result = await SearchAsync(client, new() { ["query"] = "car repair" });
+
+        Assert.Equal("Midas invoice.pdf", Csv(Names(result)));
+    }
+
+    [Fact]
+    public async Task Search_FoldsAccents_InBothDirections()
+    {
+        var admin = await CreateAdminClientAsync();
+        await SeedDocumentAsync(admin, "Factura Enel.pdf", extractedText: "Factura pentru energie electrica.");
+        await SeedDocumentAsync(admin, "Factură Hidroelectrica.pdf", extractedText: "Factură pentru apă.");
+        await SeedDocumentAsync(admin, "Unrelated.pdf", extractedText: "Nothing here.");
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        var accented = await SearchAsync(client, new() { ["query"] = "factură" });
+        var plain = await SearchAsync(client, new() { ["query"] = "factura" });
+
+        Assert.Equal(
+            ("Factura Enel.pdf, Factură Hidroelectrica.pdf", "Factura Enel.pdf, Factură Hidroelectrica.pdf"),
+            (Csv(Names(accented)), Csv(Names(plain))));
+    }
+
+    [Fact]
+    public async Task Search_MatchedOn_SaysWhereEachResultMatched()
+    {
+        var admin = await CreateAdminClientAsync();
+        await SeedDocumentAsync(admin, "Hydro bill.pdf", extractedText: "Amount due this month.");
+        var inText = await SeedDocumentAsync(admin, "Statement.pdf", extractedText: "Payment to hydro on the 3rd.");
+        await SeedDocumentAsync(admin, "Tagged.pdf", tagPaths: ["Home/Hydro"], extractedText: "Nothing in the text.");
+        await SeedDocumentAsync(admin, "Linked.pdf", partyNames: ["Toronto Hydro"], extractedText: "Nothing in the text.");
+        var withNote = await SeedDocumentAsync(admin, "Noted.pdf", extractedText: "Nothing in the text.");
+        await SetNotesAsync(withNote, "Hydro account closed.");
+        await SeedDocumentAsync(admin, "Other.pdf", extractedText: "Nothing in the text.");
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        var result = await SearchAsync(client, new() { ["query"] = "hydro", ["sort_by"] = "name", ["sort_dir"] = "asc" });
+
+        Assert.Equal(
+            ["Hydro bill.pdf: name", "Linked.pdf: party", "Noted.pdf: notes", "Statement.pdf: content", "Tagged.pdf: tag"],
+            result.Items.Select(i => $"{i.Name}: {Csv(i.MatchedOn!)}"));
+        // Without a query there is nothing to report.
+        var all = await SearchAsync(client, new());
+        Assert.All(all.Items, i => Assert.Null(i.MatchedOn));
+    }
+
+    [Fact]
+    public async Task Search_TagAndPartyMatches_RankAboveIncidentalMentionsInText()
+    {
+        var admin = await CreateAdminClientAsync();
+        // Seeded first, so recency alone would put the incidental mention first.
+        await SeedDocumentAsync(admin, "Trip receipt.pdf", tagPaths: ["Travel/Bucharest 2025"], extractedText: "Dinner, two people.");
+        await SeedDocumentAsync(admin, "Hotel invoice.pdf", partyNames: ["Hotel Bucharest"], extractedText: "Three nights.");
+        await SeedDocumentAsync(admin, "Travel notes.pdf", extractedText: "We stopped in Bucharest briefly on the way to Sofia.");
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        var result = await SearchAsync(client, new() { ["query"] = "bucharest" });
+
+        Assert.Equal(3, result.Items.Count);
+        Assert.Equal("Travel notes.pdf", result.Items[^1].Name);
+    }
+
+    [Fact]
+    public async Task Search_DidYouMean_IsTypedByWhereTheNameComesFrom()
+    {
+        var admin = await CreateAdminClientAsync();
+        await SeedDocumentAsync(admin, "Mazda Receipt 2023.pdf", partyNames: ["Toronto Hydro"]);
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        var document = await SearchAsync(client, new() { ["query"] = "mazdo" });
+        var party = await SearchAsync(client, new() { ["query"] = "torronto hydro" });
+
+        Assert.Equal(
+            ("document: Mazda Receipt 2023.pdf", "party: Toronto Hydro"),
+            (Csv(document.DidYouMean.Select(s => $"{s.Kind}: {s.Value}")), Csv(party.DidYouMean.Select(s => $"{s.Kind}: {s.Value}"))));
+    }
+
     // Snippet and summary are derived from the file's content, so they travel under the untrusted_ label too. Asserted
     // on the raw JSON: the key is the contract the model reads.
     [Fact]

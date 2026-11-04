@@ -17,6 +17,10 @@ public record GetDocumentsQuery : PaginatedRequest
     [FromQuery(Name = "Search")]
     public string? Search { get; init; }
 
+    /// <summary>How <see cref="Search"/> matches; null = <see cref="DocumentMatchMode.Substring"/>, the list page's.</summary>
+    [FromQuery(Name = "MatchMode")]
+    public DocumentMatchMode? MatchMode { get; init; }
+
     [FromQuery(Name = "SortBy")]
     public DocumentSortBy? SortBy { get; init; }
 

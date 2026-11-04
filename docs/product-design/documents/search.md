@@ -20,6 +20,23 @@ The list endpoint runs five OR'd searches against the user's query string and un
 
 A document is in the result set if any of the five modes matches. ILIKE on name and extracted text is the safety net for the FTS analyser's blind spots; tag and party ILIKE federate the search bar with the filter popover so both surfaces accept the same vocabulary; FTS is the relevance signal.
 
+Every mode folds accents on both sides (`unaccent`, the same folding the stored vector gets — see [§Weighting](#weighting)), so "factură" finds "Factura" and the other way round, in the name, the text, tag and party names, and the full-text branch alike.
+
+### Match modes
+
+The five-mode predicate above is the list page's `Substring` mode, forgiving of partial typing. The list endpoint also offers a `Words` mode (`MatchMode=Words`; the MCP server's `search_documents` uses it), for callers that send whole words and want precision over tolerance:
+
+- Every term must appear as a **whole word** in the name, a tag name, a party name or the notes (`\m`/`\M` word boundaries, case-insensitive, accents folded); a term of four or more characters also matches as the start of a word ("repai" finds "repair"). Quotes are dropped for these branches; adjacency is the full-text branch's affordance.
+- Content goes through the full-text vector with the same rule: a term shorter than four characters is its exact lexeme, not a prefix (`car`, not `car:*`), so "car repair" no longer surfaces "Health **Care**", "**car**rying" or "GO **CARD**" through prefix expansion. There is no substring branch over the text.
+- Notes are searched in this mode (the list page's mode does not search them).
+- Ranking puts what the document **is** above what its text **mentions**: a match on the name, a tag or a party comes before a content-only match, then cover-density rank, then `UpdatedAt` and id. The list page's mode keeps its documented ranking (content rank, with association-only matches at rank 0).
+
+Both modes share one definition per branch (`DocumentSearchTerms`), so the filter, the ranking tier and the per-row report below cannot disagree.
+
+### Where a result matched
+
+With a search, each item carries `MatchedOn`: which of `name`, `content`, `tag`, `party`, `notes` the query matched, in that order (null without a search). `content` means the latest version's text or the summary — the stored vector also indexes the name, so the report re-derives the name's and the text's own vectors for the page's rows rather than reading the combined one. A tag- or party-only match has no snippet (snippets come from the text), and `MatchedOn` is what explains it.
+
 The tag/party clauses are deliberately **federated** rather than baked into the `tsvector`. Including tag and party names in the stored vector would force a re-index of every linked document on each tag rename or tag/party add-remove. Renames are common, so the join-time match keeps the index pure at the cost of a wider OR predicate at query time. Access scope is preserved automatically: the join navigates from documents the user can already see, so a user never matches a tag attached to a sibling household member's document. Ranking is unaffected — `ts_rank_cd` returns 0 for documents matched only via tag or party name, so direct content matches outrank association matches under relevance sort.
 
 ### Quoted phrase search
@@ -50,7 +67,7 @@ The `tsvector` index combines three fields with explicit weights:
 
 Older versions' extracted text does not contribute to the search vector. This keeps the index small and ensures the document's "current" identity drives ranking. Reprocessing a version that happens to be the latest version updates the search vector; reprocessing an older version does not.
 
-The vector is materialised on `Document.SearchVector` and indexed with a GIN index. It is maintained **entirely by database triggers** (migration `AddSearchVectorTriggers`) — there is no application-side updater. Because the indexed content spans two tables (Name and Summary live on `documents`; the latest version's ExtractedText lives on `document_versions`), a single `GENERATED ALWAYS AS … STORED` column is not sufficient, so two triggers keep the column in sync:
+All three fields are **accent-folded** through `unaccent` before indexing (migration `AddUnaccentSearchFolding`), and every query side folds its terms the same way, so "factură" and "Factura" index and match as one lexeme. The vector is materialised on `Document.SearchVector` and indexed with a GIN index. It is maintained **entirely by database triggers** (migration `AddSearchVectorTriggers`, functions redefined by `AddUnaccentSearchFolding`) — there is no application-side updater. Because the indexed content spans two tables (Name and Summary live on `documents`; the latest version's ExtractedText lives on `document_versions`), a single `GENERATED ALWAYS AS … STORED` column is not sufficient, so two triggers keep the column in sync:
 
 - A **`BEFORE INSERT OR UPDATE OF Name, Summary`** trigger on `documents` recomputes `NEW.SearchVector` in place whenever a document is created or its `Name`/`Summary` changes.
 - An **`AFTER INSERT OR DELETE OR UPDATE OF ExtractedText, VersionNumber`** trigger on `document_versions` re-derives the parent document's vector whenever the latest version's extracted text changes, or a version is added or removed (which can change *which* version is the latest).
@@ -96,6 +113,7 @@ Rules:
 - **Filters apply.** Group, party, tag, date-range, expiry-range, has-tags / has-parties / has-pending-suggestions, and trash scoping run on the suggestion query exactly as they do on the primary query — clicking a chip never produces a "ghost" result that disappears on retry because the filter excluded it.
 - **Federated over `Document.Name`, `Tag.Name`, and `Party.Name`.** All three are sources of suggestions (extracted text is not). A typo against a tag or party name surfaces the closest tag/party name directly — not only via an overlapping document name — and clicking the chip re-runs the primary search, which federates over those same names.
 - **Distinct.** A name that appears more than once — two documents with the same name, or a document name that coincides with a tag name — produces one chip, not several.
+- **Typed.** `Suggestions` is the list of names (the chips); `SuggestionDetails` carries the same names with where each comes from (`document`, `tag` or `party` — the best-scoring source when a name is both), so a caller that acts on a suggestion knows whether to retry a search or pick a filter.
 
 Trigram GIN indexes on `Document.Name`, `Tag.Name`, and `Party.Name` (the latter two added in migration `AddTagAndPartyNameTrigramIndexes`) accelerate the suggestion query; the `Document.Name` index additionally backs the primary `ILIKE` substring match described above.
 

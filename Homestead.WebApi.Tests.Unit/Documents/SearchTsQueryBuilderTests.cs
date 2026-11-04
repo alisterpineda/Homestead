@@ -10,6 +10,20 @@ public class SearchTsQueryBuilderTests
         Assert.Equal("tax:* & invoice:*", SearchTsQueryBuilder.Build("tax invoice"));
     }
 
+    // Under a prefix minimum (the MCP tools' Words mode), a short term is its exact lexeme: "car" stays "car", so it
+    // cannot reach "care", "card" or "carrying" through prefix expansion; a longer term still expands.
+    [Fact]
+    public void Build_WithAPrefixMinimum_LeavesShortTermsExact()
+    {
+        Assert.Equal("car & repair:*", SearchTsQueryBuilder.Build("car repair", prefixMinLength: 4));
+    }
+
+    [Fact]
+    public void Build_WithAPrefixMinimum_PhrasesAreUnchanged()
+    {
+        Assert.Equal("(car <-> wash) & 2024:*", SearchTsQueryBuilder.Build("\"car wash\" 2024", prefixMinLength: 4));
+    }
+
     [Fact]
     public void Build_QuotedPhrase_EmitsFollowedByClause()
     {

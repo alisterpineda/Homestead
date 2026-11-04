@@ -32,16 +32,19 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
         var query = scopedQuery;
 
         var search = string.IsNullOrWhiteSpace(request.Search) ? null : request.Search.Trim();
-        string? tsQueryString = search is not null ? SearchTsQueryBuilder.Build(search) : null;
+        var terms = search is not null
+            ? DocumentSearchTerms.Build(search, request.MatchMode ?? DocumentMatchMode.Substring)
+            : null;
+        var tsQueryString = terms?.TsQuery;
 
-        if (search is not null)
+        if (terms is not null)
         {
-            query = DocumentSearchPredicate.ApplyTextSearch(query, search, tsQueryString);
+            query = query.Where(terms.Any);
         }
 
         var defaultSort = request.Deleted == true ? DocumentSortBy.DeletedAt : (DocumentSortBy?)null;
 
-        var paged = await ApplySort(query, request.SortBy ?? defaultSort, request.SortDir, tsQueryString)
+        var paged = await ApplySort(query, request.SortBy ?? defaultSort, request.SortDir, terms)
             .Select(d => new
             {
                 d.Id,
@@ -66,14 +69,15 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
                 d.DeletedByUserId,
                 DeletedByUserName = d.DeletedByUser != null ? d.DeletedByUser.DisplayName : null,
                 VersionCount = d.Versions.Count,
+                // Query and text are both accent-folded, as the stored vector is, so the headline finds the match.
                 MatchSnippet = (tsQueryString != null
                     && d.SearchVector != null
-                    && d.SearchVector.Matches(EF.Functions.ToTsQuery(TsLanguage, tsQueryString)))
-                    ? EF.Functions.ToTsQuery(TsLanguage, tsQueryString)
+                    && d.SearchVector.Matches(EF.Functions.ToTsQuery(TsLanguage, EF.Functions.Unaccent(tsQueryString))))
+                    ? EF.Functions.ToTsQuery(TsLanguage, EF.Functions.Unaccent(tsQueryString))
                         .GetResultHeadline(
                             TsLanguage,
-                            d.Versions.OrderByDescending(r => r.VersionNumber)
-                                .Select(r => r.ExtractedText).FirstOrDefault() ?? string.Empty,
+                            EF.Functions.Unaccent(d.Versions.OrderByDescending(r => r.VersionNumber)
+                                .Select(r => r.ExtractedText).FirstOrDefault() ?? string.Empty),
                             MatchSnippetSanitizer.HeadlineOptions)
                     : null,
                 Tags = d.DocumentTags.Select(dt => new GetDocumentsTagDto
@@ -122,38 +126,48 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
             })
             .ToPaginatedAsync(request, ct);
 
+        var matchedOn = terms is not null && paged.Items.Count > 0
+            ? await MatchedOnAsync(scopedQuery, terms, paged.Items.Select(i => i.Id).ToList(), ct)
+            : null;
+
         var sanitizedItems = paged.Items
-            .Select(item => item with { MatchSnippet = MatchSnippetSanitizer.Sanitize(item.MatchSnippet) })
+            .Select(item => item with
+            {
+                MatchSnippet = MatchSnippetSanitizer.Sanitize(item.MatchSnippet),
+                MatchedOn = matchedOn?.GetValueOrDefault(item.Id) ?? (terms is null ? null : []),
+            })
             .ToList();
 
-        IReadOnlyList<string> suggestions = [];
+        IReadOnlyList<SearchSuggestion> suggestions = [];
         if (paged.TotalCount == 0 && search is not null && search.Length >= SuggestionMinSearchLength)
         {
             var suggestionInput = search.Replace("\"", " ").Trim();
 
             var docNames = scopedQuery
                 .Where(d => EF.Functions.TrigramsWordSimilarity(suggestionInput, d.Name) >= SuggestionSimilarityThreshold)
-                .Select(d => new { d.Name, Score = EF.Functions.TrigramsWordSimilarity(suggestionInput, d.Name) });
+                .Select(d => new { Kind = "document", d.Name, Score = EF.Functions.TrigramsWordSimilarity(suggestionInput, d.Name) });
 
             var tagNames = db.Tags.AsNoTracking()
                 .Where(t => t.DocumentTags.Any(dt => scopedQuery.Any(d => d.Id == dt.DocumentId)))
                 .Where(t => EF.Functions.TrigramsWordSimilarity(suggestionInput, t.Name) >= SuggestionSimilarityThreshold)
-                .Select(t => new { t.Name, Score = EF.Functions.TrigramsWordSimilarity(suggestionInput, t.Name) });
+                .Select(t => new { Kind = "tag", t.Name, Score = EF.Functions.TrigramsWordSimilarity(suggestionInput, t.Name) });
 
             var partyNames = db.Parties.AsNoTracking()
                 .Where(p => p.DocumentParties.Any(dp => scopedQuery.Any(d => d.Id == dp.DocumentId)))
                 .Where(p => EF.Functions.TrigramsWordSimilarity(suggestionInput, p.Name) >= SuggestionSimilarityThreshold)
-                .Select(p => new { p.Name, Score = EF.Functions.TrigramsWordSimilarity(suggestionInput, p.Name) });
+                .Select(p => new { Kind = "party", p.Name, Score = EF.Functions.TrigramsWordSimilarity(suggestionInput, p.Name) });
 
-            suggestions = await docNames
-                .Concat(tagNames)
-                .Concat(partyNames)
+            // One chip per name (a document named like a tag is one suggestion), keeping the best-scoring source's
+            // kind; the three sources are small, so the dedupe runs in memory.
+            var candidates = await docNames.Concat(tagNames).Concat(partyNames).ToListAsync(ct);
+            suggestions = candidates
                 .GroupBy(x => x.Name)
-                .Select(g => new { Name = g.Key, Score = g.Max(x => x.Score) })
+                .Select(g => g.OrderByDescending(x => x.Score).First())
                 .OrderByDescending(x => x.Score)
+                .ThenBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
                 .Take(SuggestionLimit)
-                .Select(x => x.Name)
-                .ToListAsync(ct);
+                .Select(x => new SearchSuggestion(x.Kind, x.Name))
+                .ToList();
         }
 
         return new GetDocumentsResult
@@ -162,8 +176,30 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
             Page = paged.Page,
             PageSize = paged.PageSize,
             TotalCount = paged.TotalCount,
-            Suggestions = suggestions
+            Suggestions = suggestions.Select(s => s.Value).ToList(),
+            SuggestionDetails = suggestions
         };
+    }
+
+    // Which branches matched each document of the page: one query, the page's ids against each branch predicate in
+    // turn (the same predicates the filter used), so the report can never disagree with the match.
+    private static async Task<Dictionary<Guid, IReadOnlyList<string>>> MatchedOnAsync(
+        IQueryable<Domain.Documents.Document> scopedQuery, DocumentSearchTerms terms, List<Guid> ids, CancellationToken ct)
+    {
+        var page = scopedQuery.Where(d => ids.Contains(d.Id));
+        var hits = await page.Where(terms.NameReport).Select(d => new { d.Id, Kind = "name" })
+            .Concat(page.Where(terms.ContentReport).Select(d => new { d.Id, Kind = "content" }))
+            .Concat(page.Where(terms.Tag).Select(d => new { d.Id, Kind = "tag" }))
+            .Concat(page.Where(terms.Party).Select(d => new { d.Id, Kind = "party" }))
+            .Concat(page.Where(terms.Notes).Select(d => new { d.Id, Kind = "notes" }))
+            .ToListAsync(ct);
+
+        string[] order = ["name", "content", "tag", "party", "notes"];
+        return hits
+            .GroupBy(h => h.Id)
+            .ToDictionary(
+                g => g.Key,
+                g => (IReadOnlyList<string>)g.Select(h => h.Kind).Distinct().OrderBy(k => Array.IndexOf(order, k)).ToList());
     }
 
     private static void EnsureRangeOrdered(DateOnly? from, DateOnly? to, string fromName, string toName)
@@ -265,19 +301,20 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
 
     private static IOrderedQueryable<Domain.Documents.Document> ApplySort(
         IQueryable<Domain.Documents.Document> query, DocumentSortBy? sortBy, SortDirection? sortDir,
-        string? tsQueryString = null)
+        DocumentSearchTerms? terms = null)
     {
         // When searching without an explicit sort, order by relevance. ILIKE/tag/party-only matches
         // share an identical rank-0 score, so a deterministic UpdatedAt tiebreaker is required —
         // without it Skip/Take pagination over the tied rows is non-deterministic across requests.
         // The universal-search palette (DocumentSearchSource) applies the same tiebreaker; keeping them
-        // in lockstep is what makes palette results == list results for the same query.
-        if (sortBy is null && tsQueryString is not null)
+        // in lockstep is what makes palette results == list results for the same query. Under Words
+        // matching, what the document is (its name, a tag, a party) ranks above what its text mentions.
+        if (sortBy is null && terms?.TsQuery is not null)
         {
-            var tsq = tsQueryString;
-            return query
-                .OrderByDescending(d => d.SearchVector!.RankCoverDensity(EF.Functions.ToTsQuery(TsLanguage, tsq)))
-                .ThenByDescending(d => d.UpdatedAt);
+            var byRank = terms.Mode == DocumentMatchMode.Words
+                ? query.OrderByDescending(terms.Direct).ThenByDescending(terms.Rank)
+                : query.OrderByDescending(terms.Rank);
+            return byRank.ThenByDescending(d => d.UpdatedAt).ThenBy(d => d.Id);
         }
 
         var effectiveSortBy = sortBy ?? DocumentSortBy.UpdatedAt;

@@ -11,7 +11,13 @@ internal static class SearchTsQueryBuilder
         "the", "a", "an", "of", "and", "or", "to", "in", "on", "at", "for"
     };
 
-    public static string? Build(string search)
+    /// <summary>
+    /// The tsquery for <paramref name="search"/>: quoted phrases as adjacency chains, every other term prefix-expanded
+    /// (<c>tax:*</c>) — except terms shorter than <paramref name="prefixMinLength"/>, which match their lexeme exactly
+    /// (so under a minimum of 4, <c>car</c> is <c>car</c>, not <c>care</c>, <c>card</c> or <c>carri</c>). Null when
+    /// nothing remains.
+    /// </summary>
+    public static string? Build(string search, int prefixMinLength = 1)
     {
         var clauses = new List<string>();
 
@@ -31,7 +37,7 @@ internal static class SearchTsQueryBuilder
         var prefixTerms = remainder.Split(' ', StringSplitOptions.RemoveEmptyEntries)
             .Select(SanitizeTsQueryTerm)
             .Where(t => t.Length > 0)
-            .Select(t => t + ":*");
+            .Select(t => t.Length >= prefixMinLength ? t + ":*" : t);
 
         clauses.AddRange(prefixTerms);
 

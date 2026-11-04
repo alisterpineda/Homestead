@@ -100,6 +100,7 @@ export type { DeleteCommodityPricesResponse } from './models/delete-commodity-pr
 export type { DocumentBackupSourceState } from './models/document-backup-source-state';
 export type { DocumentBackupVersionState } from './models/document-backup-version-state';
 export type { DocumentLinkAvailability } from './models/document-link-availability';
+export type { DocumentMatchMode } from './models/document-match-mode';
 export type { DocumentSettingsResponse } from './models/document-settings-response';
 export type { DocumentSortBy } from './models/document-sort-by';
 export type { DocumentSuggestionDto } from './models/document-suggestion-dto';
@@ -254,6 +255,7 @@ export type { RunPriceSourceImportNowResponse } from './models/run-price-source-
 export type { SearchGroup } from './models/search-group';
 export type { SearchHit } from './models/search-hit';
 export type { SearchResponse } from './models/search-response';
+export type { SearchSuggestion } from './models/search-suggestion';
 export type { SortDirection } from './models/sort-direction';
 export type { StatementHeaderResponse } from './models/statement-header-response';
 export type { StatementImportResponse } from './models/statement-import-response';

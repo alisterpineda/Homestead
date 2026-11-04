@@ -26,6 +26,12 @@ public record GetDocumentsResponse
     public bool HasThumbnail { get; init; }
     public bool HasPendingSuggestions { get; init; }
     public string? MatchSnippet { get; init; }
+
+    /// <summary>
+    /// With a search: which of name, content, tag, party, notes the query matched, in that order. Null without one.
+    /// </summary>
+    public IReadOnlyList<string>? MatchedOn { get; init; }
+
     public required IReadOnlyList<GetDocumentsTagDto> Tags { get; init; }
     public required IReadOnlyList<GetDocumentsPartyDto> Parties { get; init; }
 }

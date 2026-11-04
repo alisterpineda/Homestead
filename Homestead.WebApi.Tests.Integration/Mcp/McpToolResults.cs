@@ -57,8 +57,10 @@ internal sealed record SearchDocumentsPayload(
     int PageSize,
     int TotalCount,
     int TotalPages,
-    IReadOnlyList<string> DidYouMean,
+    IReadOnlyList<DidYouMeanPayload> DidYouMean,
     IReadOnlyList<string> Warnings);
+
+internal sealed record DidYouMeanPayload(string Kind, string Value);
 
 internal sealed record SearchItemPayload(
     Guid Id,
@@ -71,7 +73,8 @@ internal sealed record SearchItemPayload(
     IReadOnlyList<string> Tags,
     IReadOnlyList<string> Parties,
     string? UntrustedSnippet,
-    string? UntrustedSummary);
+    string? UntrustedSummary,
+    IReadOnlyList<string>? MatchedOn);
 
 internal sealed record GetDocumentPayload(
     Guid Id,
