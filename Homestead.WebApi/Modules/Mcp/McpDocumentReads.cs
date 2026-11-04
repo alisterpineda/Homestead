@@ -66,9 +66,8 @@ public sealed class McpDocumentReads(AppDbContext db)
                     })
                     .FirstOrDefault(),
                 VersionCount = d.Versions.Count,
-                Tags = d.DocumentTags.Select(dt => new DocumentTagResult(dt.Tag.Path, dt.Tag.Description)).ToList(),
-                Parties = d.DocumentParties
-                    .Select(dp => new DocumentPartyResult(dp.Party.Name, dp.Party.Description)).ToList(),
+                Tags = d.DocumentTags.Select(dt => dt.Tag.Path).ToList(),
+                Parties = d.DocumentParties.Select(dp => dp.Party.Name).ToList(),
                 Suggestions = d.Suggestions
                     .Where(s => s.Status == DocumentSuggestionStatus.Pending)
                     .Select(s => new McpPendingSuggestion(s.Id, s.Field, s.SuggestedValue, s.OriginalValue, s.CreatedAt))
@@ -126,8 +125,8 @@ public sealed record McpDocumentDetails(
     int VersionCount,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    IReadOnlyList<DocumentTagResult> Tags,
-    IReadOnlyList<DocumentPartyResult> Parties,
+    IReadOnlyList<string> Tags,
+    IReadOnlyList<string> Parties,
     IReadOnlyList<McpPendingSuggestion> PendingSuggestions,
     Guid LatestVersionId,
     int TextTotalChars,

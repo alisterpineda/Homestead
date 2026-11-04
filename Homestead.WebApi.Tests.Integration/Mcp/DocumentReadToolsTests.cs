@@ -500,7 +500,8 @@ public partial class DocumentReadToolsTests(PostgresFixture fixture) : Integrati
     }
 
     // Everything get_document assembles, on a document whose second version differs from the first in extension,
-    // size and text — so a projection that picked the first version, or dropped a field, shows.
+    // size and text — so a projection that picked the first version, or dropped a field, shows. Tags and parties are
+    // plain paths and names, as in search results (descriptions live on list_tags / list_parties).
     [Fact]
     public async Task GetDocument_ReturnsTheFullMetadata_AndTheLatestVersionsFileAndText()
     {
@@ -524,14 +525,46 @@ public partial class DocumentReadToolsTests(PostgresFixture fixture) : Integrati
              Source: "tesseract",
              DocumentDate: (DateOnly?)new DateOnly(2024, 3, 15), ExpiryDate: (DateOnly?)new DateOnly(2025, 3, 14),
              Notes: "Renewed by phone.",
-             Tags: "Home/Insurance: Policies and claims", Parties: "Acme Insurance: The home insurer"),
+             Tags: "Home/Insurance", Parties: "Acme Insurance"),
             (Versions: document.VersionCount, Extension: document.FileExtension, HasSize: document.FileSize > 0,
              Text: document.UntrustedDocumentText, Total: document.TextTotalChars, Next: document.NextOffset,
              Source: document.TextSource,
              DocumentDate: document.DocumentDate, ExpiryDate: document.ExpiryDate,
              Notes: document.Notes,
-             Tags: Csv(document.Tags.Select(t => $"{t.Path}: {t.Description}")),
-             Parties: Csv(document.Parties.Select(p => $"{p.Name}: {p.Description}"))));
+             Tags: Csv(document.Tags), Parties: Csv(document.Parties)));
+    }
+
+    // The wire is JSON inside a JSON-RPC string, never HTML, so the HTML-sensitive characters go out as themselves:
+    // the default encoder's \u003C / \u0026 forms bloat document text for nothing.
+    [Fact]
+    public async Task Responses_DoNotEscapeHtmlSensitiveCharacters()
+    {
+        const string name = "Smith & Sons <Scan> + Tax 'Q1'.pdf";
+        var admin = await CreateAdminClientAsync();
+        var id = await SeedDocumentAsync(admin, name, extractedText: "Total: 5 < 10 & 10 > 5; A+B='C'.");
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        var search = await McpToolResults.CallForJsonTextAsync(client, "search_documents", null, CT);
+        var document = await McpToolResults.CallForJsonTextAsync(client, "get_document",
+            new Dictionary<string, object?> { ["document_id"] = id, ["include_text"] = true }, CT);
+
+        Assert.Contains(name, search);
+        Assert.Contains("Total: 5 < 10 & 10 > 5; A+B='C'.", document);
+        Assert.DoesNotContain("\\u00", search);
+        Assert.DoesNotContain("\\u00", document);
+    }
+
+    [Fact]
+    public async Task FileExtension_IsLowercase_HoweverTheFileWasNamed()
+    {
+        var admin = await CreateAdminClientAsync();
+        var id = await SeedDocumentAsync(admin, "Scan.PDF");
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        var search = await SearchAsync(client, new());
+        var document = await GetDocumentAsync(client, id, new());
+
+        Assert.Equal((".pdf", ".pdf"), (Assert.Single(search.Items).FileExtension, document.FileExtension));
     }
 
     // Where the text came from travels with it, so a model reading a statement's totals can tell engine output
@@ -580,7 +613,8 @@ public partial class DocumentReadToolsTests(PostgresFixture fixture) : Integrati
 
         var document = await GetDocumentAsync(client, id, new());
 
-        Assert.Equal("Name: Pending name", Csv(document.PendingSuggestions.Select(s => $"{s.Field}: {s.SuggestedValue}")));
+        // The field is spelled as update_document's parameter is (snake_case).
+        Assert.Equal("name: Pending name", Csv(document.PendingSuggestions.Select(s => $"{s.Field}: {s.SuggestedValue}")));
     }
 
     [Fact]
@@ -597,7 +631,7 @@ public partial class DocumentReadToolsTests(PostgresFixture fixture) : Integrati
         var document = await GetDocumentAsync(client, id, new());
 
         Assert.Equal(
-            [("Parties", "Acme Insurance"), ("Tags", "Home/Insurance")],
+            [("parties", "Acme Insurance"), ("tags", "Home/Insurance")],
             document.PendingSuggestions.Select(s => (s.Field, s.SuggestedValue)).Order());
     }
 

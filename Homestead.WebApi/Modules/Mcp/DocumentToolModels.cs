@@ -39,8 +39,8 @@ public sealed record GetDocumentResult(
     int VersionCount,
     string CreatedAt,
     string UpdatedAt,
-    IReadOnlyList<DocumentTagResult> Tags,
-    IReadOnlyList<DocumentPartyResult> Parties,
+    IReadOnlyList<string> Tags,
+    IReadOnlyList<string> Parties,
     IReadOnlyList<PendingSuggestionResult> PendingSuggestions,
     string? UntrustedDocumentText,
     int TextTotalChars,
@@ -49,12 +49,9 @@ public sealed record GetDocumentResult(
     string? TextSource,
     int? NextOffset);
 
-public sealed record DocumentTagResult(string Path, string? Description);
-
-public sealed record DocumentPartyResult(string Name, string? Description);
-
-// Field is the DocumentSuggestionField name (Tags, Name, Parties, DocumentDate, ExpiryDate). For Tags/Parties the
-// stored value is an id; SuggestedValue carries the tag path / party name instead.
+// Field is the DocumentSuggestionField name in snake_case (tags, name, parties, document_date, expiry_date), the
+// same spelling as update_document's parameters. For Tags/Parties the stored value is an id; SuggestedValue carries
+// the tag path / party name instead.
 public sealed record PendingSuggestionResult(
     Guid SuggestionId, string Field, string SuggestedValue, string? OriginalValue);
 

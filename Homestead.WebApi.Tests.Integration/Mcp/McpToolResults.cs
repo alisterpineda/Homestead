@@ -22,6 +22,16 @@ internal static class McpToolResults
         return JsonSerializer.Deserialize<T>(text, Json)!;
     }
 
+    /// <summary>The raw JSON text of a successful call, for assertions on the wire bytes themselves.</summary>
+    public static async Task<string> CallForJsonTextAsync(
+        McpClient client, string tool, IReadOnlyDictionary<string, object?>? arguments, CancellationToken ct)
+    {
+        var result = await client.CallToolAsync(tool, arguments, cancellationToken: ct);
+        var text = SingleText(result);
+        Assert.True(result.IsError != true, $"{tool} returned an error: {text}");
+        return text;
+    }
+
     /// <summary>The message after the SDK's "An error occurred invoking '…': " prefix (the McpException's message).</summary>
     public static async Task<string> CallForErrorAsync(
         McpClient client, string tool, IReadOnlyDictionary<string, object?>? arguments, CancellationToken ct)
@@ -54,6 +64,7 @@ internal sealed record SearchItemPayload(
     string Name,
     DateOnly? DocumentDate,
     DateOnly? ExpiryDate,
+    string FileExtension,
     string? DeletedAt,
     bool PendingReview,
     IReadOnlyList<string> Tags,
@@ -71,17 +82,13 @@ internal sealed record GetDocumentPayload(
     string FileExtension,
     long FileSize,
     int VersionCount,
-    IReadOnlyList<DocumentTagPayload> Tags,
-    IReadOnlyList<DocumentPartyPayload> Parties,
+    IReadOnlyList<string> Tags,
+    IReadOnlyList<string> Parties,
     IReadOnlyList<PendingSuggestionPayload> PendingSuggestions,
     string? UntrustedDocumentText,
     int TextTotalChars,
     string? TextSource,
     int? NextOffset);
-
-internal sealed record DocumentTagPayload(string Path, string? Description);
-
-internal sealed record DocumentPartyPayload(string Name, string? Description);
 
 internal sealed record PendingSuggestionPayload(Guid SuggestionId, string Field, string SuggestedValue, string? OriginalValue);
 

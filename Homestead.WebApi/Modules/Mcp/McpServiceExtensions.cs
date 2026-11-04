@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
@@ -19,11 +20,14 @@ public static class McpServiceExtensions
     // property names, so result records stay plain C# and the wire matches the parameter names (which the SDK takes
     // verbatim from the C# parameters — hence snake_case parameters in the tool classes), and nulls written: an
     // unset optional field is an explicit null, never a missing key, so "no summary" and "no expiry" read the same
-    // way every time instead of as a field the model has to know to miss.
+    // way every time instead of as a field the model has to know to miss. The relaxed encoder writes <, >, &, ' and
+    // + as themselves: the default escapes them (\u003C …) for HTML embedding, which no MCP client does, and it
+    // bloats document text badly. The output is JSON text inside a JSON-RPC string, never HTML.
     public static readonly JsonSerializerOptions ToolJsonOptions = new(McpJsonUtilities.DefaultOptions)
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
         DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.Never,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
 
     // Called right after AddAppAuthentication(): the bearer scheme and policy extend the cookie setup.
