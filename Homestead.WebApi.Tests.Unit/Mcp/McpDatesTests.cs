@@ -22,7 +22,6 @@ public class McpDatesTests
     [Theory]
     [InlineData("2024-3-7")]
     [InlineData("07/03/2024")]
-    [InlineData("2024-02-30")]
     [InlineData("2024-03-07T00:00:00")]
     [InlineData("20240307")]
     [InlineData("yesterday")]
@@ -31,6 +30,17 @@ public class McpDatesTests
         var e = Assert.Throws<ArgumentException>(() => McpDates.ParseOptional(value, "document_date_to"));
         Assert.Contains("document_date_to", e.Message);
         Assert.Contains("yyyy-MM-dd", e.Message);
+    }
+
+    // Well-formed but not a date: saying "must be yyyy-MM-dd" would send the model the wrong way.
+    [Theory]
+    [InlineData("2025-02-30")]
+    [InlineData("2024-13-01")]
+    [InlineData("2024-04-31")]
+    public void ParseOptional_AWellFormedNonDate_SaysItIsNotAValidDate(string value)
+    {
+        var e = Assert.Throws<ArgumentException>(() => McpDates.ParseOptional(value, "document_date_to"));
+        Assert.Equal($"document_date_to is not a valid calendar date, got '{value}'.", e.Message);
     }
 
     [Fact]

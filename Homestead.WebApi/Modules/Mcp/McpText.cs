@@ -10,26 +10,18 @@ public static class McpText
     public const int MinMaxChars = 1000;
     public const int MaxMaxChars = 50_000;
 
-    public static int ClampMaxChars(int maxChars) => Math.Clamp(maxChars, MinMaxChars, MaxMaxChars);
-
     // Offsets and lengths count Unicode code points — what Postgres length()/substr() count on a UTF-8 database — so
     // a chunk never ends inside a character, and feeding next_offset back reads on with nothing dropped or repeated.
-    // At or past the end the window is empty (Length 0) with no next offset.
+    // At or past the end the window is empty (Length 0) with no next offset. The offset is clamped to 0 or more and
+    // maxChars to [MinMaxChars, MaxMaxChars] by the tool (McpWarnings) before anything is read.
     public static TextWindow Window(int totalChars, int offset, int maxChars)
     {
-        RequireValidOffset(offset);
+        ArgumentOutOfRangeException.ThrowIfNegative(offset);
         if (offset >= totalChars)
             return new TextWindow(offset, 0, null);
 
         var end = (int)Math.Min(totalChars, (long)offset + maxChars);
         return new TextWindow(offset, end - offset, end < totalChars ? end : null);
-    }
-
-    // Checked before the text is read: the window itself is computed afterwards, on the length read with the chunk.
-    public static void RequireValidOffset(int offset)
-    {
-        if (offset < 0)
-            throw new ArgumentException("text_offset must be 0 or greater.");
     }
 
     // The start to slice from in SQL. EF sends Substring's start as `offset + 1` (SQL substring is 1-based), which

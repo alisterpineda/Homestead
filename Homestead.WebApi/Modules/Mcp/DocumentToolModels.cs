@@ -5,13 +5,15 @@ namespace Homestead.WebApi.Modules.Mcp;
 // tags travel by path, parties by name, suggestions by their own id. Text derived from the file's content (snippet,
 // summary, extracted text) carries the untrusted_ prefix.
 
+// Warnings (every tool with inputs): what was clamped, ignored or contradictory in the call — see McpWarnings.
 public sealed record SearchDocumentsResult(
     IReadOnlyList<SearchDocumentsItemResult> Items,
     int Page,
     int PageSize,
     int TotalCount,
     int TotalPages,
-    IReadOnlyList<string> DidYouMean);
+    IReadOnlyList<string> DidYouMean,
+    IReadOnlyList<string> Warnings);
 
 public sealed record SearchDocumentsItemResult(
     Guid Id,
@@ -47,7 +49,10 @@ public sealed record GetDocumentResult(
     // Where the latest version's text came from: an engine type slug, or "manual" when a person hand-edited
     // it. Not file-derived, so unprefixed. Null when the version carries no provenance.
     string? TextSource,
-    int? NextOffset);
+    int? NextOffset,
+    // The chunk length actually used (after clamping); null without include_text.
+    int? TextMaxChars,
+    IReadOnlyList<string> Warnings);
 
 // Field is the DocumentSuggestionField name in snake_case (tags, name, parties, document_date, expiry_date), the
 // same spelling as update_document's parameters. For Tags/Parties the stored value is an id; SuggestedValue carries
@@ -56,12 +61,14 @@ public sealed record PendingSuggestionResult(
     Guid SuggestionId, string Field, string SuggestedValue, string? OriginalValue);
 
 public sealed record ListTagsResult(
-    IReadOnlyList<TagItemResult> Items, int Page, int PageSize, int TotalCount, int TotalPages);
+    IReadOnlyList<TagItemResult> Items, int Page, int PageSize, int TotalCount, int TotalPages,
+    IReadOnlyList<string> Warnings);
 
 public sealed record TagItemResult(string Path, string? Description, int DocumentCount);
 
 public sealed record ListPartiesResult(
-    IReadOnlyList<PartyItemResult> Items, int Page, int PageSize, int TotalCount, int TotalPages);
+    IReadOnlyList<PartyItemResult> Items, int Page, int PageSize, int TotalCount, int TotalPages,
+    IReadOnlyList<string> Warnings);
 
 public sealed record PartyItemResult(string Name, string? Description, int DocumentCount);
 

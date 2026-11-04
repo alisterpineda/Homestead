@@ -104,6 +104,17 @@ public class PartyNameResolverTests : IDisposable
     }
 
     [Fact]
+    public async Task RequireKnown_UnknownWithANearName_NamesIt()
+    {
+        var e = await Assert.ThrowsAsync<McpException>(() => _sut.RequireKnownAsync(["Torronto Hydro"], Ct));
+
+        Assert.Equal(
+            "Unknown party name(s): Torronto Hydro — nearest: Toronto Hydro. " +
+            "Use list_parties; call create_party only if the user asked for a new party.",
+            e.Message);
+    }
+
+    [Fact]
     public async Task RequireKnown_Unknown_ThrowsWithTheNamesAndTheGuidance()
     {
         var e = await Assert.ThrowsAsync<McpException>(() =>

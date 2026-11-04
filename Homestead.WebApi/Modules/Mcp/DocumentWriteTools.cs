@@ -61,7 +61,7 @@ public sealed class DocumentWriteTools(
         [Description("A paragraph to add after the existing notes.")] string? append_note = null,
         [Description("Tag paths from list_tags to add.")] string[]? add_tags = null,
         [Description("Tag paths to remove (case-insensitive; a path not on the document is ignored).")] string[]? remove_tags = null,
-        [Description("Exact party names from list_parties to link.")] string[]? add_parties = null,
+        [Description("Party names from list_parties to link (case-insensitive).")] string[]? add_parties = null,
         [Description("Party names to unlink (case-insensitive; a name not linked is ignored).")] string[]? remove_parties = null,
         CancellationToken ct = default) =>
         invoker.WriteDocumentAsync(document_id, async c =>
@@ -113,7 +113,7 @@ public sealed class DocumentWriteTools(
         [Description("1 to 100 document ids from search_documents.")] Guid[] document_ids,
         [Description("Tag paths from list_tags to add.")] string[]? add_tags = null,
         [Description("Tag paths to remove (case-insensitive).")] string[]? remove_tags = null,
-        [Description("Exact party names from list_parties to link.")] string[]? add_parties = null,
+        [Description("Party names from list_parties to link (case-insensitive).")] string[]? add_parties = null,
         [Description("Party names to unlink (case-insensitive).")] string[]? remove_parties = null,
         CancellationToken ct = default) =>
         invoker.WriteAsync(async c =>

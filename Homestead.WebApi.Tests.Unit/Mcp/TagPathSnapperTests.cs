@@ -109,6 +109,17 @@ public class TagPathSnapperTests : IDisposable
         Assert.DoesNotContain("Home/Insurance", nearest);
     }
 
+    // A misspelled parent has no siblings and is nobody's prefix; the trigram fallback still finds the path meant.
+    [Fact]
+    public async Task Nearest_ForAMisspelledParent_FallsBackToTheClosestPathsByTrigram()
+    {
+        var result = await _sut.SnapAsync(["Home/Utilitis/Water"], Ct);
+
+        var (_, nearest) = Assert.Single(result.Suggestions);
+        Assert.Equal("Home/Utilities/Water", nearest[0]);
+        Assert.Contains("Home/Utilities", nearest);
+    }
+
     [Fact]
     public async Task Nearest_IsOmitted_WhenNothingSharesTheParentOrPrefix()
     {

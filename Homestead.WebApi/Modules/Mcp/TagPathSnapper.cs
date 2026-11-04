@@ -11,8 +11,6 @@ namespace Homestead.WebApi.Modules.Mcp;
 // snapping first returns the stored casing and refuses what does not exist. Read-only.
 public sealed class TagPathSnapper(AppDbContext db)
 {
-    private const int MaxNearest = 3;
-
     // Normalised exactly as a write would (TagPathResolver.NormalizePath; an empty path throws ArgumentException,
     // which the invoker reports as invalid input), matched by CaseInsensitiveMatch: an exact-casing match wins when
     // two casings of one path exist. Known keeps input order without duplicates; Suggestions lists only unknowns
@@ -51,30 +49,26 @@ public sealed class TagPathSnapper(AppDbContext db)
         if (result.Unknown.Count == 0)
             return result.Known;
 
-        var message = "Unknown tag path(s): " + string.Join(", ", result.Unknown);
-        if (result.Suggestions.Count > 0)
-        {
-            message += " — nearest: " + (result.Unknown.Count == 1
-                ? string.Join(", ", result.Suggestions[0].Nearest)
-                : string.Join("; ", result.Suggestions.Select(s => $"{s.Unknown} → {string.Join(", ", s.Nearest)}")));
-        }
-
-        throw new McpException(message + ". Use list_tags; call create_tag only if the user asked for a new tag.");
+        throw new McpException(McpNearest.Describe("tag path(s)", result.Unknown, result.Suggestions) +
+                               ". Use list_tags; call create_tag only if the user asked for a new tag.");
     }
 
     // Existing paths under the same parent (siblings) or extending the unknown path (it is their case-insensitive
-    // prefix), closest first: longest shared prefix, then shortest, then alphabetical.
-    private static string[] Nearest(string unknown, IEnumerable<string> existing)
+    // prefix), closest first: longest shared prefix, then shortest, then alphabetical. When the structure gives
+    // nothing — a misspelled parent has no siblings and is nobody's prefix — the trigram-nearest paths (McpNearest).
+    private static string[] Nearest(string unknown, IReadOnlyList<string> existing)
     {
         var parent = ParentOf(unknown);
-        return existing
+        var structural = existing
             .Where(p => p.StartsWith(unknown, StringComparison.OrdinalIgnoreCase)
                         || string.Equals(ParentOf(p), parent, StringComparison.OrdinalIgnoreCase))
             .OrderByDescending(p => SharedPrefixLength(p, unknown))
             .ThenBy(p => p.Length)
             .ThenBy(p => p, StringComparer.OrdinalIgnoreCase)
-            .Take(MaxNearest)
-            .ToArray();
+            .Take(McpNearest.Max)
+            .ToList();
+
+        return structural.Count > 0 ? [.. structural] : McpNearest.Find(unknown, existing);
     }
 
     private static string ParentOf(string path)

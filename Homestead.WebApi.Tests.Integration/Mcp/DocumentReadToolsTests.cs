@@ -318,14 +318,130 @@ public partial class DocumentReadToolsTests(PostgresFixture fixture) : Integrati
         Assert.Equal("Invalid input: expiry_from must be on or before expiry_to.", error);
     }
 
-    [Fact]
-    public async Task Search_PageSizeAbove100_IsClamped()
+    // Out-of-range numbers are clamped and reported, never rejected — and the echo says what was used.
+    [Theory]
+    [InlineData(500, 100, "page_size 500 lowered to 100.")]
+    [InlineData(0, 1, "page_size 0 raised to 1.")]
+    public async Task Search_PageSizeOutOfRange_IsClampedAndReported(int requested, int used, string warning)
     {
         await using var client = await ConnectAsync(AppRole.Viewer);
 
-        var result = await SearchAsync(client, new() { ["page_size"] = 500 });
+        var result = await SearchAsync(client, new() { ["page_size"] = requested });
 
-        Assert.Equal(100, result.PageSize);
+        Assert.Equal((used, warning), (result.PageSize, Csv(result.Warnings)));
+    }
+
+    [Fact]
+    public async Task Search_WithNothingToReport_HasAnEmptyWarningsList()
+    {
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        var result = await SearchAsync(client, new() { ["page_size"] = 10 });
+
+        Assert.Empty(result.Warnings);
+    }
+
+    [Fact]
+    public async Task Search_HasTagsFalseWithTagPaths_WarnsAboutTheContradiction()
+    {
+        var admin = await CreateAdminClientAsync();
+        await SeedDocumentAsync(admin, "Power bill.pdf", tagPaths: ["Home/Utilities"]);
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        var result = await SearchAsync(client, new() { ["has_tags"] = false, ["tag_paths"] = new[] { "Home/Utilities" } });
+
+        Assert.Equal(
+            (0, "has_tags=false contradicts tag_paths: no document can match both, so the result is empty."),
+            (result.TotalCount, Csv(result.Warnings)));
+    }
+
+    [Fact]
+    public async Task Search_SortDirWithAQueryAndNoSortBy_IsReportedAsIgnored()
+    {
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        var result = await SearchAsync(client, new() { ["query"] = "hydro", ["sort_dir"] = "asc" });
+
+        Assert.Equal(["sort_dir is ignored: with a query and no sort_by, results are ordered by relevance."], result.Warnings);
+    }
+
+    [Fact]
+    public async Task Search_PagePastTheEnd_IsReported()
+    {
+        var admin = await CreateAdminClientAsync();
+        await SeedDocumentAsync(admin, "only.pdf");
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        var result = await SearchAsync(client, new() { ["page"] = 5 });
+
+        Assert.Equal((0, 5, "page 5 is past the last page (1); no items."), (result.Items.Count, result.Page, Csv(result.Warnings)));
+    }
+
+    [Fact]
+    public async Task Search_EmptyTagPaths_IsNoFilter()
+    {
+        var admin = await CreateAdminClientAsync();
+        await SeedDocumentAsync(admin, "tagged.pdf", tagPaths: ["Home/Utilities"]);
+        await SeedDocumentAsync(admin, "untagged.pdf");
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        var result = await SearchAsync(client, new() { ["tag_paths"] = Array.Empty<string>(), ["party_names"] = Array.Empty<string>() });
+
+        Assert.Equal((2, ""), (result.TotalCount, Csv(result.Warnings)));
+    }
+
+    [Fact]
+    public async Task Search_TagPathWithATrailingSlash_AndAnotherCasing_Matches()
+    {
+        var admin = await CreateAdminClientAsync();
+        await SeedDocumentAsync(admin, "Power bill.pdf", tagPaths: ["Home/Utilities"]);
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        var result = await SearchAsync(client, new() { ["tag_paths"] = new[] { "home/utilities/" } });
+
+        Assert.Equal("Power bill.pdf", Csv(Names(result)));
+    }
+
+    [Fact]
+    public async Task Search_InvalidCalendarDate_SaysSo_NotThatTheFormIsWrong()
+    {
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        var error = await McpToolResults.CallForErrorAsync(client, "search_documents",
+            new Dictionary<string, object?> { ["document_date_from"] = "2025-02-30" }, CT);
+
+        Assert.Equal("Invalid input: document_date_from is not a valid calendar date, got '2025-02-30'.", error);
+    }
+
+    [Fact]
+    public async Task Search_UnknownPartyName_ListsTheNearestNames()
+    {
+        var admin = await CreateAdminClientAsync();
+        await CreatePartyAsync(admin, "TD Canada Trust");
+        await CreatePartyAsync(admin, "Toronto Hydro");
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        var error = await McpToolResults.CallForErrorAsync(client, "search_documents",
+            new Dictionary<string, object?> { ["party_names"] = new[] { "TD Bank" } }, CT);
+
+        Assert.Equal(
+            "Unknown party name(s): TD Bank — nearest: TD Canada Trust. " +
+            "Use list_parties; call create_party only if the user asked for a new party.",
+            error);
+    }
+
+    [Fact]
+    public async Task Search_UnknownTagPathWithAMisspelledParent_ListsTheNearestPaths()
+    {
+        var admin = await CreateAdminClientAsync();
+        await CreateTagAsync(admin, "Insurance/Disability");
+        await CreateTagAsync(admin, "Home");
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        var error = await McpToolResults.CallForErrorAsync(client, "search_documents",
+            new Dictionary<string, object?> { ["tag_paths"] = new[] { "Insurence/Disability" } }, CT);
+
+        Assert.StartsWith("Unknown tag path(s): Insurence/Disability — nearest: Insurance/Disability", error);
     }
 
     // --- group access ---
@@ -438,6 +554,44 @@ public partial class DocumentReadToolsTests(PostgresFixture fixture) : Integrati
         // The key is present and null: "no summary" is read, never inferred from a missing field.
         Assert.True(json.TryGetProperty("untrusted_summary", out var summary));
         Assert.Equal(JsonValueKind.Null, summary.ValueKind);
+    }
+
+    [Fact]
+    public async Task GetDocument_TextMaxCharsBelowTheMinimum_IsRaised_Echoed_AndReported()
+    {
+        var admin = await CreateAdminClientAsync();
+        var id = await SeedDocumentAsync(admin, "letter.pdf", extractedText: "Short.");
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        var document = await GetDocumentAsync(client, id, new() { ["include_text"] = true, ["text_max_chars"] = 10 });
+
+        Assert.Equal((1000, "text_max_chars 10 raised to 1000.", "Short."),
+            (document.TextMaxChars, Csv(document.Warnings), document.UntrustedDocumentText));
+    }
+
+    [Fact]
+    public async Task GetDocument_NegativeTextOffset_IsRaisedToZero_AndReported()
+    {
+        var admin = await CreateAdminClientAsync();
+        var id = await SeedDocumentAsync(admin, "letter.pdf", extractedText: "Short.");
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        var document = await GetDocumentAsync(client, id, new() { ["include_text"] = true, ["text_offset"] = -3 });
+
+        Assert.Equal(("text_offset -3 raised to 0.", "Short."), (Csv(document.Warnings), document.UntrustedDocumentText));
+    }
+
+    [Fact]
+    public async Task GetDocument_TextParametersWithoutIncludeText_AreReportedAsIgnored()
+    {
+        var admin = await CreateAdminClientAsync();
+        var id = await SeedDocumentAsync(admin, "letter.pdf");
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        var document = await GetDocumentAsync(client, id, new() { ["text_offset"] = 500 });
+
+        Assert.Equal((null, "text_offset and text_max_chars have no effect without include_text."),
+            (document.TextMaxChars, Csv(document.Warnings)));
     }
 
     [Fact]
@@ -666,6 +820,17 @@ public partial class DocumentReadToolsTests(PostgresFixture fixture) : Integrati
             new Dictionary<string, object?> { ["parent_path"] = "home" }, CT);
 
         Assert.Equal(["Home/Utilities"], result.Items.Select(t => t.Path));
+    }
+
+    [Fact]
+    public async Task ListTags_PageSizeAbove500_IsClampedAndReported()
+    {
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        var result = await McpToolResults.CallAsync<ListTagsPayload>(client, "list_tags",
+            new Dictionary<string, object?> { ["page_size"] = 1000 }, CT);
+
+        Assert.Equal((500, "page_size 1000 lowered to 500."), (result.PageSize, Csv(result.Warnings)));
     }
 
     [Fact]
