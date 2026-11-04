@@ -114,10 +114,11 @@ public class TextExtractionEngineTests : IntegrationTestBase
     }
 
     private record ProvenanceItem(
-        string Engine, string EngineKey, DateTimeOffset ExtractedAt,
+        string Engine, string? EngineKey, DateTimeOffset ExtractedAt,
         string? RequestedEngineKey, string? FallbackReason,
         string? Language, int? PagesFromTextLayer, int? PagesOcred, string? TextLayerExtractor,
-        string? ModelId, int? PageCount);
+        string? ModelId, int? PageCount,
+        string? EditedByDisplayName, string? BasisEngine, string? BasisEngineKey, DateTimeOffset? BasisExtractedAt);
 
     private record DocumentWithProvenance(Guid Id, string? ExtractedText, ProvenanceItem? TextExtraction);
 
@@ -190,12 +191,14 @@ public class TextExtractionEngineTests : IntegrationTestBase
     }
 
     // Provenance describes the extraction that produced the text. Once a human edits that text, the
-    // metadata would be describing text this row no longer holds — so it is cleared rather than left to
-    // attribute a hand-written edit to Tesseract, page counts and all.
+    // engine's record would be describing text this row no longer holds — so it is replaced by a manual
+    // record that names the editor and keeps the engine run as its basis, rather than either attributing
+    // a hand-written edit to Tesseract (page counts and all) or erasing it so the version reads as never
+    // extracted. The whole thing round-trips through jsonb, and the editor's name is resolved on read.
     [Fact]
-    public async Task PatchVersion_EditingExtractedTextByHand_ClearsStaleProvenance()
+    public async Task PatchVersion_EditingExtractedTextByHand_RecordsManualProvenanceWithEngineBasis()
     {
-        var client = await CreateAdminClientAsync();
+        var client = await AuthHelper.CreateAdminClientAsync(Factory, displayName: "Pat Proofreader");
         var docId = await UploadAndWaitAsync(client);
         var versionId = await GetLatestVersionIdAsync(client, docId);
 
@@ -203,6 +206,7 @@ public class TextExtractionEngineTests : IntegrationTestBase
             $"/api/v1/documents/{docId}/versions/{versionId}", CT);
         Assert.NotNull(before!.TextExtraction);
 
+        var editedAfter = DateTimeOffset.UtcNow;
         var patch = await SendJsonPatchAsync(client, $"/api/v1/documents/{docId}/versions/{versionId}", new[]
         {
             new { op = "replace", path = "/extractedText", value = "text a human typed" }
@@ -213,7 +217,22 @@ public class TextExtractionEngineTests : IntegrationTestBase
             $"/api/v1/documents/{docId}/versions/{versionId}", CT);
 
         Assert.Equal("text a human typed", after!.ExtractedText);
-        Assert.Null(after.TextExtraction);
+        var manual = after.TextExtraction;
+        Assert.NotNull(manual);
+        Assert.Equal(
+            (Engine: "manual", EngineKey: (string?)null, EditedBy: (string?)"Pat Proofreader",
+             BasisEngine: (string?)"tesseract", BasisEngineKey: (string?)"tesseract",
+             BasisExtractedAt: (DateTimeOffset?)before.TextExtraction.ExtractedAt),
+            (manual.Engine, manual.EngineKey, manual.EditedByDisplayName,
+             manual.BasisEngine, manual.BasisEngineKey, manual.BasisExtractedAt));
+        Assert.True(manual.ExtractedAt >= editedAfter.AddSeconds(-1), "the edit time is the new ExtractedAt");
+        // The engine-only fields stay absent on the flattened DTO.
+        Assert.Null(manual.Language);
+        Assert.Null(manual.PagesFromTextLayer);
+
+        // Provenance travels with the text: the document endpoint's latest-version view says the same.
+        var document = await client.GetFromJsonAsync<DocumentWithProvenance>($"/api/v1/documents/{docId}", CT);
+        Assert.Equal(manual, document!.TextExtraction);
     }
 
     // Editing something else on the version must not throw the provenance away.

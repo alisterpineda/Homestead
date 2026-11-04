@@ -8,19 +8,19 @@ public sealed class TextExtractionResult
 
     // Provenance for the extraction that produced Text. Null on failure — there is no meaningful
     // "how this text was produced" when no text was produced.
-    public TextExtractionMetadata? Metadata { get; }
+    public EngineTextExtractionMetadata? Metadata { get; }
 
     public bool Succeeded => Error is null;
     public Exception? Error { get; }
 
-    private TextExtractionResult(string? text, TextExtractionMetadata? metadata, Exception? error)
+    private TextExtractionResult(string? text, EngineTextExtractionMetadata? metadata, Exception? error)
     {
         Text = text;
         Metadata = metadata;
         Error = error;
     }
 
-    public static TextExtractionResult Success(string? text, TextExtractionMetadata metadata) =>
+    public static TextExtractionResult Success(string? text, EngineTextExtractionMetadata metadata) =>
         new(text, metadata, error: null);
 
     public static TextExtractionResult Failure(Exception error) => new(null, null, error);

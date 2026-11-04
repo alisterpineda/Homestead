@@ -76,6 +76,7 @@ internal sealed record GetDocumentPayload(
     IReadOnlyList<PendingSuggestionPayload> PendingSuggestions,
     string? UntrustedDocumentText,
     int TextTotalChars,
+    string? TextSource,
     int? NextOffset);
 
 internal sealed record DocumentTagPayload(string Path, string? Description);

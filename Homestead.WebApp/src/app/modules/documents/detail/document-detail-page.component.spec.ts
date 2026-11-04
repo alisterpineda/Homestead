@@ -772,6 +772,199 @@ describe('DocumentDetailPageComponent — edit-state guards on refresh', () => {
       expect(guardComponent.editExtractedText()).toBe('v1 late text');
     });
 
+    // The textarea is read-only until explicitly unlocked. Unlocking warns only when the text currently
+    // carries engine provenance (that is the record a hand edit replaces); the lock snaps back whenever the
+    // seed effect reseeds, and a restored draft that already differs is editable without any click.
+    describe('extracted-text edit gate', () => {
+      function loadDoc(overrides: Partial<GetDocumentResponse> = {}) {
+        docResponse = makeDoc({
+          extractedText: 'server text',
+          textExtraction: makeExtraction('2026-01-01T00:00:00Z'),
+          ...overrides,
+        });
+        setGuardDocumentId('doc-1');
+        guardFixture.detectChanges();
+      }
+
+      it('is locked once the document seeds', () => {
+        loadDoc();
+
+        expect(guardComponent.textEditable()).toBe(false);
+        expect(guardComponent.editTextDialogState()).toBe('closed');
+      });
+
+      it('asks before unlocking engine-extracted text, and unlocks on confirm', () => {
+        loadDoc();
+
+        guardComponent.startTextEdit();
+
+        expect(guardComponent.editTextDialogState()).toBe('open');
+        expect(guardComponent.textEditable()).toBe(false);
+
+        guardComponent.confirmTextEdit();
+
+        expect(guardComponent.editTextDialogState()).toBe('closed');
+        expect(guardComponent.textEditable()).toBe(true);
+      });
+
+      it('unlocks without asking when the text has no provenance', () => {
+        loadDoc({ textExtraction: null });
+
+        guardComponent.startTextEdit();
+
+        expect(guardComponent.editTextDialogState()).toBe('closed');
+        expect(guardComponent.textEditable()).toBe(true);
+      });
+
+      // A second correction has nothing left to disconnect: the text is already credited to a person.
+      it('unlocks without asking when the text was already hand-edited', () => {
+        loadDoc({
+          textExtraction: {
+            engine: 'manual',
+            engineKey: null,
+            extractedAt: '2026-02-01T00:00:00Z',
+            editedByDisplayName: 'Pat',
+            basisEngine: 'tesseract',
+            basisEngineKey: 'tesseract',
+            basisExtractedAt: '2026-01-01T00:00:00Z',
+          },
+        });
+
+        guardComponent.startTextEdit();
+
+        expect(guardComponent.editTextDialogState()).toBe('closed');
+        expect(guardComponent.textEditable()).toBe(true);
+      });
+
+      it('cancelling an edit restores the stored text and relocks', () => {
+        loadDoc();
+        guardComponent.confirmTextEdit();
+        guardComponent.editExtractedText.set('half-typed correction');
+        expect(guardComponent.hasChanges()).toBe(true);
+
+        guardComponent.cancelTextEdit();
+
+        expect(guardComponent.editExtractedText()).toBe('server text');
+        expect(guardComponent.textEditable()).toBe(false);
+        expect(guardComponent.hasChanges()).toBe(false);
+      });
+
+      it('switching versions relocks', () => {
+        loadDoc({
+          versions: [
+            makeVersion({ id: 'ver-1', versionNumber: 1 }),
+            makeVersion({ id: 'ver-2', versionNumber: 2 }),
+          ],
+        });
+        guardComponent.confirmTextEdit();
+        expect(guardComponent.textEditable()).toBe(true);
+
+        guardComponent.onVersionSelected('ver-1');
+        guardFixture.detectChanges();
+        versionDetailSubject.next(makeVersionDetail({ extractedText: 'v1 text' }));
+        guardFixture.detectChanges();
+
+        expect(guardComponent.textEditable()).toBe(false);
+      });
+
+      it('a re-extraction landing while unlocked relocks', () => {
+        loadDoc();
+        guardComponent.confirmTextEdit();
+
+        docResponse = makeDoc({
+          extractedText: 'freshly extracted',
+          textExtraction: makeExtraction('2026-03-01T00:00:00Z'),
+        });
+        jobCompletedSubject.next(null);
+        guardFixture.detectChanges();
+
+        expect(guardComponent.editExtractedText()).toBe('freshly extracted');
+        expect(guardComponent.textEditable()).toBe(false);
+      });
+
+      it('saving sends the edited text and relocks on the re-fetch', () => {
+        loadDoc();
+        guardComponent.confirmTextEdit();
+        guardComponent.editExtractedText.set('corrected text');
+
+        // What the server answers after the PATCH: the corrected text, now credited to the editor.
+        docResponse = makeDoc({
+          extractedText: 'corrected text',
+          textExtraction: {
+            engine: 'manual',
+            engineKey: null,
+            extractedAt: '2026-04-01T00:00:00Z',
+            editedByDisplayName: 'Pat',
+            basisEngine: 'tesseract',
+            basisEngineKey: 'tesseract',
+            basisExtractedAt: '2026-01-01T00:00:00Z',
+          },
+        });
+        guardComponent.handleSave();
+        guardFixture.detectChanges();
+
+        expect(guardVersionApi.patchDocumentVersion).toHaveBeenCalledWith({
+          documentId: 'doc-1',
+          id: 'ver-1',
+          body: [{ op: 'replace', path: '/extractedText', value: 'corrected text' }],
+        });
+        expect(guardComponent.editExtractedText()).toBe('corrected text');
+        expect(guardComponent.textEditable()).toBe(false);
+      });
+
+      // The sidebar reuses this component across documents. A draft restored for the next document takes
+      // the seed effect's adopt path (no reseed, no relock), so the unlock has to be dropped on the document
+      // switch itself — otherwise B's engine text opens for editing with no confirmation.
+      it('an unlock does not carry over to the next document when that document restores a draft', () => {
+        loadDoc();
+        guardComponent.confirmTextEdit();
+        expect(guardComponent.textEditable()).toBe(true);
+
+        (guardEditStateService.getState as ReturnType<typeof vi.fn>).mockReturnValue({
+          editName: 'renamed but unsaved',
+          editDocumentDate: null,
+          editExpiryDate: null,
+          editNotes: '',
+          editParties: [],
+          editTags: [],
+          editVersionLabel: 'server label',
+          editExtractedText: 'doc 2 engine text',
+          versionId: null,
+        });
+        docResponse = makeDoc({
+          id: 'doc-2',
+          name: 'Doc 2',
+          extractedText: 'doc 2 engine text',
+          textExtraction: makeExtraction('2026-02-01T00:00:00Z'),
+        });
+        setGuardDocumentId('doc-2');
+        guardFixture.detectChanges();
+
+        expect(guardComponent.editName()).toBe('renamed but unsaved');
+        expect(guardComponent.textEditable()).toBe(false);
+      });
+
+      // Nothing is persisted about the lock: a draft that differs from the stored text is, by definition,
+      // an edit in progress.
+      it('a restored draft that differs from the stored text is editable without a click', () => {
+        (guardEditStateService.getState as ReturnType<typeof vi.fn>).mockReturnValue({
+          editName: 'Doc 1',
+          editDocumentDate: null,
+          editExpiryDate: null,
+          editNotes: '',
+          editParties: [],
+          editTags: [],
+          editVersionLabel: 'server label',
+          editExtractedText: 'draft the user typed before leaving',
+          versionId: null,
+        });
+
+        loadDoc();
+
+        expect(guardComponent.textEditable()).toBe(true);
+      });
+    });
+
     describe('ngOnDestroy does not save when document is closed', () => {
       it('skips save when document has been removed from open list', () => {
         docResponse = makeDoc();
@@ -1286,5 +1479,154 @@ describe('DocumentDetailPageComponent — AI date suggestion controls', () => {
 
     expect(dateDocumentApi.approveSuggestion).toHaveBeenCalledWith({ documentId: 'doc-1', suggestionId: 'sug-expiry' });
     expect(dateDocumentApi.declineSuggestion).not.toHaveBeenCalled();
+  });
+});
+
+// The rendered gate: the textarea carries the readonly attribute until unlocked, and only writers get the
+// button that unlocks it. (Tab panels stay in the DOM when inactive, so the Content tab's controls are
+// reachable without activating it.)
+describe('DocumentDetailPageComponent — extracted-text lock in the template', () => {
+  let lockFixture: ComponentFixture<DocumentDetailPageComponent>;
+
+  function documentWithEngineText(): GetDocumentResponse {
+    return {
+      id: 'doc-1',
+      name: 'Doc 1',
+      contentType: 'application/pdf',
+      fileExtension: '.pdf',
+      fileHash: 'hash',
+      fileSize: 100,
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+      parties: [],
+      tags: [],
+      suggestions: [],
+      extractedText: 'engine text',
+      textExtraction: { engine: 'tesseract', engineKey: 'tesseract', extractedAt: '2026-01-01T00:00:00Z' },
+      versions: [
+        {
+          id: 'ver-1',
+          contentType: 'application/pdf',
+          fileExtension: '.pdf',
+          fileSize: 100,
+          createdAt: '2026-01-01T00:00:00Z',
+          updatedAt: '2026-01-01T00:00:00Z',
+          versionNumber: 1,
+        },
+      ],
+    };
+  }
+
+  async function configure(canWrite: boolean) {
+    vi.stubGlobal('localStorage', { getItem: vi.fn(() => null), setItem: vi.fn(), removeItem: vi.fn() });
+    vi.stubGlobal('sessionStorage', { getItem: vi.fn(() => null), setItem: vi.fn(), removeItem: vi.fn() });
+
+    const paramMap = new BehaviorSubject(convertToParamMap({}));
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideRouter([{ path: 'documents', component: DummyComponent }]),
+        PageHeaderService,
+        { provide: AuthService, useValue: { canWrite: signal(canWrite), isAdmin: signal(false) } },
+        { provide: AdminBackupApiService, useValue: { getDocumentBackupState: vi.fn(() => EMPTY) } },
+        {
+          provide: OpenDocumentsService,
+          useValue: {
+            addDocument: vi.fn(),
+            removeDocument: vi.fn(),
+            getPrevDocumentId: vi.fn(() => null),
+            getNextDocumentId: vi.fn(() => null),
+            openDocuments: signal([]) as unknown as OpenDocumentsService['openDocuments'],
+          },
+        },
+        {
+          provide: DocumentEditStateService,
+          useValue: {
+            saveState: vi.fn(),
+            getState: vi.fn(() => null),
+            clearState: vi.fn(),
+            clearAll: vi.fn(),
+            discardChanges: vi.fn(),
+            setActiveHasChanges: vi.fn(),
+          },
+        },
+        {
+          provide: DocumentApiService,
+          useValue: {
+            getDocument: vi.fn(() => of(documentWithEngineText())),
+            getDocumentFile: vi.fn(() => EMPTY),
+            patchDocument: vi.fn(() => of(null)),
+          },
+        },
+        {
+          provide: DocumentVersionApiService,
+          useValue: {
+            getDocumentVersion: vi.fn(() => EMPTY),
+            getDocumentActivity: vi.fn(() => of({ items: [] })),
+            patchDocumentVersion: vi.fn(() => of(null)),
+          },
+        },
+        {
+          provide: ProcessingHubService,
+          useValue: { jobCompleted$: new Subject(), waitForJob: vi.fn(() => new Promise(() => {})) },
+        },
+        {
+          provide: ActivatedRoute,
+          useValue: { paramMap: paramMap.asObservable(), snapshot: { paramMap: convertToParamMap({}) } },
+        },
+      ],
+    });
+
+    lockFixture = TestBed.createComponent(DocumentDetailPageComponent);
+    lockFixture.detectChanges();
+    paramMap.next(convertToParamMap({ id: 'doc-1' }));
+    lockFixture.detectChanges();
+    await lockFixture.whenStable();
+    lockFixture.detectChanges();
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    TestBed.resetTestingModule();
+  });
+
+  function textarea(): HTMLTextAreaElement {
+    return (lockFixture.nativeElement as HTMLElement).querySelector('#extracted-text') as HTMLTextAreaElement;
+  }
+
+  function buttonLabelled(label: string): HTMLButtonElement | undefined {
+    return Array.from((lockFixture.nativeElement as HTMLElement).querySelectorAll('button')).find(
+      (b) => b.textContent?.trim() === label,
+    );
+  }
+
+  it('renders the text read-only with an Edit text button for a writer', async () => {
+    await configure(true);
+
+    expect(textarea().readOnly).toBe(true);
+    expect(buttonLabelled('Edit text')).toBeDefined();
+    expect(buttonLabelled('Cancel edit')).toBeUndefined();
+  });
+
+  it('drops the readonly attribute and offers Cancel edit once unlocked', async () => {
+    await configure(true);
+
+    lockFixture.componentInstance.confirmTextEdit();
+    lockFixture.detectChanges();
+
+    expect(textarea().readOnly).toBe(false);
+    expect(buttonLabelled('Cancel edit')).toBeDefined();
+    expect(buttonLabelled('Edit text')).toBeUndefined();
+    expect((lockFixture.nativeElement as HTMLElement).textContent).toContain(
+      'Saving will mark this text as manually edited.',
+    );
+  });
+
+  // A viewer could never save; the read-only field now says so instead of inviting typing.
+  it('gives a viewer the read-only text and no Edit text button', async () => {
+    await configure(false);
+
+    expect(textarea().readOnly).toBe(true);
+    expect(buttonLabelled('Edit text')).toBeUndefined();
   });
 });

@@ -2,7 +2,7 @@ import { Component, ChangeDetectionStrategy, computed, input } from '@angular/co
 import { DatePipe } from '@angular/common';
 
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideTriangleAlert } from '@ng-icons/lucide';
+import { lucidePencil, lucideTriangleAlert } from '@ng-icons/lucide';
 import type { TextExtractionProvenanceResponse } from '@/api/generated/models/text-extraction-provenance-response';
 
 const TEXT_LAYER_EXTRACTORS: Record<string, string> = {
@@ -11,32 +11,53 @@ const TEXT_LAYER_EXTRACTORS: Record<string, string> = {
 };
 
 /**
- * How a version's extracted text was produced. Read-only, and shown only when provenance exists —
- * versions extracted before this was recorded simply show nothing.
+ * How a version's stored text was produced. Read-only, and shown only when provenance exists —
+ * versions extracted before this was recorded simply show nothing. An engine run reads "Extracted by";
+ * text a person hand-edited reads "Edited by", with the engine run it started from as its basis, so
+ * edited Docling output is never mistaken for Docling output.
  */
 @Component({
   selector: 'app-text-extraction-provenance',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [DatePipe, NgIcon],
-  providers: [provideIcons({ lucideTriangleAlert })],
+  providers: [provideIcons({ lucidePencil, lucideTriangleAlert })],
   template: `
     @if (provenance(); as p) {
       <div class="flex flex-col gap-1 text-sm text-muted-foreground">
-        <div>
-          Extracted by <span class="font-medium text-foreground">{{ p.engineKey }}</span>
-          on {{ p.extractedAt | date: 'medium' }}
-        </div>
-
-        <div>{{ detail() }}</div>
-
-        @if (p.requestedEngineKey) {
-          <div class="flex items-start gap-2 rounded-md border border-border bg-muted p-2">
-            <ng-icon name="lucideTriangleAlert" class="text-[length:--spacing(4)] mt-0.5 shrink-0" />
+        @if (p.engine === 'manual') {
+          <div class="flex items-center gap-1.5">
+            <ng-icon name="lucidePencil" class="text-[length:--spacing(4)] shrink-0" aria-hidden="true" />
             <span>
-              <span class="font-medium text-foreground">{{ p.requestedEngineKey }}</span> was requested but
-              unavailable ({{ p.fallbackReason }}), so {{ p.engineKey }} ran instead.
+              Edited by <span class="font-medium text-foreground">{{ p.editedByDisplayName || 'Someone' }}</span>
+              on {{ p.extractedAt | date: 'medium' }}
             </span>
           </div>
+
+          @if (p.basisEngineKey) {
+            <div>
+              Based on <span class="font-medium text-foreground">{{ p.basisEngineKey }}</span> extraction from
+              {{ p.basisExtractedAt | date: 'medium' }}
+            </div>
+          } @else {
+            <div>Entered manually, no engine extraction</div>
+          }
+        } @else {
+          <div>
+            Extracted by <span class="font-medium text-foreground">{{ p.engineKey }}</span>
+            on {{ p.extractedAt | date: 'medium' }}
+          </div>
+
+          <div>{{ detail() }}</div>
+
+          @if (p.requestedEngineKey) {
+            <div class="flex items-start gap-2 rounded-md border border-border bg-muted p-2">
+              <ng-icon name="lucideTriangleAlert" class="text-[length:--spacing(4)] mt-0.5 shrink-0" />
+              <span>
+                <span class="font-medium text-foreground">{{ p.requestedEngineKey }}</span> was requested but
+                unavailable ({{ p.fallbackReason }}), so {{ p.engineKey }} ran instead.
+              </span>
+            </div>
+          }
         }
       </div>
     }

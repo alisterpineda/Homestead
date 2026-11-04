@@ -6,7 +6,7 @@ namespace Homestead.WebApi.Infrastructure.TextExtraction;
 // What an engine produces: the text, plus provenance describing how it was produced. Text is nullable
 // (an unsupported content type, or a document with nothing in it); Metadata never is, because "engine X
 // ran and found nothing" is itself worth recording.
-public record TextExtractionOutput(string? Text, TextExtractionMetadata Metadata);
+public record TextExtractionOutput(string? Text, EngineTextExtractionMetadata Metadata);
 
 // One configured engine instance. Instances are built from config at DI registration and registered as
 // IEnumerable<ITextExtractionEngine> — never keyed, because MS DI cannot enumerate keyed registrations

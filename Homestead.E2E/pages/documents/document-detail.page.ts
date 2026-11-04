@@ -12,6 +12,11 @@ export class DocumentDetailPage {
   readonly versionSwitcher: Locator;
   readonly versionLabelInput: Locator;
   readonly extractedTextInput: Locator;
+  /** Unlocks the read-only extracted text (Content tab); swaps to "Cancel edit" while unlocked. */
+  readonly editTextButton: Locator;
+  readonly cancelTextEditButton: Locator;
+  /** The confirmation shown before editing text that an engine extracted. */
+  readonly editTextDialog: Locator;
   readonly commentInput: Locator;
   /** The visible tab's content (Info, Content, Metadata or Activity). */
   readonly activePanel: Locator;
@@ -26,6 +31,9 @@ export class DocumentDetailPage {
       .getByRole('button', { name: /^(Latest|v\d+)\b/ });
     this.versionLabelInput = page.getByRole('textbox', { name: 'Label', exact: true });
     this.extractedTextInput = page.getByRole('textbox', { name: 'Extracted Text' });
+    this.editTextButton = page.getByRole('button', { name: 'Edit text', exact: true });
+    this.cancelTextEditButton = page.getByRole('button', { name: 'Cancel edit', exact: true });
+    this.editTextDialog = page.getByRole('alertdialog', { name: 'Edit extracted text?' });
     this.commentInput = page.getByRole('textbox', { name: 'Add a comment' });
     this.activePanel = page.getByRole('tabpanel');
   }
@@ -50,16 +58,38 @@ export class DocumentDetailPage {
     await expect(this.nameInput).toBeVisible({ timeout: 15_000 });
   }
 
-  /** Saves pending edits and waits for the PATCH to succeed. */
+  /**
+   * Saves pending edits and waits for the PATCH to succeed. One Save button serves both scopes, but the
+   * page sends document fields and version fields (label, extracted text) to different endpoints, so the
+   * caller says which one its edit lands on.
+   */
   @step()
-  async save(): Promise<void> {
+  async save(scope: 'document' | 'version' = 'document'): Promise<void> {
+    const url =
+      scope === 'version'
+        ? /\/api\/v1\/documents\/[0-9a-f-]+\/versions\/[0-9a-f-]+$/
+        : /\/api\/v1\/documents\/[0-9a-f-]+$/;
     const saveResponse = this.page.waitForResponse(
-      (resp) => /\/api\/v1\/documents\/[0-9a-f-]+$/.test(resp.url()) && resp.request().method() === 'PATCH',
+      (resp) => url.test(resp.url()) && resp.request().method() === 'PATCH',
     );
     await expect(this.saveButton).toBeEnabled();
     await this.saveButton.click();
     await expectOk(await saveResponse);
     await expect(this.saveButton).toBeDisabled();
+  }
+
+  /**
+   * Unlocks the extracted text for editing from the Content tab, accepting the "marked as manually
+   * edited" confirmation that engine-extracted text shows.
+   */
+  @step()
+  async beginTextEdit(): Promise<void> {
+    await this.editTextButton.click();
+    const heading = this.editTextDialog.getByRole('heading', { name: 'Edit extracted text?' });
+    await expect(heading).toBeVisible();
+    await this.editTextDialog.getByRole('button', { name: 'Edit text', exact: true }).click();
+    await expect(heading).toBeHidden();
+    await expect(this.extractedTextInput).toBeEditable();
   }
 
   /** Adds an existing tag through the Tags field's autocomplete (not yet saved). */

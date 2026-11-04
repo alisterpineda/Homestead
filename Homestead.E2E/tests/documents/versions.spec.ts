@@ -53,6 +53,37 @@ test.describe('Documents — versions', () => {
     await expect(documentDetailPage.versionLabelInput).toHaveValue('Rescan');
   });
 
+  test('hand-editing extracted text asks first, then credits the text to the editor', async ({
+    request,
+    documentDetailPage,
+    uid,
+  }) => {
+    const doc = await uploadDocumentViaApi(request, await makePdf(`invoice-${uid}`, `Invoice total ${uid} original`));
+
+    await documentDetailPage.goto(doc.id);
+    await documentDetailPage.openTab('Content');
+    // Engine output is read-only until deliberately unlocked.
+    await expect(documentDetailPage.activePanel).toContainText(/Extracted by tesseract on/);
+    await expect(documentDetailPage.extractedTextInput).not.toBeEditable();
+    await expect(documentDetailPage.editTextButton).toBeVisible();
+
+    await documentDetailPage.beginTextEdit();
+    await expect(documentDetailPage.activePanel).toContainText('Saving will mark this text as manually edited.');
+    await documentDetailPage.extractedTextInput.fill(`Invoice total ${uid} corrected by hand`);
+    await documentDetailPage.save('version');
+
+    // The saved text now reads as a person's edit over the engine's run, and the field has relocked.
+    await expect(documentDetailPage.activePanel).toContainText(/Edited by .+ on/);
+    await expect(documentDetailPage.activePanel).toContainText(/Based on tesseract extraction from/);
+    await expect(documentDetailPage.activePanel).not.toContainText(/Extracted by tesseract/);
+    await expect(documentDetailPage.extractedTextInput).toHaveValue(new RegExp(`${uid} corrected by hand`));
+    await expect(documentDetailPage.extractedTextInput).not.toBeEditable();
+    await expect(documentDetailPage.editTextButton).toBeVisible();
+
+    await documentDetailPage.openTab('Activity');
+    await expect(documentDetailPage.activePanel).toContainText(/updated version .*extracted text/);
+  });
+
   test("a new version's text makes the document findable, without creating a second document", async ({
     request,
     documentListPage,

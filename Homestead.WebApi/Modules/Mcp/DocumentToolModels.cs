@@ -44,6 +44,9 @@ public sealed record GetDocumentResult(
     IReadOnlyList<PendingSuggestionResult> PendingSuggestions,
     string? UntrustedDocumentText,
     int TextTotalChars,
+    // Where the latest version's text came from: an engine type slug, or "manual" when a person hand-edited
+    // it. Not file-derived, so unprefixed. Null (omitted) when the version carries no provenance.
+    string? TextSource,
     int? NextOffset);
 
 public sealed record DocumentTagResult(string Path, string? Description);

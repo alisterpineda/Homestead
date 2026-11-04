@@ -450,15 +450,52 @@ public partial class DocumentReadToolsTests(PostgresFixture fixture) : Integrati
 
         Assert.Equal(
             (Versions: 2, Extension: ".png", HasSize: true, Text: "Renewal notice.", Total: 15, Next: (int?)null,
+             // SetExtractedTextAsync writes the column behind the API, so the PNG upload's engine keeps the credit.
+             Source: "tesseract",
              DocumentDate: (DateOnly?)new DateOnly(2024, 3, 15), ExpiryDate: (DateOnly?)new DateOnly(2025, 3, 14),
              Notes: "Renewed by phone.",
              Tags: "Home/Insurance: Policies and claims", Parties: "Acme Insurance: The home insurer"),
             (Versions: document.VersionCount, Extension: document.FileExtension, HasSize: document.FileSize > 0,
              Text: document.UntrustedDocumentText, Total: document.TextTotalChars, Next: document.NextOffset,
+             Source: document.TextSource,
              DocumentDate: document.DocumentDate, ExpiryDate: document.ExpiryDate,
              Notes: document.Notes,
              Tags: Csv(document.Tags.Select(t => $"{t.Path}: {t.Description}")),
              Parties: Csv(document.Parties.Select(p => $"{p.Name}: {p.Description}"))));
+    }
+
+    // Where the text came from travels with it, so a model reading a statement's totals can tell engine output
+    // from a person's correction. A hand edit over the cookie door flips the source to "manual" — with or
+    // without the text itself, since the kind is cheap and the decision to read text may depend on it.
+    [Fact]
+    public async Task GetDocument_ReportsManualTextSource_AfterAHandEdit()
+    {
+        var admin = await CreateAdminClientAsync();
+        var id = await SeedDocumentAsync(admin, "ledger.pdf", extractedText: "Engine output.");
+        var versionId = await LatestVersionIdAsync(id);
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        var before = await GetDocumentAsync(client, id, new());
+        (await SendJsonPatchAsync(admin, $"/api/v1/documents/{id}/versions/{versionId}", new[]
+        {
+            new { op = "replace", path = "/extractedText", value = "Corrected by hand." }
+        })).EnsureSuccessStatusCode();
+        var after = await GetDocumentAsync(client, id, new() { ["include_text"] = true });
+
+        Assert.Equal(
+            (Before: "tesseract", After: "manual", Text: "Corrected by hand."),
+            (Before: before.TextSource, After: after.TextSource, Text: after.UntrustedDocumentText));
+    }
+
+    private async Task<Guid> LatestVersionIdAsync(Guid documentId)
+    {
+        using var scope = CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        return await db.DocumentVersions
+            .Where(v => v.DocumentId == documentId)
+            .OrderByDescending(v => v.VersionNumber)
+            .Select(v => v.Id)
+            .FirstAsync(CT);
     }
 
     [Fact]

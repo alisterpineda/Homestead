@@ -58,7 +58,12 @@ public sealed class McpDocumentReads(AppDbContext db)
                 d.UpdatedAt,
                 LatestVersion = d.Versions
                     .OrderByDescending(v => v.VersionNumber)
-                    .Select(v => new { v.Id, v.FileExtension, v.FileSize, TextLength = (int?)v.ExtractedText!.Length })
+                    .Select(v => new
+                    {
+                        v.Id, v.FileExtension, v.FileSize,
+                        TextLength = (int?)v.ExtractedText!.Length,
+                        v.TextExtractionMetadata
+                    })
                     .FirstOrDefault(),
                 VersionCount = d.Versions.Count,
                 Tags = d.DocumentTags.Select(dt => new DocumentTagResult(dt.Tag.Path, dt.Tag.Description)).ToList(),
@@ -74,11 +79,16 @@ public sealed class McpDocumentReads(AppDbContext db)
         if (d?.LatestVersion is null)
             return null;
 
+        // The provenance blob is small jsonb; only its kind reaches the model (the slug, or null when the
+        // version predates provenance or the blob no longer reads).
+        var provenance = TextExtractionMetadata.Deserialize(d.LatestVersion.TextExtractionMetadata);
+        var textSource = provenance is null ? null : TextExtractionMetadata.SlugOf(provenance);
+
         return new McpDocumentDetails(
             d.Id, d.Name, d.DocumentDate, d.ExpiryDate, d.Notes, d.Summary,
             d.LatestVersion.FileExtension, d.LatestVersion.FileSize, d.VersionCount, d.CreatedAt, d.UpdatedAt,
             d.Tags, d.Parties, d.Suggestions,
-            d.LatestVersion.Id, d.LatestVersion.TextLength ?? 0);
+            d.LatestVersion.Id, d.LatestVersion.TextLength ?? 0, textSource);
     }
 
     // Up to maxChars of a version's extracted text from offset, cut in SQL (substring, code points) — only the chunk
@@ -120,7 +130,8 @@ public sealed record McpDocumentDetails(
     IReadOnlyList<DocumentPartyResult> Parties,
     IReadOnlyList<McpPendingSuggestion> PendingSuggestions,
     Guid LatestVersionId,
-    int TextTotalChars);
+    int TextTotalChars,
+    string? TextSource);
 
 // A pending suggestion as stored: for Tags/Parties, SuggestedValue is the tag/party id.
 public sealed record McpPendingSuggestion(

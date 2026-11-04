@@ -5,21 +5,24 @@ using Homestead.WebApi.Domain.Settings;
 namespace Homestead.WebApi.Domain.Documents;
 
 /// <summary>
-/// Provenance for one text extraction, persisted as jsonb on <see cref="DocumentVersion"/>. Polymorphic
-/// over engine type, following the <c>FieldChange</c> precedent — the discriminator is the engine TYPE
-/// slug ("tesseract"), while the configured instance that ran is the <see cref="EngineKey"/> field
-/// ("azure-layout"). Two engines of the same type differ only by config, so they share a shape.
+/// Provenance for a version's stored text, persisted as jsonb on <see cref="DocumentVersion"/>. Polymorphic
+/// over KIND, following the <c>FieldChange</c> precedent — the discriminator is the engine TYPE slug
+/// ("tesseract") for an engine run, or "manual" for text a person hand-edited. Engine kinds carry the
+/// configured instance that ran in <see cref="EngineTextExtractionMetadata.EngineKey"/> ("azure-layout"):
+/// two engines of the same type differ only by config, so they share a shape.
 /// </summary>
 [JsonPolymorphic(TypeDiscriminatorPropertyName = DiscriminatorPropertyName)]
 [JsonDerivedType(typeof(TesseractTextExtractionMetadata), TesseractSlug)]
 [JsonDerivedType(typeof(AzureDocumentIntelligenceTextExtractionMetadata), AzureDocumentIntelligenceSlug)]
 [JsonDerivedType(typeof(DoclingTextExtractionMetadata), DoclingSlug)]
+[JsonDerivedType(typeof(ManualTextExtractionMetadata), ManualSlug)]
 public abstract record TextExtractionMetadata
 {
     public const string DiscriminatorPropertyName = "engine";
     public const string TesseractSlug = "tesseract";
     public const string AzureDocumentIntelligenceSlug = "azure-document-intelligence";
     public const string DoclingSlug = "docling";
+    public const string ManualSlug = "manual";
 
     public static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -28,20 +31,22 @@ public abstract record TextExtractionMetadata
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
-    /// <summary>The configured engine instance that actually ran.</summary>
-    public required string EngineKey { get; init; }
-
+    /// <summary>
+    /// When the stored text came to be: the engine run for an engine kind, the edit for
+    /// <see cref="ManualTextExtractionMetadata"/>. Either way it changes exactly when the text does, which is
+    /// what lets the detail page key its editor seed on it.
+    /// </summary>
     public required DateTimeOffset ExtractedAt { get; init; }
 
-    /// <summary>
-    /// Set only when the engine that ran is not the one that was asked for — i.e. the requested engine
-    /// was unavailable and the built-in Tesseract engine ran instead. This is what keeps the default
-    /// path's fall-back honest: the substitution is recorded rather than silent.
-    /// </summary>
-    public string? RequestedEngineKey { get; init; }
-
-    /// <summary>Why <see cref="RequestedEngineKey"/> could not run.</summary>
-    public string? FallbackReason { get; init; }
+    /// <summary>The discriminator slug for a record — the one <see cref="Serialize"/> writes.</summary>
+    public static string SlugOf(TextExtractionMetadata metadata) => metadata switch
+    {
+        TesseractTextExtractionMetadata => TesseractSlug,
+        AzureDocumentIntelligenceTextExtractionMetadata => AzureDocumentIntelligenceSlug,
+        DoclingTextExtractionMetadata => DoclingSlug,
+        ManualTextExtractionMetadata => ManualSlug,
+        _ => throw new ArgumentOutOfRangeException(nameof(metadata), metadata.GetType(), "Unregistered provenance kind.")
+    };
 
     /// <summary>
     /// Serializes to the jsonb column's shape. Declared as the base type on purpose — that is what makes
@@ -88,6 +93,7 @@ public abstract record TextExtractionMetadata
                 AzureDocumentIntelligenceSlug =>
                     document.RootElement.Deserialize<AzureDocumentIntelligenceTextExtractionMetadata>(JsonOptions),
                 DoclingSlug => document.RootElement.Deserialize<DoclingTextExtractionMetadata>(JsonOptions),
+                ManualSlug => document.RootElement.Deserialize<ManualTextExtractionMetadata>(JsonOptions),
                 _ => null
             };
         }
@@ -98,7 +104,27 @@ public abstract record TextExtractionMetadata
     }
 }
 
-public record TesseractTextExtractionMetadata : TextExtractionMetadata
+/// <summary>
+/// What every engine run records, whichever engine type ran. Only engine kinds have an instance key and
+/// a fall-back story; a manual edit has neither, which is why these live here and not on the root.
+/// </summary>
+public abstract record EngineTextExtractionMetadata : TextExtractionMetadata
+{
+    /// <summary>The configured engine instance that actually ran.</summary>
+    public required string EngineKey { get; init; }
+
+    /// <summary>
+    /// Set only when the engine that ran is not the one that was asked for — i.e. the requested engine
+    /// was unavailable and the built-in Tesseract engine ran instead. This is what keeps the default
+    /// path's fall-back honest: the substitution is recorded rather than silent.
+    /// </summary>
+    public string? RequestedEngineKey { get; init; }
+
+    /// <summary>Why <see cref="RequestedEngineKey"/> could not run.</summary>
+    public string? FallbackReason { get; init; }
+}
+
+public record TesseractTextExtractionMetadata : EngineTextExtractionMetadata
 {
     public const string PopplerTextLayer = "poppler";
     public const string PdfPigTextLayer = "pdfpig";
@@ -135,7 +161,7 @@ public record TesseractTextExtractionMetadata : TextExtractionMetadata
     public string? TextLayerExtractor { get; init; }
 }
 
-public record AzureDocumentIntelligenceTextExtractionMetadata : TextExtractionMetadata
+public record AzureDocumentIntelligenceTextExtractionMetadata : EngineTextExtractionMetadata
 {
     public required string ModelId { get; init; }
 
@@ -149,7 +175,7 @@ public record AzureDocumentIntelligenceTextExtractionMetadata : TextExtractionMe
     public int PageCount { get; init; }
 }
 
-public record DoclingTextExtractionMetadata : TextExtractionMetadata
+public record DoclingTextExtractionMetadata : EngineTextExtractionMetadata
 {
     public const string SuccessStatus = "success";
     public const string PartialSuccessStatus = "partial_success";
@@ -185,4 +211,59 @@ public record DoclingTextExtractionMetadata : TextExtractionMetadata
 
     /// <summary>Server-side processing time, as docling-serve reports it.</summary>
     public double? ProcessingSeconds { get; init; }
+}
+
+/// <summary>
+/// The text was hand-edited by a person. Replaces an engine's record rather than erasing it: the editor
+/// and the edit time are what the version now shows, and the engine run the edit started from survives
+/// as the <i>basis</i>, so "edited Docling output" never reads as "Docling output" or as "never extracted".
+/// </summary>
+/// <remarks>
+/// Nothing here is <c>required</c> beyond the root's <see cref="TextExtractionMetadata.ExtractedAt"/>
+/// (the edit time): <see cref="TextExtractionMetadata.Deserialize"/> binds this record directly, and a
+/// required member missing from an older blob would erase the row's provenance (see
+/// <see cref="TesseractTextExtractionMetadata.TextLayerExtractor"/>).
+/// </remarks>
+public sealed record ManualTextExtractionMetadata : TextExtractionMetadata
+{
+    /// <summary>Who saved the edit. Nullable because the current user accessor's id is.</summary>
+    public Guid? EditedByUserId { get; init; }
+
+    /// <summary>
+    /// The engine run the edit started from: its type slug, the instance that ran, and when. All null when
+    /// the text was entered with no prior extraction (or over a version whose provenance was unknown).
+    /// </summary>
+    public string? BasisEngine { get; init; }
+
+    public string? BasisEngineKey { get; init; }
+
+    public DateTimeOffset? BasisExtractedAt { get; init; }
+
+    /// <summary>
+    /// The record that replaces <paramref name="previous"/> after a hand edit. An engine run becomes the
+    /// basis; an earlier manual record passes its basis through unchanged, so a second correction is still
+    /// "edited Docling output" rather than "edited an edit"; no provenance means no basis.
+    /// </summary>
+    public static ManualTextExtractionMetadata Replacing(
+        TextExtractionMetadata? previous, Guid? editedByUserId, DateTimeOffset editedAt) => previous switch
+    {
+        EngineTextExtractionMetadata engine => new()
+        {
+            ExtractedAt = editedAt,
+            EditedByUserId = editedByUserId,
+            BasisEngine = SlugOf(engine),
+            BasisEngineKey = engine.EngineKey,
+            BasisExtractedAt = engine.ExtractedAt
+        },
+        ManualTextExtractionMetadata manual => manual with
+        {
+            ExtractedAt = editedAt,
+            EditedByUserId = editedByUserId
+        },
+        _ => new()
+        {
+            ExtractedAt = editedAt,
+            EditedByUserId = editedByUserId
+        }
+    };
 }

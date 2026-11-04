@@ -37,7 +37,7 @@ The split between document-scoped and version-scoped fields is a contract:
 
 Document-scoped fields persist across uploads — replacing a file with a corrected version does not reset the document's name, notes, dates, or tag/party graph. Version-scoped fields belong to the specific upload that produced them; reprocessing a version updates only that version's `ExtractedText`.
 
-Patches respect the split. The document patch endpoint accepts only document-scoped fields; version-scoped fields (label, extracted text) are edited through a separate version-scoped endpoint.
+Patches respect the split. The document patch endpoint accepts only document-scoped fields; version-scoped fields (label, extracted text) are edited through a separate version-scoped endpoint. On the detail page the extracted text is read-only until a contributor explicitly unlocks it (see [Manual edits](#manual-edits) under Provenance); the label is a plain field.
 
 ## Upload pipeline
 
@@ -120,6 +120,14 @@ Every extraction records how it was produced, on `DocumentVersion.TextExtraction
 **Provenance travels with the text it describes**: any API response that returns `ExtractedText` returns the provenance beside it. Concretely, both the version-detail endpoint and the document endpoint (whose latest-version text feeds the default "Latest" view) carry it — so the detail page never has to fetch text and its provenance separately, and the two can never describe different extractions. A new endpoint that exposes extracted text inherits this rule.
 
 Versions extracted before provenance existed simply show nothing.
+
+#### Manual edits
+
+A contributor can hand-correct a version's text (an OCR misread of a total, a garbled vendor name) from the detail page's Content tab. The textarea is **read-only by default**: an explicit *Edit text* action unlocks it, and when the text currently carries engine provenance that action first asks for confirmation, naming the engine and date and saying the text will be marked as manually edited (text already hand-edited, or with no provenance at all, unlocks without asking — there is nothing to disconnect). While unlocked, a note under the field repeats the consequence and *Cancel edit* reverts the draft and relocks. Saving stays the page's single Save; the field relocks on save, on a version switch, and whenever a re-extraction lands. Viewers see the read-only text and no button.
+
+Saving a changed text (clearing it included) **replaces the provenance with a `manual` record** rather than erasing it: an erased record would make the version read as never extracted, and the engine's record would credit Tesseract or Docling with text it did not produce. The manual record carries who edited (the user id, resolved to a display name on read, so renames stay correct and a deleted user degrades to "Someone"), when (`extractedAt`, the time the stored text came to be, so the detail page's reseed key keeps working), and the **basis** — the engine type, instance key and extracted-at of the run the edit started from, all null for text typed in over nothing. A second correction keeps the original basis: it is still "edited Docling output", not "edited an edit". The UI shows two lines, "Edited by Pat on …" then "Based on docling-gpu extraction from …", naming the basis by its instance key, exactly as the engine line names the instance that ran. A label-only patch, or a replace with the text already stored, leaves provenance untouched; a reprocess overwrites the manual record with the engine's, as it overwrites the text. Because `EngineKey` and the fall-back fields belong to engine runs only, they live on `EngineTextExtractionMetadata`, the base of the three engine records, and are null on the flat API DTO for `manual`.
+
+The MCP `get_document` tool reports the kind as `text_source` (an engine type slug or `manual`, absent when unknown) whether or not text is requested, so a model reading a statement's totals can tell engine output from a person's correction.
 
 ## Version delete
 

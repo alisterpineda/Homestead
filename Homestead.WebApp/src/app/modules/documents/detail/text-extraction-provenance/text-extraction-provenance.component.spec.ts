@@ -36,6 +36,17 @@ const DOCLING: TextExtractionProvenanceResponse = {
   processingSeconds: 41.66,
 };
 
+const MANUAL: TextExtractionProvenanceResponse = {
+  engine: 'manual',
+  engineKey: null,
+  extractedAt: '2026-11-04T09:15:00Z',
+  editedByDisplayName: 'Pat Proofreader',
+  basisEngine: 'docling',
+  // Deliberately differs from basisEngine: the line names the INSTANCE that ran, like "Extracted by" does.
+  basisEngineKey: 'docling-gpu',
+  basisExtractedAt: '2026-07-15T10:34:02Z',
+};
+
 describe('TextExtractionProvenanceComponent', () => {
   let fixture: ComponentFixture<TextExtractionProvenanceComponent>;
   let component: TextExtractionProvenanceComponent;
@@ -152,5 +163,50 @@ describe('TextExtractionProvenanceComponent', () => {
     fixture.detectChanges();
 
     expect(fixture.nativeElement.textContent as string).not.toContain('was requested but');
+  });
+
+  // A hand edit is credited to the person, never to the engine whose output they corrected.
+  it('credits a manual edit to the editor, with the engine run as its basis', () => {
+    fixture.componentRef.setInput('provenance', MANUAL);
+    fixture.detectChanges();
+
+    const text = (fixture.nativeElement.textContent as string).replace(/\s+/g, ' ').trim();
+    // Exactly the two manual lines: the editor line, then the basis naming the instance key.
+    expect(text).toMatch(/^Edited by Pat Proofreader on .+ Based on docling-gpu extraction from .+$/);
+    expect(text).not.toContain('Extracted by');
+  });
+
+  it('says text typed in over nothing was entered manually', () => {
+    fixture.componentRef.setInput('provenance', {
+      ...MANUAL,
+      basisEngine: null,
+      basisEngineKey: null,
+      basisExtractedAt: null,
+    });
+    fixture.detectChanges();
+
+    const text = (fixture.nativeElement.textContent as string).replace(/\s+/g, ' ');
+    expect(text).toContain('Entered manually, no engine extraction');
+    expect(text).not.toContain('Based on');
+  });
+
+  // The editor's name is resolved server-side and may be missing (a user since deleted).
+  it('falls back to "Someone" when the editor cannot be named', () => {
+    fixture.componentRef.setInput('provenance', { ...MANUAL, editedByDisplayName: null });
+    fixture.detectChanges();
+
+    expect((fixture.nativeElement.textContent as string).replace(/\s+/g, ' ')).toContain('Edited by Someone on');
+  });
+
+  // The engine-only lines (detail, fallback notice) must not leak into the manual branch, even when a
+  // stray fallback field rides along on the record.
+  it('shows no engine detail or fallback notice for a manual edit', () => {
+    fixture.componentRef.setInput('provenance', { ...MANUAL, requestedEngineKey: 'azure-layout' });
+    fixture.detectChanges();
+
+    const text = (fixture.nativeElement.textContent as string).replace(/\s+/g, ' ').trim();
+    expect(text).toMatch(/^Edited by Pat Proofreader on .+ Based on docling-gpu extraction from .+$/);
+    expect(text).not.toContain('was requested but');
+    expect(text).not.toContain('azure-layout');
   });
 });

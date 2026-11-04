@@ -10,9 +10,10 @@ import {
   viewChild,
   afterNextRender,
   DestroyRef,
+  ElementRef,
   TemplateRef,
 } from '@angular/core';
-import { Location, NgTemplateOutlet } from '@angular/common';
+import { DatePipe, Location, NgTemplateOutlet } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { DomSanitizer } from '@angular/platform-browser';
 import { ActivatedRoute, NavigationEnd, Router, RouterLink } from '@angular/router';
@@ -39,7 +40,9 @@ import {
   lucideArrowLeft,
   lucideSparkles,
   lucideDatabaseBackup,
+  lucidePencil,
 } from '@ng-icons/lucide';
+import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmButtonGroupImports } from '@/shared/components/spartan/button-group';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
@@ -95,6 +98,7 @@ import { toast } from '@spartan-ng/brain/sonner';
   selector: 'app-document-detail-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    DatePipe,
     NgTemplateOutlet,
     NgIcon,
     HlmButton,
@@ -148,6 +152,7 @@ import { toast } from '@spartan-ng/brain/sonner';
       lucideArrowLeft,
       lucideSparkles,
       lucideDatabaseBackup,
+      lucidePencil,
     }),
   ],
   template: `
@@ -346,6 +351,24 @@ import { toast } from '@spartan-ng/brain/sonner';
             <button hlmAlertDialogAction variant="destructive" (click)="handleDeleteVersion(); ctx.close()" [disabled]="deletingVersion()">
               {{ deletingVersion() ? 'Deleting...' : 'Delete' }}
             </button>
+          </div>
+        </hlm-alert-dialog-content>
+      </hlm-alert-dialog>
+
+      <!-- Opened only when the text currently carries engine provenance: that is the record an edit replaces. -->
+      <hlm-alert-dialog [state]="editTextDialogState()" (stateChanged)="editTextDialogState.set($event)">
+        <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
+          <div hlmAlertDialogHeader>
+            <h2 hlmAlertDialogTitle>Edit extracted text?</h2>
+            <p hlmAlertDialogDescription>
+              This text was extracted by {{ displayTextExtraction()?.engineKey }} on
+              {{ displayTextExtraction()?.extractedAt | date: 'mediumDate' }}. Once you edit it, it will be marked as
+              manually edited instead. Reprocessing the version brings back the engine's output.
+            </p>
+          </div>
+          <div hlmAlertDialogFooter>
+            <button hlmAlertDialogCancel (click)="ctx.close()">Cancel</button>
+            <button hlmAlertDialogAction (click)="confirmTextEdit()">Edit text</button>
           </div>
         </hlm-alert-dialog-content>
       </hlm-alert-dialog>
@@ -710,15 +733,39 @@ import { toast } from '@spartan-ng/brain/sonner';
             </div>
           }
           <div class="flex min-h-0 flex-1 flex-col gap-1.5">
-            <label hlmLabel for="extracted-text">Extracted Text</label>
+            <div class="flex items-center justify-between gap-2">
+              <label hlmLabel for="extracted-text">Extracted Text</label>
+              @if (auth.canWrite()) {
+                <!-- One element in both states, so keyboard focus survives the swap to "Cancel edit" and back. -->
+                <button
+                  hlmBtn
+                  size="sm"
+                  [variant]="textEditable() ? 'ghost' : 'outline'"
+                  (click)="textEditable() ? cancelTextEdit() : startTextEdit()"
+                >
+                  @if (!textEditable()) {
+                    <ng-icon name="lucidePencil" />
+                  }
+                  {{ textEditable() ? 'Cancel edit' : 'Edit text' }}
+                </button>
+              }
+            </div>
+            <!-- Read-only until explicitly unlocked: the stored text is engine output (or a deliberate edit),
+                 and a stray keystroke must not turn into a save that re-credits it to a person. The helm
+                 textarea has no read-only variant and is CLI-regenerated, so the styling lives here. -->
             <textarea
               hlmTextarea
+              #extractedTextarea
               id="extracted-text"
-              class="min-h-0 flex-1 resize-none [field-sizing:fixed]"
+              class="min-h-0 flex-1 resize-none [field-sizing:fixed] read-only:bg-muted/30 read-only:text-muted-foreground read-only:cursor-default read-only:focus-visible:ring-0"
               placeholder="No extracted text available"
+              [readonly]="!textEditable()"
               [value]="editExtractedText()"
               (input)="editExtractedText.set(asInputValue($event))"
             ></textarea>
+            @if (textEditable()) {
+              <p class="text-xs text-muted-foreground">Saving will mark this text as manually edited.</p>
+            }
             <app-text-extraction-provenance [provenance]="displayTextExtraction()" />
           </div>
         </div>
@@ -1097,6 +1144,43 @@ export class DocumentDetailPageComponent implements OnDestroy {
     return this.document()?.textExtraction ?? null;
   });
 
+  // --- Extracted-text editing gate ---
+  // The textarea is read-only until explicitly unlocked. Editable when unlocked, or when a restored draft
+  // already differs from the stored text — a draft that survived navigation is never shown locked, and no
+  // flag has to be persisted for it.
+  private textUnlocked = signal(false);
+  textEditable = computed(
+    () => this.textUnlocked() || this.editExtractedText() !== (this.displayExtractedText() ?? ''),
+  );
+  editTextDialogState = signal<BrnDialogState>('closed');
+  private extractedTextarea = viewChild<ElementRef<HTMLTextAreaElement>>('extractedTextarea');
+
+  startTextEdit(): void {
+    // Only engine provenance is worth a warning: that is the record an edit replaces. Text already edited
+    // by hand, or with no provenance at all, has nothing to disconnect.
+    const provenance = this.displayTextExtraction();
+    if (provenance && provenance.engine !== 'manual') {
+      this.editTextDialogState.set('open');
+      return;
+    }
+    this.unlockText();
+  }
+
+  confirmTextEdit(): void {
+    this.editTextDialogState.set('closed');
+    this.unlockText();
+  }
+
+  cancelTextEdit(): void {
+    this.editExtractedText.set(this.displayExtractedText() ?? '');
+    this.textUnlocked.set(false);
+  }
+
+  private unlockText(): void {
+    this.textUnlocked.set(true);
+    this.extractedTextarea()?.nativeElement.focus();
+  }
+
   private fileSub: Subscription | null = null;
   private versionDetailSub: Subscription | null = null;
 
@@ -1307,6 +1391,10 @@ export class DocumentDetailPageComponent implements OnDestroy {
         // background job completes) should not overwrite the user's pending edits.
         if (doc.id === this.initializedDocId) return;
         this.initializedDocId = doc.id;
+        // An unlock belongs to the document it was granted on. A restored draft below takes the seed
+        // effect's adopt path, which never relocks, so without this an unlock would leak into the next
+        // document and let its engine text be edited with no confirmation.
+        this.textUnlocked.set(false);
 
         const saved = untracked(() => this.editStateService.getState(doc.id));
         if (saved) {
@@ -1369,6 +1457,10 @@ export class DocumentDetailPageComponent implements OnDestroy {
       this.seededVersionKey = seedKey;
       this.editVersionLabel.set(ver.label ?? '');
       this.editExtractedText.set(text ?? '');
+      // Whatever unlocked the textarea was about the previous text: a version switch, a re-extraction or a
+      // post-save reseed all relock it. (A restored draft takes the early return above and stays editable
+      // through the derived rule in `textEditable`.)
+      this.textUnlocked.set(false);
     });
 
     // Track active changes for sidebar indicator
@@ -1860,6 +1952,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
         // Reset so the re-fetch reinitializes edit fields with server values
         this.initializedDocId = null;
         this.seededVersionKey = null;
+        this.textUnlocked.set(false);
         this.refreshTrigger.update((v) => v + 1);
         toast.success('Document updated.');
       },

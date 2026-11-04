@@ -3,10 +3,14 @@
 
 import { AzureOutputContentFormat } from '../models/azure-output-content-format';
 export interface TextExtractionProvenanceResponse {
+  basisEngine?: (string | null);
+  basisEngineKey?: (string | null);
+  basisExtractedAt?: (string | null);
   conversionStatus?: (string | null);
   dpi?: (number | null);
+  editedByDisplayName?: (string | null);
   engine: string;
-  engineKey: string;
+  engineKey?: (string | null);
   extractedAt: string;
   fallbackReason?: (string | null);
   forceOcr?: (boolean | null);

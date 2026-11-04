@@ -66,3 +66,11 @@ Info tab whenever any suggestion is pending (its Approve all / Decline all butto
 - Unsaved detail-page edits are restored from `sessionStorage` across reloads: a reload with pending edits
   raises a `beforeunload` prompt (`dialog-accept`), and a suggestion seeded under an old draft shows the
   draft's value under the badge.
+- **Content tab: the Extracted Text textarea is `readonly` until unlocked.** Writers get an **Edit text**
+  button beside the label (viewers get none). When the text has engine provenance ("Extracted by …"), the
+  click opens the alertdialog **"Edit extracted text?"**; its **Edit text** action unlocks (button becomes
+  **Cancel edit**, a "Saving will mark this text as manually edited." note appears). Text already edited
+  by hand (two lines: "Edited by … on …" then "Based on … extraction from …") or with no provenance unlocks
+  with no dialog. The page-level Save sends the text; after the re-fetch the field relocks and the first
+  provenance line reads "Edited by <display name>". ⋮ → Reprocess Text opens a "Reprocess Text Extraction"
+  dialog (engine select) and, once the job completes, restores "Extracted by" in place.

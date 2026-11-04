@@ -14,7 +14,7 @@ public static class TestTextExtraction
 {
     public const string DefaultKey = OcrEngineOptions.BuiltInTesseractKey;
 
-    public static TextExtractionMetadata Metadata(string engineKey = DefaultKey) =>
+    public static EngineTextExtractionMetadata Metadata(string engineKey = DefaultKey) =>
         new TesseractTextExtractionMetadata
         {
             EngineKey = engineKey,

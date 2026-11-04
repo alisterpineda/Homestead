@@ -1,3 +1,4 @@
+using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Documents;
@@ -9,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Modules.Documents.Features.Versions.PatchDocumentVersion;
 
 public class PatchDocumentVersionHandler(AppDbContext db,
-    IAuditContext audit, IUnitOfWork unitOfWork)
+    IAuditContext audit, ICurrentUserAccessor currentUser, IUnitOfWork unitOfWork)
 {
     public async Task<PatchDocumentVersionResponse> HandleAsync(Guid documentId, Guid id,
         JsonPatchDocument<PatchDocumentVersionModel> patchDoc, CancellationToken ct)
@@ -45,14 +46,21 @@ public class PatchDocumentVersionHandler(AppDbContext db,
         // Update entity from patched model
         version.Label = model.Label;
 
-        // Hand-editing the text invalidates its provenance: the metadata describes an extraction that
-        // produced text this row no longer holds. Clearing it makes the version read as "no engine
-        // provenance" rather than attributing a human's edit to Tesseract or Azure, page counts and all.
+        var now = DateTimeOffset.UtcNow;
+
+        // Hand-editing the text (clearing it included) replaces its provenance: the engine's record
+        // describes text this row no longer holds, so attributing the edit to Tesseract or Azure, page
+        // counts and all, would mislead — but erasing it would make the version read as never extracted.
+        // The manual record names the editor and keeps the engine run as its basis.
         if (model.ExtractedText != version.ExtractedText)
-            version.TextExtractionMetadata = null;
+        {
+            var previous = TextExtractionMetadata.Deserialize(version.TextExtractionMetadata);
+            version.TextExtractionMetadata = TextExtractionMetadata.Serialize(
+                ManualTextExtractionMetadata.Replacing(previous, currentUser.UserId, now));
+        }
 
         version.ExtractedText = model.ExtractedText;
-        version.UpdatedAt = DateTimeOffset.UtcNow;
+        version.UpdatedAt = now;
 
         await unitOfWork.SaveChangesAsync(ct);
 

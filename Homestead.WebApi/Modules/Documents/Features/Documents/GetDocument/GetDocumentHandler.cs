@@ -116,7 +116,7 @@ public class GetDocumentHandler(AppDbContext db)
             GroupName = d.GroupName,
             Summary = d.Summary,
             ExtractedText = d.LatestVersion.ExtractedText,
-            TextExtraction = TextExtractionProvenanceResponse.From(d.LatestVersion.TextExtractionMetadata),
+            TextExtraction = await TextExtractionProvenanceReader.ReadAsync(db, d.LatestVersion.TextExtractionMetadata, ct),
             VersionCount = d.VersionCount,
             Versions = d.Versions,
             Tags = d.Tags,

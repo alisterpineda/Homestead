@@ -41,7 +41,7 @@ public class GetDocumentVersionHandler(AppDbContext db)
             FileHash = row.FileHash,
             FileExtension = row.FileExtension,
             ExtractedText = row.ExtractedText,
-            TextExtraction = TextExtractionProvenanceResponse.From(row.TextExtractionMetadata),
+            TextExtraction = await TextExtractionProvenanceReader.ReadAsync(db, row.TextExtractionMetadata, ct),
             CreatedAt = row.CreatedAt,
             UpdatedAt = row.UpdatedAt
         };
