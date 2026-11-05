@@ -116,7 +116,7 @@ public class McpToolInvokerWriteTests
         var e = await Assert.ThrowsAsync<McpException>(() =>
             _sut.WriteAsync<int>(_ => throw thrown, TestContext.Current.CancellationToken));
 
-        Assert.Equal("Unexpected error (InvalidOperationException): boom", e.Message);
+        Assert.Equal("Unexpected error (InvalidOperationException); the server log has the details.", e.Message);
         Assert.Same(thrown, e.InnerException);
     }
 

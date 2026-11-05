@@ -382,6 +382,9 @@ if (!string.IsNullOrEmpty(app.Configuration.GetConnectionString("postgresdb")))
 {
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    // A migration that rewrites every row (AddUnaccentSearchFolding recomputes every search vector) outgrows the 30 s
+    // default on a large library, and a timed-out migration rolls back and fails startup on every restart.
+    db.Database.SetCommandTimeout(TimeSpan.FromMinutes(30));
     db.Database.Migrate();
 }
 

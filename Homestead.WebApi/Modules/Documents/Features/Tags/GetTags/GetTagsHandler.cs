@@ -1,3 +1,4 @@
+using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Search;
 using Homestead.WebApi.Persistence;
@@ -5,11 +6,16 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Documents.Features.Tags.GetTags;
 
-public class GetTagsHandler(AppDbContext db)
+public class GetTagsHandler(AppDbContext db, IDocumentQueryService accessService)
 {
     public async Task<PaginatedResponse<GetTagsResponse>> HandleAsync(GetTagsQuery request, CancellationToken ct)
     {
         var query = db.Tags.AsNoTracking();
+
+        // DocumentCount counts the documents the caller can see (as GetPartiesHandler does); an admin sees all.
+        var accessibleDocIds = !accessService.IsAdmin
+            ? accessService.AccessibleDocumentIds()
+            : null;
 
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
@@ -39,7 +45,7 @@ public class GetTagsHandler(AppDbContext db)
         }
         // No params: return all tags
 
-        return await ApplySort(query, request.SortBy, request.SortDir)
+        return await ApplySort(query, request.SortBy, request.SortDir, accessibleDocIds)
             .Select(t => new GetTagsResponse
             {
                 Id = t.Id,
@@ -53,13 +59,16 @@ public class GetTagsHandler(AppDbContext db)
                 UpdatedAt = t.UpdatedAt,
                 UpdatedByUserId = t.UpdatedByUserId,
                 UpdatedByUserName = t.UpdatedByUser != null ? t.UpdatedByUser.DisplayName : null,
-                DocumentCount = t.DocumentTags.Count
+                DocumentCount = accessibleDocIds != null
+                    ? t.DocumentTags.Count(dt => accessibleDocIds.Contains(dt.DocumentId))
+                    : t.DocumentTags.Count
             })
             .ToPaginatedAsync(request, ct);
     }
 
     private static IOrderedQueryable<Domain.Documents.Tag> ApplySort(
-        IQueryable<Domain.Documents.Tag> query, TagSortBy? sortBy, SortDirection? sortDir)
+        IQueryable<Domain.Documents.Tag> query, TagSortBy? sortBy, SortDirection? sortDir,
+        IQueryable<Guid>? accessibleDocIds)
     {
         var effectiveSortBy = sortBy ?? TagSortBy.Name;
         var effectiveSortDir = sortDir ?? SortDirection.Asc;
@@ -70,8 +79,12 @@ public class GetTagsHandler(AppDbContext db)
             (TagSortBy.Name, SortDirection.Desc) => query.OrderByDescending(t => t.Name),
             (TagSortBy.Path, SortDirection.Asc) => query.OrderBy(t => t.Path),
             (TagSortBy.Path, SortDirection.Desc) => query.OrderByDescending(t => t.Path),
-            (TagSortBy.DocumentCount, SortDirection.Asc) => query.OrderBy(t => t.DocumentTags.Count),
-            (TagSortBy.DocumentCount, SortDirection.Desc) => query.OrderByDescending(t => t.DocumentTags.Count),
+            (TagSortBy.DocumentCount, SortDirection.Asc) => accessibleDocIds != null
+                ? query.OrderBy(t => t.DocumentTags.Count(dt => accessibleDocIds.Contains(dt.DocumentId)))
+                : query.OrderBy(t => t.DocumentTags.Count),
+            (TagSortBy.DocumentCount, SortDirection.Desc) => accessibleDocIds != null
+                ? query.OrderByDescending(t => t.DocumentTags.Count(dt => accessibleDocIds.Contains(dt.DocumentId)))
+                : query.OrderByDescending(t => t.DocumentTags.Count),
             (TagSortBy.CreatedAt, SortDirection.Asc) => query.OrderBy(t => t.CreatedAt),
             (TagSortBy.CreatedAt, SortDirection.Desc) => query.OrderByDescending(t => t.CreatedAt),
             (TagSortBy.UpdatedAt, SortDirection.Asc) => query.OrderBy(t => t.UpdatedAt),

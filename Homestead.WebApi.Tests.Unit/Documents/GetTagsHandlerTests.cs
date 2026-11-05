@@ -1,18 +1,23 @@
+using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Modules.Documents.Features.Tags.GetTags;
+using NSubstitute;
 
 namespace Homestead.WebApi.Tests.Unit.Documents;
 
 public class GetTagsHandlerTests : IDisposable
 {
     private readonly TestAppDbContext _db;
+    private readonly IDocumentQueryService _accessService;
     private readonly GetTagsHandler _sut;
 
     public GetTagsHandlerTests()
     {
         _db = TestAppDbContext.Create();
-        _sut = new GetTagsHandler(_db);
+        _accessService = Substitute.For<IDocumentQueryService>();
+        _accessService.IsAdmin.Returns(true);
+        _sut = new GetTagsHandler(_db, _accessService);
     }
 
     public void Dispose() => _db.Dispose();

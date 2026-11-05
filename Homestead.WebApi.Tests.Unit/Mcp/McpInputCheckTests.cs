@@ -85,6 +85,35 @@ public class McpInputCheckTests
             problems);
     }
 
+    // The binder reads a number from a string, so the check accepts what the binder accepts.
+    [Theory]
+    [InlineData("2")]
+    [InlineData("-7")]
+    public void NumericStrings_AreAccepted(string page)
+    {
+        Assert.Empty(Check("{" + Id + "\"page\": \"" + page + "\"}"));
+    }
+
+    [Theory]
+    [InlineData("2.5", "page must be an integer, got '2.5'.")]
+    [InlineData("", "page must be an integer, got ''.")]
+    public void NonIntegerStrings_AreStillRejected(string page, string expected)
+    {
+        Assert.Equal([expected], Check("{" + Id + "\"page\": \"" + page + "\"}"));
+    }
+
+    [Fact]
+    public void ManyProblems_AreCappedWithAnAndMoreLine()
+    {
+        var nulls = string.Join(", ", Enumerable.Repeat("null", McpInputCheck.MaxProblems * 3));
+
+        var problems = Check("{" + Id + "\"tag_paths\": [" + nulls + "]}");
+
+        Assert.Equal(McpInputCheck.MaxProblems + 1, problems.Count);
+        Assert.Equal("tag_paths[0] must be a string, got null.", problems[0]);
+        Assert.Equal("and more; fix these first.", problems[^1]);
+    }
+
     [Fact]
     public void LongStringValues_AreTruncatedInTheMessage()
     {

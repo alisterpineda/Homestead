@@ -1,27 +1,26 @@
 namespace Homestead.WebApi.Modules.Mcp;
 
-// Closest existing names for a name the model sent that does not exist: the "did you mean" of search_documents
-// (pg_trgm word_similarity at 0.3, top matches) done in C#, because the candidate sets here — a household's tag paths
-// or party names — are small enough to load whole on the miss path, and the unit tests run on the in-memory provider,
-// which has no pg_trgm. Trigrams are built as pg_trgm builds them (lowercased words, two leading and one trailing
-// space of padding); the score is the share of the query's trigrams the candidate contains, so a short query against
-// a long name ("TD Bank" → "TD Canada Trust") scores on what it shares rather than being diluted by what it lacks.
+// Closest existing names for a name the model sent that does not exist: a trigram "did you mean" in the spirit of
+// search_documents's (pg_trgm), done in C# because the candidate sets here — a household's tag paths or party
+// names — are small enough to load whole on the miss path, and the unit tests run on the in-memory provider, which
+// has no pg_trgm. Trigrams are built as pg_trgm builds them (lowercased words, two leading and one trailing space of
+// padding), but the score is query-trigram coverage — the share of the query's trigrams the candidate contains — so a
+// short query against a long name ("TD Bank" → "TD Canada Trust") scores on what it shares rather than being diluted
+// by what it lacks. It is not pg_trgm's word_similarity and the threshold is its own (the list page's, in
+// GetDocumentsHandler, is tuned separately).
 public static class McpNearest
 {
     public const double Threshold = 0.3;
     public const int Max = 3;
 
-    // Up to Max candidates scoring at least Threshold against unknown, best first (then shortest, then alphabetical),
-    // skipping any in exclude (already listed by another rule).
-    public static string[] Find(string unknown, IEnumerable<string> candidates, IEnumerable<string>? exclude = null)
+    // Up to Max candidates scoring at least Threshold against unknown, best first (then shortest, then alphabetical).
+    public static string[] Find(string unknown, IEnumerable<string> candidates)
     {
-        var excluded = new HashSet<string>(exclude ?? [], StringComparer.OrdinalIgnoreCase);
         var query = Trigrams(unknown);
         if (query.Count == 0)
             return [];
 
         return candidates
-            .Where(c => !excluded.Contains(c))
             .Select(c => (Name: c, Score: Score(query, Trigrams(c))))
             .Where(x => x.Score >= Threshold)
             .OrderByDescending(x => x.Score)

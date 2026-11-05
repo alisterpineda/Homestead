@@ -32,16 +32,15 @@ public class McpNearestTests
     }
 
     [Fact]
-    public void Find_ListsAtMostThree_BestFirst_SkippingExcluded()
+    public void Find_ListsAtMostThree_BestFirst()
     {
         string[] paths = ["Home/Utilities/Water", "Home/Utilities", "Home/Utilities/Electricity", "Home/Utilities/Gas", "Car"];
 
-        var nearest = McpNearest.Find("home/utilities/wter", paths, exclude: ["Home/Utilities/Water"]);
+        var nearest = McpNearest.Find("home/utilities/wter", paths);
 
         Assert.Equal(3, nearest.Length);
-        Assert.DoesNotContain("Home/Utilities/Water", nearest);
         Assert.DoesNotContain("Car", nearest);
-        Assert.Equal("Home/Utilities", nearest[0]);
+        Assert.Equal("Home/Utilities/Water", nearest[0]);
     }
 
     [Fact]

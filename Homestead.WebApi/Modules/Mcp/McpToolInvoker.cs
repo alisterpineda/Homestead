@@ -90,7 +90,10 @@ public sealed class McpToolInvoker(
             e),
         // TagPathResolver's "Tag path cannot be empty." and the resolvers' own input checks.
         ArgumentException e => new McpException("Invalid input: " + e.Message, e),
-        // A bug or an outage: the model still gets something to report, and the inner exception keeps the stack.
-        _ => new McpException($"Unexpected error ({exception.GetType().Name}): {exception.Message}", exception),
+        // A bug or an outage: the model still gets something to report — the type, never the message, which can
+        // name hosts, paths or keys and would land in the client's and its model provider's context — and the inner
+        // exception keeps the message and stack for the SDK's log.
+        _ => new McpException(
+            $"Unexpected error ({exception.GetType().Name}); the server log has the details.", exception),
     };
 }

@@ -127,15 +127,16 @@ public class McpToolInvokerTests
     }
 
     [Fact]
-    public async Task UnknownException_MapsToUnexpectedError_NamingTheTypeAndMessage()
+    public async Task UnknownException_MapsToUnexpectedError_NamingTheType_NotTheMessage()
     {
-        // The SDK would answer a non-McpException with no message at all; the model needs something to report. The
-        // original stays as the inner exception for the SDK's log.
+        // The SDK would answer a non-McpException with no message at all; the model needs something to report — but
+        // not the message, which can carry hosts, paths or keys. The original stays as the inner exception for the
+        // SDK's log.
         var thrown = new InvalidOperationException("boom");
 
         var e = await ReadThrowing(thrown);
 
-        Assert.Equal("Unexpected error (InvalidOperationException): boom", e.Message);
+        Assert.Equal("Unexpected error (InvalidOperationException); the server log has the details.", e.Message);
         Assert.Same(thrown, e.InnerException);
     }
 

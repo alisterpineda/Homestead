@@ -184,7 +184,7 @@ public sealed class DocumentTools(
                            ?? throw new EntityNotFoundException($"document {document_id} (it may be in the trash).");
 
             // text_total_chars is always reported, so the model knows whether asking for text is worth it. Only the
-            // requested chunk is read, cut in SQL; offsets and lengths are code points (McpText.Window). With text,
+            // requested chunk is read, cut in SQL; offsets and lengths are code points (McpText). With text,
             // the total and next_offset come from the length read with the chunk, so all three describe one text.
             var totalChars = document.TextTotalChars;
             string? text = null;
@@ -314,25 +314,35 @@ public sealed class DocumentTools(
                 result.Page, result.PageSize, result.TotalCount, result.TotalPages, warnings.Items);
         }, ct);
 
-    // Distinct documents tagged with each path or any path under it. The same source as the handler's DocumentCount
-    // (every document-tag row, trashed documents included), read once: a household's rows number in the thousands,
-    // so one scan beats a query per tag of the page.
+    // Distinct documents tagged with each path or any path under it, among the documents the caller can see (the same
+    // scope as the handler's DocumentCount). The rows are read once and grouped by path — a household's rows number
+    // in the thousands — then each page path unions the sets of the paths at or under it.
     private async Task<Dictionary<string, int>> TotalDocumentCountsAsync(List<string> paths, CancellationToken ct)
     {
         if (paths.Count == 0)
             return [];
 
-        var rows = await db.DocumentTags.AsNoTracking()
-            .Select(dt => new { dt.Tag.Path, dt.DocumentId })
-            .ToListAsync(ct);
+        var rows = documentQuery.IsAdmin
+            ? db.DocumentTags.AsNoTracking()
+            : db.DocumentTags.AsNoTracking().Where(dt => documentQuery.AccessibleDocumentIds().Contains(dt.DocumentId));
+        var byPath = (await rows.Select(dt => new { dt.Tag.Path, dt.DocumentId }).ToListAsync(ct))
+            .GroupBy(r => r.Path, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => g.Select(r => r.DocumentId).ToHashSet(), StringComparer.Ordinal);
 
         return paths.ToDictionary(
             path => path,
-            path => rows
-                .Where(r => r.Path == path || r.Path.StartsWith(path + "/", StringComparison.Ordinal))
-                .Select(r => r.DocumentId)
-                .Distinct()
-                .Count(),
+            path =>
+            {
+                var prefix = path + "/";
+                var documents = new HashSet<Guid>();
+                foreach (var (tagPath, ids) in byPath)
+                {
+                    if (tagPath == path || tagPath.StartsWith(prefix, StringComparison.Ordinal))
+                        documents.UnionWith(ids);
+                }
+
+                return documents.Count;
+            },
             StringComparer.Ordinal);
     }
 

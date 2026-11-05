@@ -1063,14 +1063,34 @@ public partial class DocumentReadToolsTests(PostgresFixture fixture) : Integrati
         await SeedDocumentAsync(admin, "ltd.pdf", tagPaths: ["Insurance/Disability"]);
         await SeedDocumentAsync(admin, "both.pdf", tagPaths: ["Insurance/Disability", "Insurance/Home"]);
         await SeedDocumentAsync(admin, "direct.pdf", tagPaths: ["Insurance"]);
+        // A sibling sharing the prefix is not "under" Insurance.
+        await SeedDocumentAsync(admin, "old.pdf", tagPaths: ["InsuranceOld/2019"]);
         await using var client = await ConnectAsync(AppRole.Viewer);
 
         var result = await McpToolResults.CallAsync<ListTagsPayload>(client, "list_tags", null, CT);
 
         // Insurance: one direct document; three distinct documents under it in total (both.pdf counted once).
         Assert.Equal(
-            ["Insurance: Policies and claims, 1, 3", "Insurance/Disability: , 2, 2", "Insurance/Home: , 1, 1"],
+            ["Insurance: Policies and claims, 1, 3", "Insurance/Disability: , 2, 2", "Insurance/Home: , 1, 1",
+                "InsuranceOld: , 0, 1", "InsuranceOld/2019: , 1, 1"],
             result.Items.Select(t => $"{t.Path}: {t.Description}, {t.DocumentCount}, {t.TotalDocumentCount}"));
+    }
+
+    [Fact]
+    public async Task ListTags_CountsOnlyTheDocumentsTheCallerCanSee()
+    {
+        var admin = await CreateAdminClientAsync();
+        var group = await CreateGroupAsync(admin, "Tag count group");
+        await SeedDocumentAsync(admin, "mine.pdf", tagPaths: ["Insurance/Home"]);
+        await SeedDocumentAsync(admin, "theirs.pdf", tagPaths: ["Insurance/Home"], groupId: group);
+        await SeedDocumentAsync(admin, "theirs too.pdf", tagPaths: ["Insurance"], groupId: group);
+        await using var client = await ConnectAsync(AppRole.Contributor);
+
+        var result = await McpToolResults.CallAsync<ListTagsPayload>(client, "list_tags", null, CT);
+
+        Assert.Equal(
+            ["Insurance: 0, 1", "Insurance/Home: 1, 1"],
+            result.Items.Select(t => $"{t.Path}: {t.DocumentCount}, {t.TotalDocumentCount}"));
     }
 
     [Fact]
