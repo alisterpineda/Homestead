@@ -5,6 +5,7 @@ import { GetDocumentsResponse } from '../models/get-documents-response';
 import { SearchSuggestion } from '../models/search-suggestion';
 export interface GetDocumentsResult {
   items: Array<GetDocumentsResponse>;
+  orderedByRelevance: boolean;
   page: number;
   pageSize: number;
   suggestionDetails: Array<SearchSuggestion>;

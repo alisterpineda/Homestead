@@ -70,6 +70,136 @@ public partial class DocumentReadToolsTests(PostgresFixture fixture) : Integrati
             (Csv(Names(accented)), Csv(Names(plain))));
     }
 
+    // Accents are folded in the database, before the sanitizers run: a character that folds to an operator (« → <<,
+    // ’ → ', ¡ → !, © → (C)) must never become live tsquery, LIKE or regex syntax.
+    [Theory]
+    [InlineData("«Le Parisien»")]
+    [InlineData("© 2024 report")]
+    [InlineData("’98 class")]
+    [InlineData("）（．＊）（．＊）＼\u0031b（")]
+    [InlineData("×")]
+    public async Task Search_FoldedPunctuation_IsNeverAnOperator_NorAnError(string query)
+    {
+        var admin = await CreateAdminClientAsync();
+        await SeedDocumentAsync(admin, "Unrelated.pdf", extractedText: "Nothing of the kind here.");
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        var result = await SearchAsync(client, new() { ["query"] = query });
+
+        Assert.Empty(result.Items);
+    }
+
+    [Fact]
+    public async Task Search_InvertedExclamation_IsNotANegation_AndDoubleBarIsNotMatchAll()
+    {
+        var admin = await CreateAdminClientAsync();
+        await SeedDocumentAsync(admin, "Greeting.pdf", extractedText: "hola amigos");
+        await SeedDocumentAsync(admin, "Other.pdf", extractedText: "nothing else");
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        var negated = await SearchAsync(client, new() { ["query"] = "¡hola" });
+        var bars = await SearchAsync(client, new() { ["query"] = "‖" });
+
+        Assert.Equal(("Greeting.pdf", 0), (Csv(Names(negated)), bars.Items.Count));
+    }
+
+    [Fact]
+    public async Task Search_AccentedQuery_FindsAccentedTextThroughTheStoredVector()
+    {
+        var admin = await CreateAdminClientAsync();
+        // Only the text carries the accented word; the name says nothing, so the match has to come from the vector
+        // the trigger folded.
+        await SeedDocumentAsync(admin, "Unrelated name.pdf", extractedText: "Plata pentru apă la Hidroelectrica.");
+        await SeedDocumentAsync(admin, "Summary only.pdf", extractedText: "Nothing here.", summary: "Factură pentru apă.");
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        var plain = await SearchAsync(client, new() { ["query"] = "apa", ["sort_by"] = "name", ["sort_dir"] = "asc" });
+        var accented = await SearchAsync(client, new() { ["query"] = "apă", ["sort_by"] = "name", ["sort_dir"] = "asc" });
+
+        Assert.Equal(
+            ("Summary only.pdf: content, Unrelated name.pdf: content", "Summary only.pdf: content, Unrelated name.pdf: content"),
+            (Csv(plain.Items.Select(i => $"{i.Name}: {Csv(i.MatchedOn!)}")), Csv(accented.Items.Select(i => $"{i.Name}: {Csv(i.MatchedOn!)}"))));
+    }
+
+    [Fact]
+    public async Task Search_NotesOnSeparateParagraphs_MatchTogether()
+    {
+        var admin = await CreateAdminClientAsync();
+        var id = await SeedDocumentAsync(admin, "Policy.pdf", extractedText: "Nothing in the text.");
+        await SetNotesAsync(id, "Renewed by phone.\n\nPolicy cancelled in May.");
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        var result = await SearchAsync(client, new() { ["query"] = "renewed cancelled" });
+
+        Assert.Equal(["Policy.pdf: notes"], result.Items.Select(i => $"{i.Name}: {Csv(i.MatchedOn!)}"));
+    }
+
+    [Fact]
+    public async Task Search_TermsWrappedInPunctuation_StillMatchTagsAndNotes()
+    {
+        var admin = await CreateAdminClientAsync();
+        await SeedDocumentAsync(admin, "Shed.pdf", tagPaths: ["Home & Garden"], extractedText: "Nothing in the text.");
+        var order = await SeedDocumentAsync(admin, "Order.pdf", extractedText: "Nothing in the text.");
+        await SetNotesAsync(order, "Order #702-1234567, paid $120.");
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        var tag = await SearchAsync(client, new() { ["query"] = "Home & Garden" });
+        var number = await SearchAsync(client, new() { ["query"] = "#702-1234567" });
+        var amount = await SearchAsync(client, new() { ["query"] = "$120" });
+
+        Assert.Equal(
+            ("Shed.pdf: tag", "Order.pdf: notes", "Order.pdf: notes"),
+            (Csv(tag.Items.Select(i => $"{i.Name}: {Csv(i.MatchedOn!)}")),
+                Csv(number.Items.Select(i => $"{i.Name}: {Csv(i.MatchedOn!)}")),
+                Csv(amount.Items.Select(i => $"{i.Name}: {Csv(i.MatchedOn!)}"))));
+    }
+
+    [Fact]
+    public async Task Search_TermsSplitBetweenNameAndText_ReportBoth()
+    {
+        var admin = await CreateAdminClientAsync();
+        await SeedDocumentAsync(admin, "Car Insurance - 2025.pdf", extractedText: "Intact Automobile policy.");
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        var result = await SearchAsync(client, new() { ["query"] = "car intact" });
+
+        Assert.Equal(["Car Insurance - 2025.pdf: name, content"], result.Items.Select(i => $"{i.Name}: {Csv(i.MatchedOn!)}"));
+    }
+
+    [Fact]
+    public async Task Search_LongQuery_IsCutAndReported()
+    {
+        var admin = await CreateAdminClientAsync();
+        await SeedDocumentAsync(admin, "Needle.pdf", extractedText: "Nothing in the text.");
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        // The term that would match sits past the cut.
+        var query = string.Join(" ", Enumerable.Repeat("filler", 40)) + " needle";
+        var result = await SearchAsync(client, new() { ["query"] = query });
+
+        Assert.Equal((0, "query was cut to its first 200 characters."), (result.Items.Count, Csv(result.Warnings)));
+    }
+
+    [Fact]
+    public async Task Search_SortDirWithAQueryThatHasNoFullTextTerms_IsHonoured_AndNotReportedAsIgnored()
+    {
+        var admin = await CreateAdminClientAsync();
+        var plan = await SeedDocumentAsync(admin, "The plan.pdf");
+        await SeedDocumentAsync(admin, "The budget.pdf");
+        // An edit makes the plan the most recently updated, whatever the upload jobs did.
+        (await SendJsonPatchAsync(admin, $"/api/v1/documents/{plan}",
+            new List<object> { new { op = "replace", path = "/notes", value = (object)"edited" } })).EnsureSuccessStatusCode();
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        // A quoted stopword leaves no tsquery, so nothing is ordered by relevance: sort_dir applies to updated_at.
+        var ascending = await SearchAsync(client, new() { ["query"] = "\"the\"", ["sort_dir"] = "asc" });
+        var descending = await SearchAsync(client, new() { ["query"] = "\"the\"", ["sort_dir"] = "desc" });
+
+        Assert.Equal(
+            ("The budget.pdf, The plan.pdf", "The plan.pdf, The budget.pdf", ""),
+            (Csv(ascending.Items.Select(i => i.Name)), Csv(descending.Items.Select(i => i.Name)), Csv(ascending.Warnings)));
+    }
+
     [Fact]
     public async Task Search_MatchedOn_SaysWhereEachResultMatched()
     {

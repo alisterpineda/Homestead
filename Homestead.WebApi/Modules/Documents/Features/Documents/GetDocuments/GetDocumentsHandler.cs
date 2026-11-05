@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Documents;
@@ -31,9 +32,9 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
         var scopedQuery = await BuildScopedQueryAsync(request, ct);
         var query = scopedQuery;
 
-        var search = string.IsNullOrWhiteSpace(request.Search) ? null : request.Search.Trim();
+        var search = string.IsNullOrWhiteSpace(request.Search) ? null : DocumentSearchTerms.Truncate(request.Search.Trim());
         var terms = search is not null
-            ? DocumentSearchTerms.Build(search, request.MatchMode ?? DocumentMatchMode.Substring)
+            ? await DocumentSearchTerms.BuildAsync(db, search, request.MatchMode ?? DocumentMatchMode.Substring, ct)
             : null;
         var tsQueryString = terms?.TsQuery;
 
@@ -43,8 +44,11 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
         }
 
         var defaultSort = request.Deleted == true ? DocumentSortBy.DeletedAt : (DocumentSortBy?)null;
+        var sortBy = request.SortBy ?? defaultSort;
+        // Searching without an explicit sort orders by relevance — when the query left any full-text terms.
+        var orderedByRelevance = sortBy is null && tsQueryString is not null;
 
-        var paged = await ApplySort(query, request.SortBy ?? defaultSort, request.SortDir, terms)
+        var paged = await ApplySort(query, sortBy, request.SortDir, orderedByRelevance ? terms : null)
             .Select(d => new
             {
                 d.Id,
@@ -69,11 +73,12 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
                 d.DeletedByUserId,
                 DeletedByUserName = d.DeletedByUser != null ? d.DeletedByUser.DisplayName : null,
                 VersionCount = d.Versions.Count,
-                // Query and text are both accent-folded, as the stored vector is, so the headline finds the match.
+                // The query is already folded and the text is folded here, as the stored vector is, so the headline
+                // finds the match (and shows the folded text).
                 MatchSnippet = (tsQueryString != null
                     && d.SearchVector != null
-                    && d.SearchVector.Matches(EF.Functions.ToTsQuery(TsLanguage, EF.Functions.Unaccent(tsQueryString))))
-                    ? EF.Functions.ToTsQuery(TsLanguage, EF.Functions.Unaccent(tsQueryString))
+                    && d.SearchVector.Matches(EF.Functions.ToTsQuery(TsLanguage, tsQueryString)))
+                    ? EF.Functions.ToTsQuery(TsLanguage, tsQueryString)
                         .GetResultHeadline(
                             TsLanguage,
                             EF.Functions.Unaccent(d.Versions.OrderByDescending(r => r.VersionNumber)
@@ -130,11 +135,14 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
             ? await MatchedOnAsync(scopedQuery, terms, paged.Items.Select(i => i.Id).ToList(), ct)
             : null;
 
+        // A row the filter matched but no report branch claims matched the combined vector across fields — its terms
+        // split between the name and the text or summary — so it matched both.
+        IReadOnlyList<string> acrossFields = [DocumentMatchKind.Name, DocumentMatchKind.Content];
         var sanitizedItems = paged.Items
             .Select(item => item with
             {
                 MatchSnippet = MatchSnippetSanitizer.Sanitize(item.MatchSnippet),
-                MatchedOn = matchedOn?.GetValueOrDefault(item.Id) ?? (terms is null ? null : []),
+                MatchedOn = terms is null ? null : matchedOn?.GetValueOrDefault(item.Id) ?? acrossFields,
             })
             .ToList();
 
@@ -177,29 +185,37 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
             PageSize = paged.PageSize,
             TotalCount = paged.TotalCount,
             Suggestions = suggestions.Select(s => s.Value).ToList(),
-            SuggestionDetails = suggestions
+            SuggestionDetails = suggestions,
+            OrderedByRelevance = orderedByRelevance,
         };
     }
 
     // Which branches matched each document of the page: one query, the page's ids against each branch predicate in
-    // turn (the same predicates the filter used), so the report can never disagree with the match.
+    // turn (the same predicates the filter used), so the report can never disagree with the match. Kinds come back
+    // in DocumentMatchKind.Order.
     private static async Task<Dictionary<Guid, IReadOnlyList<string>>> MatchedOnAsync(
         IQueryable<Domain.Documents.Document> scopedQuery, DocumentSearchTerms terms, List<Guid> ids, CancellationToken ct)
     {
         var page = scopedQuery.Where(d => ids.Contains(d.Id));
-        var hits = await page.Where(terms.NameReport).Select(d => new { d.Id, Kind = "name" })
-            .Concat(page.Where(terms.ContentReport).Select(d => new { d.Id, Kind = "content" }))
-            .Concat(page.Where(terms.Tag).Select(d => new { d.Id, Kind = "tag" }))
-            .Concat(page.Where(terms.Party).Select(d => new { d.Id, Kind = "party" }))
-            .Concat(page.Where(terms.Notes).Select(d => new { d.Id, Kind = "notes" }))
-            .ToListAsync(ct);
+        (string Kind, Expression<Func<Domain.Documents.Document, bool>> Matched)[] branches =
+        [
+            (DocumentMatchKind.Name, terms.NameReport),
+            (DocumentMatchKind.Content, terms.ContentReport),
+            (DocumentMatchKind.Tag, terms.Tag),
+            (DocumentMatchKind.Party, terms.Party),
+            (DocumentMatchKind.Notes, terms.Notes),
+        ];
+        var union = branches
+            .Select(b => page.Where(b.Matched).Select(d => new { d.Id, b.Kind }))
+            .Aggregate((all, part) => all.Concat(part));
+        var hits = await union.ToListAsync(ct);
 
-        string[] order = ["name", "content", "tag", "party", "notes"];
         return hits
             .GroupBy(h => h.Id)
             .ToDictionary(
                 g => g.Key,
-                g => (IReadOnlyList<string>)g.Select(h => h.Kind).Distinct().OrderBy(k => Array.IndexOf(order, k)).ToList());
+                g => (IReadOnlyList<string>)g.Select(h => h.Kind).Distinct()
+                    .OrderBy(k => Array.IndexOf(DocumentMatchKind.Order, k)).ToList());
     }
 
     private static void EnsureRangeOrdered(DateOnly? from, DateOnly? to, string fromName, string toName)
@@ -309,21 +325,20 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
         return query;
     }
 
+    // With relevance terms, order by relevance. ILIKE/tag/party-only matches share an identical rank-0 score, so a
+    // deterministic UpdatedAt tiebreaker is required — without it Skip/Take pagination over the tied rows is
+    // non-deterministic across requests. The universal-search palette (DocumentSearchSource) applies the same
+    // tiebreaker; keeping them in lockstep is what makes palette results == list results for the same query. Under
+    // Words matching, what the document is (its name, a tag, a party) ranks above what its text mentions.
     private static IOrderedQueryable<Domain.Documents.Document> ApplySort(
         IQueryable<Domain.Documents.Document> query, DocumentSortBy? sortBy, SortDirection? sortDir,
-        DocumentSearchTerms? terms = null)
+        DocumentSearchTerms? relevance)
     {
-        // When searching without an explicit sort, order by relevance. ILIKE/tag/party-only matches
-        // share an identical rank-0 score, so a deterministic UpdatedAt tiebreaker is required —
-        // without it Skip/Take pagination over the tied rows is non-deterministic across requests.
-        // The universal-search palette (DocumentSearchSource) applies the same tiebreaker; keeping them
-        // in lockstep is what makes palette results == list results for the same query. Under Words
-        // matching, what the document is (its name, a tag, a party) ranks above what its text mentions.
-        if (sortBy is null && terms?.TsQuery is not null)
+        if (relevance is not null)
         {
-            var byRank = terms.Mode == DocumentMatchMode.Words
-                ? query.OrderByDescending(terms.Direct).ThenByDescending(terms.Rank)
-                : query.OrderByDescending(terms.Rank);
+            var byRank = relevance.Mode == DocumentMatchMode.Words
+                ? query.OrderByDescending(relevance.Direct).ThenByDescending(relevance.Rank)
+                : query.OrderByDescending(relevance.Rank);
             return byRank.ThenByDescending(d => d.UpdatedAt).ThenBy(d => d.Id);
         }
 
@@ -331,9 +346,10 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
         var effectiveSortDir = sortDir ?? SortDirection.Desc;
 
         // Every order ends in UpdatedAt (newest first), then Id, so ties — same name, same date, the undated tail —
-        // page deterministically. Name sorts case-insensitively (lower(), which the trigram index does not serve,
-        // but a household's document table is small). Documents without a date (or an expiry) sort last in both
-        // directions: Postgres would otherwise put NULLs first under DESC, and most documents have no expiry.
+        // page deterministically (after an UpdatedAt sort the extra UpdatedAt key is a harmless no-op). Name sorts
+        // case-insensitively (lower(), which the trigram index does not serve, but a household's document table is
+        // small). Documents without a date (or an expiry) sort last in both directions: Postgres would otherwise put
+        // NULLs first under DESC, and most documents have no expiry.
         var ordered = (effectiveSortBy, effectiveSortDir) switch
         {
             (DocumentSortBy.Name, SortDirection.Asc) => query.OrderBy(d => d.Name.ToLower()),
@@ -360,15 +376,12 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
                 .ThenByDescending(d => d.ExpiryDate),
             (DocumentSortBy.CreatedAt, SortDirection.Asc) => query.OrderBy(d => d.CreatedAt),
             (DocumentSortBy.CreatedAt, SortDirection.Desc) => query.OrderByDescending(d => d.CreatedAt),
-            (DocumentSortBy.UpdatedAt, SortDirection.Asc) => query.OrderBy(d => d.UpdatedAt).ThenBy(d => d.Id),
-            (DocumentSortBy.UpdatedAt, _) => query.OrderByDescending(d => d.UpdatedAt),
+            (DocumentSortBy.UpdatedAt, SortDirection.Asc) => query.OrderBy(d => d.UpdatedAt),
             (DocumentSortBy.DeletedAt, SortDirection.Asc) => query.OrderBy(d => d.DeletedAt),
             (DocumentSortBy.DeletedAt, SortDirection.Desc) => query.OrderByDescending(d => d.DeletedAt),
             _ => query.OrderByDescending(d => d.UpdatedAt),
         };
 
-        return effectiveSortBy == DocumentSortBy.UpdatedAt && effectiveSortDir == SortDirection.Asc
-            ? ordered
-            : ordered.ThenByDescending(d => d.UpdatedAt).ThenBy(d => d.Id);
+        return ordered.ThenByDescending(d => d.UpdatedAt).ThenBy(d => d.Id);
     }
 }

@@ -11,6 +11,12 @@ public record GetDocumentsResult
 
     /// <summary>The same "Did you mean…?" names with where each comes from (<c>document</c>, <c>tag</c> or <c>party</c>).</summary>
     public required IReadOnlyList<SearchSuggestion> SuggestionDetails { get; init; }
+
+    /// <summary>
+    /// True when the items are in relevance order (a search with full-text terms and no explicit sort), in which case
+    /// <see cref="GetDocumentsQuery.SortDir"/> had no effect.
+    /// </summary>
+    public required bool OrderedByRelevance { get; init; }
 }
 
 public sealed record SearchSuggestion(string Kind, string Value);

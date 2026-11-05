@@ -13,20 +13,20 @@ The user's mental model is "type words, find files." Filters refine; they do not
 The list endpoint runs five OR'd searches against the user's query string and unions the matches:
 
 1. **ILIKE on `Document.Name`** — case-insensitive substring match. Catches partial-word matches the FTS analyser would not pick up. Quote characters in the query are stripped before this match runs so phrase syntax doesn't degrade substring matching.
-2. **ILIKE on `DocumentVersion.ExtractedText`** across any version of the document. Catches substring matches inside extracted text — useful when the FTS analyser would tokenise away the user's exact string, and the only path to find a substring buried inside a longer token. Same quote-stripping rule as above.
+2. **ILIKE on `DocumentVersion.ExtractedText`** across any version of the document. Catches substring matches inside extracted text — useful when the FTS analyser would tokenise away the user's exact string, and the only path to find a substring buried inside a longer token. Same quote-stripping rule as above. This branch matches the text **as stored** (no accent folding), so the trigram index on the column keeps serving it; an accented word in the text is still found through the folded full-text branch (5).
 3. **ILIKE on `Tag.Name`** through the document's attached tags. Typing `invoices` finds documents tagged **Invoice** without the user having to open the filter popover. Case-insensitive substring match, same quote-stripping rule.
 4. **ILIKE on `Party.Name`** through the document's linked parties. Typing `acme` finds documents linked to **Acme Corp**. Same matching rules.
 5. **PostgreSQL full-text search** against the document's weighted `tsvector`, when the document has one. Uses `ts_rank_cd` for relevance scoring with prefix expansion — `tax` becomes `tax:*` so it matches `taxes`, `taxation`, `taxed`, etc.
 
 A document is in the result set if any of the five modes matches. ILIKE on name and extracted text is the safety net for the FTS analyser's blind spots; tag and party ILIKE federate the search bar with the filter popover so both surfaces accept the same vocabulary; FTS is the relevance signal.
 
-Every mode folds accents on both sides (`unaccent`, the same folding the stored vector gets — see [§Weighting](#weighting)), so "factură" finds "Factura" and the other way round, in the name, the text, tag and party names, and the full-text branch alike.
+Every mode but the text substring branch folds accents on both sides (`unaccent`, the same folding the stored vector gets — see [§Weighting](#weighting)), so "factură" finds "Factura" and the other way round, in the name, tag and party names and the full-text branch alike. The search text is folded once, in the database, *before* the operator sanitizers and escapers run, because folding turns `«` into `<<`, `¡` into `!`, `’` into `'` and full-width punctuation into its ASCII form — fold after escaping and a smart apostrophe is a tsquery syntax error. Search text longer than 200 characters is cut.
 
 ### Match modes
 
 The five-mode predicate above is the list page's `Substring` mode, forgiving of partial typing. The list endpoint also offers a `Words` mode (`MatchMode=Words`; the MCP server's `search_documents` uses it), for callers that send whole words and want precision over tolerance:
 
-- Every term must appear as a **whole word** in the name, a tag name, a party name or the notes (`\m`/`\M` word boundaries, case-insensitive, accents folded); a term of four or more characters also matches as the start of a word ("repai" finds "repair"). Quotes are dropped for these branches; adjacency is the full-text branch's affordance.
+- Every term must appear as a **whole word** in the name, a tag name, a party name or the notes (`\m`/`\M` word boundaries, case-insensitive, accents folded, one predicate per term so a long note costs one linear scan per term, newlines included); a term of four or more characters also matches as the start of a word ("repai" finds "repair"). A term is trimmed to its word characters first — `#702-1234567`, `$120` and `50%` match the number, `&` alone matches nothing — because a word boundary can never sit next to punctuation. At most twelve terms count. Quotes are dropped for these branches; adjacency is the full-text branch's affordance.
 - Content goes through the full-text vector with the same rule: a term shorter than four characters is its exact lexeme, not a prefix (`car`, not `car:*`), so "car repair" no longer surfaces "Health **Care**", "**car**rying" or "GO **CARD**" through prefix expansion. There is no substring branch over the text.
 - Notes are searched in this mode (the list page's mode does not search them).
 - Ranking puts what the document **is** above what its text **mentions**: a match on the name, a tag or a party comes before a content-only match, then cover-density rank, then `UpdatedAt` and id. The list page's mode keeps its documented ranking (content rank, with association-only matches at rank 0).
@@ -35,7 +35,7 @@ Both modes share one definition per branch (`DocumentSearchTerms`), so the filte
 
 ### Where a result matched
 
-With a search, each item carries `MatchedOn`: which of `name`, `content`, `tag`, `party`, `notes` the query matched, in that order (null without a search). `content` means the latest version's text or the summary — the stored vector also indexes the name, so the report re-derives the name's and the text's own vectors for the page's rows rather than reading the combined one. A tag- or party-only match has no snippet (snippets come from the text), and `MatchedOn` is what explains it.
+With a search, each item carries `MatchedOn`: which of `name`, `content`, `tag`, `party`, `notes` the query matched, in that order (null without a search). `content` means the latest version's text or the summary — the stored vector also indexes the name, so the report queries it by weight (name lexemes carry A, text B, summary C: `term:*A` / `term:*BC`) rather than reading the combined match. A row the filter matched through the combined vector that neither weight class matches alone had its terms split between the name and the text, and reports both `name` and `content`. A tag- or party-only match has no snippet (snippets come from the text), and `MatchedOn` is what explains it.
 
 The tag/party clauses are deliberately **federated** rather than baked into the `tsvector`. Including tag and party names in the stored vector would force a re-index of every linked document on each tag rename or tag/party add-remove. Renames are common, so the join-time match keeps the index pure at the cost of a wider OR predicate at query time. Access scope is preserved automatically: the join navigates from documents the user can already see, so a user never matches a tag attached to a sibling household member's document. Ranking is unaffected — `ts_rank_cd` returns 0 for documents matched only via tag or party name, so direct content matches outrank association matches under relevance sort.
 
@@ -116,7 +116,7 @@ Rules:
 - **Distinct.** A name that appears more than once — two documents with the same name, or a document name that coincides with a tag name — produces one chip, not several.
 - **Typed.** `Suggestions` is the list of names (the chips); `SuggestionDetails` carries the same names with where each comes from (`document`, `tag` or `party` — the best-scoring source when a name is both), so a caller that acts on a suggestion knows whether to retry a search or pick a filter.
 
-Trigram GIN indexes on `Document.Name`, `Tag.Name`, and `Party.Name` (the latter two added in migration `AddTagAndPartyNameTrigramIndexes`) accelerate the suggestion query; the `Document.Name` index additionally backs the primary `ILIKE` substring match described above.
+Trigram GIN indexes on `Document.Name`, `Tag.Name`, and `Party.Name` (the latter two added in migration `AddTagAndPartyNameTrigramIndexes`) accelerate the suggestion query. They do not serve the folded `ILIKE` branches on those columns (`unaccent()` is not immutable, so no index expression covers it; the tables are small). The `DocumentVersion.ExtractedText` trigram index still serves the unfolded text substring branch.
 
 ## Index maintenance and direct edits
 

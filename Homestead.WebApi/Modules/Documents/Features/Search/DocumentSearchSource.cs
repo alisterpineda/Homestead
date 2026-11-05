@@ -1,50 +1,44 @@
 using System.Globalization;
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common.Search;
-using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Modules.Documents.Features.Documents.GetDocuments;
+using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Documents.Features.Search;
 
 /// <summary>
 /// Universal-search source for documents. Mirrors the document list page exactly — same access
-/// scoping (<see cref="IDocumentQueryService.AccessibleDocuments"/>), same five-mode predicate
-/// (<see cref="DocumentSearchPredicate"/>), and the same FTS <c>ts_headline</c> snippet — so palette
-/// results equal list results for the same query. Soft-deleted documents are excluded by the default
-/// <see cref="TrashFilter.ActiveOnly"/> scope.
+/// scoping (<see cref="IDocumentQueryService.AccessibleDocuments"/>), the same <see cref="DocumentSearchTerms"/>
+/// (its filter, tsquery and rank) in the list page's <see cref="DocumentMatchMode.Substring"/> mode, and the same
+/// FTS <c>ts_headline</c> snippet — so palette results equal list results for the same query. Soft-deleted
+/// documents are excluded by the default <see cref="TrashFilter.ActiveOnly"/> scope.
 /// </summary>
-public class DocumentSearchSource(IDocumentQueryService accessService) : ISearchSource
+public class DocumentSearchSource(AppDbContext db, IDocumentQueryService accessService) : ISearchSource
 {
-    private const string TsLanguage = DocumentSearchPredicate.TsLanguage;
+    private const string TsLanguage = DocumentSearchTerms.TsLanguage;
 
     public string Source => "documents";
     public string Label => "Documents";
 
     public async Task<SearchSourceResult> SearchAsync(string query, int limit, CancellationToken ct)
     {
-        // Same tsquery builder the list uses — keeps prefix/phrase parsing identical across surfaces.
-        var tsQueryString = SearchTsQueryBuilder.Build(query);
+        var terms = await DocumentSearchTerms.BuildAsync(db, query, DocumentMatchMode.Substring, ct);
+        var tsQueryString = terms.TsQuery;
 
-        var filtered = DocumentSearchPredicate.ApplyTextSearch(
-            accessService.AccessibleDocuments().AsNoTracking(), query);
+        var filtered = accessService.AccessibleDocuments().AsNoTracking().Where(terms.Any);
 
         // Full (uncapped) match count drives "View all (N)".
         var total = await filtered.CountAsync(ct);
         if (total == 0)
             return new SearchSourceResult(0, []);
 
-        // Relevance first when we have an FTS query. The rank is null-safe because non-FTS matches
-        // (ILIKE on name/tag/party) have no SearchVector hit and would otherwise rank as NULL; the
-        // UpdatedAt tiebreaker gives those rank-0 rows a deterministic order. When the query reduced
-        // to nothing (all stopwords/punctuation), there's no tsquery, so order purely by recency.
+        // Relevance first when we have an FTS query (the rank is 0 for non-FTS matches — ILIKE on name/tag/party —
+        // so the UpdatedAt tiebreaker gives those rows a deterministic order). When the query reduced to nothing
+        // (all stopwords/punctuation), there's no tsquery, so order purely by recency.
         var ordered = tsQueryString is not null
-            ? filtered
-                .OrderByDescending(d => d.SearchVector != null
-                    ? d.SearchVector.RankCoverDensity(EF.Functions.ToTsQuery(TsLanguage, EF.Functions.Unaccent(tsQueryString)))
-                    : 0f)
-                .ThenByDescending(d => d.UpdatedAt)
-            : filtered.OrderByDescending(d => d.UpdatedAt);
+            ? filtered.OrderByDescending(terms.Rank).ThenByDescending(d => d.UpdatedAt).ThenBy(d => d.Id)
+            : filtered.OrderByDescending(d => d.UpdatedAt).ThenBy(d => d.Id);
 
         // Take BEFORE projecting so the correlated subqueries + ts_headline run for <= limit rows only —
         // the same per-page cost the list already pays, well within the 3s per-source soft timeout.
@@ -56,12 +50,12 @@ public class DocumentSearchSource(IDocumentQueryService accessService) : ISearch
                 d.DocumentDate,
                 d.CreatedAt,
                 d.Versions.OrderByDescending(v => v.VersionNumber).Select(v => v.ContentType).FirstOrDefault(),
-                // Mirror of GetDocumentsHandler's MatchSnippet: only generate a headline when the FTS
-                // vector actually matched (name/tag/party-only matches produce no content snippet). Query and
-                // text are both accent-folded, as the stored vector is, so the headline finds the match.
+                // Mirror of GetDocumentsHandler's MatchSnippet: only generate a headline when the FTS vector actually
+                // matched (name/tag/party-only matches produce no content snippet). The query is already folded and
+                // the text is folded here, as the stored vector is, so the headline finds the match.
                 (tsQueryString != null && d.SearchVector != null
-                    && d.SearchVector.Matches(EF.Functions.ToTsQuery(TsLanguage, EF.Functions.Unaccent(tsQueryString))))
-                    ? EF.Functions.ToTsQuery(TsLanguage, EF.Functions.Unaccent(tsQueryString))
+                    && d.SearchVector.Matches(EF.Functions.ToTsQuery(TsLanguage, tsQueryString)))
+                    ? EF.Functions.ToTsQuery(TsLanguage, tsQueryString)
                         .GetResultHeadline(
                             TsLanguage,
                             EF.Functions.Unaccent(d.Versions.OrderByDescending(v => v.VersionNumber)

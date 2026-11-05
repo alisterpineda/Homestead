@@ -326,6 +326,56 @@ public class DocumentSearchTests : IntegrationTestBase
         Assert.Single(body!.Items, d => d.Id == docId);
     }
 
+    // The list page's substring mode folds accents on the name, tag and party branches (the text goes through the
+    // folded vector): "factura" finds a document whose only "Factură" is its tag, or its party, or its name.
+    [Theory]
+    [InlineData("tag")]
+    [InlineData("party")]
+    [InlineData("name")]
+    public async Task GetDocuments_Search_FoldsAccents_OnEveryBranch(string where)
+    {
+        var client = await CreateAdminClientAsync();
+        var docId = await UploadAndWaitAsync(client, where == "name" ? "Factură apă.pdf" : "Plain.pdf");
+        await UploadAndWaitAsync(client, "Other.pdf");
+        if (where == "tag")
+        {
+            (await SendJsonPatchAsync(client, $"/api/v1/documents/{docId}", new[]
+            {
+                new { op = "replace", path = "/tagPaths", value = (object)new[] { "Factură" } }
+            })).EnsureSuccessStatusCode();
+        }
+        else if (where == "party")
+        {
+            var party = await (await client.PostAsJsonAsync("/api/v1/documents/parties", new { name = "Factură SRL" }, CT))
+                .Content.ReadFromJsonAsync<PartyResult>(CT);
+            (await SendJsonPatchAsync(client, $"/api/v1/documents/{docId}", new[]
+            {
+                new { op = "replace", path = "/partyIds", value = (object)new[] { party!.Id } }
+            })).EnsureSuccessStatusCode();
+        }
+
+        var plain = await client.GetFromJsonAsync<PaginatedResult<DocumentListItem>>(
+            "/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false&Search=factura", CT);
+        var accented = await client.GetFromJsonAsync<PaginatedResult<DocumentListItem>>(
+            "/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false&Search=" + Uri.EscapeDataString("FACTURĂ"), CT);
+
+        Assert.Equal((docId, docId), (Assert.Single(plain!.Items).Id, Assert.Single(accented!.Items).Id));
+    }
+
+    [Fact]
+    public async Task GetDocuments_Search_FoldedPunctuation_DoesNotThrow()
+    {
+        var client = await CreateAdminClientAsync();
+        await UploadAndWaitAsync(client, "Doc.pdf");
+
+        foreach (var query in new[] { "«Le Parisien»", "’98 class", "© 2024", "¡hola", "％" })
+        {
+            var response = await client.GetAsync(
+                "/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false&Search=" + Uri.EscapeDataString(query), CT);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        }
+    }
+
     [Fact]
     public async Task GetDocuments_SearchByTagName_CaseInsensitive()
     {

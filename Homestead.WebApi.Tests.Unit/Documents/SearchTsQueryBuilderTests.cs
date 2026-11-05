@@ -24,6 +24,17 @@ public class SearchTsQueryBuilderTests
         Assert.Equal("(car <-> wash) & 2024:*", SearchTsQueryBuilder.Build("\"car wash\" 2024", prefixMinLength: 4));
     }
 
+    // Weights restrict every term — prefix, exact or in a phrase — to the vector's lexemes carrying those weights, so
+    // the stored vector can say which field matched.
+    [Fact]
+    public void Build_WithWeights_LabelsEveryTerm()
+    {
+        Assert.Equal(
+            ("(car:BC <-> wash:BC) & car:BC & repair:*BC", "tax:*A"),
+            (SearchTsQueryBuilder.Build("\"car wash\" car repair", prefixMinLength: 4, weights: "BC"),
+                SearchTsQueryBuilder.Build("tax", weights: "A")));
+    }
+
     [Fact]
     public void Build_QuotedPhrase_EmitsFollowedByClause()
     {

@@ -87,6 +87,19 @@ public class DocumentUniversalSearchTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task Search_FoldsAccents_LikeTheListPage()
+    {
+        var client = await CreateAdminClientAsync();
+        var docId = await UploadAndWaitAsync(client, "Factură apă.pdf");
+        await UploadAndWaitAsync(client, "Other.pdf");
+
+        var result = await SearchAsync(client, "factura");
+
+        var hit = Assert.Single(Documents(result)!.Results);
+        Assert.Equal(docId.ToString(), hit.Id);
+    }
+
+    [Fact]
     public async Task Search_NameOnlyMatch_SubtitleIsDateFallback()
     {
         var client = await CreateAdminClientAsync();
