@@ -15,7 +15,7 @@ namespace Homestead.WebApi.Migrations
         // The vector expression, folded. unaccent() is stable, not immutable, which a trigger body may call freely
         // (only an index expression or a generated column needs immutability). Schema-qualified: the extension lands
         // in public, the trigger functions live in documents.
-        private const string FoldedVector =
+        internal const string FoldedVector =
             """
                 setweight(to_tsvector('english', public.unaccent(COALESCE({0}."Name", ''))), 'A') ||
                 setweight(to_tsvector('english', public.unaccent(COALESCE(
@@ -62,8 +62,9 @@ namespace Homestead.WebApi.Migrations
         }
 
         // CREATE OR REPLACE keeps the existing triggers bound; the backfill brings every row to the new definition
-        // (a SearchVector-only UPDATE does not fire the documents trigger).
-        private static void ReplaceVectorFunctions(MigrationBuilder migrationBuilder, string vector)
+        // (a SearchVector-only UPDATE does not fire the documents trigger). Shared with the later migrations that
+        // redefine the vector (AddUnaccentTextSearchConfiguration).
+        internal static void ReplaceVectorFunctions(MigrationBuilder migrationBuilder, string vector)
         {
             migrationBuilder.Sql(
                 $"""

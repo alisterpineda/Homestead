@@ -10,7 +10,7 @@ namespace Homestead.WebApi.Modules.Documents.Features.Documents.GetDocuments;
 
 public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessService)
 {
-    private const string TsLanguage = "english";
+    private const string TsLanguage = DocumentSearchTerms.TsLanguage;
     // word_similarity finds the best-matching continuous extent of trigrams within the
     // document name, so it tolerates long names ("Mazda Receipt 2023.pdf") matched by
     // a short search ("mazdo") far better than plain similarity(). 0.3 is below pg_trgm's
@@ -73,16 +73,16 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
                 d.DeletedByUserId,
                 DeletedByUserName = d.DeletedByUser != null ? d.DeletedByUser.DisplayName : null,
                 VersionCount = d.Versions.Count,
-                // The query is already folded and the text is folded here, as the stored vector is, so the headline
-                // finds the match (and shows the folded text).
+                // The configuration folds accents on both sides, so the headline runs over — and shows — the original
+                // text while still finding an accented match.
                 MatchSnippet = (tsQueryString != null
                     && d.SearchVector != null
                     && d.SearchVector.Matches(EF.Functions.ToTsQuery(TsLanguage, tsQueryString)))
                     ? EF.Functions.ToTsQuery(TsLanguage, tsQueryString)
                         .GetResultHeadline(
                             TsLanguage,
-                            EF.Functions.Unaccent(d.Versions.OrderByDescending(r => r.VersionNumber)
-                                .Select(r => r.ExtractedText).FirstOrDefault() ?? string.Empty),
+                            d.Versions.OrderByDescending(r => r.VersionNumber)
+                                .Select(r => r.ExtractedText).FirstOrDefault() ?? string.Empty,
                             MatchSnippetSanitizer.HeadlineOptions)
                     : null,
                 Tags = d.DocumentTags.Select(dt => new GetDocumentsTagDto

@@ -492,6 +492,28 @@ public class DocumentSearchTests : IntegrationTestBase
         Assert.Contains("<mark>tax</mark>", doc.MatchSnippet, StringComparison.OrdinalIgnoreCase);
     }
 
+    // The text search configuration folds accents itself, so the headline runs over the original text: the snippet
+    // keeps its diacritics and still highlights the accented word a plain query matched.
+    [Theory]
+    [InlineData("factura")]
+    [InlineData("factură")]
+    public async Task Snippet_KeepsDiacritics_AndHighlightsTheAccentedMatch(string search)
+    {
+        var client = await CreateAdminClientAsync();
+        var docId = await UploadAndWaitAsync(client, "Receipt.pdf");
+        await SetExtractedTextAsync(docId, "Factură pentru apă la Hydro-Québec, plătită în martie.");
+
+        var response = await client.GetAsync(
+            "/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false&Search=" + Uri.EscapeDataString(search), CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<DocumentSnippetItem>>(CT);
+        var doc = Assert.Single(body!.Items, d => d.Id == docId);
+        Assert.NotNull(doc.MatchSnippet);
+        // The sanitizer HTML-encodes non-ASCII characters (the page renders the snippet as HTML).
+        Assert.Contains("<mark>Factură</mark> pentru apă la Hydro-Québec", System.Net.WebUtility.HtmlDecode(doc.MatchSnippet));
+    }
+
     [Fact]
     public async Task Snippet_RealFixtureExtraction_ReturnsHighlightedExcerpt()
     {

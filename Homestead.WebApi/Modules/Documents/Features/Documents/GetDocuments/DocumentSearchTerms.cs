@@ -10,15 +10,20 @@ namespace Homestead.WebApi.Modules.Documents.Features.Documents.GetDocuments;
 /// <summary>
 /// One search query's match branches — name, content, tag name, party name, notes — each written once as an EF
 /// predicate, so the list filter (<see cref="Any"/>), the relevance tier (<see cref="Direct"/>), the rank and the
-/// per-row "matched on" report cannot drift apart. Accents are folded the way the stored search vector is folded
-/// (<c>unaccent</c>): the search text once, in the database, through <see cref="BuildAsync"/> <em>before</em> any
+/// per-row "matched on" report cannot drift apart. Accents are folded everywhere: the full-text branches through the
+/// <see cref="TsLanguage"/> configuration, which folds lexemes itself; the substring and word branches through
+/// <c>unaccent</c> — the search text once, in the database, through <see cref="BuildAsync"/> <em>before</em> any
 /// escaping, and the stored columns in each predicate — so "factură" and "Factura" meet, and a folded character can
 /// never turn into live LIKE, tsquery or regex syntax after the escaper has run. The universal-search palette and
 /// the list page both build their terms here.
 /// </summary>
 internal sealed class DocumentSearchTerms
 {
-    public const string TsLanguage = "english";
+    /// <summary>
+    /// The text search configuration: english with the unaccent dictionary in front of the stemmer (migration
+    /// AddUnaccentTextSearchConfiguration), so to_tsquery, to_tsvector and ts_headline fold accents themselves.
+    /// </summary>
+    public const string TsLanguage = "documents.english_unaccent";
 
     /// <summary>Terms shorter than this match a whole word only under <see cref="DocumentMatchMode.Words"/>.</summary>
     public const int WordsPrefixMinLength = 4;

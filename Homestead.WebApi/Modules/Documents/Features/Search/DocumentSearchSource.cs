@@ -51,15 +51,15 @@ public class DocumentSearchSource(AppDbContext db, IDocumentQueryService accessS
                 d.CreatedAt,
                 d.Versions.OrderByDescending(v => v.VersionNumber).Select(v => v.ContentType).FirstOrDefault(),
                 // Mirror of GetDocumentsHandler's MatchSnippet: only generate a headline when the FTS vector actually
-                // matched (name/tag/party-only matches produce no content snippet). The query is already folded and
-                // the text is folded here, as the stored vector is, so the headline finds the match.
+                // matched (name/tag/party-only matches produce no content snippet). The configuration folds accents,
+                // so the headline runs over — and shows — the original text.
                 (tsQueryString != null && d.SearchVector != null
                     && d.SearchVector.Matches(EF.Functions.ToTsQuery(TsLanguage, tsQueryString)))
                     ? EF.Functions.ToTsQuery(TsLanguage, tsQueryString)
                         .GetResultHeadline(
                             TsLanguage,
-                            EF.Functions.Unaccent(d.Versions.OrderByDescending(v => v.VersionNumber)
-                                .Select(v => v.ExtractedText).FirstOrDefault() ?? string.Empty),
+                            d.Versions.OrderByDescending(v => v.VersionNumber)
+                                .Select(v => v.ExtractedText).FirstOrDefault() ?? string.Empty,
                             MatchSnippetSanitizer.HeadlineOptions)
                     : null))
             .ToListAsync(ct);

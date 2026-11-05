@@ -122,6 +122,19 @@ public partial class DocumentReadToolsTests(PostgresFixture fixture) : Integrati
     }
 
     [Fact]
+    public async Task Search_Snippet_KeepsDiacritics()
+    {
+        var admin = await CreateAdminClientAsync();
+        await SeedDocumentAsync(admin, "Receipt.pdf", extractedText: "Factură pentru apă la Hydro-Québec, plătită în martie.");
+        await using var client = await ConnectAsync(AppRole.Viewer);
+
+        var result = await SearchAsync(client, new() { ["query"] = "factura" });
+
+        var item = Assert.Single(result.Items);
+        Assert.Contains("Factură pentru apă la Hydro-Québec", item.UntrustedSnippet);
+    }
+
+    [Fact]
     public async Task Search_NotesOnSeparateParagraphs_MatchTogether()
     {
         var admin = await CreateAdminClientAsync();
